@@ -1,17 +1,24 @@
 <template>
   <div class="app">
-    <SkyCanvas />
-    <button class="fab" @click="showForm = true">
-      <span class="fab-icon">+</span>
-      <span class="fab-text">挂上我的故事</span>
-    </button>
+    <Transition name="fade">
+      <LoadingScreen v-if="loading" />
+    </Transition>
+    <SkyCanvas
+      v-show="!loading"
+      ref="skyCanvasRef"
+      @star-hover="onHover"
+      @star-select="onSelect"
+      @star-deselect="onDeselect"
+      @stars-loaded="loading = false"
+    />
     <Transition name="fade">
       <StarDetail
         v-if="selectedStar"
         :star="selectedStar"
         :screen-pos="detailPos"
+        :resonating="resonatingId === selectedStar.id"
         @resonate="onResonate"
-        @close="selectedStar = null"
+        @close="onDeselect"
       />
     </Transition>
     <Transition name="fade">
@@ -25,71 +32,128 @@
       :filters="filters"
       @update="onFilterChange"
     />
+    <button class="fab" @click="showForm = true">
+      <span class="fab-icon">+</span>
+      <span class="fab-text">挂上我的故事</span>
+    </button>
     <Transition name="fade">
-      <LoadingScreen v-if="loading" />
+      <div v-if="toast" class="toast">{{ toast }}</div>
     </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, provide } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import SkyCanvas from './components/SkyCanvas.vue'
+import type { StarData } from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
 import StoryForm from './components/StoryForm.vue'
 import LegendToggle from './components/LegendToggle.vue'
 import LoadingScreen from './components/LoadingScreen.vue'
+import { useStars } from './composables/useStars'
+import { useResonate } from './composables/useResonate'
 
-interface Star {
-  id: number
-  type: 'history' | 'user'
-  title: string | null
-  content: string
-  resonanceCount: number
-  position: { x: number; y: number; z: number }
-  createdAt: string
-}
+const skyCanvasRef = ref<InstanceType<typeof SkyCanvas> | null>(null)
+const { loading, error, filters, filteredStars, fetchStars, addLocalStar, updateResonanceLocally } = useStars()
+const { resonate, resonatingId } = useResonate()
 
-const loading = ref(true)
-const selectedStar = ref<Star | null>(null)
+const selectedStar = ref<StarData | null>(null)
 const detailPos = ref({ x: 0, y: 0 })
 const showForm = ref(false)
+const toast = ref('')
 
-const filters = reactive({
-  history: true,
-  user: true,
-  highlightResonance: false,
+// 数据加载后推送到 SkyCanvas
+watch(filteredStars, (stars) => {
+  if (skyCanvasRef.value) {
+    skyCanvasRef.value.setStars(stars)
+  }
 })
 
-function onHover(star: Star | null, screenX: number, screenY: number) {
-  // hover 时更新 cursor，SkyCanvas 内部处理
+// 初始加载
+watch(skyCanvasRef, (ref) => {
+  if (ref && filteredStars.value.length > 0) {
+    ref.setStars(filteredStars.value)
+  }
+})
+
+// 错误 toast
+watch(error, (msg) => {
+  if (msg) showToast(msg)
+})
+
+function onHover(star: StarData | null, _x: number, _y: number) {
+  // hover 反馈由 SkyCanvas 内部处理（光环 sprite）
 }
 
-function onSelect(star: Star, screenX: number, screenY: number) {
+function onSelect(star: StarData, screenX: number, screenY: number) {
   selectedStar.value = star
   detailPos.value = { x: screenX, y: screenY }
 }
 
 function onDeselect() {
   selectedStar.value = null
+  skyCanvasRef.value?.getSky()?.resumeBreathing()
 }
 
 async function onResonate(id: number) {
-  // 由 StarDetail 内部调用 useResonate
+  const ok = await resonate(id)
+  if (ok) {
+    updateResonanceLocally(id)
+    // 更新 StarDetail 中显示的星
+    if (selectedStar.value && selectedStar.value.id === id) {
+      selectedStar.value = {
+        ...selectedStar.value,
+        resonanceCount: selectedStar.value.resonanceCount + 1,
+      }
+    }
+    showToast('共鸣已点亮 ✨')
+  } else {
+    showToast('共鸣失败，请重试')
+  }
 }
 
-function onSubmitStory(content: string) {
-  showForm.value = false
-  // SkyCanvas 内部监听添加新星
+async function onSubmitStory(content: string) {
+  try {
+    const res = await fetch('/api/stars/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    const json = await res.json()
+    if (json.code === 200) {
+      const raw = json.data
+      const newStar: StarData = {
+        id: raw.id,
+        type: 'user',
+        title: raw.title ?? null,
+        content: raw.content,
+        resonanceCount: raw.resonance_count ?? 0,
+        posX: raw.pos_x ?? raw.position?.x ?? 0,
+        posY: raw.pos_y ?? raw.position?.y ?? 0,
+        posZ: raw.pos_z ?? raw.position?.z ?? 0,
+        createdAt: raw.created_at ?? new Date().toISOString(),
+      }
+      addLocalStar(newStar)
+      skyCanvasRef.value?.addStar(newStar)
+      showToast('故事已化作星光 🌟')
+    } else {
+      showToast(json.message || '投递失败')
+    }
+  } catch (e: any) {
+    showToast('网络错误，请重试')
+  }
 }
 
 function onFilterChange(newFilters: typeof filters) {
   Object.assign(filters, newFilters)
 }
 
-// Provide for child components
-provide('filters', filters)
-provide('onStarSelect', onSelect)
-provide('onStarHover', onHover)
+function showToast(msg: string) {
+  toast.value = msg
+  setTimeout(() => {
+    toast.value = ''
+  }, 2500)
+}
 </script>
 
 <style>
@@ -135,6 +199,23 @@ provide('onStarHover', onHover)
 .fab-icon {
   font-size: 1.2rem;
   color: var(--accent);
+}
+
+.toast {
+  position: fixed;
+  bottom: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.4rem;
+  background: color-mix(in srgb, var(--bg2) 90%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  color: var(--accent);
+  font-size: 0.9rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px var(--shadow);
+  z-index: 50;
+  white-space: nowrap;
 }
 
 .fade-enter-active,
