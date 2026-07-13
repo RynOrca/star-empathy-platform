@@ -1,10 +1,9 @@
 import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
-  Line, LineBasicMaterial,
-  LineSegments,
+  Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   Mesh, MeshBasicMaterial,
-  AdditiveBlending, Color,
+  AdditiveBlending, Color, RingGeometry, BackSide,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
@@ -155,6 +154,35 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
   }
 
+  // ═══ 地平遮罩 (下半球暗化) ═══
+  {
+    // 透明渐变环：在 y=0 附近有一条半透明过渡带
+    const ring = new RingGeometry(SPHERE_RADIUS * 0.7, SPHERE_RADIUS * 1.15, 64)
+    const ringMat = new MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.35,
+      side: 2, // DoubleSide
+      depthWrite: false,
+      depthTest: false,
+    })
+    const ringMesh = new Mesh(ring, ringMat)
+    ringMesh.rotation.x = -Math.PI / 2 // 躺在 y=0 平面
+    scene.add(ringMesh)
+
+    // 下半球暗色遮罩 (fade)
+    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
+    const maskMat = new MeshBasicMaterial({
+      color: 0x050812,
+      transparent: true,
+      opacity: 0.78,
+      side: BackSide,
+      depthWrite: false,
+      depthTest: false,
+    })
+    scene.add(new Mesh(maskGeo, maskMat))
+  }
+
   // ═══ 天赤道 (Dec=0°) ═══
   {
     const v: number[] = []
@@ -166,7 +194,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(new Line(g, new LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.25, depthTest: true, depthWrite: false })))
   }
 
-  // ═══ 黄道 ═══
+  // ═══ 黄道 (虚线) ═══
   {
     const v: number[] = []
     for (let i = 0; i <= 360; i++) {
@@ -175,7 +203,19 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
       v.push(p.x, p.y, p.z)
     }
     const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    scene.add(new Line(g, new LineBasicMaterial({ color: 0x886633, transparent: true, opacity: 0.3, depthTest: true, depthWrite: false })))
+    g.computeBoundingSphere()
+    const mat = new LineDashedMaterial({
+      color: 0xcc8844,
+      dashSize: 2.5,
+      gapSize: 1.5,
+      transparent: true,
+      opacity: 0.55,
+      depthTest: true,
+      depthWrite: false,
+    })
+    const line = new Line(g, mat)
+    line.computeLineDistances()
+    scene.add(line)
   }
 
   // ═══ 银河 ═══
