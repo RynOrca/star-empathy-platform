@@ -2,8 +2,7 @@ import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
-  Mesh, MeshBasicMaterial,
-  AdditiveBlending, Color, RingGeometry, SphereGeometry, BackSide,
+  AdditiveBlending, Color,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
@@ -154,48 +153,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
   }
 
-  // ═══ 地平面以下 (深色地面 + 地平微光) ═══
-  {
-    // 地面暗色半球
-    const groundGeo = new SphereGeometry(SPHERE_RADIUS * 0.99, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
-    const groundMat = new MeshBasicMaterial({
-      color: 0x080c1a,
-      transparent: true,
-      opacity: 0.92,
-      side: BackSide,
-      depthWrite: false,
-      depthTest: false,
-    })
-    scene.add(new Mesh(groundGeo, groundMat))
 
-    // 地平线附近的暖色微光 (渐变环带)
-    const glowCanvas = document.createElement('canvas')
-    glowCanvas.width = 256
-    glowCanvas.height = 32
-    const ctx = glowCanvas.getContext('2d')!
-    const g = ctx.createLinearGradient(0, 0, 0, 32)
-    g.addColorStop(0, 'transparent')
-    g.addColorStop(0.4, 'rgba(60, 50, 80, 0.25)')
-    g.addColorStop(0.5, 'rgba(100, 70, 120, 0.30)')
-    g.addColorStop(0.6, 'rgba(60, 50, 80, 0.25)')
-    g.addColorStop(1, 'transparent')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, 256, 32)
-    const glowTex = new CanvasTexture(glowCanvas)
-
-    const glowRing = new RingGeometry(SPHERE_RADIUS * 0.6, SPHERE_RADIUS * 1.02, 64)
-    const glowMat = new MeshBasicMaterial({
-      map: glowTex,
-      transparent: true,
-      opacity: 1,
-      side: 2,
-      depthWrite: false,
-      depthTest: false,
-    })
-    const glow = new Mesh(glowRing, glowMat)
-    glow.rotation.x = -Math.PI / 2
-    scene.add(glow)
-  }
 
   // ═══ 天赤道 (Dec=0°) ═══
   {
