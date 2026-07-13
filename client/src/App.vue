@@ -9,25 +9,21 @@
       <p>拖拽旋转 &nbsp;|&nbsp; 滚轮缩放 &nbsp;|&nbsp; 点击星星</p>
     </div>
 
-    <Transition name="fade">
       <StarDetail
         v-if="selectedStarInfo"
         :stories="selectedStories"
         :active-index="activeStoryIndex"
         :star-info="selectedStarInfo"
-        :screen-pos="selectedStarScreenPos"
         :resonating="resonating"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @close="onCloseDetail"
       />
-    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue'
-import { Vector3 } from 'three'
 import type { SkyAPI } from './composables/useSky'
 import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
@@ -39,11 +35,13 @@ interface CatalogStar {
   name: string | null
   con: string
   mag: number
+  ra: number
+  dec: number
   x: number; y: number; z: number
 }
 const catalogStarLookup = new Map<number, CatalogStar>()
 for (const s of catalogData.stars) {
-  catalogStarLookup.set(s.id, { id: s.id, name: s.name, con: s.con, mag: s.mag, x: s.x, y: s.y, z: s.z })
+  catalogStarLookup.set(s.id, { id: s.id, name: s.name, con: s.con, mag: s.mag, ra: s.ra, dec: s.dec, x: s.x, y: s.y, z: s.z })
 }
 
 // ─── 无故事时的占位 ───
@@ -87,8 +85,7 @@ onMounted(async () => {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
-const selectedStarInfo = ref<{ name: string | null; con: string; mag: number } | null>(null)
-const selectedStarScreenPos = ref({ x: 0, y: 0 })
+const selectedStarInfo = ref<{ name: string | null; con: string; mag: number; ra: number; dec: number } | null>(null)
 const resonating = ref(false)
 
 function onStarClick(starId: number) {
@@ -99,16 +96,7 @@ function onStarClick(starId: number) {
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
-  selectedStarInfo.value = { name: star.name, con: star.con, mag: star.mag }
-
-  // 投影到屏幕坐标
-  const camera = skyRef.value?.sky?.camera
-  if (!camera) return
-  const pos = new Vector3(star.x, star.y, star.z)
-  pos.project(camera)
-  const sx = (pos.x * 0.5 + 0.5) * window.innerWidth
-  const sy = (-pos.y * 0.5 + 0.5) * window.innerHeight
-  selectedStarScreenPos.value = { x: sx, y: sy }
+  selectedStarInfo.value = { name: star.name, con: star.con, mag: star.mag, ra: star.ra, dec: star.dec }
 }
 
 function onCloseDetail() {
@@ -191,7 +179,4 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   z-index: 5;
   pointer-events: none;
 }
-
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

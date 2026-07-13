@@ -1,10 +1,11 @@
 <template>
-  <div class="star-detail" :class="{ flip: isFlipped }" :style="cardStyle" ref="cardRef">
+  <div class="overlay" @click.self="$emit('close')">
+    <div class="star-detail" ref="cardRef">
     <button class="close-btn" @click="$emit('close')">&times;</button>
 
     <!-- 恒星信息 -->
     <div v-if="starInfo" class="star-header">
-      <div class="star-name">{{ starInfo.name || '未命名恒星' }}</div>
+      <div class="star-name">{{ displayName }}</div>
       <div class="star-meta">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
     </div>
 
@@ -42,7 +43,8 @@
       <span class="no-story-icon">✦</span>
       <p>这颗星还在等待它的故事...</p>
     </div>
-  </div>
+    </div><!-- /star-detail -->
+  </div><!-- /overlay -->
 </template>
 
 <script setup lang="ts">
@@ -51,8 +53,7 @@ import { computed, ref, onMounted, nextTick, watch } from 'vue'
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
   activeIndex: number
-  starInfo: { name: string | null; con: string; mag: number } | null
-  screenPos: { x: number; y: number }
+  starInfo: { name: string | null; con: string; mag: number; ra: number; dec: number } | null
   resonating: boolean
 }>()
 
@@ -61,6 +62,19 @@ const emit = defineEmits<{
   resonate: [id: number]
   close: []
 }>()
+
+// 恒星显示名：有名字用名字，没有则用天球坐标
+const displayName = computed(() => {
+  if (props.starInfo?.name) return props.starInfo.name
+  if (!props.starInfo) return ''
+  const { ra, dec } = props.starInfo
+  const rh = Math.floor(ra)
+  const rm = Math.floor((ra - rh) * 60)
+  const ds = dec >= 0 ? '+' : '-'
+  const dd = Math.floor(Math.abs(dec))
+  const dm = Math.floor((Math.abs(dec) - dd) * 60)
+  return `${rh}h${rm.toString().padStart(2,'0')}m · ${ds}${dd}°${dm.toString().padStart(2,'0')}′`
+})
 
 // 过滤出真实故事（排除占位符 id=-1）
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
@@ -76,27 +90,8 @@ function goTo(i: number) {
   emit('switch', i)
 }
 
-const isFlipped = ref(false)
 const justResonated = ref(false)
 const cardRef = ref<HTMLElement | null>(null)
-
-const cardStyle = computed(() => ({
-  left: `${props.screenPos.x}px`,
-  top: `${props.screenPos.y}px`,
-}))
-
-onMounted(() => {
-  nextTick(() => {
-    const card = cardRef.value
-    if (!card) return
-    const rect = card.getBoundingClientRect()
-    if (rect.top < 10) isFlipped.value = true
-    if (rect.left < 10) card.style.left = `${props.screenPos.x + (10 - rect.left)}px`
-    if (rect.right > window.innerWidth - 10) {
-      card.style.left = `${props.screenPos.x - (rect.right - window.innerWidth + 10)}px`
-    }
-  })
-})
 
 function onResonate() {
   if (!currentReal.value) return
@@ -107,31 +102,39 @@ function onResonate() {
 </script>
 
 <style scoped>
-.star-detail {
+/* 半透明背景遮罩 */
+.overlay {
   position: fixed;
-  transform: translate(-50%, -120%);
-  max-width: 320px;
-  min-width: 220px;
-  padding: 1.2rem 1.4rem;
-  background: color-mix(in srgb, var(--bg2) 85%, transparent);
+  inset: 0;
+  background: rgba(7, 8, 22, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: overlayIn 0.25s ease;
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.star-detail {
+  width: 360px;
+  max-width: 90vw;
+  max-height: 80vh;
+  padding: 1.5rem 1.6rem;
+  background: color-mix(in srgb, var(--bg2) 92%, transparent);
   border: 1px solid var(--rule);
-  border-radius: 22px;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 16px 48px var(--shadow);
-  z-index: 20;
-  animation: floatIn 0.3s ease;
+  border-radius: 24px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 64px var(--shadow);
+  animation: cardIn 0.3s ease;
+  overflow-y: auto;
 }
-@keyframes floatIn {
-  from { opacity: 0; transform: translate(-50%, -110%); }
-  to { opacity: 1; transform: translate(-50%, -120%); }
-}
-.star-detail.flip {
-  transform: translate(-50%, 20%);
-  animation: floatInDown 0.3s ease;
-}
-@keyframes floatInDown {
-  from { opacity: 0; transform: translate(-50%, 30%); }
-  to { opacity: 1; transform: translate(-50%, 20%); }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .close-btn {
   position: absolute;
