@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+server/dist/
+
+# Database
+data/
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+server.log
+server_err.log
+out.log
+err.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
