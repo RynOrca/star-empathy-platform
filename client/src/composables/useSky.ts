@@ -2,7 +2,7 @@ import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
-  AdditiveBlending, Color, Mesh, MeshBasicMaterial,
+  AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
@@ -201,6 +201,20 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
       color: 0xaaccff, transparent: true, opacity: 0.12,
       blending: AdditiveBlending, depthWrite: false, depthTest: true, side: 2, // DoubleSide
     })))
+  }
+
+  // ═══ 地平面以下遮罩 (红色调试) ═══
+  {
+    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.99, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
+    const maskMat = new MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.85,
+      side: BackSide,
+      depthWrite: false,
+      depthTest: false,
+    })
+    scene.add(new Mesh(maskGeo, maskMat))
   }
 
   // ═══ 相机 ═══

@@ -5,7 +5,6 @@
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div class="horizon-overlay" />
     <div class="hint">
       <p>拖拽旋转 &nbsp;|&nbsp; 滚轮缩放</p>
     </div>
@@ -33,23 +32,6 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: var(--bg);
   font-family: var(--font);
   color: var(--ink);
-}
-
-.horizon-overlay {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50vh;
-  background: linear-gradient(to top,
-    rgba(255, 0, 0, 1) 0%,
-    rgba(255, 0, 0, 0.85) 20%,
-    rgba(255, 0, 0, 0.6) 40%,
-    rgba(255, 0, 0, 0.3) 60%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 10;
 }
 
 .zoom-controls {
