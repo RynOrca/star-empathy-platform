@@ -203,18 +203,54 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     })))
   }
 
-  // ═══ 地平面以下遮罩 (红色调试) ═══
+  // ═══ 地平面以下遮罩 ═══
   {
-    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.99, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
+    // 主遮罩 — 深暖色下半球
+    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0xff0000,
+      color: 0x0a0410,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.92,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
     })
-    scene.add(new Mesh(maskGeo, maskMat))
+    const mask = new Mesh(maskGeo, maskMat)
+    mask.renderOrder = 9999
+    scene.add(mask)
+
+    // 地平线暖色晕圈（薄薄一条）
+    const glowGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 1, 0, Math.PI*2, Math.PI/2 - 0.025, 0.05)
+    const glowMat = new MeshBasicMaterial({
+      color: 0xcc7744,
+      transparent: true,
+      opacity: 0.20,
+      side: BackSide,
+      depthWrite: false,
+      depthTest: false,
+      blending: AdditiveBlending,
+    })
+    const glow = new Mesh(glowGeo, glowMat)
+    glow.renderOrder = 9999
+    scene.add(glow)
+
+    // 地平线轮廓线
+    const hVerts: number[] = []
+    for (let i = 0; i <= 360; i++) {
+      const a = i / 360 * Math.PI * 2
+      hVerts.push(Math.cos(a) * SPHERE_RADIUS * 0.995, 0, -Math.sin(a) * SPHERE_RADIUS * 0.995)
+    }
+    const hGeo = new BufferGeometry()
+    hGeo.setAttribute('position', new BufferAttribute(new Float32Array(hVerts), 3))
+    const hLine = new Line(hGeo, new LineBasicMaterial({
+      color: 0xdd8844,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: false,
+      depthWrite: false,
+    }))
+    hLine.renderOrder = 10000
+    scene.add(hLine)
   }
 
   // ═══ 相机 ═══
