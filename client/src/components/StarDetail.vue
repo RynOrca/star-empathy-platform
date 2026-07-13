@@ -131,8 +131,10 @@ const generatedTags = computed<string[]>(() => {
 /* ─── 容器 ─── */
 .detail-wrap {
   display: flex;
-  gap: 1.25rem;
+  gap: 1.5rem;
   align-items: flex-start;
+  width: 80vw;
+  max-width: 1160px;
   animation: slideUp 0.25s ease;
 }
 @keyframes slideUp {
@@ -151,7 +153,8 @@ const generatedTags = computed<string[]>(() => {
 
 /* ─── 左：故事面板 ─── */
 .panel-stories {
-  width: 520px;
+  flex: 1;
+  min-width: 0;
   height: 80vh;
   display: flex;
   flex-direction: column;
@@ -265,7 +268,8 @@ const generatedTags = computed<string[]>(() => {
 
 /* ─── 右：信息面板 ─── */
 .panel-info {
-  width: 240px;
+  width: 18rem;
+  flex-shrink: 0;
   padding: 1.25rem;
   position: relative;
 }
