@@ -112,8 +112,9 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
 
   // ─── 场景 / 相机 / 渲染器 ────────────────────
   const scene = new Scene()
-  const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth / canvas.clientHeight, 1, SPHERE_RADIUS * 3)
-  camera.position.set(0, 0, 0)
+  const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth / canvas.clientHeight, 0.5, SPHERE_RADIUS * 3)
+  // 相机放在接近球心的位置，略偏移避免退化
+  camera.position.set(0, 0.1, 0.1)
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true })
   renderer.setSize(canvas.clientWidth, canvas.clientHeight)
@@ -130,12 +131,15 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     positions[i * 3] = s.x
     positions[i * 3 + 1] = s.y
     positions[i * 3 + 2] = s.z
+    // 提亮颜色（AdditiveBlending 下暗色看不见）
+    const brightness = s.mag < 3 ? 1.0 : s.mag < 5 ? 0.75 : 0.5
     const [r, g, b] = hexToRGB(s.color)
-    colors[i * 3] = r
-    colors[i * 3 + 1] = g
-    colors[i * 3 + 2] = b
+    colors[i * 3] = Math.min(1, r * brightness + 0.2)
+    colors[i * 3 + 1] = Math.min(1, g * brightness + 0.2)
+    colors[i * 3 + 2] = Math.min(1, b * brightness + 0.2)
     sizes[i] = magToSize(s.mag)
   }
+  console.log(`🌟 Loaded ${totalStars} catalog stars, sample:`, CATALOG[0])
 
   const starGeometry = new BufferGeometry()
   starGeometry.setAttribute('position', new BufferAttribute(positions, 3))

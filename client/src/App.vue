@@ -12,14 +12,15 @@
         </div>
       </div>
     </Transition>
-    <SkyCanvas
-      v-show="!loading && !error"
-      ref="skyCanvasRef"
-      @star-hover="onHover"
-      @star-select="onSelect"
-      @star-deselect="onDeselect"
-      @stars-loaded="loading = false"
-    />
+    <div class="canvas-wrap" :class="{ invisible: loading && !error }">
+      <SkyCanvas
+        ref="skyCanvasRef"
+        @star-hover="onHover"
+        @star-select="onSelect"
+        @star-deselect="onDeselect"
+        @stars-loaded="loading = false"
+      />
+    </div>
     <Transition name="fade">
       <StarDetail
         v-if="selectedStar"
@@ -197,6 +198,15 @@ function showToast(msg: string) {
 
 <style>
 @import './styles/variables.css';
+
+.canvas-wrap {
+  position: fixed;
+  inset: 0;
+}
+/* visibility:hidden 保留下尺寸，避免 WebGL 0x0 */
+.canvas-wrap.invisible {
+  visibility: hidden;
+}
 
 .app {
   width: 100vw;
