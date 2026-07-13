@@ -129,7 +129,7 @@ const generatedTags = computed<string[]>(() => {
 
 .star-detail-wrap {
   display: flex;
-  gap: 0.6rem;
+  gap: 1rem;
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn {
@@ -149,19 +149,19 @@ const generatedTags = computed<string[]>(() => {
 
 /* ─── 左：故事卡片 ─── */
 .card-stories {
-  width: 340px;
-  max-height: 420px;
+  width: 520px;
+  max-height: 540px;
   overflow-y: auto;
-  padding: 0.6rem;
+  padding: 0.8rem;
 }
 .story-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.6rem;
 }
 .story-item {
-  padding: 0.7rem 0.8rem;
-  border-radius: 10px;
+  padding: 1rem 1rem;
+  border-radius: 12px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
@@ -179,7 +179,7 @@ const generatedTags = computed<string[]>(() => {
 }
 .story-title {
   color: var(--ink);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 500;
 }
 .resonate-btn {
@@ -203,13 +203,13 @@ const generatedTags = computed<string[]>(() => {
 }
 .story-content {
   color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.6;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin: 0 0 0.3rem;
+  margin: 0.3rem 0 0.5rem;
 }
 .story-meta {
   display: flex;
@@ -234,22 +234,22 @@ const generatedTags = computed<string[]>(() => {
 
 /* ─── 右：信息卡片 ─── */
 .card-info {
-  width: 200px;
-  padding: 1rem;
+  width: 260px;
+  padding: 1.2rem;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 .star-name {
   color: var(--accent);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
 .star-meta {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--muted);
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
 }
 .divider {
   height: 1px;
