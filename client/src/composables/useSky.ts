@@ -18,10 +18,11 @@ import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants
 // ═══════════════════════════════════════════════
 const STAR_VERTEX = /* glsl */ `
   attribute float size;
+  attribute vec3 color;
   varying vec3 vColor;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (280.0 / -mv.z);
+    gl_PointSize = size * (400.0 / -mv.z);
     gl_Position = projectionMatrix * mv;
     vColor = color;
   }
@@ -75,8 +76,8 @@ function hexToRGB(hex: string): [number, number, number] {
 
 // mag → GL点大小（一等星 ~8, 六等星 ~1.5）
 function magToSize(mag: number): number {
-  // Sirius (-1.46) → ~10, 一等星 ~7, 六等星 ~1.5
-  return Math.max(1.2, 8.5 - mag * 1.2)
+  // Sirius (-1.46)→12px, 一等星→8px, 三等星→5px, 六等星→2.5px
+  return Math.max(2.0, 10.0 - mag * 1.35)
 }
 
 // ═══════════════════════════════════════════════
@@ -140,6 +141,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
 
   const starPoints = new Points(starGeo, starMat)
   scene.add(starPoints)
+  console.log(`🌟 ${n} stars added to scene, first:`, stars[0].name, 'mag', stars[0].mag, 'size', sizes[0])
 
   // ═════════════════════════════════════════
   // 星座连线
