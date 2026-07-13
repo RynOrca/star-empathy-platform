@@ -1,5 +1,16 @@
 import { ref, reactive, computed, onMounted } from 'vue'
-import type { StarData } from '../components/SkyCanvas.vue'
+
+interface StarData {
+  id: number
+  type: 'history' | 'user'
+  title: string | null
+  content: string
+  resonanceCount: number
+  posX: number
+  posY: number
+  posZ: number
+  createdAt: string
+}
 
 interface RawStar {
   id: number

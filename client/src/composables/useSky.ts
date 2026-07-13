@@ -3,6 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
+  Raycaster, Vector2,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -102,9 +103,17 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 }
 
 // ═══════════════════════════════════════════
-export interface SkyAPI { camera: PerspectiveCamera; zoomIn: () => void; zoomOut: () => void; dispose: () => void }
+export interface SkyAPI {
+  camera: PerspectiveCamera
+  zoomIn: () => void
+  zoomOut: () => void
+  dispose: () => void
+}
 
-export function useSky(canvas: HTMLCanvasElement): SkyAPI {
+export function useSky(
+  canvas: HTMLCanvasElement,
+  options?: { onStarClick?: (starId: number) => void }
+): SkyAPI {
   const scene = new Scene()
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
   camera.position.set(0,0,0)
@@ -137,13 +146,15 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     { maxMag: 99,    size: 1.8 },
   ]
   const bins = tiers.map(() => ({ pos: [] as number[], col: [] as number[] }))
+  const tierStarIds: number[][] = tiers.map(() => [])
   for (let i = 0; i < n; i++) {
     const s = stars[i]; const [r,g,b] = hexRGB(s.color)
     for (let t = 0; t < tiers.length; t++) {
-      if (s.mag <= tiers[t].maxMag) { bins[t].pos.push(s.x,s.y,s.z); bins[t].col.push(r,g,b); break }
+      if (s.mag <= tiers[t].maxMag) { bins[t].pos.push(s.x,s.y,s.z); bins[t].col.push(r,g,b); tierStarIds[t].push(s.id); break }
     }
   }
   const texCache = new Map<number, CanvasTexture>()
+  const starPointsRefs: Points[] = []
   for (let t = 0; t < tiers.length; t++) {
     const b = bins[t]; if (b.pos.length === 0) continue
     const sz = tiers[t].size
@@ -151,10 +162,13 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array(b.pos), 3))
     g.setAttribute('color', new BufferAttribute(new Float32Array(b.col), 3))
-    scene.add(new Points(g, new PointsMaterial({
+    const pts = new Points(g, new PointsMaterial({
       size: sz, map: texCache.get(sz)!, blending: AdditiveBlending,
       depthWrite: false, depthTest: true, transparent: true, vertexColors: true, sizeAttenuation: true,
-    })))
+    }))
+    pts.userData.tierIndex = t
+    starPointsRefs.push(pts)
+    scene.add(pts)
   }
 
   // ═══ 星座连线 ═══
@@ -262,6 +276,38 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     }
   }
 
+  // ═══ 点击检测 ═══
+  {
+    const raycaster = new Raycaster()
+    const mouse = new Vector2()
+    const DRAG_THRESHOLD = 5
+    let clickDrag = false
+
+    canvas.addEventListener('pointerdown', () => { clickDrag = false })
+    canvas.addEventListener('pointermove', (e) => {
+      // 给拖动标记距离，由 pointerup 判读是否是点击
+      if (dragging) {
+        const dx = e.clientX - px, dy = e.clientY - py
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
+      }
+    })
+    canvas.addEventListener('pointerup', (e) => {
+      if (clickDrag) return // 是拖动不是点击
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(mouse, camera)
+      raycaster.params.Points!.threshold = 8
+      const hits = raycaster.intersectObjects(starPointsRefs)
+      if (hits.length) {
+        const hit = hits[0]
+        const tierIdx = hit.object.userData.tierIndex as number
+        const starId = tierStarIds[tierIdx][hit.index!]
+        options?.onStarClick?.(starId)
+      }
+    })
+  }
+
   // ═══ 相机 ═══
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
   let userFov = DEFAULT_FOV
@@ -313,7 +359,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()
-      labelRenderer.dispose()
+      ;(labelRenderer as unknown as { dispose: () => void }).dispose()
       renderer.dispose()
       scene.clear()
     },

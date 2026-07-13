@@ -1,4 +1,3 @@
-import type { StoryAttachment } from '../composables/useSky'
 import catalogData from '../data/stars.json'
 
 interface CatalogStar {
@@ -9,7 +8,7 @@ interface CatalogStar {
   x: number; y: number; z: number
 }
 
-const CATALOG: CatalogStar[] = catalogData as CatalogStar[]
+const CATALOG: CatalogStar[] = (catalogData as { stars: CatalogStar[] }).stars
 
 /** 根据名字模糊查找星表恒星 */
 function findStar(namePattern: string): CatalogStar | null {

@@ -3,18 +3,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useSky } from '../composables/useSky'
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
+import { useSky, type SkyAPI } from '../composables/useSky'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-let sky: ReturnType<typeof useSky> | null = null
+const sky = shallowRef<SkyAPI | null>(null)
+
+const emit = defineEmits<{
+  starClick: [starId: number]
+}>()
 
 onMounted(() => {
-  sky = useSky(canvasRef.value!)
+  sky.value = useSky(canvasRef.value!, {
+    onStarClick: (starId) => emit('starClick', starId),
+  })
 })
 
 onBeforeUnmount(() => {
-  sky?.dispose()
+  sky.value?.dispose()
 })
 
 defineExpose({ sky })
