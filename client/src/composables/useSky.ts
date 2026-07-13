@@ -240,16 +240,6 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
       { text: 'W', sub: '西', x: -1, z: 0 },
     ]
     for (const c of cardinals) {
-      const dot = document.createElement('div')
-      dot.style.width = '3px'
-      dot.style.height = '3px'
-      dot.style.borderRadius = '50%'
-      dot.style.background = '#dd8844'
-      dot.style.boxShadow = '0 0 6px #dd8844'
-      const dotObj = new CSS2DObject(dot)
-      dotObj.position.set(c.x * SPHERE_RADIUS, 0, c.z * SPHERE_RADIUS)
-      scene.add(dotObj)
-
       const el = document.createElement('div')
       el.textContent = `${c.text} ${c.sub}`
       el.style.cssText = [
