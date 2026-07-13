@@ -3,7 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   Mesh, MeshBasicMaterial,
-  AdditiveBlending, Color, RingGeometry, BackSide,
+  AdditiveBlending, Color, RingGeometry, SphereGeometry, BackSide,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
