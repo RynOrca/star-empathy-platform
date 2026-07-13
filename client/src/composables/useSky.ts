@@ -4,6 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
 } from 'three'
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
 // ─── 星表 ───
@@ -113,6 +114,17 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setClearColor(new Color('#070816'))
 
+  // ═══ CSS2D 标签渲染器 ═══
+  const labelRenderer = new CSS2DRenderer()
+  labelRenderer.setSize(canvas.clientWidth, canvas.clientHeight)
+  const lrEl = labelRenderer.domElement
+  lrEl.style.position = 'absolute'
+  lrEl.style.top = '0'
+  lrEl.style.left = '0'
+  lrEl.style.pointerEvents = 'none'
+  lrEl.style.zIndex = '10'
+  canvas.parentElement?.appendChild(lrEl)
+
   const stars = CAT.stars; const n = stars.length
 
   // ═══ 星星分层 ═══
@@ -219,6 +231,47 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(mask)
   }
 
+  // ═══ 东南西北标注 ═══
+  {
+    const cardinals = [
+      { text: 'N', sub: '北', x: 0, z: -1 },
+      { text: 'S', sub: '南', x: 0, z: 1 },
+      { text: 'E', sub: '东', x: 1, z: 0 },
+      { text: 'W', sub: '西', x: -1, z: 0 },
+    ]
+    for (const c of cardinals) {
+      const dot = document.createElement('div')
+      dot.style.width = '3px'
+      dot.style.height = '3px'
+      dot.style.borderRadius = '50%'
+      dot.style.background = '#dd8844'
+      dot.style.boxShadow = '0 0 6px #dd8844'
+      const dotObj = new CSS2DObject(dot)
+      dotObj.position.set(c.x * SPHERE_RADIUS, 0, c.z * SPHERE_RADIUS)
+      scene.add(dotObj)
+
+      const el = document.createElement('div')
+      el.textContent = `${c.text} ${c.sub}`
+      el.style.cssText = [
+        'color:#dd8844',
+        'font-family:"Inter","Helvetica Neue",system-ui,sans-serif',
+        'font-size:13px',
+        'font-weight:400',
+        'letter-spacing:0.08em',
+        'text-shadow:0 0 12px rgba(221,136,68,0.35), 0 0 30px rgba(7,8,22,0.9)',
+        'background:rgba(7,8,22,0.45)',
+        'padding:2px 10px',
+        'border-radius:12px',
+        'border:1px solid rgba(221,136,68,0.18)',
+        'backdrop-filter:blur(6px)',
+        'white-space:nowrap',
+      ].join(';')
+      const label = new CSS2DObject(el)
+      label.position.set(c.x * SPHERE_RADIUS, 3, c.z * SPHERE_RADIUS)
+      scene.add(label)
+    }
+  }
+
   // ═══ 相机 ═══
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
   let userFov = DEFAULT_FOV
@@ -247,6 +300,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     camera.aspect = canvas.clientWidth / canvas.clientHeight
     camera.updateProjectionMatrix()
     renderer.setSize(canvas.clientWidth, canvas.clientHeight)
+    labelRenderer.setSize(canvas.clientWidth, canvas.clientHeight)
   })
 
   // ═══ 渲染 ═══
@@ -256,6 +310,7 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     const breath = Math.sin(performance.now() * 0.0008) * 1.5
     camera.fov = userFov + breath
     camera.updateProjectionMatrix()
+    labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
   animate()
@@ -265,6 +320,12 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
-    dispose() { cancelAnimationFrame(af); renderer.dispose(); scene.clear() },
+    dispose() {
+      cancelAnimationFrame(af)
+      lrEl.remove()
+      labelRenderer.dispose()
+      renderer.dispose()
+      scene.clear()
+    },
   }
 }
