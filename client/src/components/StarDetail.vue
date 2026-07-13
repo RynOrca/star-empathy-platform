@@ -2,36 +2,45 @@
   <div class="star-detail" :class="{ flip: isFlipped }" :style="cardStyle" ref="cardRef">
     <button class="close-btn" @click="$emit('close')">&times;</button>
 
-    <!-- 亮星名称 -->
-    <div v-if="starName" class="star-label">{{ starName }}</div>
-
-    <!-- 多故事指示 -->
-    <div v-if="stories.length > 1" class="story-counter">
-      <button class="nav-btn" :disabled="activeIndex <= 0" @click="$emit('switch', activeIndex - 1)">‹</button>
-      <span>{{ activeIndex + 1 }} / {{ stories.length }}</span>
-      <button class="nav-btn" :disabled="activeIndex >= stories.length - 1" @click="$emit('switch', activeIndex + 1)">›</button>
+    <!-- 恒星信息 -->
+    <div v-if="starInfo" class="star-header">
+      <div class="star-name">{{ starInfo.name || '未命名恒星' }}</div>
+      <div class="star-meta">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
     </div>
 
-    <!-- 当前故事 -->
-    <template v-if="current">
-      <h3 v-if="current.title">{{ current.title }}</h3>
-      <h3 v-else class="anonymous">匿名心事</h3>
-      <p class="content">{{ current.content }}</p>
+    <!-- 有故事 -->
+    <template v-if="hasRealStory">
+      <div v-if="realStories.length > 1" class="story-counter">
+        <button class="nav-btn" :disabled="localIndex <= 0" @click="goTo(localIndex - 1)">‹</button>
+        <span>{{ localIndex + 1 }} / {{ realStories.length }}</span>
+        <button class="nav-btn" :disabled="localIndex >= realStories.length - 1" @click="goTo(localIndex + 1)">›</button>
+      </div>
+
+      <template v-if="currentReal">
+        <h3 v-if="currentReal.title">{{ currentReal.title }}</h3>
+        <h3 v-else class="anonymous">匿名心事</h3>
+        <p class="content">{{ currentReal.content }}</p>
+      </template>
+
+      <div class="footer">
+        <span class="resonance-count">{{ currentReal?.resonanceCount ?? 0 }} 次共鸣</span>
+        <button
+          class="resonate-btn"
+          :class="{ resonating: resonating, done: justResonated }"
+          :disabled="resonating"
+          @click="onResonate"
+        >
+          <span v-if="resonating">点亮中...</span>
+          <span v-else-if="justResonated">✓ 已共鸣</span>
+          <span v-else>我也感同身受</span>
+        </button>
+      </div>
     </template>
 
-    <!-- 共鸣 -->
-    <div v-if="current" class="footer">
-      <span class="resonance-count">{{ current.resonanceCount }} 次共鸣</span>
-      <button
-        class="resonate-btn"
-        :class="{ resonating: resonating, done: justResonated }"
-        :disabled="resonating"
-        @click="onResonate"
-      >
-        <span v-if="resonating">点亮中...</span>
-        <span v-else-if="justResonated">✓ 已共鸣</span>
-        <span v-else>我也感同身受</span>
-      </button>
+    <!-- 无故事等待中 -->
+    <div v-else class="no-story">
+      <span class="no-story-icon">✦</span>
+      <p>这颗星还在等待它的故事...</p>
     </div>
   </div>
 </template>
@@ -42,7 +51,7 @@ import { computed, ref, onMounted, nextTick, watch } from 'vue'
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
   activeIndex: number
-  starName: string | null
+  starInfo: { name: string | null; con: string; mag: number } | null
   screenPos: { x: number; y: number }
   resonating: boolean
 }>()
@@ -53,7 +62,19 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const current = computed(() => props.stories[props.activeIndex] ?? null)
+// 过滤出真实故事（排除占位符 id=-1）
+const realStories = computed(() => props.stories.filter(s => s.id > 0))
+const hasRealStory = computed(() => realStories.value.length > 0)
+const localIndex = ref(0)
+const currentReal = computed(() => realStories.value[localIndex.value] ?? null)
+
+watch(() => props.activeIndex, (v) => { localIndex.value = v })
+watch(() => props.stories, () => { localIndex.value = 0 })
+
+function goTo(i: number) {
+  localIndex.value = i
+  emit('switch', i)
+}
 
 const isFlipped = ref(false)
 const justResonated = ref(false)
@@ -63,11 +84,6 @@ const cardStyle = computed(() => ({
   left: `${props.screenPos.x}px`,
   top: `${props.screenPos.y}px`,
 }))
-
-watch(() => props.activeIndex, () => {
-  // 切换故事时重置共鸣状态
-  justResonated.value = false
-})
 
 onMounted(() => {
   nextTick(() => {
@@ -83,8 +99,8 @@ onMounted(() => {
 })
 
 function onResonate() {
-  if (!current.value) return
-  emit('resonate', current.value.id)
+  if (!currentReal.value) return
+  emit('resonate', currentReal.value.id)
   justResonated.value = true
   setTimeout(() => { justResonated.value = false }, 2000)
 }
@@ -126,12 +142,27 @@ function onResonate() {
   transition: color 0.2s;
 }
 .close-btn:hover { color: var(--ink); }
-.star-label {
-  font-size: 0.78rem;
+
+/* 恒星头部 */
+.star-header {
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.star-name {
+  color: var(--accent);
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+.star-meta {
+  font-size: 0.75rem;
   color: var(--muted);
-  margin-bottom: 0.3rem;
+  margin-top: 0.15rem;
   letter-spacing: 0.05em;
 }
+
+/* 故事计数器 */
 .story-counter {
   display: flex;
   align-items: center;
@@ -152,12 +183,30 @@ function onResonate() {
 }
 .nav-btn:hover:not(:disabled) { border-color: var(--accent); }
 .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
 h3 { color: var(--accent); margin-bottom: 0.4rem; font-size: 1.1rem; }
 .anonymous { color: var(--star-blue); }
 .content {
   color: var(--muted); line-height: 1.6; margin-bottom: 0.8rem;
   font-size: 0.93rem; max-height: 160px; overflow-y: auto;
 }
+
+/* 无故事状态 */
+.no-story {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.8rem 0;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+.no-story-icon {
+  font-size: 1.2rem;
+  opacity: 0.5;
+}
+
 .footer { display: flex; align-items: center; justify-content: space-between; }
 .resonance-count { color: var(--muted); font-size: 0.85rem; }
 .resonate-btn {

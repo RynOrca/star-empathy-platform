@@ -11,15 +11,15 @@
 
     <Transition name="fade">
       <StarDetail
-        v-if="selectedStories.length > 0"
+        v-if="selectedStarInfo"
         :stories="selectedStories"
         :active-index="activeStoryIndex"
-        :star-name="selectedStarName"
+        :star-info="selectedStarInfo"
         :screen-pos="selectedStarScreenPos"
         :resonating="resonating"
         @switch="onSwitchStory"
         @resonate="onResonate"
-        @close="selectedStories = []"
+        @close="onCloseDetail"
       />
     </Transition>
   </div>
@@ -37,12 +37,17 @@ import catalogData from './data/stars.json'
 interface CatalogStar {
   id: number
   name: string | null
+  con: string
+  mag: number
   x: number; y: number; z: number
 }
 const catalogStarLookup = new Map<number, CatalogStar>()
 for (const s of catalogData.stars) {
-  catalogStarLookup.set(s.id, { id: s.id, name: s.name, x: s.x, y: s.y, z: s.z })
+  catalogStarLookup.set(s.id, { id: s.id, name: s.name, con: s.con, mag: s.mag, x: s.x, y: s.y, z: s.z })
 }
+
+// ─── 无故事时的占位 ───
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1 }
 
 // ─── 故事查询 ───
 interface StoryData {
@@ -82,7 +87,7 @@ onMounted(async () => {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
-const selectedStarName = ref<string | null>(null)
+const selectedStarInfo = ref<{ name: string | null; con: string; mag: number } | null>(null)
 const selectedStarScreenPos = ref({ x: 0, y: 0 })
 const resonating = ref(false)
 
@@ -90,11 +95,11 @@ function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId)
   if (!star) return
 
+  // 总是显示卡片（有故事展示故事，无故事显示占位）
   const stories = storiesByStarId.value.get(starId)
-  if (!stories || stories.length === 0) {
-    // 无故事的星 — 短暂闪烁提示
-    return
-  }
+  selectedStories.value = stories?.length ? stories : [NO_STORY]
+  activeStoryIndex.value = 0
+  selectedStarInfo.value = { name: star.name, con: star.con, mag: star.mag }
 
   // 投影到屏幕坐标
   const camera = skyRef.value?.sky?.camera
@@ -103,11 +108,12 @@ function onStarClick(starId: number) {
   pos.project(camera)
   const sx = (pos.x * 0.5 + 0.5) * window.innerWidth
   const sy = (-pos.y * 0.5 + 0.5) * window.innerHeight
-
-  selectedStories.value = stories
-  activeStoryIndex.value = 0
-  selectedStarName.value = star.name
   selectedStarScreenPos.value = { x: sx, y: sy }
+}
+
+function onCloseDetail() {
+  selectedStories.value = []
+  selectedStarInfo.value = null
 }
 
 function onSwitchStory(index: number) {
