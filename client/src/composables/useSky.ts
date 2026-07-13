@@ -15,6 +15,7 @@ import {
   SpriteMaterial,
   LineSegments,
   LineBasicMaterial,
+  AdditiveBlending,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
@@ -83,7 +84,8 @@ function createGlowTexture(innerColor: string, size: number): CanvasTexture {
 
 // magnitude → 粒子大小 (星等越小=越亮=越大)
 function magToSize(mag: number): number {
-  return Math.max(0.8, (5.5 - mag) * 1.3)
+  // 一等星 ~8, 六等星 ~1.5
+  return Math.max(1.5, (7.0 - mag) * 1.6)
 }
 
 export interface SkyAPI {
@@ -141,12 +143,13 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
 
   const starTexture = createGlowTexture('white', 32)
   const starMaterial = new PointsMaterial({
-    size: 2.5,  // 基础大小，会被 ShaderMaterial 替代吗？不，PointsMaterial 不支持逐点 size
+    size: 7,
     map: starTexture,
-    blending: 2,
+    blending: AdditiveBlending,
     depthWrite: false,
     depthTest: true,
     transparent: true,
+    opacity: 0.9,
     vertexColors: true,
     sizeAttenuation: true,
   })
@@ -163,12 +166,13 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
   overlayGeometry.setAttribute('color', new BufferAttribute(emptyCol, 3))
 
   const overlayMaterial = new PointsMaterial({
-    size: 4.5,
+    size: 10,
     map: createGlowTexture('white', 48),
-    blending: 2,
+    blending: AdditiveBlending,
     depthWrite: false,
     depthTest: true,
     transparent: true,
+    opacity: 0.85,
     vertexColors: true,
     sizeAttenuation: true,
   })
@@ -237,7 +241,8 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
   controls.minPolarAngle = Math.PI / 8
   controls.maxPolarAngle = (Math.PI * 7) / 8
   controls.rotateSpeed = 0.4
-  controls.target.set(0, 0, SPHERE_RADIUS * 0.5)
+  // 初始看向天球前方（+Z方向的天区，包含猎户座等冬季亮星）
+  controls.target.set(0, 0, SPHERE_RADIUS)
 
   // ─── FOV 缩放 ──────────────────────────────
   let userInteracting = false
