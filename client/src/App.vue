@@ -6,7 +6,7 @@
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
     <div class="hint">
-      <p>拖拽旋转 &nbsp;|&nbsp; 滚轮缩放 &nbsp;|&nbsp; 点击星星</p>
+      <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
       <StarDetail
@@ -185,6 +185,11 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 <style>
 @import './styles/variables.css';
 
+/* ─── Global Reset ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 .app {
   width: 100vw;
   height: 100vh;
@@ -193,40 +198,63 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: var(--bg);
   font-family: var(--font);
   color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── Zoom Controls ─── */
 .zoom-controls {
   position: fixed;
-  right: 1.5rem;
-  bottom: 5rem;
+  right: 1.25rem;
+  bottom: 4.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 4px;
   z-index: 10;
+  background: var(--bg2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: var(--shadow-sm);
 }
 .zoom-btn {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bg2) 80%, transparent);
-  border: 1px solid var(--rule);
-  color: var(--ink);
-  font-size: 1.2rem;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--ink-secondary);
+  font-size: 1.15rem;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: border-color 0.3s;
-  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.zoom-btn:hover { border-color: var(--accent); }
+.zoom-btn:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+.zoom-btn:active {
+  transform: scale(0.92);
+}
 
+/* ─── Bottom Hint ─── */
 .hint {
   position: fixed;
-  bottom: 2rem;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--muted);
-  font-size: 0.82rem;
-  opacity: 0.6;
+  color: var(--muted-light);
+  font-size: 0.78rem;
   z-index: 5;
   pointer-events: none;
+  opacity: 0.5;
+}
+.hint p {
+  margin: 0;
+}
+.hint p span {
+  opacity: 0.6;
 }
 </style>

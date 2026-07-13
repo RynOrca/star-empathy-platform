@@ -47,35 +47,45 @@ function toggle(key: 'history' | 'user' | 'highlightResonance') {
 <style scoped>
 .legend {
   position: fixed;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: 1.25rem;
+  right: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 2px;
   z-index: 10;
+  background: var(--bg2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: var(--shadow-sm);
 }
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.9rem;
-  background: color-mix(in srgb, var(--bg2) 80%, transparent);
-  border: 1px solid var(--rule);
-  border-radius: 18px;
+  gap: 8px;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   color: var(--muted);
   font-family: var(--font);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: border-color 0.3s, color 0.3s;
+  transition: color 0.15s, background 0.15s;
+  width: 100%;
+  text-align: left;
+}
+.legend-item:hover {
+  color: var(--ink-secondary);
+  background: rgba(255, 255, 255, 0.03);
 }
 .legend-item.active {
-  border-color: var(--accent);
   color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
 }
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }

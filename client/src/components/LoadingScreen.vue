@@ -22,12 +22,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.2rem;
+  gap: 1.5rem;
   z-index: 100;
 }
 .star-loader {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   animation: spin 2s linear infinite;
 }
 @keyframes spin {
@@ -35,11 +35,13 @@
 }
 .loading-text {
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 </style>

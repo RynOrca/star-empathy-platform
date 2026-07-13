@@ -1,16 +1,55 @@
 :root {
+  /* ─── Background layers (PrimeVue Aura dark) ─── */
   --bg: #070816;
   --bg2: #10142b;
-  --ink: #f6f1ff;
-  --muted: #b9b4d6;
-  --rule: #303757;
+  --surface: #1a1e35;
+  --surface-hover: #222847;
+  --surface-ground: #0e1120;
+
+  /* ─── Text ─── */
+  --ink: #f0ecf6;
+  --ink-secondary: #b8b2cc;
+  --muted: #847e9a;
+  --muted-light: #5e587a;
+
+  /* ─── Borders & Rules ─── */
+  --rule: rgba(255, 255, 255, 0.06);
+  --rule-hover: rgba(255, 255, 255, 0.12);
+  --rule-focus: rgba(255, 217, 138, 0.5);
+
+  /* ─── Accent (warm gold) ─── */
   --accent: #ffd98a;
-  --accent2: #8bb9ff;
+  --accent-hover: #ffc94d;
+  --accent-subtle: rgba(255, 217, 138, 0.08);
+  --accent-border: rgba(255, 217, 138, 0.15);
+  --accent-glow: rgba(255, 217, 138, 0.2);
+
+  /* ─── Star category colors ─── */
   --star-blue: #86a8ff;
   --star-purple: #caa7ff;
   --star-green: #95f0c0;
   --star-red: #ff8b7d;
-  --shadow: rgba(0, 0, 0, 0.32);
-  --glow: rgba(255, 217, 138, 0.34);
-  --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+
+  /* ─── Shadows (subtle, PrimeVue-like) ─── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 16px rgba(255, 217, 138, 0.12);
+
+  /* ─── Radius (PrimeVue uses rem, slightly less rounded) ─── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ─── Motion ─── */
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ─── Typography ─── */
+  --font: "Inter", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* ─── Transitions ─── */
+  --transition-fast: 150ms var(--ease-out);
+  --transition-normal: 200ms var(--ease-out);
 }

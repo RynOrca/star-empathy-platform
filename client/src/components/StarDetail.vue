@@ -11,7 +11,7 @@
         <!-- 详情标题 -->
         <div class="panel-header" v-else>
           <button class="back-btn" @click="detailStoryId = null">
-            <ArrowLeft :size="16" />
+            <ArrowLeft :size="15" />
             <span>所有故事</span>
           </button>
         </div>
@@ -33,20 +33,20 @@
                   :disabled="resonating"
                   @click.stop="onResonate(story)"
                 >
-                  <component :is="justResonatedId === story.id ? Check : Lightbulb" :size="14" />
+                  <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
                   <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
                 </button>
               </div>
               <p class="story-excerpt">{{ story.content }}</p>
               <div class="story-meta">
-                <MessageSquare :size="13" /> <span>{{ story.resonanceCount }} 次共鸣</span>
+                <Sparkles :size="12" /> <span>{{ story.resonanceCount }}</span>
               </div>
             </div>
           </div>
 
           <div v-else class="empty-state">
-            <Star :size="22" class="empty-icon" />
-            <p>这颗星还在等待它的故事...</p>
+            <Star :size="20" class="empty-icon" />
+            <p>这颗星还在等待它的故事</p>
           </div>
         </template>
 
@@ -61,7 +61,7 @@
               :disabled="resonating"
               @click.stop="onResonate(detailStory)"
             >
-              <component :is="justResonatedId === detailStory.id ? Check : Lightbulb" :size="16" />
+              <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
               <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
               <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
             </button>
@@ -71,6 +71,7 @@
 
       <!-- 右：恒星信息 -->
       <div class="panel panel-info">
+        <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
         <div class="star-name">{{ starInfo?.displayName }}</div>
         <div class="star-meta" v-if="starInfo">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
 
@@ -82,8 +83,7 @@
           </div>
         </div>
 
-        <button class="write-btn" @click="onWriteStory"><PenSquare :size="15" /> 写我的故事</button>
-        <button class="close-btn" @click="$emit('close')"><X :size="14" /></button>
+        <button class="write-btn" @click="onWriteStory"><PenSquare :size="14" /> 写我的故事</button>
       </div>
     </div>
   </div>
@@ -91,7 +91,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Star, Lightbulb, Check, MessageSquare, PenSquare, X, ArrowLeft } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft } from 'lucide-vue-next'
 
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
@@ -142,80 +142,76 @@ const generatedTags = computed<string[]>(() => {
 </script>
 
 <style scoped>
-/* ─── 遮罩 ─── */
+/* ─── Overlay ─── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.55);
+  background: rgba(7, 8, 22, 0.45);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 0.2s;
+  animation: fadeIn 0.15s ease-out;
 }
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* ─── 容器 ─── */
+/* ─── Container ─── */
 .detail-wrap {
   display: flex;
-  gap: 1.5rem;
+  gap: 10px;
   align-items: flex-start;
-  width: 80vw;
-  max-width: 1160px;
-  animation: slideUp 0.25s ease;
+  width: 88vw;
+  max-width: 1300px;
+  animation: slideUp 0.2s ease-out;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── 面板通用 ─── */
+/* ─── Panel Base ─── */
 .panel {
-  background: color-mix(in srgb, var(--bg2) 94%, transparent);
+  background: var(--surface);
   border: 1px solid var(--rule);
-  border-radius: 16px;
-  backdrop-filter: blur(24px);
-  box-shadow: 0 8px 32px var(--shadow);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
 }
 
-/* ─── 左：故事面板 ─── */
+/* ─── Left: Stories Panel (fixed height, scrollable) ─── */
 .panel-stories {
   flex: 1;
   min-width: 0;
-  height: 80vh;
+  height: 70vh;
+  max-height: 600px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
+
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--rule);
   flex-shrink: 0;
 }
 .panel-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
 }
 .panel-count {
   font-size: 0.75rem;
-  color: var(--muted);
-}
-.story-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  color: var(--muted-light);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
 }
 
-/* ─── 返回按钮 ─── */
+/* ─── Back Button ─── */
 .back-btn {
   background: none;
   border: none;
@@ -225,45 +221,74 @@ const generatedTags = computed<string[]>(() => {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0;
+  gap: 6px;
+  padding: 2px 0;
   transition: opacity 0.15s;
 }
 .back-btn:hover { opacity: 0.7; }
 
-/* 故事卡片 */
+/* ─── Story List ─── */
+.story-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.story-list::-webkit-scrollbar {
+  width: 5px;
+}
+.story-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.story-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.story-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ─── Story Card ─── */
 .story-card {
-  padding: 1rem 1rem;
-  border-radius: 12px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
-  background: color-mix(in srgb, var(--bg2) 50%, transparent);
-  transition: border-color 0.2s, background 0.15s;
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
   cursor: pointer;
 }
 .story-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-color: var(--rule);
+  background: rgba(255, 255, 255, 0.02);
 }
+
 .story-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-bottom: 0.25rem;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
 }
 .story-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
   color: var(--ink);
   line-height: 1.4;
 }
+
+/* ─── Resonate Button ─── */
 .resonate-btn {
   flex-shrink: 0;
-  padding: 0.3rem 0.7rem;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
   color: var(--accent);
   font-size: 0.78rem;
   font-family: var(--font);
@@ -272,19 +297,25 @@ const generatedTags = computed<string[]>(() => {
   transition: background 0.15s;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 5px;
 }
 .resonate-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: rgba(255, 217, 138, 0.15);
+}
+.resonate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .resonate-btn.done {
-  border-color: var(--star-green);
+  border-color: rgba(149, 240, 192, 0.25);
+  background: rgba(149, 240, 192, 0.08);
   color: var(--star-green);
 }
+
 .story-excerpt {
-  margin: 0.25rem 0 0.5rem;
-  color: var(--muted);
-  font-size: 0.88rem;
+  margin: 0 0 8px;
+  color: var(--ink-secondary);
+  font-size: 0.85rem;
   line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -292,150 +323,177 @@ const generatedTags = computed<string[]>(() => {
   overflow: hidden;
 }
 .story-meta {
-  font-size: 0.78rem;
-  color: var(--muted);
+  font-size: 0.75rem;
+  color: var(--muted-light);
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 5px;
 }
 
-/* ─── 详情视图 ─── */
+/* ─── Detail View ─── */
 .detail-view {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem 1.5rem;
+  overflow-x: hidden;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.detail-view::-webkit-scrollbar {
+  width: 5px;
+}
+.detail-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+.detail-view::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.detail-view::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 .detail-title {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
-  font-weight: 500;
+  margin: 0 0 16px;
+  font-size: 1.08rem;
+  font-weight: 600;
   color: var(--ink);
   line-height: 1.5;
-  padding-bottom: 0.75rem;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--rule);
 }
 .detail-body {
   flex: 1;
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.8;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+  line-height: 1.85;
   white-space: pre-wrap;
 }
 .detail-footer {
   flex-shrink: 0;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
+  margin-top: 20px;
+  padding-top: 16px;
   border-top: 1px solid var(--rule);
 }
 .detail-resonate {
-  padding: 0.5rem 1rem;
-  font-size: 0.88rem;
-  gap: 0.4rem;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  gap: 6px;
 }
 .resonate-count {
-  margin-left: 0.15rem;
-  opacity: 0.65;
+  margin-left: 4px;
+  opacity: 0.6;
   font-weight: 400;
 }
 
-/* 空状态 */
+/* ─── Empty State ─── */
 .empty-state {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  color: var(--muted);
-  font-style: italic;
-  font-size: 0.88rem;
+  gap: 8px;
+  color: var(--muted-light);
+  font-size: 0.85rem;
 }
-.empty-icon { opacity: 0.3; }
+.empty-icon { opacity: 0.2; }
 
-/* ─── 右：信息面板 ─── */
+/* ─── Right: Info Panel ─── */
 .panel-info {
-  width: 18rem;
+  width: 320px;
   flex-shrink: 0;
-  padding: 1.25rem;
+  padding: 24px;
   position: relative;
 }
 .star-name {
-  font-size: 1.05rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--accent);
   letter-spacing: 0.02em;
+  line-height: 1.3;
 }
 .star-meta {
   font-size: 0.8rem;
   color: var(--muted);
-  margin-top: 0.2rem;
+  margin-top: 2px;
 }
 .info-section {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 24px;
+  padding-top: 16px;
   border-top: 1px solid var(--rule);
 }
 .info-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 10px;
 }
 .info-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 6px;
 }
 .tag {
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: color-mix(in srgb, var(--accent) 70%, white);
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-secondary);
+  border: 1px solid var(--rule);
 }
 .tag.is-empty {
-  opacity: 0.35;
+  opacity: 0.3;
   font-style: italic;
 }
 
+/* ─── Write Button ─── */
 .write-btn {
-  margin-top: 1rem;
+  margin-top: 20px;
   width: 100%;
-  padding: 0.55rem 0;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  color: var(--accent);
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  border: none;
+  color: rgba(0, 0, 0, 0.75);
   font-family: var(--font);
   font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 8px;
 }
 .write-btn:hover {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--accent-hover);
+}
+.write-btn:active {
+  transform: scale(0.98);
 }
 
+/* ─── Close Button ─── */
 .close-btn {
   position: absolute;
-  top: 0.6rem; right: 0.7rem;
+  top: 16px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
-  border: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
   color: var(--muted);
-  font-size: 0.9rem;
   cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.15s;
-  padding: 2px;
-  line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+  padding: 0;
 }
-.close-btn:hover { opacity: 0.8; }
+.close-btn:hover {
+  color: var(--ink);
+  border-color: var(--rule-hover);
+}
 </style>

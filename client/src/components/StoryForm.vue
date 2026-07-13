@@ -2,13 +2,13 @@
   <div class="overlay" @click.self="$emit('close')">
     <div class="form-panel">
       <div class="form-header">
-        <h2 class="form-heading"><PenSquare :size="18" /> 写我的故事</h2>
-        <button class="close-icon" @click="$emit('close')"><X :size="16" /></button>
+        <h2 class="form-heading"><PenSquare :size="16" /> 写我的故事</h2>
+        <button class="close-icon" @click="$emit('close')"><X :size="15" /></button>
       </div>
 
       <div class="form-body">
         <div class="field">
-          <label class="field-label">标题 <span class="required">*</span></label>
+          <label class="field-label">标题</label>
           <input
             v-model="title"
             class="field-input"
@@ -35,7 +35,7 @@
         <p v-if="error" class="form-error">{{ error }}</p>
 
         <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
-          <Send :size="15" />
+          <Send :size="14" />
           <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
         </button>
       </div>
@@ -106,155 +106,177 @@ async function onSubmit() {
 </script>
 
 <style scoped>
+/* ─── Overlay ─── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.55);
+  background: rgba(7, 8, 22, 0.45);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
-  animation: fadeIn 0.2s;
+  animation: fadeIn 0.15s ease-out;
 }
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* ─── Form Panel ─── */
 .form-panel {
-  width: 520px;
-  max-width: 90vw;
-  background: color-mix(in srgb, var(--bg2) 94%, transparent);
+  width: 540px;
+  max-width: 92vw;
+  background: var(--surface);
   border: 1px solid var(--rule);
-  border-radius: 16px;
-  backdrop-filter: blur(24px);
-  box-shadow: 0 8px 32px var(--shadow);
-  animation: slideUp 0.25s ease;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.2s ease-out;
   overflow: hidden;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ─── Header ─── */
 .form-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--rule);
 }
 .form-heading {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--ink);
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 8px;
 }
 .close-icon {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
-  border: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
   color: var(--muted);
   cursor: pointer;
-  padding: 2px;
-  opacity: 0.4;
-  transition: opacity 0.15s;
+  transition: color 0.15s, border-color 0.15s;
+  padding: 0;
 }
-.close-icon:hover { opacity: 0.8; }
+.close-icon:hover {
+  color: var(--ink);
+  border-color: var(--rule-hover);
+}
 
+/* ─── Body ─── */
 .form-body {
-  padding: 1.25rem;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 18px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 6px;
 }
 .field-label {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--ink-secondary);
 }
-.required {
-  font-weight: 500;
-  color: var(--accent);
-}
+
+/* ─── Inputs (PrimeVue form field style) ─── */
 .field-input {
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--rule);
-  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  background: var(--surface-ground);
   color: var(--ink);
   font-family: var(--font);
   font-size: 0.88rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s;
 }
 .field-input:focus {
   border-color: var(--accent);
 }
 .field-input::placeholder {
-  color: color-mix(in srgb, var(--muted) 50%, transparent);
+  color: var(--muted-light);
 }
+
 .field-textarea {
   resize: vertical;
-  min-height: 120px;
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  min-height: 130px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--rule);
-  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  background: var(--surface-ground);
   color: var(--ink);
   font-family: var(--font);
   font-size: 0.88rem;
   line-height: 1.65;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s;
 }
 .field-textarea:focus {
   border-color: var(--accent);
 }
 .field-textarea::placeholder {
-  color: color-mix(in srgb, var(--muted) 50%, transparent);
+  color: var(--muted-light);
 }
+
+/* ─── Char Count ─── */
 .char-count {
   text-align: right;
   font-size: 0.72rem;
-  color: var(--muted);
-  margin-top: 0.15rem;
+  color: var(--muted-light);
+  margin-top: 2px;
 }
 .char-count.warn {
   color: #e8a84c;
 }
 
+/* ─── Error ─── */
 .form-error {
   margin: 0;
   font-size: 0.82rem;
-  color: #e85a5a;
+  color: var(--star-red);
+  padding: 8px 12px;
+  background: rgba(255, 139, 125, 0.06);
+  border: 1px solid rgba(255, 139, 125, 0.12);
+  border-radius: var(--radius-sm);
 }
 
+/* ─── Submit Button ─── */
 .submit-btn {
   width: 100%;
-  padding: 0.65rem 0;
-  border-radius: 10px;
+  padding: 11px 0;
+  border-radius: var(--radius-md);
   border: none;
   background: var(--accent);
-  color: #fff;
+  color: rgba(0, 0, 0, 0.75);
   font-family: var(--font);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: background 0.15s, transform 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 8px;
+  margin-top: 4px;
 }
 .submit-btn:hover:not(:disabled) {
-  opacity: 0.85;
+  background: var(--accent-hover);
+}
+.submit-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .submit-btn:disabled {
   opacity: 0.35;
