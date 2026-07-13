@@ -20,13 +20,13 @@ export function getAllStars(): Star[] {
 }
 
 // 创建星星
-export function createStar(content: string, catalogStarId?: number): Star {
+export function createStar(content: string, title?: string, catalogStarId?: number): Star {
   const pos = generatePosition();
   const stmt = db.prepare(`
-    INSERT INTO stars (type, content, pos_x, pos_y, pos_z, catalog_star_id)
-    VALUES ('user', ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id)
+    VALUES ('user', ?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(content, pos.x, pos.y, pos.z, catalogStarId ?? null);
+  const result = stmt.run(title ?? null, content, pos.x, pos.y, pos.z, catalogStarId ?? null);
   return db.prepare('SELECT * FROM stars WHERE id = ?').get(result.lastInsertRowid) as unknown as Star;
 }
 

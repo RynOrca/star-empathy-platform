@@ -8,7 +8,7 @@
 
       <div class="form-body">
         <div class="field">
-          <label class="field-label">标题 <span class="optional">（选填）</span></label>
+          <label class="field-label">标题 <span class="required">*</span></label>
           <input
             v-model="title"
             class="field-input"
@@ -34,7 +34,7 @@
 
         <p v-if="error" class="form-error">{{ error }}</p>
 
-        <button class="submit-btn" :disabled="submitting || !content.trim()" @click="onSubmit">
+        <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
           <Send :size="15" />
           <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
         </button>
@@ -68,8 +68,9 @@ onMounted(() => {
 })
 
 async function onSubmit() {
+  const trimmedTitle = title.value.trim()
   const trimmed = content.value.trim()
-  if (!trimmed || submitting.value) return
+  if (!trimmedTitle || !trimmed || submitting.value) return
 
   submitting.value = true
   error.value = ''
@@ -80,7 +81,7 @@ async function onSubmit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         catalog_star_id: props.catalogStarId,
-        title: title.value.trim() || null,
+        title: trimmedTitle,
         content: trimmed,
       }),
     })
@@ -178,9 +179,9 @@ async function onSubmit() {
   font-weight: 500;
   color: var(--muted);
 }
-.optional {
-  font-weight: 400;
-  opacity: 0.6;
+.required {
+  font-weight: 500;
+  color: var(--accent);
 }
 .field-input {
   padding: 0.6rem 0.75rem;

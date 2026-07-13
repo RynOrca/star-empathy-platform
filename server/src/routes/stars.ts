@@ -17,7 +17,7 @@ router.get('/', (_req: Request, res: Response) => {
 // 投递心事/创建星星
 router.post('/story', (req: Request, res: Response) => {
   try {
-    const { content, catalog_star_id } = req.body;
+    const { title, content, catalog_star_id } = req.body;
 
     // 校验 content
     if (!content || typeof content !== 'string') {
@@ -33,17 +33,16 @@ router.post('/story', (req: Request, res: Response) => {
     const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
 
     // 转义 HTML 特殊字符，防止 XSS
-    const safeContent = trimmed.replace(/[<>&"]/g, (c) => {
+    const esc = (s: string) => s.replace(/[<>&"]/g, (c) => {
       const map: Record<string, string> = {
-        '<': '&lt;',
-        '>': '&gt;',
-        '&': '&amp;',
-        '"': '&quot;',
+        '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;',
       };
       return map[c] || c;
     });
+    const safeContent = esc(trimmed);
+    const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
 
-    const star = createStar(safeContent, starId);
+    const star = createStar(safeContent, safeTitle, starId);
     res.status(200).json({ code: 200, message: '故事已化作星光', data: star });
   } catch (error) {
     console.error('POST /api/stars/story error:', error);
