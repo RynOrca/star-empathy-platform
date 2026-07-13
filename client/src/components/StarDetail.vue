@@ -151,7 +151,7 @@ const generatedTags = computed<string[]>(() => {
 /* ─── 左：故事卡片 ─── */
 .card-stories {
   width: 520px;
-  max-height: 80vh;
+  height: 80vh;
   overflow-y: auto;
   padding: 0.8rem;
 }
