@@ -1,56 +1,62 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
-    <div class="star-detail-wrap">
-    <!-- 左：故事列表 -->
-    <div class="card card-stories">
-      <div v-if="hasRealStory" class="story-list">
-        <div
-          v-for="(story, i) in realStories"
-          :key="story.id"
-          class="story-item"
-          :class="{ active: localIndex === i }"
-          @click="goTo(i)"
-        >
-          <div class="story-head">
-            <span class="story-title">{{ story.title || '匿名心事' }}</span>
-            <button
-              class="resonate-btn"
-              :class="{ done: justResonatedId === story.id }"
-              :disabled="resonating"
-              @click.stop="onResonate(story)"
-            >
-              {{ justResonatedId === story.id ? '✓' : '💡' }}
-            </button>
-          </div>
-          <p class="story-content">{{ story.content }}</p>
-          <div class="story-meta">
-            <span class="resonance">💬 {{ story.resonanceCount }}</span>
+    <div class="detail-wrap">
+      <!-- 左：故事列表 -->
+      <div class="panel panel-stories">
+        <div class="panel-header">
+          <span class="panel-title">故事</span>
+          <span class="panel-count" v-if="hasRealStory">{{ realStories.length }} 条</span>
+        </div>
+
+        <div v-if="hasRealStory" class="story-list">
+          <div
+            v-for="(story, i) in realStories"
+            :key="story.id"
+            class="story-card"
+            :class="{ active: localIndex === i }"
+          >
+            <div class="story-head">
+              <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+              <button
+                class="resonate-btn"
+                :class="{ done: justResonatedId === story.id }"
+                :disabled="resonating"
+                @click.stop="onResonate(story)"
+              >
+                {{ justResonatedId === story.id ? '✓ 已共鸣' : '💡 共鸣' }}
+              </button>
+            </div>
+            <p class="story-content">{{ story.content }}</p>
+            <div class="story-meta">
+              <span>💬 {{ story.resonanceCount }} 次共鸣</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div v-else class="empty-state">
-        <p>✦ 这颗星还在等待它的故事...</p>
-      </div>
-    </div>
 
-    <!-- 右：恒星信息 -->
-    <div class="card card-info">
-      <div class="star-name">{{ starInfo?.displayName }}</div>
-      <div class="star-meta" v-if="starInfo">
-        {{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星
+        <div v-else class="empty-state">
+          <span class="empty-icon">✦</span>
+          <p>这颗星还在等待它的故事...</p>
+        </div>
       </div>
-      <div class="divider"></div>
-      <div class="section-label">标签</div>
-      <div class="tag-list">
-        <span class="tag" v-for="tag in generatedTags" :key="tag">{{ tag }}</span>
-        <span v-if="generatedTags.length === 0" class="tag dim">暂无</span>
+
+      <!-- 右：恒星信息 -->
+      <div class="panel panel-info">
+        <div class="star-name">{{ starInfo?.displayName }}</div>
+        <div class="star-meta" v-if="starInfo">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
+
+        <div class="info-section">
+          <div class="info-label">标签</div>
+          <div class="info-tags">
+            <span class="tag" v-for="tag in generatedTags" :key="tag">{{ tag }}</span>
+            <span v-if="generatedTags.length === 0" class="tag is-empty">暂无标签</span>
+          </div>
+        </div>
+
+        <button class="write-btn" @click="onWriteStory">✎ 写我的故事</button>
+        <button class="close-btn" @click="$emit('close')">✕</button>
       </div>
-      <div class="divider"></div>
-      <button class="write-btn" @click="onWriteStory">✎ 写我的故事</button>
-      <button class="close-card" @click="$emit('close')">✕</button>
     </div>
-    </div><!-- /star-detail-wrap -->
-  </div><!-- /overlay -->
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -87,13 +93,8 @@ function onResonate(story: { id: number }) {
   setTimeout(() => { justResonatedId.value = null }, 2000)
 }
 
-function onWriteStory() {
-  emit('writeStory')
-}
+function onWriteStory() { emit('writeStory') }
 
-// 点遮罩关闭（模板中 @click.self 处理）
-
-// 自动标签
 const generatedTags = computed<string[]>(() => {
   if (!hasRealStory.value) return []
   const all = realStories.value.map(s => (s.title || '') + ' ' + s.content).join(' ')
@@ -111,89 +112,116 @@ const generatedTags = computed<string[]>(() => {
 </script>
 
 <style scoped>
+/* ─── 遮罩 ─── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.5);
-  backdrop-filter: blur(3px);
+  background: rgba(7, 8, 22, 0.55);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: overlayIn 0.2s ease;
+  animation: fadeIn 0.2s;
 }
-@keyframes overlayIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 
-.star-detail-wrap {
+/* ─── 容器 ─── */
+.detail-wrap {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: flex-start;
-  animation: fadeIn 0.2s ease;
+  animation: slideUp 0.25s ease;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── 卡片通用 ─── */
-.card {
-  background: color-mix(in srgb, var(--bg2) 92%, transparent);
+/* ─── 面板通用 ─── */
+.panel {
+  background: color-mix(in srgb, var(--bg2) 94%, transparent);
   border: 1px solid var(--rule);
   border-radius: 16px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 16px 48px var(--shadow);
-  overflow: hidden;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 8px 32px var(--shadow);
 }
 
-/* ─── 左：故事卡片 ─── */
-.card-stories {
+/* ─── 左：故事面板 ─── */
+.panel-stories {
   width: 520px;
   height: 80vh;
-  overflow-y: auto;
-  padding: 0.8rem;
-}
-.story-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
 }
-.story-item {
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.panel-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.panel-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.story-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 故事卡片 */
+.story-card {
   padding: 1rem 1rem;
   border-radius: 12px;
   border: 1px solid transparent;
-  cursor: pointer;
+  background: color-mix(in srgb, var(--bg2) 50%, transparent);
   transition: border-color 0.2s, background 0.2s;
+  cursor: default;
 }
-.story-item:hover,
-.story-item.active {
+.story-card:hover,
+.story-card.active {
   border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .story-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.2rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
 }
 .story-title {
-  color: var(--ink);
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 500;
+  color: var(--ink);
+  line-height: 1.4;
 }
 .resonate-btn {
-  width: 26px; height: 26px;
-  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   color: var(--accent);
+  font-size: 0.78rem;
+  font-family: var(--font);
   cursor: pointer;
-  font-size: 0.8rem;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s;
-  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s;
 }
 .resonate-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -203,48 +231,40 @@ const generatedTags = computed<string[]>(() => {
   color: var(--star-green);
 }
 .story-content {
+  margin: 0 0 0.5rem;
   color: var(--muted);
   font-size: 0.88rem;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin: 0.3rem 0 0.5rem;
+  line-height: 1.65;
 }
 .story-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.resonance {
+  font-size: 0.78rem;
   color: var(--muted);
-  font-size: 0.72rem;
 }
 
-/* ─── 空状态 ─── */
+/* 空状态 */
 .empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 0;
-  color: var(--muted);
-  font-style: italic;
-  font-size: 0.82rem;
-}
-
-/* ─── 右：信息卡片 ─── */
-.card-info {
-  width: 260px;
-  padding: 1.2rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+.empty-icon { font-size: 1.4rem; opacity: 0.4; }
+
+/* ─── 右：信息面板 ─── */
+.panel-info {
+  width: 240px;
+  padding: 1.25rem;
   position: relative;
 }
 .star-name {
-  color: var(--accent);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 500;
+  color: var(--accent);
   letter-spacing: 0.02em;
 }
 .star-meta {
@@ -252,61 +272,66 @@ const generatedTags = computed<string[]>(() => {
   color: var(--muted);
   margin-top: 0.2rem;
 }
-.divider {
-  height: 1px;
-  background: var(--rule);
-  margin: 0.7rem 0;
+.info-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
 }
-.section-label {
+.info-label {
   font-size: 0.68rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
 }
-.tag-list {
+.info-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 .tag {
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 6px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: color-mix(in srgb, var(--accent) 75%, white);
+  color: color-mix(in srgb, var(--accent) 70%, white);
   border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.tag.dim { opacity: 0.35; font-style: italic; }
+.tag.is-empty {
+  opacity: 0.35;
+  font-style: italic;
+}
 
 .write-btn {
-  margin-top: auto;
-  padding: 0.5rem 0;
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.55rem 0;
   border-radius: 10px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent);
   font-family: var(--font);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s;
-  text-align: center;
+  transition: background 0.15s;
 }
 .write-btn:hover {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.close-card {
+.close-btn {
   position: absolute;
-  top: 0.5rem; right: 0.6rem;
-  background: none; border: none;
+  top: 0.6rem; right: 0.7rem;
+  background: none;
+  border: none;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s;
   padding: 2px;
   line-height: 1;
-  opacity: 0.5;
-  transition: opacity 0.2s;
 }
-.close-card:hover { opacity: 1; }
+.close-btn:hover { opacity: 0.8; }
 </style>
