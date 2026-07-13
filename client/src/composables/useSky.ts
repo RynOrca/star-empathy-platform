@@ -154,36 +154,18 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
   }
 
-  // ═══ 地平渐变遮罩 (柔和消光) ═══
+  // ═══ 地平面以下白色遮罩 ═══
   {
-    // 用 canvas 画一个水平渐变带
-    const gradCanvas = document.createElement('canvas')
-    gradCanvas.width = 256
-    gradCanvas.height = 16
-    const ctx = gradCanvas.getContext('2d')!
-    const grad = ctx.createLinearGradient(0, 0, 0, 16)
-    grad.addColorStop(0, 'transparent')
-    grad.addColorStop(0.3, 'rgba(10,15,30,0.25)')
-    grad.addColorStop(0.5, 'rgba(10,15,30,0.45)')
-    grad.addColorStop(0.7, 'rgba(10,15,30,0.25)')
-    grad.addColorStop(1, 'transparent')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, 256, 16)
-    const tex = new CanvasTexture(gradCanvas)
-
-    // 围绕 y=0 的水平环带
-    const ring = new RingGeometry(SPHERE_RADIUS * 0.6, SPHERE_RADIUS * 1.1, 64)
-    const ringMat = new MeshBasicMaterial({
-      map: tex,
+    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.99, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
+    const maskMat = new MeshBasicMaterial({
+      color: 0xffffff,
       transparent: true,
       opacity: 0.6,
-      side: 2,
+      side: BackSide,
       depthWrite: false,
       depthTest: false,
     })
-    const ringMesh = new Mesh(ring, ringMat)
-    ringMesh.rotation.x = -Math.PI / 2
-    scene.add(ringMesh)
+    scene.add(new Mesh(maskGeo, maskMat))
   }
 
   // ═══ 天赤道 (Dec=0°) ═══
