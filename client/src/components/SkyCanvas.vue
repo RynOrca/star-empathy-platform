@@ -224,10 +224,43 @@ function clearSelection() {
   emit('star-deselect')
 }
 
+// ─── 触屏缩放 ──────────────────────────────
+let lastPinchDist = 0
+
+function onTouchStart(e: TouchEvent) {
+  if (e.touches.length === 2) {
+    lastPinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY,
+    )
+  }
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (e.touches.length === 2 && sky) {
+    e.preventDefault()
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY,
+    )
+    const delta = lastPinchDist - dist
+    if (Math.abs(delta) > 2) {
+      sky.camera.fov = Math.max(25, Math.min(75, sky.camera.fov + delta * 0.05))
+      sky.camera.updateProjectionMatrix()
+    }
+    lastPinchDist = dist
+  }
+}
+
 onMounted(() => {
   sky = useSky({ value: canvasRef.value! })
-  canvasRef.value!.addEventListener('mousemove', onMouseMove)
-  canvasRef.value!.addEventListener('click', onClick)
+  const el = canvasRef.value!
+  el.addEventListener('mousemove', onMouseMove)
+  el.addEventListener('click', onClick)
+  el.addEventListener('touchstart', onTouchStart, { passive: false })
+  el.addEventListener('touchmove', onTouchMove, { passive: false })
+  // 防止双击缩放
+  el.addEventListener('dblclick', (e) => e.preventDefault())
 })
 
 onBeforeUnmount(() => {

@@ -1,5 +1,5 @@
 <template>
-  <div class="star-detail" :style="cardStyle" ref="cardRef">
+  <div class="star-detail" :class="{ flip: isFlipped }" :style="cardStyle" ref="cardRef">
     <button class="close-btn" @click="$emit('close')">&times;</button>
     <h3 v-if="star.title">{{ star.title }}</h3>
     <h3 v-else class="anonymous">匿名心事</h3>
@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 
 const props = defineProps<{
   star: {
@@ -56,6 +56,29 @@ const cardStyle = computed(() => {
   }
 })
 
+const isFlipped = ref(false)
+
+// 边界检测：卡片超出视口顶部时翻转到星星下方
+onMounted(() => {
+  nextTick(() => {
+    const card = cardRef.value
+    if (!card) return
+    const rect = card.getBoundingClientRect()
+    // 卡片定位是 translate(-50%, -120%)，即星星上方
+    // 如果卡片顶部超出视口，翻到下方
+    if (rect.top < 10) {
+      isFlipped.value = true
+    }
+    // 如果左右超出
+    if (rect.left < 10) {
+      card.style.left = `${props.screenPos.x + (10 - rect.left)}px`
+    }
+    if (rect.right > window.innerWidth - 10) {
+      card.style.left = `${props.screenPos.x - (rect.right - window.innerWidth + 10)}px`
+    }
+  })
+})
+
 function onResonate() {
   emit('resonate', props.star.id)
   justResonated.value = true
@@ -83,6 +106,15 @@ function onResonate() {
 @keyframes floatIn {
   from { opacity: 0; transform: translate(-50%, -110%); }
   to { opacity: 1; transform: translate(-50%, -120%); }
+}
+/* 翻转到下方 */
+.star-detail.flip {
+  transform: translate(-50%, 20%);
+  animation: floatInDown 0.3s ease;
+}
+@keyframes floatInDown {
+  from { opacity: 0; transform: translate(-50%, 30%); }
+  to { opacity: 1; transform: translate(-50%, 20%); }
 }
 .close-btn {
   position: absolute;

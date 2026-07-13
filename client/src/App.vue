@@ -1,10 +1,19 @@
 <template>
   <div class="app">
     <Transition name="fade">
-      <LoadingScreen v-if="loading" />
+      <LoadingScreen v-if="loading && !error" />
+    </Transition>
+    <Transition name="fade">
+      <div v-if="error && !loading" class="error-overlay">
+        <div class="error-card">
+          <p>😔 星空连接失败</p>
+          <span class="error-detail">{{ error }}</span>
+          <button class="retry-btn" @click="retryFetch">重新连接</button>
+        </div>
+      </div>
     </Transition>
     <SkyCanvas
-      v-show="!loading"
+      v-show="!loading && !error"
       ref="skyCanvasRef"
       @star-hover="onHover"
       @star-select="onSelect"
@@ -148,6 +157,10 @@ function onFilterChange(newFilters: typeof filters) {
   Object.assign(filters, newFilters)
 }
 
+function retryFetch() {
+  fetchStars()
+}
+
 function showToast(msg: string) {
   toast.value = msg
   setTimeout(() => {
@@ -199,6 +212,45 @@ function showToast(msg: string) {
 .fab-icon {
   font-size: 1.2rem;
   color: var(--accent);
+}
+
+.error-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+}
+.error-card {
+  text-align: center;
+  padding: 2rem;
+}
+.error-card p {
+  font-size: 1.3rem;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.error-detail {
+  display: block;
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-bottom: 1.2rem;
+}
+.retry-btn {
+  padding: 0.55rem 1.5rem;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 18px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.retry-btn:hover {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .toast {
