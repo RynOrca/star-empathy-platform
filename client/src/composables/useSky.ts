@@ -207,9 +207,9 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0xd4a060,
+      color: 0xb07890,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.28,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
