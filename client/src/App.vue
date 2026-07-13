@@ -1,6 +1,10 @@
 <template>
   <div class="app">
-    <SkyCanvas />
+    <SkyCanvas ref="skyRef" />
+    <div class="zoom-controls">
+      <button class="zoom-btn" @click="zoomIn">+</button>
+      <button class="zoom-btn" @click="zoomOut">−</button>
+    </div>
     <div class="hint">
       <p>拖拽旋转 &nbsp;|&nbsp; 滚轮缩放</p>
     </div>
@@ -8,7 +12,13 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import SkyCanvas from './components/SkyCanvas.vue'
+
+const skyRef = ref<InstanceType<typeof SkyCanvas> | null>(null)
+
+function zoomIn()  { skyRef.value?.sky?.zoomIn() }
+function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>
 
 <style>
@@ -23,6 +33,29 @@ import SkyCanvas from './components/SkyCanvas.vue'
   font-family: var(--font);
   color: var(--ink);
 }
+
+.zoom-controls {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 10;
+}
+.zoom-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg2) 80%, transparent);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.3s;
+  display: flex; align-items: center; justify-content: center;
+}
+.zoom-btn:hover { border-color: var(--accent); }
 
 .hint {
   position: fixed;

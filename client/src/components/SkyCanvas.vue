@@ -16,6 +16,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   sky?.dispose()
 })
+
+defineExpose({ sky })
 </script>
 
 <style scoped>
