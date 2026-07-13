@@ -12,4 +12,4 @@
 - **docs**: AGENTS.md 全局指令文件
 - **docs**: toA.md 前端对接 & 部署指南
 
-> Git commit: (待首次提交)
+> Git commit: edac02f
