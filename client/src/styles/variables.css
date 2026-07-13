@@ -1,0 +1,16 @@
+:root {
+  --bg: #070816;
+  --bg2: #10142b;
+  --ink: #f6f1ff;
+  --muted: #b9b4d6;
+  --rule: #303757;
+  --accent: #ffd98a;
+  --accent2: #8bb9ff;
+  --star-blue: #86a8ff;
+  --star-purple: #caa7ff;
+  --star-green: #95f0c0;
+  --star-red: #ff8b7d;
+  --shadow: rgba(0, 0, 0, 0.32);
+  --glow: rgba(255, 217, 138, 0.34);
+  --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
