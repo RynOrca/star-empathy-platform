@@ -23,18 +23,19 @@
                 :disabled="resonating"
                 @click.stop="onResonate(story)"
               >
-                {{ justResonatedId === story.id ? '✓ 已共鸣' : '💡 共鸣' }}
+                <component :is="justResonatedId === story.id ? Check : Lightbulb" :size="14" />
+                <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
               </button>
             </div>
             <p class="story-content">{{ story.content }}</p>
             <div class="story-meta">
-              <span>💬 {{ story.resonanceCount }} 次共鸣</span>
+              <MessageSquare :size="13" /> <span>{{ story.resonanceCount }} 次共鸣</span>
             </div>
           </div>
         </div>
 
         <div v-else class="empty-state">
-          <span class="empty-icon">✦</span>
+          <Star :size="22" class="empty-icon" />
           <p>这颗星还在等待它的故事...</p>
         </div>
       </div>
@@ -52,8 +53,8 @@
           </div>
         </div>
 
-        <button class="write-btn" @click="onWriteStory">✎ 写我的故事</button>
-        <button class="close-btn" @click="$emit('close')">✕</button>
+        <button class="write-btn" @click="onWriteStory"><PenSquare :size="15" /> 写我的故事</button>
+        <button class="close-btn" @click="$emit('close')"><X :size="14" /></button>
       </div>
     </div>
   </div>
@@ -61,6 +62,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { Star, Lightbulb, Check, MessageSquare, PenSquare, X } from 'lucide-vue-next'
 
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
@@ -222,6 +224,9 @@ const generatedTags = computed<string[]>(() => {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 .resonate-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -239,6 +244,9 @@ const generatedTags = computed<string[]>(() => {
 .story-meta {
   font-size: 0.78rem;
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 /* 空状态 */
@@ -253,7 +261,7 @@ const generatedTags = computed<string[]>(() => {
   font-style: italic;
   font-size: 0.88rem;
 }
-.empty-icon { font-size: 1.4rem; opacity: 0.4; }
+.empty-icon { opacity: 0.3; }
 
 /* ─── 右：信息面板 ─── */
 .panel-info {
@@ -315,6 +323,10 @@ const generatedTags = computed<string[]>(() => {
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 .write-btn:hover {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
