@@ -2,7 +2,7 @@ import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
-  AdditiveBlending, Color,
+  AdditiveBlending, Color, Mesh, MeshBasicMaterial,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 
