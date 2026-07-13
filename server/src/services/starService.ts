@@ -10,6 +10,7 @@ export interface Star {
   pos_x: number;
   pos_y: number;
   pos_z: number;
+  catalog_star_id: number | null;
   created_at: string;
 }
 
@@ -19,13 +20,13 @@ export function getAllStars(): Star[] {
 }
 
 // 创建星星
-export function createStar(content: string): Star {
+export function createStar(content: string, catalogStarId?: number): Star {
   const pos = generatePosition();
   const stmt = db.prepare(`
-    INSERT INTO stars (type, content, pos_x, pos_y, pos_z)
-    VALUES ('user', ?, ?, ?, ?)
+    INSERT INTO stars (type, content, pos_x, pos_y, pos_z, catalog_star_id)
+    VALUES ('user', ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(content, pos.x, pos.y, pos.z);
+  const result = stmt.run(content, pos.x, pos.y, pos.z, catalogStarId ?? null);
   return db.prepare('SELECT * FROM stars WHERE id = ?').get(result.lastInsertRowid) as unknown as Star;
 }
 

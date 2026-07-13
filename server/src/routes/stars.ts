@@ -17,7 +17,7 @@ router.get('/', (_req: Request, res: Response) => {
 // 投递心事/创建星星
 router.post('/story', (req: Request, res: Response) => {
   try {
-    const { content } = req.body;
+    const { content, catalog_star_id } = req.body;
 
     // 校验 content
     if (!content || typeof content !== 'string') {
@@ -28,6 +28,9 @@ router.post('/story', (req: Request, res: Response) => {
     if (trimmed.length === 0 || trimmed.length > 300) {
       return res.status(400).json({ code: 400, message: 'content 长度需在 1~300 字之间', data: null });
     }
+
+    // 校验 catalog_star_id（可选）
+    const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
 
     // 转义 HTML 特殊字符，防止 XSS
     const safeContent = trimmed.replace(/[<>&"]/g, (c) => {
@@ -40,7 +43,7 @@ router.post('/story', (req: Request, res: Response) => {
       return map[c] || c;
     });
 
-    const star = createStar(safeContent);
+    const star = createStar(safeContent, starId);
     res.status(200).json({ code: 200, message: '故事已化作星光', data: star });
   } catch (error) {
     console.error('POST /api/stars/story error:', error);

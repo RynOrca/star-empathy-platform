@@ -15,9 +15,11 @@ db.exec(`
     pos_x           REAL NOT NULL,
     pos_y           REAL NOT NULL,
     pos_z           REAL NOT NULL,
+    catalog_star_id INTEGER,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
+  CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
 `);
 
 export default db;
