@@ -5,39 +5,14 @@ import {
   Points,
   BufferGeometry,
   BufferAttribute,
-  ShaderMaterial,
+  PointsMaterial,
+  CanvasTexture,
   LineSegments,
   LineBasicMaterial,
   AdditiveBlending,
   Color,
 } from 'three'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
-
-// ═══════════════════════════════════════════════
-// 自定义着色器：逐点大小 + 软光晕
-// ═══════════════════════════════════════════════
-const STAR_VERTEX = /* glsl */ `
-  attribute float size;
-  attribute vec3 color;
-  varying vec3 vColor;
-  void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (400.0 / -mv.z);
-    gl_Position = projectionMatrix * mv;
-    vColor = color;
-  }
-`
-
-const STAR_FRAGMENT = /* glsl */ `
-  varying vec3 vColor;
-  void main() {
-    float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float alpha = 1.0 - smoothstep(0.0, 1.0, d);
-    alpha = pow(alpha, 2.5);
-    if (alpha < 0.02) discard;
-    gl_FragColor = vec4(vColor, alpha);
-  }
-`
 
 // ═══════════════════════════════════════════════
 // 星表数据结构
@@ -127,21 +102,36 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
   const starGeo = new BufferGeometry()
   starGeo.setAttribute('position', new BufferAttribute(positions, 3))
   starGeo.setAttribute('color',    new BufferAttribute(colors, 3))
-  starGeo.setAttribute('size',     new BufferAttribute(sizes, 1))
 
-  const starMat = new ShaderMaterial({
-    vertexShader: STAR_VERTEX,
-    fragmentShader: STAR_FRAGMENT,
+  function makeGlowTexture(inner: string, sz: number): CanvasTexture {
+    const c = document.createElement('canvas')
+    c.width = c.height = sz
+    const ctx = c.getContext('2d')!
+    const h = sz / 2
+    const g = ctx.createRadialGradient(h, h, h * 0.02, h, h, h)
+    g.addColorStop(0, inner)
+    g.addColorStop(0.2, inner)
+    g.addColorStop(1, 'transparent')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, sz, sz)
+    return new CanvasTexture(c)
+  }
+
+  const starTex = makeGlowTexture('white', 64)
+  const starMat = new PointsMaterial({
+    size: 6,
+    map: starTex,
     blending: AdditiveBlending,
     depthWrite: false,
     depthTest: true,
     transparent: true,
     vertexColors: true,
+    sizeAttenuation: true,
   })
 
   const starPoints = new Points(starGeo, starMat)
   scene.add(starPoints)
-  console.log(`🌟 ${n} stars added to scene, first:`, stars[0].name, 'mag', stars[0].mag, 'size', sizes[0])
+  console.log('🌟', n, 'stars added to scene. First:', stars[0]?.name, 'mag', stars[0]?.mag)
 
   // ═════════════════════════════════════════
   // 星座连线
