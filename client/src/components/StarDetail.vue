@@ -1,10 +1,20 @@
 <template>
   <div class="star-detail" :class="{ flip: isFlipped }" :style="cardStyle" ref="cardRef">
     <button class="close-btn" @click="$emit('close')">&times;</button>
-    <h3 v-if="star.title">{{ star.title }}</h3>
-    <h3 v-else class="anonymous">匿名心事</h3>
-    <p class="content">{{ star.content }}</p>
-    <div class="footer">
+
+    <!-- 亮星名称 -->
+    <div v-if="starName" class="star-label">{{ starName }}</div>
+
+    <!-- 故事内容 -->
+    <template v-if="star.content">
+      <h3 v-if="star.title">{{ star.title }}</h3>
+      <h3 v-else class="anonymous">匿名心事</h3>
+      <p class="content">{{ star.content }}</p>
+    </template>
+    <p v-else class="no-story">这颗星还在等待它的故事...</p>
+
+    <!-- 共鸣 -->
+    <div v-if="star.storyId >= 0" class="footer">
       <span class="resonance-count">{{ star.resonanceCount }} 次共鸣</span>
       <button
         class="resonate-btn"
@@ -25,12 +35,12 @@ import { computed, ref, onMounted, nextTick } from 'vue'
 
 const props = defineProps<{
   star: {
-    id: number
-    type: string
+    storyId: number
     title: string | null
     content: string
     resonanceCount: number
   }
+  starName: string | null
   screenPos: { x: number; y: number }
   resonating: boolean
 }>()
@@ -40,39 +50,22 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const isFlipped = ref(false)
 const justResonated = ref(false)
 const cardRef = ref<HTMLElement | null>(null)
 
-const cardStyle = computed(() => {
-  let left = props.screenPos.x
-  let top = props.screenPos.y
+const cardStyle = computed(() => ({
+  left: `${props.screenPos.x}px`,
+  top: `${props.screenPos.y}px`,
+}))
 
-  // 边界检测在 mounted 后做，这里先用近似值
-  // transform: translate(-50%, -120%) 把卡片放在星星上方
-  // 如果卡超出视口，做翻转
-  return {
-    left: `${left}px`,
-    top: `${top}px`,
-  }
-})
-
-const isFlipped = ref(false)
-
-// 边界检测：卡片超出视口顶部时翻转到星星下方
 onMounted(() => {
   nextTick(() => {
     const card = cardRef.value
     if (!card) return
     const rect = card.getBoundingClientRect()
-    // 卡片定位是 translate(-50%, -120%)，即星星上方
-    // 如果卡片顶部超出视口，翻到下方
-    if (rect.top < 10) {
-      isFlipped.value = true
-    }
-    // 如果左右超出
-    if (rect.left < 10) {
-      card.style.left = `${props.screenPos.x + (10 - rect.left)}px`
-    }
+    if (rect.top < 10) isFlipped.value = true
+    if (rect.left < 10) card.style.left = `${props.screenPos.x + (10 - rect.left)}px`
     if (rect.right > window.innerWidth - 10) {
       card.style.left = `${props.screenPos.x - (rect.right - window.innerWidth + 10)}px`
     }
@@ -80,11 +73,9 @@ onMounted(() => {
 })
 
 function onResonate() {
-  emit('resonate', props.star.id)
+  emit('resonate', props.star.storyId)
   justResonated.value = true
-  setTimeout(() => {
-    justResonated.value = false
-  }, 2000)
+  setTimeout(() => { justResonated.value = false }, 2000)
 }
 </script>
 
@@ -107,7 +98,6 @@ function onResonate() {
   from { opacity: 0; transform: translate(-50%, -110%); }
   to { opacity: 1; transform: translate(-50%, -120%); }
 }
-/* 翻转到下方 */
 .star-detail.flip {
   transform: translate(-50%, 20%);
   animation: floatInDown 0.3s ease;
@@ -118,53 +108,40 @@ function onResonate() {
 }
 .close-btn {
   position: absolute;
-  top: 0.5rem;
-  right: 0.7rem;
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 1.3rem;
-  cursor: pointer;
-  line-height: 1;
+  top: 0.5rem; right: 0.7rem;
+  background: none; border: none;
+  color: var(--muted); font-size: 1.3rem;
+  cursor: pointer; line-height: 1;
   transition: color 0.2s;
 }
 .close-btn:hover { color: var(--ink); }
+.star-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.05em;
+}
 h3 { color: var(--accent); margin-bottom: 0.4rem; font-size: 1.1rem; }
 .anonymous { color: var(--star-blue); }
 .content {
-  color: var(--muted);
-  line-height: 1.6;
-  margin-bottom: 0.8rem;
-  font-size: 0.93rem;
-  max-height: 160px;
-  overflow-y: auto;
+  color: var(--muted); line-height: 1.6; margin-bottom: 0.8rem;
+  font-size: 0.93rem; max-height: 160px; overflow-y: auto;
 }
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.no-story {
+  color: var(--muted); font-style: italic; font-size: 0.9rem; margin: 0.5rem 0;
 }
+.footer { display: flex; align-items: center; justify-content: space-between; }
 .resonance-count { color: var(--muted); font-size: 0.85rem; }
 .resonate-btn {
   padding: 0.4rem 1rem;
   background: color-mix(in srgb, var(--accent) 15%, transparent);
-  border: 1px solid var(--accent);
-  border-radius: 16px;
-  color: var(--accent);
-  font-family: var(--font);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.3s, border-color 0.3s, color 0.3s;
+  border: 1px solid var(--accent); border-radius: 16px;
+  color: var(--accent); font-family: var(--font); font-size: 0.85rem;
+  cursor: pointer; transition: background 0.3s, border-color 0.3s, color 0.3s;
   white-space: nowrap;
 }
-.resonate-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
-}
+.resonate-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .resonate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .resonate-btn.resonating { border-color: var(--accent2); color: var(--accent2); }
-.resonate-btn.done {
-  border-color: var(--star-green);
-  color: var(--star-green);
-  background: color-mix(in srgb, var(--star-green) 15%, transparent);
-}
+.resonate-btn.done { border-color: var(--star-green); color: var(--star-green); background: color-mix(in srgb, var(--star-green) 15%, transparent); }
 </style>

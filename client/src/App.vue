@@ -26,6 +26,7 @@
         :star="selectedStar"
         :screen-pos="detailPos"
         :resonating="resonatingId === selectedStar.id"
+        :star-name="selectedStarName"
         @resonate="onResonate"
         @close="onDeselect"
       />
@@ -52,68 +53,89 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 import SkyCanvas from './components/SkyCanvas.vue'
-import type { StarData } from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
 import StoryForm from './components/StoryForm.vue'
 import LegendToggle from './components/LegendToggle.vue'
 import LoadingScreen from './components/LoadingScreen.vue'
 import { useStars } from './composables/useStars'
 import { useResonate } from './composables/useResonate'
+import { getSeedStarId, assignUserStar } from './utils/storyMappings'
+import type { StoryAttachment } from './composables/useSky'
 
 const skyCanvasRef = ref<InstanceType<typeof SkyCanvas> | null>(null)
-const { loading, error, filters, filteredStars, fetchStars, addLocalStar, updateResonanceLocally } = useStars()
+const { stars: apiStars, loading, error, filters, fetchStars, addLocalStar, updateResonanceLocally } = useStars()
 const { resonate, resonatingId } = useResonate()
 
-const selectedStar = ref<StarData | null>(null)
+const selectedStar = ref<StoryAttachment | null>(null)
+const selectedStarName = ref<string | null>(null)
 const detailPos = ref({ x: 0, y: 0 })
 const showForm = ref(false)
 const toast = ref('')
 
-// 数据加载后推送到 SkyCanvas
-watch(filteredStars, (stars) => {
-  if (skyCanvasRef.value) {
-    skyCanvasRef.value.setStars(stars)
-  }
-})
+// ─── API 数据 → 恒星映射 → SkyCanvas ────────
+function buildAttachments(): StoryAttachment[] {
+  return apiStars.value.map(s => {
+    let catalogId: number | null = null
 
-// 初始加载
-watch(skyCanvasRef, (ref) => {
-  if (ref && filteredStars.value.length > 0) {
-    ref.setStars(filteredStars.value)
-  }
-})
+    if (s.type === 'history' && s.title) {
+      catalogId = getSeedStarId(s.title)
+    }
 
-// 错误 toast
-watch(error, (msg) => {
-  if (msg) showToast(msg)
-})
+    // 如果映射失败，分配未命名暗星
+    if (catalogId === null) {
+      catalogId = assignUserStar().id
+    }
 
-function onHover(star: StarData | null, _x: number, _y: number) {
-  // hover 反馈由 SkyCanvas 内部处理（光环 sprite）
+    return {
+      storyId: s.id,
+      catalogStarId: catalogId,
+      type: s.type,
+      title: s.title,
+      content: s.content,
+      resonanceCount: s.resonanceCount,
+    }
+  })
 }
 
-function onSelect(star: StarData, screenX: number, screenY: number) {
-  selectedStar.value = star
+watch(apiStars, (stars) => {
+  if (stars.length > 0 && skyCanvasRef.value) {
+    const attachments = buildAttachments()
+    skyCanvasRef.value.setStoryAttachments(attachments)
+  }
+})
+
+watch(skyCanvasRef, (ref) => {
+  if (ref && apiStars.value.length > 0) {
+    ref.setStoryAttachments(buildAttachments())
+  }
+})
+
+watch(error, (msg) => { if (msg) showToast(msg) })
+
+// ─── 交互 ───────────────────────────────────
+function onHover(_att: StoryAttachment | null, _x: number, _y: number) {}
+
+function onSelect(attachment: StoryAttachment, catalogName: string | null, screenX: number, screenY: number) {
+  selectedStar.value = attachment
+  selectedStarName.value = catalogName
   detailPos.value = { x: screenX, y: screenY }
 }
 
 function onDeselect() {
   selectedStar.value = null
+  selectedStarName.value = null
   skyCanvasRef.value?.clearSelection()
 }
 
 async function onResonate(id: number) {
+  if (id < 0) return // 无故事的亮星不能共鸣
   const ok = await resonate(id)
   if (ok) {
     updateResonanceLocally(id)
-    // 更新 StarDetail 中显示的星
-    if (selectedStar.value && selectedStar.value.id === id) {
-      selectedStar.value = {
-        ...selectedStar.value,
-        resonanceCount: selectedStar.value.resonanceCount + 1,
-      }
+    if (selectedStar.value && selectedStar.value.storyId === id) {
+      selectedStar.value = { ...selectedStar.value, resonanceCount: selectedStar.value.resonanceCount + 1 }
     }
     showToast('共鸣已点亮 ✨')
   } else {
@@ -131,19 +153,27 @@ async function onSubmitStory(content: string) {
     const json = await res.json()
     if (json.code === 200) {
       const raw = json.data
-      const newStar: StarData = {
+      const catalogStar = assignUserStar()
+      const newStar = {
         id: raw.id,
-        type: 'user',
+        type: 'user' as const,
         title: raw.title ?? null,
         content: raw.content,
         resonanceCount: raw.resonance_count ?? 0,
-        posX: raw.pos_x ?? raw.position?.x ?? 0,
-        posY: raw.pos_y ?? raw.position?.y ?? 0,
-        posZ: raw.pos_z ?? raw.position?.z ?? 0,
+        posX: raw.pos_x ?? 0,
+        posY: raw.pos_y ?? 0,
+        posZ: raw.pos_z ?? 0,
         createdAt: raw.created_at ?? new Date().toISOString(),
       }
       addLocalStar(newStar)
-      skyCanvasRef.value?.addStar(newStar)
+      skyCanvasRef.value?.addStoryAttachment({
+        storyId: newStar.id,
+        catalogStarId: catalogStar.id,
+        type: 'user',
+        title: null,
+        content: newStar.content,
+        resonanceCount: 0,
+      })
       showToast('故事已化作星光 🌟')
     } else {
       showToast(json.message || '投递失败')
@@ -155,17 +185,13 @@ async function onSubmitStory(content: string) {
 
 function onFilterChange(newFilters: typeof filters) {
   Object.assign(filters, newFilters)
+  // TODO: 按类型筛选 overlay 显示/隐藏
 }
 
-function retryFetch() {
-  fetchStars()
-}
-
+function retryFetch() { fetchStars() }
 function showToast(msg: string) {
   toast.value = msg
-  setTimeout(() => {
-    toast.value = ''
-  }, 2500)
+  setTimeout(() => { toast.value = '' }, 2500)
 }
 </script>
 
@@ -203,55 +229,8 @@ function showToast(msg: string) {
   transition: border-color 0.3s, box-shadow 0.3s;
   z-index: 10;
 }
-
-.fab:hover {
-  border-color: var(--accent);
-  box-shadow: 0 8px 40px var(--glow);
-}
-
-.fab-icon {
-  font-size: 1.2rem;
-  color: var(--accent);
-}
-
-.error-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 90;
-}
-.error-card {
-  text-align: center;
-  padding: 2rem;
-}
-.error-card p {
-  font-size: 1.3rem;
-  color: var(--ink);
-  margin-bottom: 0.5rem;
-}
-.error-detail {
-  display: block;
-  color: var(--muted);
-  font-size: 0.88rem;
-  margin-bottom: 1.2rem;
-}
-.retry-btn {
-  padding: 0.55rem 1.5rem;
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  border: 1px solid var(--accent);
-  border-radius: 18px;
-  color: var(--accent);
-  font-family: var(--font);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-.retry-btn:hover {
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
-}
+.fab:hover { border-color: var(--accent); box-shadow: 0 8px 40px var(--glow); }
+.fab-icon { font-size: 1.2rem; color: var(--accent); }
 
 .toast {
   position: fixed;
@@ -270,12 +249,24 @@ function showToast(msg: string) {
   white-space: nowrap;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.4s ease;
+.error-overlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 90;
 }
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.error-card { text-align: center; padding: 2rem; }
+.error-card p { font-size: 1.3rem; color: var(--ink); margin-bottom: 0.5rem; }
+.error-detail { display: block; color: var(--muted); font-size: 0.88rem; margin-bottom: 1.2rem; }
+.retry-btn {
+  padding: 0.55rem 1.5rem;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid var(--accent); border-radius: 18px;
+  color: var(--accent); font-family: var(--font); font-size: 0.9rem; cursor: pointer;
+  transition: background 0.3s;
 }
+.retry-btn:hover { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

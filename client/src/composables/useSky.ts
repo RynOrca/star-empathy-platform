@@ -17,9 +17,7 @@ import {
   LineBasicMaterial,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { randomSpherePoint } from '../utils/sphereMapping'
 import {
-  BACKGROUND_STAR_COUNT,
   SPHERE_RADIUS,
   DEFAULT_FOV,
   FOV_MIN,
@@ -28,11 +26,46 @@ import {
   BREATHING_AMPLITUDE,
   BREATHING_PERIOD,
   RAYCASTER_THRESHOLD,
+  STAR_COLORS,
+  HIGH_RESONANCE_THRESHOLD,
+  NEARBY_LINE_COUNT,
 } from '../utils/constants'
 
-/**
- * 用 Canvas 生成径向渐变圆形贴图
- */
+// ─── 星表数据 ─────────────────────────────
+interface CatalogStar {
+  id: number
+  name: string | null
+  ra: number
+  dec: number
+  mag: number
+  color: string
+  con: string
+  x: number
+  y: number
+  z: number
+}
+
+import catalogData from '../data/stars.json'
+const CATALOG: CatalogStar[] = catalogData as CatalogStar[]
+
+// ─── 故事星映射 ────────────────────────────
+export interface StoryAttachment {
+  storyId: number       // 后端 story id
+  catalogStarId: number // 对应星表恒星 id
+  type: 'history' | 'user'
+  title: string | null
+  content: string
+  resonanceCount: number
+}
+
+// ─── 工具函数 ──────────────────────────────
+function hexToRGB(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return [r, g, b]
+}
+
 function createGlowTexture(innerColor: string, size: number): CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = size
@@ -48,15 +81,19 @@ function createGlowTexture(innerColor: string, size: number): CanvasTexture {
   return new CanvasTexture(canvas)
 }
 
+// magnitude → 粒子大小 (星等越小=越亮=越大)
+function magToSize(mag: number): number {
+  return Math.max(0.8, (5.5 - mag) * 1.3)
+}
+
 export interface SkyAPI {
   scene: Scene
   camera: PerspectiveCamera
-  renderer: WebGLRenderer
-  canvas: HTMLCanvasElement
-  addDataStars: (positions: Float32Array, colors: Float32Array, sizes: Float32Array) => Points
-  updateDataStars: (points: Points, positions: Float32Array, colors: Float32Array, sizes: Float32Array) => void
-  removeDataStars: (points: Points) => void
-  getHoveredIndex: (event: MouseEvent, dataPoints: Points) => number
+  overlayPoints: Points
+  attachStories: (attachments: StoryAttachment[]) => void
+  attachOneStory: (attachment: StoryAttachment) => void
+  getHoveredIndex: (event: MouseEvent) => number
+  getStarAt: (index: number) => { catalog: CatalogStar; attachment: StoryAttachment | null }
   getScreenPos: (worldPos: Vector3) => { x: number; y: number }
   highlightPosition: (worldPos: Vector3) => void
   clearHighlight: () => void
@@ -68,81 +105,144 @@ export interface SkyAPI {
 }
 
 export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
-  if (!canvasRef.value) {
-    throw new Error('Canvas ref is null — ensure onMounted has fired.')
-  }
-
+  if (!canvasRef.value) throw new Error('Canvas ref is null')
   const canvas = canvasRef.value
 
-  // ─── 场景 / 相机 / 渲染器 ──────────────────
+  // ─── 场景 / 相机 / 渲染器 ────────────────────
   const scene = new Scene()
-  const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth / canvas.clientHeight, 1, SPHERE_RADIUS * 2)
-  camera.position.set(0, 0, 0) // 球心
+  const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth / canvas.clientHeight, 1, SPHERE_RADIUS * 3)
+  camera.position.set(0, 0, 0)
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true })
   renderer.setSize(canvas.clientWidth, canvas.clientHeight)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
-  // ─── 背景星空粒子 ─────────────────────────
-  const bgGeometry = new BufferGeometry()
-  const bgPositions = new Float32Array(BACKGROUND_STAR_COUNT * 3)
-  const bgOpacities = new Float32Array(BACKGROUND_STAR_COUNT)
+  // ─── 真实星表渲染 (统一星空) ────────────────
+  const totalStars = CATALOG.length
+  const positions = new Float32Array(totalStars * 3)
+  const colors = new Float32Array(totalStars * 3)
+  const sizes = new Float32Array(totalStars)
 
-  for (let i = 0; i < BACKGROUND_STAR_COUNT; i++) {
-    const p = randomSpherePoint(SPHERE_RADIUS * 0.98) // 略内缩
-    bgPositions[i * 3] = p.x
-    bgPositions[i * 3 + 1] = p.y
-    bgPositions[i * 3 + 2] = p.z
-    bgOpacities[i] = 0.35 + Math.random() * 0.55 // 0.35 ~ 0.9
+  for (let i = 0; i < totalStars; i++) {
+    const s = CATALOG[i]
+    positions[i * 3] = s.x
+    positions[i * 3 + 1] = s.y
+    positions[i * 3 + 2] = s.z
+    const [r, g, b] = hexToRGB(s.color)
+    colors[i * 3] = r
+    colors[i * 3 + 1] = g
+    colors[i * 3 + 2] = b
+    sizes[i] = magToSize(s.mag)
   }
 
-  bgGeometry.setAttribute('position', new BufferAttribute(bgPositions, 3))
-  bgGeometry.setAttribute('opacity', new BufferAttribute(bgOpacities, 1))
+  const starGeometry = new BufferGeometry()
+  starGeometry.setAttribute('position', new BufferAttribute(positions, 3))
+  starGeometry.setAttribute('color', new BufferAttribute(colors, 3))
 
-  const bgTexture = createGlowTexture('rgba(246,241,255,1)', 32)
-  const bgMaterial = new PointsMaterial({
-    size: 1.8,
-    map: bgTexture,
-    blending: 2, // NormalBlending
+  const starTexture = createGlowTexture('white', 32)
+  const starMaterial = new PointsMaterial({
+    size: 2.5,  // 基础大小，会被 ShaderMaterial 替代吗？不，PointsMaterial 不支持逐点 size
+    map: starTexture,
+    blending: 2,
     depthWrite: false,
+    depthTest: true,
     transparent: true,
-    opacity: 0.72,
-    vertexColors: false,
+    vertexColors: true,
+    sizeAttenuation: true,
   })
-  // 为背景粒子添加颜色随机性（用 vertexColors + 随机色）
-  const bgColors = new Float32Array(BACKGROUND_STAR_COUNT * 3)
-  for (let i = 0; i < BACKGROUND_STAR_COUNT; i++) {
-    // 大部分白色，少数偏金/偏蓝
-    const rand = Math.random()
-    if (rand < 0.08) {
-      bgColors[i * 3] = 1.0; bgColors[i * 3 + 1] = 0.85; bgColors[i * 3 + 2] = 0.54 // 暖金
-    } else if (rand < 0.15) {
-      bgColors[i * 3] = 0.53; bgColors[i * 3 + 1] = 0.66; bgColors[i * 3 + 2] = 1.0 // 星蓝
+
+  const starPoints = new Points(starGeometry, starMaterial)
+  scene.add(starPoints)
+
+  // ─── 故事星高亮层 (金色/蓝色/绿色 overlay) ──
+  // 用于覆盖有故事的星星
+  const overlayGeometry = new BufferGeometry()
+  const emptyPos = new Float32Array(0)
+  const emptyCol = new Float32Array(0)
+  overlayGeometry.setAttribute('position', new BufferAttribute(emptyPos, 3))
+  overlayGeometry.setAttribute('color', new BufferAttribute(emptyCol, 3))
+
+  const overlayMaterial = new PointsMaterial({
+    size: 4.5,
+    map: createGlowTexture('white', 48),
+    blending: 2,
+    depthWrite: false,
+    depthTest: true,
+    transparent: true,
+    vertexColors: true,
+    sizeAttenuation: true,
+  })
+
+  const overlayPoints = new Points(overlayGeometry, overlayMaterial)
+  scene.add(overlayPoints)
+
+  // ─── 故事 → 星表映射 ──────────────────────
+  const storyMap = new Map<number, StoryAttachment>() // catalogStarId → StoryAttachment
+
+  function getStoryColor(att: StoryAttachment): string {
+    if (att.type === 'history') {
+      return att.resonanceCount >= HIGH_RESONANCE_THRESHOLD
+        ? STAR_COLORS.highResonanceHistory
+        : STAR_COLORS.history
     } else {
-      bgColors[i * 3] = 0.96; bgColors[i * 3 + 1] = 0.94; bgColors[i * 3 + 2] = 1.0 // 近白
+      return att.resonanceCount >= HIGH_RESONANCE_THRESHOLD
+        ? STAR_COLORS.highResonance
+        : STAR_COLORS.user
     }
   }
-  bgGeometry.setAttribute('color', new BufferAttribute(bgColors, 3))
-  bgMaterial.vertexColors = true
 
-  const bgPoints = new Points(bgGeometry, bgMaterial)
-  scene.add(bgPoints)
+  function rebuildOverlay() {
+    const count = storyMap.size
+    const posArr = new Float32Array(count * 3)
+    const colArr = new Float32Array(count * 3)
+    let idx = 0
+    for (const [catId, att] of storyMap) {
+      const star = CATALOG[catId]
+      if (!star) continue
+      posArr[idx * 3] = star.x
+      posArr[idx * 3 + 1] = star.y
+      posArr[idx * 3 + 2] = star.z
+      const [r, g, b] = hexToRGB(getStoryColor(att))
+      colArr[idx * 3] = r
+      colArr[idx * 3 + 1] = g
+      colArr[idx * 3 + 2] = b
+      idx++
+    }
+    overlayPoints.geometry.dispose()
+    const geo = new BufferGeometry()
+    geo.setAttribute('position', new BufferAttribute(posArr, 3))
+    geo.setAttribute('color', new BufferAttribute(colArr, 3))
+    overlayPoints.geometry = geo
+  }
+
+  function attachStories(attachments: StoryAttachment[]) {
+    storyMap.clear()
+    for (const att of attachments) {
+      storyMap.set(att.catalogStarId, att)
+    }
+    rebuildOverlay()
+  }
+
+  function attachOneStory(att: StoryAttachment) {
+    storyMap.set(att.catalogStarId, att)
+    rebuildOverlay()
+  }
 
   // ─── 轨道控制 ──────────────────────────────
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enablePan = false
-  controls.enableZoom = false // 我们自己处理 FOV 缩放
+  controls.enableZoom = false
   controls.enableDamping = true
   controls.dampingFactor = 0.08
-  controls.minPolarAngle = Math.PI / 6
-  controls.maxPolarAngle = (Math.PI * 5) / 6
+  controls.minPolarAngle = Math.PI / 8
+  controls.maxPolarAngle = (Math.PI * 7) / 8
   controls.rotateSpeed = 0.4
-  controls.target.set(0, 0, SPHERE_RADIUS) // 看向前方球面
+  controls.target.set(0, 0, SPHERE_RADIUS * 0.5)
 
   // ─── FOV 缩放 ──────────────────────────────
   let userInteracting = false
   let interactionTimer = 0
-  const interactionTimeout = 3.0 // 3 秒无操作恢复呼吸
+  const interactionTimeout = 3.0
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault()
@@ -153,7 +253,6 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     camera.updateProjectionMatrix()
   }, { passive: false })
 
-  // 拖拽/旋转也视为交互
   canvas.addEventListener('pointerdown', () => {
     userInteracting = true
     interactionTimer = 0
@@ -163,18 +262,38 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
   const raycaster = new Raycaster()
   raycaster.params.Points!.threshold = RAYCASTER_THRESHOLD
 
-  function getHoveredIndex(event: MouseEvent, dataPoints: Points): number {
+  function getHoveredIndex(event: MouseEvent): number {
     const rect = canvas.getBoundingClientRect()
     const mouse = new Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     )
     raycaster.setFromCamera(mouse, camera)
-    const intersects = raycaster.intersectObject(dataPoints)
+    // 先检测 overlay (故事星)，再检测主星表
+    const intersects = raycaster.intersectObjects([overlayPoints, starPoints])
     if (intersects.length > 0) {
-      return intersects[0].index!
+      // 如果命中 overlay，通过 position 匹配找到主星表 index
+      const hitPos = intersects[0].point
+      const posArr = starGeometry.attributes.position.array as Float32Array
+      let closestIdx = -1
+      let minDist = Infinity
+      for (let i = 0; i < totalStars; i++) {
+        const dx = hitPos.x - posArr[i * 3]
+        const dy = hitPos.y - posArr[i * 3 + 1]
+        const dz = hitPos.z - posArr[i * 3 + 2]
+        const d = dx * dx + dy * dy + dz * dz
+        if (d < minDist) { minDist = d; closestIdx = i }
+      }
+      return closestIdx
     }
     return -1
+  }
+
+  function getStarAt(index: number): { catalog: CatalogStar; attachment: StoryAttachment | null } {
+    return {
+      catalog: CATALOG[index],
+      attachment: storyMap.get(index) ?? null,
+    }
   }
 
   function getScreenPos(worldPos: Vector3): { x: number; y: number } {
@@ -205,10 +324,7 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     halo.position.copy(worldPos)
     halo.visible = true
   }
-
-  function clearHighlight() {
-    halo.visible = false
-  }
+  function clearHighlight() { halo.visible = false }
 
   // ─── 邻星连线 ──────────────────────────────
   let constellationLines: LineSegments | null = null
@@ -216,22 +332,19 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
   function showConstellationLines(centerPos: Vector3, neighborPositions: Vector3[]) {
     clearConstellationLines()
     if (neighborPositions.length === 0) return
-
     const vertices: number[] = []
     for (const np of neighborPositions) {
       vertices.push(centerPos.x, centerPos.y, centerPos.z)
       vertices.push(np.x, np.y, np.z)
     }
-
     const geo = new BufferGeometry()
     geo.setAttribute('position', new BufferAttribute(new Float32Array(vertices), 3))
     const mat = new LineBasicMaterial({
       color: 0xffd98a,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.3,
       depthTest: true,
       depthWrite: false,
-      linewidth: 1,
     })
     constellationLines = new LineSegments(geo, mat)
     scene.add(constellationLines)
@@ -246,46 +359,7 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     }
   }
 
-  // ─── 数据星管理 ───────────────────────────
-  function addDataStars(positions: Float32Array, colors: Float32Array, sizes: Float32Array): Points {
-    const geometry = new BufferGeometry()
-    geometry.setAttribute('position', new BufferAttribute(positions, 3))
-    geometry.setAttribute('color', new BufferAttribute(colors, 3))
-    geometry.setAttribute('size', new BufferAttribute(sizes, 1))
-
-    // 使用带大小和颜色的 ShaderMaterial（PointsMaterial 不支持逐点大小）
-    const spriteTexture = createGlowTexture('white', 32)
-    const material = new PointsMaterial({
-      size: 3.5,
-      map: spriteTexture,
-      blending: 2,
-      depthWrite: false,
-      depthTest: true,
-      transparent: true,
-      vertexColors: true,
-      sizeAttenuation: true,
-    })
-
-    const points = new Points(geometry, material)
-    scene.add(points)
-    return points
-  }
-
-  function updateDataStars(points: Points, positions: Float32Array, colors: Float32Array, sizes: Float32Array) {
-    points.geometry.setAttribute('position', new BufferAttribute(positions, 3))
-    points.geometry.setAttribute('color', new BufferAttribute(colors, 3))
-    points.geometry.setAttribute('size', new BufferAttribute(sizes, 1))
-    points.geometry.attributes.position.needsUpdate = true
-    points.geometry.attributes.color.needsUpdate = true
-  }
-
-  function removeDataStars(points: Points) {
-    scene.remove(points)
-    points.geometry.dispose()
-    ;(points.material as PointsMaterial).dispose()
-  }
-
-  // ─── 响应式 resize ────────────────────────
+  // ─── 响应式 ─────────────────────────────────
   function onResize() {
     camera.aspect = canvas.clientWidth / canvas.clientHeight
     camera.updateProjectionMatrix()
@@ -293,47 +367,38 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
   }
   window.addEventListener('resize', onResize)
 
-  // ─── 渲染循环 ─────────────────────────────
+  // ─── 渲染循环 ───────────────────────────────
   const clock = new Clock()
   let animId = 0
-  const defaultFov = DEFAULT_FOV
   let pausedBreathing = false
 
   function animate() {
     animId = requestAnimationFrame(animate)
-
     const dt = Math.min(clock.getDelta(), 0.1)
 
-    // 呼吸动画
     if (!pausedBreathing) {
       if (userInteracting) {
         interactionTimer += dt
         if (interactionTimer >= interactionTimeout) {
           userInteracting = false
-          // 平滑回到默认 FOV 附近
-          // 简化为直接恢复呼吸
         }
       }
       if (!userInteracting) {
         const elapsed = performance.now() * 0.001
-        camera.fov = defaultFov + Math.sin(elapsed * (Math.PI * 2 / BREATHING_PERIOD)) * BREATHING_AMPLITUDE
+        camera.fov = DEFAULT_FOV + Math.sin(elapsed * (Math.PI * 2 / BREATHING_PERIOD)) * BREATHING_AMPLITUDE
         camera.updateProjectionMatrix()
+        controls.autoRotate = true
+        controls.autoRotateSpeed = 0.15
+      } else {
+        controls.autoRotate = false
       }
     }
 
     controls.update()
     renderer.render(scene, camera)
-
-    // 自动旋转（慢速）
-    if (!userInteracting) {
-      controls.autoRotate = true
-      controls.autoRotateSpeed = 0.15
-    } else {
-      controls.autoRotate = false
-    }
   }
 
-  function pauseBreathing() { pausedBreathing = true }
+  function pauseBreathing() { pausedBreathing = true; controls.autoRotate = false }
   function resumeBreathing() { pausedBreathing = false }
 
   function dispose() {
@@ -343,18 +408,16 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     scene.clear()
   }
 
-  // 启动渲染
   animate()
 
   return {
     scene,
     camera,
-    renderer,
-    canvas,
-    addDataStars,
-    updateDataStars,
-    removeDataStars,
+    overlayPoints,
+    attachStories,
+    attachOneStory,
     getHoveredIndex,
+    getStarAt,
     getScreenPos,
     highlightPosition,
     clearHighlight,
