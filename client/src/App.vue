@@ -18,6 +18,7 @@
         @switch="onSwitchStory"
         @resonate="onResonate"
         @close="onCloseDetail"
+        @write-story="onWriteStory"
       />
   </div>
 </template>
@@ -115,6 +116,11 @@ function onStarClick(starId: number) {
 function onCloseDetail() {
   selectedStories.value = []
   selectedStarInfo.value = null
+}
+
+function onWriteStory() {
+  // 后续实现：打开故事提交表单
+  onCloseDetail()
 }
 
 function onSwitchStory(index: number) {
