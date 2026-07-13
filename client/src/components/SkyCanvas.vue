@@ -8,7 +8,7 @@ import { Vector3, Points, type BufferGeometry } from 'three'
 import { useSky } from '../composables/useSky'
 import type { SkyAPI } from '../composables/useSky'
 import { cubeToSphere } from '../utils/sphereMapping'
-import { STAR_COLORS, STAR_SIZES, HIGH_RESONANCE_THRESHOLD } from '../utils/constants'
+import { NEARBY_LINE_COUNT, STAR_COLORS, STAR_SIZES, HIGH_RESONANCE_THRESHOLD } from '../utils/constants'
 
 export interface StarData {
   id: number
@@ -140,6 +140,41 @@ function addStar(star: StarData) {
   sky.updateDataStars(starPoints, newPositions, newColors, newSizes)
 }
 
+// ─── 邻星查找 ────────────────────────────
+function findNeighbors(starIndex: number): Vector3[] {
+  if (!starPoints) return []
+  const positions = starPoints.geometry.attributes.position.array as Float32Array
+  const total = positions.length / 3
+  const cx = positions[starIndex * 3]
+  const cy = positions[starIndex * 3 + 1]
+  const cz = positions[starIndex * 3 + 2]
+  const targetStar = starIndexMap.get(starIndex)
+  if (!targetStar) return []
+
+  // 计算所有同类型星的距离
+  const distances: { index: number; dist: number }[] = []
+  for (let i = 0; i < total; i++) {
+    if (i === starIndex) continue
+    const star = starIndexMap.get(i)
+    if (!star || star.type !== targetStar.type) continue
+    const dx = positions[i * 3] - cx
+    const dy = positions[i * 3 + 1] - cy
+    const dz = positions[i * 3 + 2] - cz
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    distances.push({ index: i, dist })
+  }
+
+  distances.sort((a, b) => a.dist - b.dist)
+  const neighbors = distances.slice(0, NEARBY_LINE_COUNT)
+  return neighbors.map((n) => {
+    return new Vector3(
+      positions[n.index * 3],
+      positions[n.index * 3 + 1],
+      positions[n.index * 3 + 2],
+    )
+  })
+}
+
 // ─── Hover / Click 事件 ────────────────────
 function onMouseMove(e: MouseEvent) {
   if (!sky || !starPoints) return
@@ -169,10 +204,24 @@ function onClick(e: MouseEvent) {
     const screenPos = sky.getScreenPos(pos)
     const star = starIndexMap.get(index)
     if (star) {
+      // 邻星连线
+      const neighbors = findNeighbors(index)
+      if (neighbors.length > 0) {
+        sky.showConstellationLines(pos, neighbors)
+      }
       emit('star-select', star, screenPos.x, screenPos.y)
       sky.pauseBreathing()
     }
   }
+}
+
+function clearSelection() {
+  if (sky) {
+    sky.clearConstellationLines()
+    sky.clearHighlight()
+    sky.resumeBreathing()
+  }
+  emit('star-deselect')
 }
 
 onMounted(() => {
@@ -185,7 +234,7 @@ onBeforeUnmount(() => {
   if (sky) sky.dispose()
 })
 
-defineExpose({ setStars, addStar, getSky: () => sky })
+defineExpose({ setStars, addStar, clearSelection, getSky: () => sky })
 </script>
 
 <style scoped>

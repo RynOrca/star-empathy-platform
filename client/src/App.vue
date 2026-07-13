@@ -92,7 +92,7 @@ function onSelect(star: StarData, screenX: number, screenY: number) {
 
 function onDeselect() {
   selectedStar.value = null
-  skyCanvasRef.value?.getSky()?.resumeBreathing()
+  skyCanvasRef.value?.clearSelection()
 }
 
 async function onResonate(id: number) {

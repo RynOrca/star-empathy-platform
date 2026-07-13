@@ -13,6 +13,8 @@ import {
   Clock,
   Sprite,
   SpriteMaterial,
+  LineSegments,
+  LineBasicMaterial,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { randomSpherePoint } from '../utils/sphereMapping'
@@ -58,6 +60,8 @@ export interface SkyAPI {
   getScreenPos: (worldPos: Vector3) => { x: number; y: number }
   highlightPosition: (worldPos: Vector3) => void
   clearHighlight: () => void
+  showConstellationLines: (centerPos: Vector3, neighbors: Vector3[]) => void
+  clearConstellationLines: () => void
   pauseBreathing: () => void
   resumeBreathing: () => void
   dispose: () => void
@@ -206,6 +210,42 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     halo.visible = false
   }
 
+  // ─── 邻星连线 ──────────────────────────────
+  let constellationLines: LineSegments | null = null
+
+  function showConstellationLines(centerPos: Vector3, neighborPositions: Vector3[]) {
+    clearConstellationLines()
+    if (neighborPositions.length === 0) return
+
+    const vertices: number[] = []
+    for (const np of neighborPositions) {
+      vertices.push(centerPos.x, centerPos.y, centerPos.z)
+      vertices.push(np.x, np.y, np.z)
+    }
+
+    const geo = new BufferGeometry()
+    geo.setAttribute('position', new BufferAttribute(new Float32Array(vertices), 3))
+    const mat = new LineBasicMaterial({
+      color: 0xffd98a,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: true,
+      depthWrite: false,
+      linewidth: 1,
+    })
+    constellationLines = new LineSegments(geo, mat)
+    scene.add(constellationLines)
+  }
+
+  function clearConstellationLines() {
+    if (constellationLines) {
+      scene.remove(constellationLines)
+      constellationLines.geometry.dispose()
+      ;(constellationLines.material as LineBasicMaterial).dispose()
+      constellationLines = null
+    }
+  }
+
   // ─── 数据星管理 ───────────────────────────
   function addDataStars(positions: Float32Array, colors: Float32Array, sizes: Float32Array): Points {
     const geometry = new BufferGeometry()
@@ -318,6 +358,8 @@ export function useSky(canvasRef: { value: HTMLCanvasElement | null }): SkyAPI {
     getScreenPos,
     highlightPosition,
     clearHighlight,
+    showConstellationLines,
+    clearConstellationLines,
     pauseBreathing,
     resumeBreathing,
     dispose,
