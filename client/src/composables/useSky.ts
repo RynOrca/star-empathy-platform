@@ -154,33 +154,36 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
   }
 
-  // ═══ 地平遮罩 (下半球暗化) ═══
+  // ═══ 地平渐变遮罩 (柔和消光) ═══
   {
-    // 透明渐变环：在 y=0 附近有一条半透明过渡带
-    const ring = new RingGeometry(SPHERE_RADIUS * 0.7, SPHERE_RADIUS * 1.15, 64)
+    // 用 canvas 画一个水平渐变带
+    const gradCanvas = document.createElement('canvas')
+    gradCanvas.width = 256
+    gradCanvas.height = 16
+    const ctx = gradCanvas.getContext('2d')!
+    const grad = ctx.createLinearGradient(0, 0, 0, 16)
+    grad.addColorStop(0, 'transparent')
+    grad.addColorStop(0.3, 'rgba(10,15,30,0.25)')
+    grad.addColorStop(0.5, 'rgba(10,15,30,0.45)')
+    grad.addColorStop(0.7, 'rgba(10,15,30,0.25)')
+    grad.addColorStop(1, 'transparent')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 256, 16)
+    const tex = new CanvasTexture(gradCanvas)
+
+    // 围绕 y=0 的水平环带
+    const ring = new RingGeometry(SPHERE_RADIUS * 0.6, SPHERE_RADIUS * 1.1, 64)
     const ringMat = new MeshBasicMaterial({
-      color: 0x000000,
+      map: tex,
       transparent: true,
-      opacity: 0.35,
-      side: 2, // DoubleSide
+      opacity: 0.6,
+      side: 2,
       depthWrite: false,
       depthTest: false,
     })
     const ringMesh = new Mesh(ring, ringMat)
-    ringMesh.rotation.x = -Math.PI / 2 // 躺在 y=0 平面
+    ringMesh.rotation.x = -Math.PI / 2
     scene.add(ringMesh)
-
-    // 下半球暗色遮罩 (fade)
-    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
-    const maskMat = new MeshBasicMaterial({
-      color: 0x050812,
-      transparent: true,
-      opacity: 0.78,
-      side: BackSide,
-      depthWrite: false,
-      depthTest: false,
-    })
-    scene.add(new Mesh(maskGeo, maskMat))
   }
 
   // ═══ 天赤道 (Dec=0°) ═══
