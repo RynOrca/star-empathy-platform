@@ -130,6 +130,7 @@ const generatedTags = computed<string[]>(() => {
 .star-detail-wrap {
   display: flex;
   gap: 1rem;
+  align-items: flex-start;
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn {
@@ -150,7 +151,7 @@ const generatedTags = computed<string[]>(() => {
 /* ─── 左：故事卡片 ─── */
 .card-stories {
   width: 520px;
-  max-height: 540px;
+  max-height: 80vh;
   overflow-y: auto;
   padding: 0.8rem;
 }
