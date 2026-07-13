@@ -203,14 +203,14 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     })))
   }
 
-  // ═══ 地平面以下遮罩 ═══
+  // ═══ 地平面以下暖色滤镜遮罩 ═══
   {
-    // 主遮罩 — 深暖色下半球
-    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
+    // 半透明暖色滤镜 — 星星透出来但整体变暗
+    const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0x0a0410,
+      color: 0x1a0815,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.42,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -219,12 +219,12 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     mask.renderOrder = 9999
     scene.add(mask)
 
-    // 地平线暖色晕圈（薄薄一条）
-    const glowGeo = new SphereGeometry(SPHERE_RADIUS * 0.995, 64, 1, 0, Math.PI*2, Math.PI/2 - 0.025, 0.05)
+    // 地平线暖色光晕
+    const glowGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 1, 0, Math.PI*2, Math.PI/2 - 0.02, 0.04)
     const glowMat = new MeshBasicMaterial({
-      color: 0xcc7744,
+      color: 0xda8540,
       transparent: true,
-      opacity: 0.20,
+      opacity: 0.18,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -234,18 +234,18 @@ export function useSky(canvas: HTMLCanvasElement): SkyAPI {
     glow.renderOrder = 9999
     scene.add(glow)
 
-    // 地平线轮廓线
+    // 地平线金色轮廓线
     const hVerts: number[] = []
     for (let i = 0; i <= 360; i++) {
       const a = i / 360 * Math.PI * 2
-      hVerts.push(Math.cos(a) * SPHERE_RADIUS * 0.995, 0, -Math.sin(a) * SPHERE_RADIUS * 0.995)
+      hVerts.push(Math.cos(a) * SPHERE_RADIUS * 1.001, 0, -Math.sin(a) * SPHERE_RADIUS * 1.001)
     }
     const hGeo = new BufferGeometry()
     hGeo.setAttribute('position', new BufferAttribute(new Float32Array(hVerts), 3))
     const hLine = new Line(hGeo, new LineBasicMaterial({
       color: 0xdd8844,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.30,
       depthTest: false,
       depthWrite: false,
     }))
