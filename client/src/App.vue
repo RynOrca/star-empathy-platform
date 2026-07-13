@@ -20,6 +20,14 @@
         @close="onCloseDetail"
         @write-story="onWriteStory"
       />
+
+      <StoryForm
+        v-if="showForm"
+        :star-name="selectedStarInfo?.displayName ?? ''"
+        :catalog-star-id="selectedCatalogStarId"
+        @submitted="onStorySubmitted"
+        @close="showForm = false"
+      />
   </div>
 </template>
 
@@ -28,6 +36,7 @@ import { ref, shallowRef, onMounted } from 'vue'
 import type { SkyAPI } from './composables/useSky'
 import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
+import StoryForm from './components/StoryForm.vue'
 import catalogData from './data/stars.json'
 
 // ─── 星表查询 ───
@@ -101,7 +110,11 @@ const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number } | null>(null)
+const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
+
+// 写故事表单
+const showForm = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId)
@@ -111,6 +124,7 @@ function onStarClick(starId: number) {
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag }
+  selectedCatalogStarId.value = starId
 }
 
 function onCloseDetail() {
@@ -119,8 +133,25 @@ function onCloseDetail() {
 }
 
 function onWriteStory() {
-  // 后续实现：打开故事提交表单
-  onCloseDetail()
+  if (!selectedStarInfo.value) return
+  showForm.value = true
+}
+
+function onStorySubmitted(story: StoryData) {
+  // 添加到本地 stories 映射
+  const cid = story.catalog_star_id
+  const map = storiesByStarId.value
+  const existing = map.get(cid) ?? []
+  existing.push(story)
+  map.set(cid, existing)
+  storiesByStarId.value = new Map(map)
+
+  // 如果当前正在查看这颗星，同步更新 selectedStories
+  if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
+    selectedStories.value = [...existing]
+  }
+
+  showForm.value = false
 }
 
 function onSwitchStory(index: number) {
