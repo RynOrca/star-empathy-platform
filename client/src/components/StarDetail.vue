@@ -1,42 +1,71 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="detail-wrap">
-      <!-- 左：故事列表 -->
+      <!-- 左：故事面板 -->
       <div class="panel panel-stories">
-        <div class="panel-header">
+        <!-- 列表标题 -->
+        <div class="panel-header" v-if="!detailStory">
           <span class="panel-title">故事</span>
           <span class="panel-count" v-if="hasRealStory">{{ realStories.length }} 条</span>
         </div>
-
-        <div v-if="hasRealStory" class="story-list">
-          <div
-            v-for="(story, i) in realStories"
-            :key="story.id"
-            class="story-card"
-            :class="{ active: localIndex === i }"
-          >
-            <div class="story-head">
-              <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
-              <button
-                class="resonate-btn"
-                :class="{ done: justResonatedId === story.id }"
-                :disabled="resonating"
-                @click.stop="onResonate(story)"
-              >
-                <component :is="justResonatedId === story.id ? Check : Lightbulb" :size="14" />
-                <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
-              </button>
-            </div>
-            <p class="story-content">{{ story.content }}</p>
-            <div class="story-meta">
-              <MessageSquare :size="13" /> <span>{{ story.resonanceCount }} 次共鸣</span>
-            </div>
-          </div>
+        <!-- 详情标题 -->
+        <div class="panel-header" v-else>
+          <button class="back-btn" @click="detailStoryId = null">
+            <ArrowLeft :size="16" />
+            <span>所有故事</span>
+          </button>
         </div>
 
-        <div v-else class="empty-state">
-          <Star :size="22" class="empty-icon" />
-          <p>这颗星还在等待它的故事...</p>
+        <!-- ─── 列表视图 ─── -->
+        <template v-if="!detailStoryId">
+          <div v-if="hasRealStory" class="story-list">
+            <div
+              v-for="story in realStories"
+              :key="story.id"
+              class="story-card"
+              @click="detailStoryId = story.id"
+            >
+              <div class="story-head">
+                <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                <button
+                  class="resonate-btn"
+                  :class="{ done: justResonatedId === story.id }"
+                  :disabled="resonating"
+                  @click.stop="onResonate(story)"
+                >
+                  <component :is="justResonatedId === story.id ? Check : Lightbulb" :size="14" />
+                  <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
+                </button>
+              </div>
+              <p class="story-excerpt">{{ story.content }}</p>
+              <div class="story-meta">
+                <MessageSquare :size="13" /> <span>{{ story.resonanceCount }} 次共鸣</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <Star :size="22" class="empty-icon" />
+            <p>这颗星还在等待它的故事...</p>
+          </div>
+        </template>
+
+        <!-- ─── 详情视图 ─── -->
+        <div v-else-if="detailStory" class="detail-view">
+          <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+          <div class="detail-body">{{ detailStory.content }}</div>
+          <div class="detail-footer">
+            <button
+              class="resonate-btn detail-resonate"
+              :class="{ done: justResonatedId === detailStory.id }"
+              :disabled="resonating"
+              @click.stop="onResonate(detailStory)"
+            >
+              <component :is="justResonatedId === detailStory.id ? Check : Lightbulb" :size="16" />
+              <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+              <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -62,7 +91,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Star, Lightbulb, Check, MessageSquare, PenSquare, X } from 'lucide-vue-next'
+import { Star, Lightbulb, Check, MessageSquare, PenSquare, X, ArrowLeft } from 'lucide-vue-next'
 
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
@@ -81,15 +110,14 @@ const emit = defineEmits<{
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
 
-const localIndex = ref(0)
+const detailStoryId = ref<number | null>(null)
+const detailStory = computed(() => {
+  if (detailStoryId.value === null) return null
+  return realStories.value.find(s => s.id === detailStoryId.value) ?? null
+})
 const justResonatedId = ref<number | null>(null)
 
-function goTo(i: number) {
-  localIndex.value = i
-  emit('switch', i)
-}
-
-function onResonate(story: { id: number }) {
+function onResonate(story: { id: number; resonanceCount: number }) {
   emit('resonate', story.id)
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
@@ -187,17 +215,32 @@ const generatedTags = computed<string[]>(() => {
   gap: 0.5rem;
 }
 
+/* ─── 返回按钮 ─── */
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0;
+  transition: opacity 0.15s;
+}
+.back-btn:hover { opacity: 0.7; }
+
 /* 故事卡片 */
 .story-card {
   padding: 1rem 1rem;
   border-radius: 12px;
   border: 1px solid transparent;
   background: color-mix(in srgb, var(--bg2) 50%, transparent);
-  transition: border-color 0.2s, background 0.2s;
-  cursor: default;
+  transition: border-color 0.2s, background 0.15s;
+  cursor: pointer;
 }
-.story-card:hover,
-.story-card.active {
+.story-card:hover {
   border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
@@ -206,7 +249,7 @@ const generatedTags = computed<string[]>(() => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 .story-title {
   margin: 0;
@@ -238,11 +281,15 @@ const generatedTags = computed<string[]>(() => {
   border-color: var(--star-green);
   color: var(--star-green);
 }
-.story-content {
-  margin: 0 0 0.5rem;
+.story-excerpt {
+  margin: 0.25rem 0 0.5rem;
   color: var(--muted);
   font-size: 0.88rem;
-  line-height: 1.65;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .story-meta {
   font-size: 0.78rem;
@@ -250,6 +297,47 @@ const generatedTags = computed<string[]>(() => {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+}
+
+/* ─── 详情视图 ─── */
+.detail-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+.detail-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.5;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+.detail-body {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+.detail-footer {
+  flex-shrink: 0;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+.detail-resonate {
+  padding: 0.5rem 1rem;
+  font-size: 0.88rem;
+  gap: 0.4rem;
+}
+.resonate-count {
+  margin-left: 0.15rem;
+  opacity: 0.65;
+  font-weight: 400;
 }
 
 /* 空状态 */
