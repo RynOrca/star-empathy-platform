@@ -81,22 +81,35 @@ onMounted(async () => {
   }
 })
 
+// 格式化恒星显示名
+function formatStarName(s: CatalogStar): string {
+  if (s.name) return s.name
+  if (s.ra != null && s.dec != null && isFinite(s.ra) && isFinite(s.dec)) {
+    const rh = Math.floor(s.ra)
+    const rm = Math.floor((s.ra - rh) * 60)
+    const ds = s.dec >= 0 ? '+' : '-'
+    const dd = Math.floor(Math.abs(s.dec))
+    const dm = Math.floor((Math.abs(s.dec) - dd) * 60)
+    return `${rh}h${rm.toString().padStart(2,'0')}m · ${ds}${dd}°${dm.toString().padStart(2,'0')}′`
+  }
+  return `恒星 · ${s.con || '未知'}`
+}
+
 // ─── 点击处理 ───
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
-const selectedStarInfo = ref<{ name: string | null; con: string; mag: number; ra: number; dec: number } | null>(null)
+const selectedStarInfo = ref<{ displayName: string; con: string; mag: number } | null>(null)
 const resonating = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId)
   if (!star) return
 
-  // 总是显示卡片（有故事展示故事，无故事显示占位）
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
-  selectedStarInfo.value = { name: star.name, con: star.con, mag: star.mag, ra: star.ra, dec: star.dec }
+  selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag }
 }
 
 function onCloseDetail() {

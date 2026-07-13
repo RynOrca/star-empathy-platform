@@ -1,11 +1,11 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
-    <div class="star-detail" ref="cardRef">
+    <div class="star-detail">
     <button class="close-btn" @click="$emit('close')">&times;</button>
 
     <!-- 恒星信息 -->
     <div v-if="starInfo" class="star-header">
-      <div class="star-name">{{ displayName }}</div>
+      <div class="star-name">{{ starInfo.displayName }}</div>
       <div class="star-meta">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
     </div>
 
@@ -48,12 +48,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
   activeIndex: number
-  starInfo: { name: string | null; con: string; mag: number; ra: number; dec: number } | null
+  starInfo: { displayName: string; con: string; mag: number } | null
   resonating: boolean
 }>()
 
@@ -62,19 +62,6 @@ const emit = defineEmits<{
   resonate: [id: number]
   close: []
 }>()
-
-// 恒星显示名：有名字用名字，没有则用天球坐标
-const displayName = computed(() => {
-  if (props.starInfo?.name) return props.starInfo.name
-  if (!props.starInfo) return ''
-  const { ra, dec } = props.starInfo
-  const rh = Math.floor(ra)
-  const rm = Math.floor((ra - rh) * 60)
-  const ds = dec >= 0 ? '+' : '-'
-  const dd = Math.floor(Math.abs(dec))
-  const dm = Math.floor((Math.abs(dec) - dd) * 60)
-  return `${rh}h${rm.toString().padStart(2,'0')}m · ${ds}${dd}°${dm.toString().padStart(2,'0')}′`
-})
 
 // 过滤出真实故事（排除占位符 id=-1）
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
@@ -91,7 +78,6 @@ function goTo(i: number) {
 }
 
 const justResonated = ref(false)
-const cardRef = ref<HTMLElement | null>(null)
 
 function onResonate() {
   if (!currentReal.value) return
@@ -120,14 +106,14 @@ function onResonate() {
 }
 
 .star-detail {
-  width: 360px;
-  max-width: 90vw;
-  max-height: 80vh;
-  padding: 1.5rem 1.6rem;
-  background: color-mix(in srgb, var(--bg2) 92%, transparent);
+  width: 480px;
+  max-width: 88vw;
+  max-height: 75vh;
+  padding: 1.6rem 1.8rem;
+  background: color-mix(in srgb, var(--bg2) 94%, transparent);
   border: 1px solid var(--rule);
   border-radius: 24px;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
   box-shadow: 0 24px 64px var(--shadow);
   animation: cardIn 0.3s ease;
   overflow-y: auto;
