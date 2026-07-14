@@ -395,13 +395,60 @@ export function useSky(
 
     // 预计算所有星的归一化位置（用于屏幕投影）
     const allStarNorms: { id: number; nx: number; ny: number; nz: number }[] = []
+    const starNormMap = new Map<number, { nx: number; ny: number; nz: number }>()
     for (const s of stars) {
       const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
-      if (len > 0) allStarNorms.push({ id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len })
+      if (len > 0) {
+        const norm = { id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len }
+        allStarNorms.push(norm)
+        starNormMap.set(s.id, norm)
+      }
     }
 
     // 临时向量（避免每帧分配）
     const _v = new Vector3()
+
+    // tooltip 内容更新函数
+    let _lastStatsKey = ''
+    function updateTooltipContent(starId: number) {
+      const star = stars[starId]
+      if (!star) return
+      const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+      const rh = Math.floor(star.ra)
+      const rm = Math.floor((star.ra - rh) * 60)
+      const ds = star.dec >= 0 ? '+' : '-'
+      const dd = Math.floor(Math.abs(star.dec))
+      const dm = Math.floor((Math.abs(star.dec) - dd) * 60)
+      nameEl.textContent = star.name || `${rh}h${String(rm).padStart(2,'0')}m · ${ds}${dd}°${String(dm).padStart(2,'0')}′`
+      const stats = statsCache.get(star.id)
+      vals[0].textContent = stats ? String(stats.stories) : '0'
+      vals[1].textContent = stats ? String(stats.resonance) : '0'
+      vals[2].textContent = stats ? String(stats.views) : '0'
+      vals[3].textContent = stats ? String(stats.favorites) : '0'
+      _lastStatsKey = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
+      // tooltip 位置
+      const sn = starNormMap.get(starId)
+      if (sn) {
+        tooltipLabel.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS - 50, sn.nz * SPHERE_RADIUS)
+        hoverGlow.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+      }
+      tooltipEl.style.opacity = '1'
+      hoverGlow.visible = true
+      hoverGlowTargetOpacity = 0.95
+      options?.onStarHover?.(starId)
+    }
+    function refreshTooltipStats(starId: number) {
+      const stats = statsCache.get(starId)
+      const key = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
+      if (key === _lastStatsKey) return // 没变化
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+      vals[0].textContent = stats ? String(stats.stories) : '0'
+      vals[1].textContent = stats ? String(stats.resonance) : '0'
+      vals[2].textContent = stats ? String(stats.views) : '0'
+      vals[3].textContent = stats ? String(stats.favorites) : '0'
+      _lastStatsKey = key
+    }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
@@ -439,32 +486,10 @@ export function useSky(
       if (bestDist < 0.0015 && bestId !== -1) {
         if (bestId !== hoveredStarId) {
           hoveredStarId = bestId
-          const star = stars[bestId]
-          if (star) {
-            // 更新 tooltip 内容
-            const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
-            const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
-            const rh = Math.floor(star.ra)
-            const rm = Math.floor((star.ra - rh) * 60)
-            const ds = star.dec >= 0 ? '+' : '-'
-            const dd = Math.floor(Math.abs(star.dec))
-            const dm = Math.floor((Math.abs(star.dec) - dd) * 60)
-            nameEl.textContent = star.name || `${rh}h${String(rm).padStart(2,'0')}m · ${ds}${dd}°${String(dm).padStart(2,'0')}′`
-            const stats = statsCache.get(star.id)
-            vals[0].textContent = stats ? String(stats.stories) : '0'
-            vals[1].textContent = stats ? String(stats.resonance) : '0'
-            vals[2].textContent = stats ? String(stats.views) : '0'
-            vals[3].textContent = stats ? String(stats.favorites) : '0'
-            // tooltip 位置：星星位置下方更远
-            tooltipLabel.position.set(bestNx * SPHERE_RADIUS, bestNy * SPHERE_RADIUS - 50, bestNz * SPHERE_RADIUS)
-            tooltipEl.style.opacity = '1'
-            // 辉光跟随星星
-            hoverGlow.position.set(bestNx * SPHERE_RADIUS, bestNy * SPHERE_RADIUS, bestNz * SPHERE_RADIUS)
-            hoverGlow.visible = true
-            hoverGlowTargetOpacity = 0.95
-            // 通知外部
-            options?.onStarHover?.(bestId)
-          }
+          updateTooltipContent(bestId)
+        } else {
+          // 同一颗星：检查 stats 是否有更新
+          refreshTooltipStats(bestId)
         }
       } else if (hoveredStarId !== -1) {
         hoveredStarId = -1
@@ -536,7 +561,6 @@ export function useSky(
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
     setStarStatsCache(cache) {
-      statsCache.clear()
       cache.forEach((v, k) => statsCache.set(k, v))
     },
     dispose() {

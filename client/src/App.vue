@@ -146,7 +146,7 @@ function syncStatToCache(starId: number, stats: { storyCount: number; totalReson
   cache.set(starId, {
     stories: stats.storyCount,
     resonance: stats.totalResonance,
-    views: stats.totalViews,
+    views: (stats.totalViews ?? 0) + (stats.starViews ?? 0),
     favorites: stats.favoriteCount,
   })
   skyRef.value.sky.setStarStatsCache(cache)
