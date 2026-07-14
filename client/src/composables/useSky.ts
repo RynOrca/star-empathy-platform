@@ -507,8 +507,6 @@ export function useSky(
   let hoverGlowTargetOpacity = 0
   function animate() {
     af = requestAnimationFrame(animate)
-    const breath = Math.sin(performance.now() * 0.0008) * 1.5
-    camera.fov = userFov + breath
     camera.updateProjectionMatrix()
     // hover glow opacity lerp
     const sm = hoverGlow.material as SpriteMaterial
