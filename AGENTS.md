@@ -1,50 +1,94 @@
 # AGENTS.md — 星语穹庭 (Star Language Dome)
 
-## Project Overview
+## 项目概述
 
 3D 星空情绪表达平台。用户匿名将心事"挂"在星星上，浏览历史星空故事和他人心事，通过"共鸣"形成弱连接。
 
-**当前阶段**：方案 + HTML 原型阶段，尚未开始编码。`star-empathy-platform.html` 是设计稿，不是最终产品。
+**当前阶段**：已实现完整前后端。前端 Vue 3 + Three.js，后端 Express + node:sqlite。
 
-## Tech Stack (已确定)
+## 仓库结构（两包 monorepo）
 
-| 层 | 技术 |
+| 目录 | 技术 | 说明 |
+|---|---|---|
+| `server/` | Node.js + Express + TypeScript | REST API，零外部依赖（用 node:sqlite） |
+| `client/` | Vue 3 + Vite + Three.js + PrimeVue | 3D 星空前端 |
+
+## 数据库架构
+
+SQLite（`server/data/stars.db`），三张表：
+
+| 表 | 用途 |
 |---|---|
-| 前端/3D | Three.js (WebGL) + 现有 HTML 原型 |
-| 后端 | Node.js + Express |
-| 数据库 | SQLite (单文件，免配置) |
-| 部署 | 阿里云 ECS + PM2 + Nginx + SSL |
+| `stars` | 核心表：历史星 + 用户星，含 `catalog_star_id`（星表恒星 ID）、`pos_x/y/z`（3D 坐标）、`resonance_count`、`view_count`、`origin` |
+| `catalog_visits` | 星表恒星被浏览的记录 |
+| `favorites` | 用户收藏的恒星 |
 
-## Three-Person Split
+## 后端 API
 
-- **开发者 A**：前端 + 3D 交互（Three.js 渲染、射线检测、UI 逻辑）
-- **开发者 B**：后端 + 数据 + 部署（SQLite 设计、API 开发、爬虫冷启动数据、ECS 环境）
+Base URL：`http://localhost:3000`（开发），部署后为 `https://your-domain.com`
 
-## API Contract (先读这个再写代码)
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/stars` | 获取所有星星 |
+| POST | `/api/stars/story` | 投递心事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`） |
+| POST | `/api/stars/:id/resonate` | 共鸣 +1 |
+| GET | `/api/stars/:id/stats` | 获取某星表的聚合统计 |
+| POST | `/api/stars/:id/visit` | 记录恒星浏览 |
+| POST | `/api/stars/story/:id/view` | 记录故事浏览 |
+| POST | `/api/stars/:id/favorite` | 收藏 |
+| DELETE | `/api/stars/:id/favorite` | 取消收藏 |
 
-完整接口定义在 `方案.md` 第三节。三个核心接口：
+响应统一格式：`{ code: 200|400|404|500, message: "...", data: ... }`
 
-1. `GET /api/stars` — 一次性拉取所有星星数据（历史星 + 用户星），前端据此渲染 3D 星空
-2. `POST /api/stars/story` — 用户匿名投递心事，后端生成随机 3D 坐标存入 SQLite
-3. `POST /api/stars/:id/resonate` — 共鸣点亮，对应星星 `resonance_count` +1
+## 前端关键模块
 
-响应格式统一：`{ code: 200, message: "...", data: {...} }`
+- `client/src/composables/useStars.ts` — 获取/过滤/本地更新星星列表
+- `client/src/composables/useSky.ts` — Three.js 渲染核心（天球体 + 银河 + 星座连线 + Raycaster 点击）
+- `client/src/composables/useResonate.ts` — 共鸣操作
+- `client/scripts/generateStarCatalog.ts` — 预计算恒星 3D 坐标 → `client/src/data/stars.json`
+- `client/src/components/SkyCanvas.vue` — 3D 画布
+- `client/src/components/StarDetail.vue` — 星星详情面板
+- `client/src/components/StoryForm.vue` — 投递心事表单
 
-## Critical Design Decisions
+## 坐标系统
 
-- **不做任何权限系统**。所有星星内容默认全量公开——这是产品"匿名弱连接"的核心调性，也是简化鉴权的关键决策。不要在实现时擅自加 auth。
-- **冷启动数据必须真实**。编写爬虫抓取真实古诗词、星座神话、开源社区语录注入 SQLite。禁止使用无意义的假数据（如 "test 123"）。
-- **坐标系**：星星的 `position: {x, y, z}` 由后端随机生成，前端直接映射到 3D 场景。
+前端天球半径 R=500，恒星坐标由赤经赤纬转 3D，运行在 `useSky.ts` 中。用户星投递时后端随机生成 ±300 立方体坐标。
 
-## Implementation Order
+## 常用命令
 
-1. B 先建 SQLite + 三个 API 完整逻辑（含错误处理）→ 部署到 ECS → 写爬虫注入 20 条真实数据
-2. A 搭前端工程，引入 HTML/CSS 原型 + Three.js 基础球体渲染
-3. A 对接线上真实接口，将数据映射为 3D 粒子/球体，实现点击→弹故事、提交→调 API
-4. 最后打磨 3D 漫游拖拽手感 + Raycaster 点击命中率 + Nginx 跨域/HTTPS
+```bash
+# 后端
+cd server
+npm install        # 首次安装依赖
+npm run seed       # 注入 23 条冷启动数据
+npm run dev        # 开发模式（nodemon + ts-node）
+npm run build      # tsc 编译 → dist/
+npm run start      # 运行编译产物
 
-## What's NOT Here (Don't Assume)
+# 前端
+cd client
+npm install        # 首次安装依赖
+npm run dev        # Vite 开发服务器（:5173）
+npm run build      # vue-tsc + vite build
+npm run preview    # 预览构建产物
+```
 
-- 没有 package.json / 没有 lockfile — 项目尚未初始化
-- 没有 CI / 没有 lint / 没有 test 框架 — 都需要从零搭建
-- 没有 `.env` 模板 — 部署时手动管理环境变量
+## 前端代理配置
+
+`client/vite.config.ts` 中 `/api` 代理到 `http://localhost:31415`。确保后端端口与此一致，或在 Vite 配置中修改。
+
+## 关键约束
+
+- **Node.js ≥22.5 必需** — 后端使用 `node:sqlite`（Node 内置实验模块），旧版本不可用
+- **不做权限系统** — 所有星星默认公开，这是产品核心设计
+- **冷启动数据真实** — seed 脚本中含古诗词、星座神话、社区语录，禁止用假数据
+- **数据迁移兼容** — `server/src/db.ts` 中有 `ALTER TABLE ... ADD COLUMN` 的 try-catch 兼容旧库，新环境不需要但保留无害
+- **星表坐标预计算** — 恒星坐标由 `generateStarCatalog.ts` 离线生成 JSON，后端不参与
+
+## 部署
+
+→ 见 `toA.md`（给开发者 A 的部署指南）
+
+## 版本管理
+
+Git 仓库已初始化，commit 记录在 `CHANGELOG.md`。每个功能完成请 commit。
