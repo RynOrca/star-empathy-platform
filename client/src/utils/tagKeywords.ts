@@ -177,10 +177,7 @@ const HISTORY_MULTIPLIER = 1.5
 const USER_MULTIPLIER = 1.0
 const TITLE_BOOST = 3.0
 const RESONANCE_DIVISOR = 5
-const MAX_TAGS = 14
-
-export const FONT_MIN = 0.78
-export const FONT_MAX = 1.35
+const MAX_TAGS = 9
 
 export interface TagStoryInput {
   id: number
@@ -229,8 +226,3 @@ export function buildTagCloud(stories: TagStoryInput[]): TagCloudItem[] {
   return ranked.slice(0, MAX_TAGS)
 }
 
-export function fontSize(weight: number, minW: number, maxW: number): number {
-  if (maxW <= minW) return (FONT_MIN + FONT_MAX) / 2
-  const t = (weight - minW) / (maxW - minW)
-  return FONT_MIN + t * (FONT_MAX - FONT_MIN)
-}

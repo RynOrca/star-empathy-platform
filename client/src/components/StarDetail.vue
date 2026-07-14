@@ -211,13 +211,8 @@
         <!-- 标签（词云） -->
         <div class="info-section">
           <div class="info-label">标签</div>
-          <div class="info-tags word-cloud">
-            <span
-              class="tag"
-              v-for="item in tagCloud"
-              :key="item.text"
-              :style="tagStyle(item)"
-            >{{ item.text }}</span>
+          <div class="info-tags">
+            <span class="tag" v-for="item in tagCloud" :key="item.text">{{ item.text }}</span>
             <span v-if="tagCloud.length === 0" class="tag is-empty">暂无标签</span>
           </div>
         </div>
@@ -241,7 +236,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown } from 'lucide-vue-next'
-import { buildTagCloud, fontSize, type TagCloudItem } from '../utils/tagKeywords'
+import { buildTagCloud, type TagCloudItem } from '../utils/tagKeywords'
 
 const props = defineProps<{
   stories: Array<{
@@ -546,57 +541,19 @@ function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): D
   return { text: `${Math.round(km)}km`, near: false }
 }
 
-// ─── 词云标签（基于 n-gram 频率 + 主题词加权，历史故事权重更高）──
-const tagCloud = computed<TagCloudItem[]>(() => {
-  const input = realStories.value.map((s) => ({
-    id: s.id,
-    title: s.title,
-    content: s.content,
-    type: s.type,
-    resonanceCount: s.resonanceCount,
-  }))
-  return buildTagCloud(input)
-})
+// ─── 标签（词典去重 + 频次加权排序，视觉统一用 .tag 胶囊样式）──
+const tagCloud = computed<TagCloudItem[]>(() =>
+  buildTagCloud(
+    realStories.value.map((s) => ({
+      id: s.id,
+      title: s.title,
+      content: s.content,
+      type: s.type,
+      resonanceCount: s.resonanceCount,
+    }))
+  )
+)
 
-const tagWeightRange = computed(() => {
-  const items = tagCloud.value
-  if (items.length === 0) return { min: 0, max: 0 }
-  const ws = items.map((t) => t.weight)
-  return { min: Math.min(...ws), max: Math.max(...ws) }
-})
-
-function tagStyle(item: TagCloudItem): Record<string, string> {
-  const { min, max } = tagWeightRange.value
-  const w = fontSize(item.weight, min, max)
-  const t = max <= min ? 0.5 : (item.weight - min) / (max - min)
-  // top tier → warm gold accent; mid → soft tinted pill; base → muted
-  if (t > 0.66) {
-    return {
-      fontSize: `${w.toFixed(3)}rem`,
-      fontWeight: '600',
-      color: 'var(--accent)',
-      background: 'var(--accent-subtle)',
-      borderColor: 'var(--accent-border)',
-      padding: '2px 8px',
-      borderRadius: '6px',
-      lineHeight: '1.4',
-    }
-  }
-  if (t > 0.33) {
-    return {
-      fontSize: `${w.toFixed(3)}rem`,
-      fontWeight: '500',
-      color: 'var(--ink)',
-      opacity: '0.85',
-    }
-  }
-  return {
-    fontSize: `${w.toFixed(3)}rem`,
-    fontWeight: '400',
-    color: 'var(--ink-secondary)',
-    opacity: '0.6',
-  }
-}
 </script>
 
 <style scoped>
@@ -1240,19 +1197,4 @@ function tagStyle(item: TagCloudItem): Record<string, string> {
   border-color: var(--rule-hover);
 }
 
-/* ─── 标签词云 ─── */
-.word-cloud {
-  align-items: center;
-  gap: 6px 8px;
-  line-height: 1.1;
-}
-.word-cloud .tag {
-  transition: font-size 0.15s var(--ease-out);
-  vertical-align: baseline;
-}
-.word-cloud .tag:not(.is-empty):hover {
-  border-color: var(--accent-border);
-  color: var(--accent) !important;
-  opacity: 1 !important;
-}
 </style>
