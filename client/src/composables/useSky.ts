@@ -456,17 +456,8 @@ export function useSky(
     })
     canvas.addEventListener('pointerup', (e) => {
       if (clickDrag) return // 是拖动不是点击
-      const rect = canvas.getBoundingClientRect()
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const hits = raycaster.intersectObjects(starPointsRefs)
-      if (hits.length) {
-        const hit = hits[0]
-        const tierIdx = hit.object.userData.tierIndex as number
-        const starId = tierStarIds[tierIdx][hit.index!]
-        options?.onStarClick?.(starId)
+      if (hoveredStarId !== -1) {
+        options?.onStarClick?.(hoveredStarId)
       }
     })
   }
