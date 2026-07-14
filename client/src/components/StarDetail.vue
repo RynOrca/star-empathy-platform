@@ -258,6 +258,9 @@ const emit = defineEmits<{
   switch: [index: number]
   resonate: [id: number]
   refreshStories: []
+  incrementViews: []
+  incrementFavorites: []
+  decrementFavorites: []
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
@@ -398,13 +401,14 @@ const isFavorited = ref(false)
 async function toggleFavorite() {
   const prev = isFavorited.value
   isFavorited.value = !prev
+  if (prev) { emit('decrementFavorites') } else { emit('incrementFavorites') }
   try {
     const method = prev ? 'DELETE' : 'POST'
     await fetch(`/api/stars/${props.catalogStarId}/favorite`, { method })
-    emit('refreshStories')
     fetchCatalogStatsFromFront()
   } catch {
     isFavorited.value = prev
+    if (prev) { emit('incrementFavorites') } else { emit('decrementFavorites') }
   }
 }
 
@@ -427,6 +431,8 @@ function openStoryDetail(story: { id: number }) {
   // 乐观更新浏览数
   const current = getStoryViewCount(story.id)
   viewCountOverrides.set(story.id, current + 1)
+  // 通知父组件更新统计行
+  emit('incrementViews')
   // 后端记录 + 重新拉取
   fetch(`/api/stars/story/${story.id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))

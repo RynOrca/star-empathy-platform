@@ -20,6 +20,9 @@
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
+        @increment-views="onIncrementViews"
+        @increment-favorites="onIncrementFavorites"
+        @decrement-favorites="onDecrementFavorites"
         @update-stats="catalogStats = $event"
         @close="onCloseDetail"
         @write-story="onWriteStory"
@@ -171,6 +174,11 @@ function onStarClick(starId: number) {
   // 异步获取真实统计（覆盖降级值）
   fetchCatalogStats(starId)
   fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
+
+  // 乐观更新访问数
+  if (catalogStats.value) {
+    catalogStats.value = { ...catalogStats.value, starViews: catalogStats.value.starViews + 1 }
+  }
 }
 
 async function fetchCatalogStats(starId: number) {
@@ -221,6 +229,22 @@ function onSwitchStory(index: number) {
   activeStoryIndex.value = index
 }
 
+function onIncrementViews() {
+  if (catalogStats.value) {
+    catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 }
+  }
+}
+function onIncrementFavorites() {
+  if (catalogStats.value) {
+    catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 }
+  }
+}
+function onDecrementFavorites() {
+  if (catalogStats.value && catalogStats.value.favoriteCount > 0) {
+    catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount - 1 }
+  }
+}
+
 async function onResonate(storyId: number) {
   resonating.value = true
   try {
@@ -232,6 +256,10 @@ async function onResonate(storyId: number) {
       if (idx >= 0) {
         stories[idx].resonanceCount = json.data.resonance_count
         selectedStories.value = [...stories] // trigger reactivity
+      }
+      // 乐观更新统计行
+      if (catalogStats.value) {
+        catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 }
       }
     }
   } catch (e) {
