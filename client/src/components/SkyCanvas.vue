@@ -1,5 +1,8 @@
 <template>
-  <canvas ref="canvasRef" class="sky-canvas" />
+  <div class="sky-wrapper">
+    <div class="sky-glow"></div>
+    <canvas ref="canvasRef" class="sky-canvas" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -27,13 +30,25 @@ defineExpose({ sky })
 </script>
 
 <style scoped>
-.sky-canvas {
+.sky-wrapper {
   position: fixed;
+  inset: 0;
+}
+.sky-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, rgba(88, 60, 140, 0.08) 0%, rgba(40, 30, 80, 0.04) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+.sky-canvas {
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   cursor: grab;
+  z-index: 0;
 }
 .sky-canvas:active {
   cursor: grabbing;

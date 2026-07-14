@@ -301,6 +301,23 @@ export function useSky(
     }
   }
 
+  // ═══ 悬浮高亮点 ═══
+  const hoverGlowTex = glowTex('#ffd98a', 64)
+  const hoverGlowGeo = new BufferGeometry()
+  hoverGlowGeo.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  const hoverGlow = new Points(hoverGlowGeo, new PointsMaterial({
+    size: 18,
+    map: hoverGlowTex,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+    opacity: 0,
+    sizeAttenuation: true,
+  }))
+  hoverGlow.renderOrder = 100
+  scene.add(hoverGlow)
+
   // ═══ 悬浮名称 Tooltip ═══
   const tooltipEl = document.createElement('div')
   tooltipEl.style.cssText = [
@@ -367,11 +384,17 @@ export function useSky(
             const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
             tooltipLabel.position.set(ox/len * SPHERE_RADIUS, oy/len * SPHERE_RADIUS - 14, oz/len * SPHERE_RADIUS)
             tooltipEl.style.opacity = '1'
+            // 高亮点跟随星星位置
+            const posAttr = hoverGlowGeo.getAttribute('position')
+            posAttr.setXYZ(0, ox, oy, oz)
+            posAttr.needsUpdate = true
+            hoverGlowTargetOpacity = 0.7
           }
         }
       } else if (hoveredStarId !== -1) {
         hoveredStarId = -1
         tooltipEl.style.opacity = '0'
+        hoverGlowTargetOpacity = 0
       }
     })
     canvas.addEventListener('pointerup', (e) => {
@@ -424,11 +447,15 @@ export function useSky(
 
   // ═══ 渲染 ═══
   let af = 0
+  let hoverGlowTargetOpacity = 0
   function animate() {
     af = requestAnimationFrame(animate)
     const breath = Math.sin(performance.now() * 0.0008) * 1.5
     camera.fov = userFov + breath
     camera.updateProjectionMatrix()
+    // hover glow opacity lerp
+    const mat = hoverGlow.material as PointsMaterial
+    mat.opacity += (hoverGlowTargetOpacity - mat.opacity) * 0.15
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
