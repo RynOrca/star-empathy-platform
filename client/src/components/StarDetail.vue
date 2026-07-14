@@ -208,12 +208,17 @@
           </div>
         </div>
 
-        <!-- 标签 -->
+        <!-- 标签（词云） -->
         <div class="info-section">
           <div class="info-label">标签</div>
-          <div class="info-tags">
-            <span class="tag" v-for="tag in generatedTags" :key="tag">{{ tag }}</span>
-            <span v-if="generatedTags.length === 0" class="tag is-empty">暂无标签</span>
+          <div class="info-tags word-cloud">
+            <span
+              class="tag"
+              v-for="item in tagCloud"
+              :key="item.text"
+              :style="tagStyle(item)"
+            >{{ item.text }}</span>
+            <span v-if="tagCloud.length === 0" class="tag is-empty">暂无标签</span>
           </div>
         </div>
 
@@ -236,6 +241,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown } from 'lucide-vue-next'
+import { buildTagCloud, fontSize, type TagCloudItem } from '../utils/tagKeywords'
 
 const props = defineProps<{
   stories: Array<{
@@ -540,20 +546,36 @@ function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): D
   return { text: `${Math.round(km)}km`, near: false }
 }
 
-const generatedTags = computed<string[]>(() => {
-  if (!hasRealStory.value) return []
-  const all = realStories.value.map(s => (s.title || '') + ' ' + s.content).join(' ')
-  const tags: string[] = []
-  if (/月|嫦娥|广寒/.test(all)) tags.push('月亮')
-  if (/星|天狼|织女|银河/.test(all)) tags.push('星辰')
-  if (/爱|恋|相思/.test(all)) tags.push('思念')
-  if (/独|孤|寂|一人/.test(all)) tags.push('孤独')
-  if (/梦|想/.test(all)) tags.push('梦想')
-  if (/家|乡|故/.test(all)) tags.push('思乡')
-  if (/毕业|青春/.test(all)) tags.push('青春')
-  if (tags.length === 0) tags.push('星空')
-  return [...new Set(tags)].slice(0, 5)
+// ─── 词云标签（基于 n-gram 频率 + 主题词加权，历史故事权重更高）──
+const tagCloud = computed<TagCloudItem[]>(() => {
+  const input = realStories.value.map((s) => ({
+    id: s.id,
+    title: s.title,
+    content: s.content,
+    type: s.type,
+    resonanceCount: s.resonanceCount,
+  }))
+  return buildTagCloud(input)
 })
+
+const tagWeightRange = computed(() => {
+  const items = tagCloud.value
+  if (items.length === 0) return { min: 0, max: 0 }
+  const ws = items.map((t) => t.weight)
+  return { min: Math.min(...ws), max: Math.max(...ws) }
+})
+
+function tagStyle(item: TagCloudItem): Record<string, string> {
+  const { min, max } = tagWeightRange.value
+  const w = fontSize(item.weight, min, max)
+  const t = max <= min ? 0.5 : (item.weight - min) / (max - min)
+  return {
+    fontSize: `${w.toFixed(3)}rem`,
+    fontWeight: t > 0.66 ? '600' : t > 0.33 ? '500' : '400',
+    opacity: (0.55 + 0.45 * t).toFixed(2),
+    color: t > 0.66 ? 'var(--ink)' : t > 0.33 ? 'var(--ink-secondary)' : 'var(--ink-secondary)',
+  }
+}
 </script>
 
 <style scoped>
@@ -1195,5 +1217,21 @@ const generatedTags = computed<string[]>(() => {
 .close-btn:hover {
   color: var(--ink);
   border-color: var(--rule-hover);
+}
+
+/* ─── 标签词云 ─── */
+.word-cloud {
+  align-items: center;
+  gap: 6px 8px;
+  line-height: 1.1;
+}
+.word-cloud .tag {
+  transition: font-size 0.15s var(--ease-out);
+  vertical-align: baseline;
+}
+.word-cloud .tag:not(.is-empty):hover {
+  border-color: var(--accent-border);
+  color: var(--accent) !important;
+  opacity: 1 !important;
 }
 </style>
