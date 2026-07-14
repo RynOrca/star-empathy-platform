@@ -569,11 +569,32 @@ function tagStyle(item: TagCloudItem): Record<string, string> {
   const { min, max } = tagWeightRange.value
   const w = fontSize(item.weight, min, max)
   const t = max <= min ? 0.5 : (item.weight - min) / (max - min)
+  // top tier → warm gold accent; mid → soft tinted pill; base → muted
+  if (t > 0.66) {
+    return {
+      fontSize: `${w.toFixed(3)}rem`,
+      fontWeight: '600',
+      color: 'var(--accent)',
+      background: 'var(--accent-subtle)',
+      borderColor: 'var(--accent-border)',
+      padding: '2px 8px',
+      borderRadius: '6px',
+      lineHeight: '1.4',
+    }
+  }
+  if (t > 0.33) {
+    return {
+      fontSize: `${w.toFixed(3)}rem`,
+      fontWeight: '500',
+      color: 'var(--ink)',
+      opacity: '0.85',
+    }
+  }
   return {
     fontSize: `${w.toFixed(3)}rem`,
-    fontWeight: t > 0.66 ? '600' : t > 0.33 ? '500' : '400',
-    opacity: (0.55 + 0.45 * t).toFixed(2),
-    color: t > 0.66 ? 'var(--ink)' : t > 0.33 ? 'var(--ink-secondary)' : 'var(--ink-secondary)',
+    fontWeight: '400',
+    color: 'var(--ink-secondary)',
+    opacity: '0.6',
   }
 }
 </script>

@@ -1,6 +1,18 @@
 /**
- * 词云标签提取 — 基于 n-gram 频率 + 主题词加权
- * 无依赖，纯字符串运算；支持中文（无分词）。
+ * 文学主题词标签提取（词云用）
+ *
+ * 思路：中文古诗没有分词边界，纯 n-gram 会产生大量"重叠碎片"
+ * （"十五夜望月" → 十五/五夜/夜望/望月/十五夜/…），并让单字噪声进入结果。
+ * 改为：
+ *   1) 用一个精选的「文学主题词典」（≈ 250 条）在文本里做子串频次扫描
+ *      （O(|dict| × |text|)，词典小、文本短，开销可忽略）；
+ *   2) 故事标题里的字典词会被识别并获得标题加权；
+ *   3) 频次做故事类型加权（history × 1.5）、标题 × 3、共鸣对数加成；
+ *   4) 子串去重：当一个标签被另一个更长标签包含，且长者权重不低于短者的
+ *      40% 时，保留更长者（更具体的词是更好的标签）；
+ *   5) top-N 截断给词云。
+ *
+ * 无依赖，纯字符串运算。
  */
 
 export interface TagCloudItem {
@@ -8,89 +20,167 @@ export interface TagCloudItem {
   weight: number
 }
 
-// ── 停用字符（高频虚词/介词/量词，在 n-gram 中几乎不贡献语义）──
-const STOP_CHARS = new Set(
-  '的了了一是在有和也都不而但个之上中为人到会以可这那年那来又她对里后很就把当从让给向出还得去要对能如着过及与将把被或因很最更只其与所在那这'.split('')
-)
+// ════════════════════════════════════════
+// 文学主题词典（≈ 250 条）
+// 覆盖唐宋古诗与东西方神话的高频语汇。词条需要是真实会独立出现的词。
+// ════════════════════════════════════════
+const DICT: string[] = [
+  // ════════ 4 字成语 / 固定语（优先长匹配）════════
+  '牛郎织女', '嫦娥奔月', '吴刚伐桂', '玉兔银蟾', '月落乌啼',
+  '人生如梦', '天涯海角', '物是人非', '参商之阔', '北斗七星',
+  '迢迢牵牛', '泣涕零如', '盈盈一水', '脉脉不得', '金风玉露',
+  '飞星传恨', '银汉迢迢', '柔情似水', '佳期如梦', '两情久长',
+  '参与商也',
 
-// ── 主题词别名（变体 → 规范词，起别名折叠 + 语义归一）──
-const ALIASES: Record<string, string> = {
-  // 天象
-  织女: '织女星', 牛郎: '牛郎星', 天狼: '天狼星', 北斗: '北斗七星',
-  银河: '银河', 天河: '银河', 银汉: '银河',
-  // 月亮
-  明月: '月亮', 玉盘: '月亮', 婵娟: '月亮', 嫦娥: '月亮', 广寒: '月亮',
-  素娥: '月亮', 玉兔: '月亮',
-  // 情感
-  相思: '思念', 眷恋: '思念', 怀念: '思念',
-  别离: '离别', 离别: '离别', 分离: '离别', 分隔: '离别',
-  独酌: '孤独', 孤: '孤独',
-  家乡: '故乡', 家园: '故乡', 故土: '故乡',
-  // 时间
-  岁月: '岁月', 光阴: '光阴', 年华: '年华',
-}
+  // ════════ 天象 ════════
+  '月亮', '明月', '新月', '残月', '圆月', '孤月', '冷月', '霜月',
+  '晓月', '江月', '山月', '素月', '皓月', '婵娟', '玉盘',
+  '星星', '星辰', '繁星', '流星', '彗星', '星汉', '星垂', '星斗',
+  '银河', '天河', '银汉',
+  '织女', '牛郎', '北斗', '牵牛', '天津', '河鼓',
+  '天狼', '参宿', '心宿', '商星', '参星',
+  '夜空', '苍穹', '碧空', '云霄', '长空', '九霄', '星河',
+  '曙光', '残阳', '夕阳', '落晖', '朝霞', '晚霞', '流萤', '霞光',
+  '桂花', '月宫', '广寒', '蟾宫', '琼楼', '玉宇',
 
-// ── 高信号主题词（出现即 ×1.5 奖励，帮助真正的意象从噪声中浮现）──
-const THEME_BOOST = new Set([
-  '月亮', '星星', '星辰', '银河', '星空', '夜空', '织女星', '牛郎星',
-  '北斗七星', '天狼星', '参宿', '心宿',
-  '思念', '离别', '孤独', '故乡', '思乡', '等待', '守候',
-  '岁月', '光阴', '流年', '人生',
-  '清风', '明月', '落花', '流水',
-  '天涯', '海角', '重逢',
-  '梦想', '希望', '惆怅', '忧伤',
-  '永恒', '传说', '神话',
-])
+  // ════════ 季候 / 时序 ════════
+  '春风', '秋风', '东风', '西风', '清风', '寒风', '微风', '和风',
+  '春日', '秋色', '春花', '春江', '秋思', '秋夕', '秋夜', '春夜',
+  '良宵', '清宵', '今夕', '今宵', '昨夜', '明夜', '夜深',
+  '岁月', '光阴', '流年', '年华', '韶华', '芳华', '流年似水',
+  '千古', '万古', '千载', '永恒', '不朽', '须臾', '刹那',
+  '十五夜', '三五夜', '七夕', '中元', '重阳', '佳节', '良夜',
+  '黄昏', '破晓', '拂晓', '夜半', '半夜', '三更', '清晨',
 
-// ── 权重参数 ──
-const HISTORY_MULTIPLIER = 1.5   // 历史故事权重
-const USER_MULTIPLIER = 1.0
-const TITLE_BOOST = 3.0          // 标题出现 = 3× 正文出现
-const RESONANCE_DIVISOR = 5      // ln(1+res) / 5
-const THEME_BONUS = 1.5
-const MAX_TAGS = 12
-const MIN_RATIO = 0.12           // 低于峰值 12% 的丢弃
+  // ════════ 情思 ════════
+  '相思', '思念', '眷恋', '怀念', '牵挂', '牵念', '相忆',
+  '离别', '别离', '分离', '离散', '分携', '分袂',
+  '孤独', '孤寂', '寂寞', '落寞', '寥落', '凄清', '清冷', '寂寥',
+  '思乡', '乡愁', '乡思', '归心', '归思', '乡关', '故园',
+  '惆怅', '惘然', '伤感', '忧伤', '忧愁', '幽愁', '闲愁', '百愁', '愁绪',
+  '离愁', '离恨', '遗恨', '长恨', '凄婉', '幽怨',
+  '守候', '守望', '企盼', '凝望', '凝眸', '遥望', '仰望', '怅望',
+  '相逢', '重逢', '邂逅', '再会', '挥手',
+  '深情', '柔情', '痴情', '真情', '幽情', '闲情',
+  '无眠', '不寐', '难寐', '愁眠', '独眠',
+  '遥寄', '凭栏', '追忆', '怀念', '怀旧', '眷恋',
+  '悲欢离合', '魂梦', '离殇',
 
-// ── 字体映射参数（传给调用方）──
-export const FONT_MIN = 0.70  // rem
-export const FONT_MAX = 1.25  // rem
+  // ════════ 人伦 ════════
+  '故乡', '家乡', '故土', '故园', '家园', '乡关', '乡井',
+  '故人', '旧友', '亲友', '亲人', '家人', '妻儿', '游子', '羁旅人',
+  '天涯', '远方', '异客', '异乡', '客愁', '离人', '归人', '行人',
+  '故人', '旧交', '知交',
+  '故人西辞',
+
+  // ════════ 自然 / 草木 ════════
+  '落花', '落叶', '飞花', '残红', '落英', '花谢',
+  '流水', '江水', '河水', '溪流', '清泉', '沧海', '桑田', '碧波', '春江',
+  '白云', '浮云', '孤云', '碧云', '云海', '暮云',
+  '青山', '远山', '翠峰', '碧山', '高山', '苍山',
+  '绿柳', '杨柳', '垂柳',
+  '细雨', '烟雨', '骤雨', '枯雨', '风雨', '微雨',
+  '秋霜', '寒霜', '严霜', '青霜', '霜天',
+  '菊花', '梅花', '荷花', '桃花', '柳絮', '芳草', '海棠', '梨花', '杏花', '芙蓉',
+  '庭树', '高梧', '庭梧', '古槐', '栖鸦', '寒蝉', '孤雁', '归雁', '归鸦', '流萤',
+  '孤舟', '扁舟', '归舟', '行舟', '渔舟', '客舟', '轻舟',
+  '江枫', '渔火', '芦苇', '青苔', '藤萝', '松风', '竹影', '梅香',
+
+  // ════════ 人居 / 器物 ════════
+  '高楼', '危楼', '江楼', '小楼', '西楼', '楼阁', '亭台', '画屏',
+  '寒窗', '孤灯', '残灯', '灯花', '红烛', '烛光', '青灯', '灯火',
+  '浊酒', '清酒', '酒杯', '独酌', '对酒', '举杯', '酒樽',
+  '归帆', '远帆', '孤帆', '轻帆',
+  '渔火', '灯火', '篝火', '孤烟', '炊烟',
+  '钟声', '鼓角', '羌笛', '琵琶', '古琴', '胡笳',
+  '寒山寺', '姑苏', '潇湘', '长安', '洛阳', '江南', '塞北', '边城',
+
+  // ════════ 状态 / 质感 ════════
+  '飘零', '漂泊', '萍踪', '天涯', '零落',
+  '凄凉', '凄迷', '寂寂', '悠悠', '绵绵', '脉脉',
+  '无言', '不语', '独坐', '独酌', '独眠', '独倚', '独立',
+  '回首', '凝眸', '怅望', '遥望',
+  '无尽', '无穷', '无限', '未央', '不尽',
+  '往事', '前尘', '旧梦', '春梦', '残梦', '幽梦', '空梦',
+  '前路', '远路', '归路', '歧路', '穷途',
+  '命运', '缘分', '因缘', '造化', '轮回', '宿命',
+  '传说', '神话', '传奇', '史诗', '童话',
+  '人生', '浮生', '红尘', '人世', '人间', '尘缘',
+
+  // ════════ 神话 / 史诗专名（希腊·北欧·东方）════════
+  '宙斯', '冥王', '冥府', '波塞冬', '美杜莎', '珀尔修斯', '安德洛墨达',
+  '俄耳甫斯', '欧律狄刻', '酒神', '赫布鲁斯', '竖琴', '天琴', '天鹅',
+  '金羊毛', '白羊座', '仙后', '仙王', '仙女', '英仙', '飞马',
+  '恶魔之星', '大陵五', '参商', '阏伯', '实沈', '高辛氏',
+  '织女星', '牛郎星', '天津四', '北斗', '北极星', '岁差',
+  '金字塔', '尼罗河', '银河', '鹊桥', '七夕',
+
+  // ════════ 常见完整诗题（让标题以整体出现）════════
+  '静夜思', '水调歌头', '春江花月夜', '望月怀远', '霜月', '十五夜望月',
+  '月下独酌', '古朗月行', '把酒问月', '西江月', '枫桥夜泊', '秋夕',
+  '旅夜书怀', '登高', '无题', '鹊桥仙', '念奴娇', '满江红', '声声慢',
+  '虞美人', '一剪梅', '临江仙', '渔家傲', '天琴与竖琴', '天鹅与飞鸟',
+  '恶魔之星', '仙后的惩罚', '金毛与公羊', '皇室四星座', '不永恒的北极',
+  '帝车与四乡', '牵牛不服箱',
+
+  // ════════ 通用情感 / 动作（补漏）════════
+  '悲伤', '死去', '斩首', '撕碎', '漂浮', '诉说', '吟唱', '断琴',
+  '琴声', '歌声', '泪水', '河水', '石头', '毒蛇', '毒龙', '献祭',
+  '救赎', '远航', '归航', '坠落', '升天', '升上', '天空', '围绕',
+  '旋转', '倒悬', '永恒', '惩罚', '团圆', '苦难', '王室', '全家福',
+  '有名无实', '讥刺', '凝视', '仰望', '误称',
+]
 
 // ════════════════════════════════════════
-function normalize(raw: string): string {
-  return raw.replace(/[，。、！？：；""''（）《》【】…—\-—\sA-Za-z0-9·]+/g, '')
-}
-
-function isStopGram(gram: string): boolean {
-  const chars = [...gram]
-  if (chars.every((c) => STOP_CHARS.has(c))) return true
-  if (STOP_CHARS.has(chars[0]) || STOP_CHARS.has(chars[chars.length - 1])) return true
-  return false
-}
-
-/** 从一段文本中提取 n-gram 到计数器 */
-function extractGrams(text: string, out: Map<string, number>): void {
-  const chars = [...normalize(text)]
-  if (chars.length < 2) return
-  for (const n of [2, 3, 4]) {
-    for (let i = 0; i + n <= chars.length; i++) {
-      const gram = chars.slice(i, i + n).join('')
-      if (isStopGram(gram)) continue
-      const label = ALIASES[gram] ?? gram
-      const bonus = THEME_BOOST.has(label) ? THEME_BONUS : 1.0
-      out.set(label, (out.get(label) ?? 0) + bonus)
+// 用词典在文本里做子串频次统计
+// ════════════════════════════════════════
+function scanDict(text: string, out: Map<string, number>): void {
+  for (const term of DICT) {
+    let cnt = 0
+    let pos = text.indexOf(term)
+    while (pos !== -1) {
+      cnt++
+      pos = text.indexOf(term, pos + 1)
     }
+    if (cnt > 0) out.set(term, (out.get(term) ?? 0) + cnt)
   }
 }
 
-function pickTop(map: Map<string, number>, n = MAX_TAGS): TagCloudItem[] {
-  const sorted = [...map.entries()]
-    .map(([text, weight]) => ({ text, weight }))
-    .sort((a, b) => b.weight - a.weight)
-  if (sorted.length === 0) return []
-  const peak = sorted[0].weight
-  const floor = peak * MIN_RATIO
-  return sorted.filter((it) => it.weight >= floor).slice(0, n)
+// ════════════════════════════════════════
+// 子串去重：当一个标签被另一个更长标签包含，且长者权重不低于短者的
+// WEIGHT_RATIO 时，保留更长者（更具体 = 更好的标签）。
+// ════════════════════════════════════════
+const WEIGHT_RATIO = 0.35
+
+function dedupe(items: TagCloudItem[]): TagCloudItem[] {
+  const sorted = [...items].sort(
+    (a, b) => b.text.length - a.text.length || b.weight - a.weight
+  )
+  const kept: TagCloudItem[] = []
+  for (const cur of sorted) {
+    const dominated = sorted.some(
+      (o) =>
+        o.text !== cur.text &&
+        o.text.length > cur.text.length &&
+        o.weight >= cur.weight * WEIGHT_RATIO &&
+        o.text.includes(cur.text)
+    )
+    if (!dominated) kept.push(cur)
+  }
+  return kept
 }
+
+// ════════════════════════════════════════
+// 权重参数
+// ════════════════════════════════════════
+const HISTORY_MULTIPLIER = 1.5
+const USER_MULTIPLIER = 1.0
+const TITLE_BOOST = 3.0
+const RESONANCE_DIVISOR = 5
+const MAX_TAGS = 14
+
+export const FONT_MIN = 0.78
+export const FONT_MAX = 1.35
 
 export interface TagStoryInput {
   id: number
@@ -100,36 +190,45 @@ export interface TagStoryInput {
   resonanceCount: number
 }
 
-/** 主入口：从一组故事生成加权标签云 */
+// ════════════════════════════════════════
+// 主入口
+// ════════════════════════════════════════
 export function buildTagCloud(stories: TagStoryInput[]): TagCloudItem[] {
   const global = new Map<string, number>()
   const real = stories.filter((s) => s.id > 0)
 
   for (const s of real) {
     const body = new Map<string, number>()
-    extractGrams(s.content, body)
-
-    const title = new Map<string, number>()
-    if (s.title) extractGrams(s.title, title)
+    if (s.content) scanDict(s.content, body)
+    if (s.title) scanDict(s.title, body)
 
     const typeMul = s.type === 'history' ? HISTORY_MULTIPLIER : USER_MULTIPLIER
     const resonance = 1 + Math.log(1 + (s.resonanceCount ?? 0)) / RESONANCE_DIVISOR
 
-    const allKeys = new Set([...body.keys(), ...title.keys()])
-    for (const word of allKeys) {
-      const bodyCount = body.get(word) ?? 0
-      const titleCount = title.get(word) ?? 0
-      // 标题额外 ×(TITLE_BOOST - 1)（body 已算过一次）
+    for (const [word, count] of body) {
+      const inTitle = s.title?.includes(word) ?? false
       const weighted =
-        (bodyCount + titleCount * (TITLE_BOOST - 1)) * typeMul * resonance
+        count * (inTitle ? TITLE_BOOST : 1) * typeMul * resonance
       global.set(word, (global.get(word) ?? 0) + weighted)
+    }
+
+    // 把标题本身也作为候选词注入，让"十五夜望月"作为整体参与去重
+    // （否则它的子串"十五夜"会单独出现）
+    if (s.title) {
+      const titleWeight = TITLE_BOOST * typeMul * resonance
+      global.set(s.title, (global.get(s.title) ?? 0) + titleWeight)
     }
   }
 
-  return pickTop(global)
+  let ranked: TagCloudItem[] = [...global.entries()]
+    .map(([text, weight]) => ({ text, weight }))
+    .sort((a, b) => b.weight - a.weight)
+
+  ranked = dedupe(ranked)
+
+  return ranked.slice(0, MAX_TAGS)
 }
 
-/** 计算某个标签的字体 rem（调用方传入当前最大/最小 weight）── */
 export function fontSize(weight: number, minW: number, maxW: number): number {
   if (maxW <= minW) return (FONT_MIN + FONT_MAX) / 2
   const t = (weight - minW) / (maxW - minW)
