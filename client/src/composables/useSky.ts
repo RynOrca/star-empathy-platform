@@ -3,6 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
+  RingGeometry, MeshLambertMaterial,
   Raycaster, Vector2,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
@@ -337,6 +338,53 @@ export function useSky(
     camera.updateProjectionMatrix()
     renderer.setSize(canvas.clientWidth, canvas.clientHeight)
     labelRenderer.setSize(canvas.clientWidth, canvas.clientHeight)
+  })
+
+  // ═══ 太阳系行星 ═══
+  import('../data/planets').then(({ planets, getPlanetPosition }) => {
+    const now = Math.floor((Date.now() - new Date('2026-07-01').getTime()) / 86400000)
+    const R = SPHERE_RADIUS * 0.98
+    for (const planet of planets) {
+      const { ra, dec } = getPlanetPosition(planet, now)
+      const { x, y, z } = raDecXYZ(ra, dec, R)
+      // 行星球体
+      const geo = new SphereGeometry(planet.size, 16, 12)
+      const mat = new MeshLambertMaterial({ color: planet.color })
+      const mesh = new Mesh(geo, mat)
+      mesh.position.set(x, y, z)
+      scene.add(mesh)
+      // 太阳发���光晕
+      if (planet.name === 'Sun') {
+        const glowGeo = new SphereGeometry(planet.size * 2.5, 16, 12)
+        const glowMat = new MeshBasicMaterial({
+          color: 0xffcc66, transparent: true, opacity: 0.2,
+          blending: AdditiveBlending, depthWrite: false,
+        })
+        const glow = new Mesh(glowGeo, glowMat)
+        glow.position.copy(mesh.position)
+        scene.add(glow)
+      }
+      // 土星环
+      if (planet.ringColor) {
+        const ringGeo = new RingGeometry(planet.ringSize! - 1, planet.ringSize! + 1, 32)
+        const ringMat = new MeshBasicMaterial({
+          color: planet.ringColor, side: 2, transparent: true, opacity: 0.6,
+          depthWrite: false,
+        })
+        const ring = new Mesh(ringGeo, ringMat)
+        ring.position.copy(mesh.position)
+        ring.rotation.x = Math.PI * 0.45
+        scene.add(ring)
+      }
+      // 标签
+      const el = document.createElement('div')
+      el.textContent = planet.nameCN
+      el.style.cssText = 'color:#ffd98a;font-size:11px;background:rgba(7,8,22,0.6);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,217,138,0.2);backdrop-filter:blur(4px);white-space:nowrap'
+      const label = new CSS2DObject(el)
+      const len = Math.sqrt(x*x + y*y + z*z)
+      label.position.set(x * (1 + 6/len), y * (1 + 6/len), z * (1 + 6/len))
+      scene.add(label)
+    }
   })
 
   // ═══ 渲染 ═══
