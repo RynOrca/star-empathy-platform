@@ -359,6 +359,7 @@ export function useSky(
       white-space:nowrap; pointer-events:none;
       opacity:0; transition:opacity 0.15s;
       line-height:1;
+      margin-top: 1rem;
     }
     .star-tooltip .tt-name {
       font-size:13px; font-weight:600;
@@ -434,7 +435,7 @@ export function useSky(
             const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
             const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
             const nx = ox/len * SPHERE_RADIUS, ny = oy/len * SPHERE_RADIUS, nz = oz/len * SPHERE_RADIUS
-            tooltipLabel.position.set(nx, ny - 24, nz)
+            tooltipLabel.position.set(nx, ny - 50, nz)
             tooltipEl.style.opacity = '1'
             // 辉光跟随星星
             hoverGlow.position.set(nx, ny, nz)

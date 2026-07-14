@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue'
+import { ref, shallowRef, onMounted, watch, nextTick } from 'vue'
 import type { SkyAPI } from './composables/useSky'
 import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
@@ -113,6 +113,24 @@ async function fetchStories() {
 }
 
 onMounted(() => { fetchStories() })
+
+// stories 加载完成后注入统计缓存到星空
+watch(storiesByStarId, (map) => {
+  if (!map.size) return
+  nextTick(() => {
+    if (!skyRef.value?.sky) return
+    const cache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+    map.forEach((stories, starId) => {
+      cache.set(starId, {
+        stories: stories.length,
+        resonance: stories.reduce((s, st) => s + st.resonanceCount, 0),
+        views: stories.reduce((s, st) => s + st.view_count, 0),
+        favorites: 0,
+      })
+    })
+    skyRef.value.sky.setStarStatsCache(cache)
+  })
+}, { immediate: true })
 
 // 格式化恒星显示名
 function formatStarName(s: CatalogStar): string {
