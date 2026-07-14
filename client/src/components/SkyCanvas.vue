@@ -29,8 +29,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
-import { useSky, type SkyAPI } from '../composables/useSky'
+import { ref, shallowRef, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useSky, type SkyAPI, type ObserverLoc } from '../composables/useSky'
+
+const props = defineProps<{ observer?: ObserverLoc | null }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const sky = shallowRef<SkyAPI | null>(null)
@@ -45,6 +47,11 @@ onMounted(() => {
     onStarClick: (starId) => emit('starClick', starId),
     onStarHover: (starId) => emit('starHover', starId),
   })
+  if (props.observer) sky.value.setObserver(props.observer)
+})
+
+watch(() => props.observer, (obs) => {
+  if (sky.value) sky.value.setObserver(obs ?? null)
 })
 
 onBeforeUnmount(() => {

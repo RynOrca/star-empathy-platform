@@ -7,6 +7,7 @@ import {
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
+import { dateToJD, lstDeg, orientationEuler } from '../utils/astro'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
@@ -118,18 +119,26 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 }
 
 // ═══════════════════════════════════════════
+export interface ObserverLoc { lat: number; lon: number }
+
 export interface SkyAPI {
   camera: PerspectiveCamera
   zoomIn: () => void
   zoomOut: () => void
   dispose: () => void
+  setObserver: (obs: ObserverLoc | null) => void
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
 }
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void }
+  options?: {
+    onStarClick?: (starId: number) => void
+    onStarHover?: (starId: number | null) => void
+    live?: boolean
+  }
 ): SkyAPI {
+  const live = options?.live ?? true
   const scene = new Scene()
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
   camera.position.set(0,0,0)
@@ -526,8 +535,28 @@ export function useSky(
   }
 
   // ═══ 相机 ═══
+  let baseRotX = 0.3, baseRotY = 0                 // 由 observer/lst 算出的「基础朝向」
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
   let userFov = DEFAULT_FOV
+  let observer: ObserverLoc | null = null
+  let lstRefDeg = 0                                 // 设定 observer 时的 LST，用于实时自转
+
+  /** 根据当前地点+真实时刻刷新基础朝向 */
+  function applyObserverRotation(now = new Date()) {
+    if (!observer) return
+    const jd = dateToJD(now)
+    const lst = lstDeg(jd, observer.lon)
+    const euler = orientationEuler(observer.lat, lst)
+    baseRotX = euler.rotX
+    baseRotY = euler.rotY
+    lstRefDeg = lst
+    camera.rotation.set(baseRotX + rotX - 0.3, baseRotY + rotY, 0, 'YXZ')
+  }
+
+  function setObserver(obs: ObserverLoc | null) {
+    observer = obs
+    if (obs) applyObserverRotation()
+  }
 
   canvas.addEventListener('pointerdown', (e) => {
     dragging = true; px = e.clientX; py = e.clientY; canvas.setPointerCapture(e.pointerId)
@@ -559,9 +588,32 @@ export function useSky(
   // ═══ 渲染 ═══
   let af = 0
   let hoverGlowTargetOpacity = 0
+  let lstSyncAccum = 0
   function animate() {
     af = requestAnimationFrame(animate)
     camera.updateProjectionMatrix()
+
+    // 实时恒星漂移：按真实恒星时与基础 LST 的差修正 rotY
+    if (observer) {
+      lstSyncAccum += 16
+      if (lstSyncAccum >= 5000) {
+        lstSyncAccum = 0
+        const jd = dateToJD(new Date())
+        const cur = lstDeg(jd, observer.lon)
+        let d = cur - lstRefDeg
+        if (d > 180) d -= 360
+        if (d < -180) d += 360
+        baseRotY = -(cur / 15) * D2R
+        lstRefDeg = cur
+      }
+      // 基础朝向 + 用户拖动偏移
+      camera.rotation.set(
+        baseRotX + (rotX - 0.3),
+        baseRotY + rotY,
+        0,
+        'YXZ',
+      )
+    }
     // hover glow opacity lerp
     const sm = hoverGlow.material as SpriteMaterial
     sm.opacity += (hoverGlowTargetOpacity - sm.opacity) * 0.2
@@ -573,12 +625,13 @@ export function useSky(
     renderer.render(scene, camera)
   }
   animate()
-  camera.rotation.set(rotX, rotY, 0, 'YXZ')
+  if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
 
   return {
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
+    setObserver,
     setStarStatsCache(cache) {
       cache.forEach((v, k) => statsCache.set(k, v))
     },

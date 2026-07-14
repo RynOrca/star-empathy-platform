@@ -1,11 +1,22 @@
 <template>
   <div class="app">
-    <SkyCanvas ref="skyRef" @star-click="onStarClick" @star-hover="onStarHover" />
-    <div class="zoom-controls">
+    <StartScreen
+      v-if="phase === 'start'"
+      @ready="onLocationReady"
+    />
+
+    <SkyCanvas
+      v-if="phase === 'sky'"
+      ref="skyRef"
+      :observer="observer"
+      @star-click="onStarClick"
+      @star-hover="onStarHover"
+    />
+    <div v-if="phase === 'sky'" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div class="hint">
+    <div v-if="phase === 'sky'" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
@@ -40,12 +51,21 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, watch } from 'vue'
-import type { SkyAPI } from './composables/useSky'
+import type { SkyAPI, ObserverLoc } from './composables/useSky'
 import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
 import StoryForm from './components/StoryForm.vue'
+import StartScreen from './components/StartScreen.vue'
 import catalogData from './data/stars.json'
 import { constellationNames, starDistances } from './data/starInfo'
+
+// ─── 启动阶段 ───
+const phase = ref<'start' | 'sky'>('start')
+const observer = ref<ObserverLoc | null>(null)
+function onLocationReady(loc: ObserverLoc) {
+  observer.value = loc
+  phase.value = 'sky'
+}
 
 // ─── 星表查询 ───
 interface CatalogStar {
