@@ -123,11 +123,12 @@ export interface SkyAPI {
   zoomIn: () => void
   zoomOut: () => void
   dispose: () => void
+  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
 }
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void }
+  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void }
 ): SkyAPI {
   const scene = new Scene()
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
@@ -329,25 +330,56 @@ export function useSky(
   hoverGlow.visible = false
   scene.add(hoverGlow)
 
-  // ═══ 悬浮名称 Tooltip ═══
+  // ═══ 悬浮 Tooltip ═══
+  const statsCache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+
   const tooltipEl = document.createElement('div')
-  tooltipEl.style.cssText = [
-    'color:#f0ecf6',
-    'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
-    'font-size:12px',
-    'font-weight:400',
-    'letter-spacing:0.04em',
-    'background:rgba(15,15,30,0.88)',
-    'padding:3px 10px',
-    'border-radius:6px',
-    'border:1px solid rgba(255,255,255,0.08)',
-    'backdrop-filter:blur(6px)',
-    'white-space:nowrap',
-    'pointer-events:none',
-    'opacity:0',
-    'transition:opacity 0.15s',
-    'transform:translateY(8px)',
-  ].join(';')
+  tooltipEl.className = 'star-tooltip'
+  tooltipEl.innerHTML = `
+    <div class="tt-name"></div>
+    <div class="tt-row">
+      <span class="tt-stat" title="故事"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><em class="tt-val">0</em></span>
+      <span class="tt-stat" title="共鸣"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><em class="tt-val">0</em></span>
+    </div>
+    <div class="tt-row">
+      <span class="tt-stat" title="访问"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><em class="tt-val">0</em></span>
+      <span class="tt-stat" title="收藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><em class="tt-val">0</em></span>
+    </div>
+  `
+  // 注入 tooltip 样式
+  const ttStyle = document.createElement('style')
+  ttStyle.textContent = `
+    .star-tooltip {
+      font-family:"Inter","Microsoft YaHei",system-ui,sans-serif;
+      font-size:11px; color:#c8c2d8;
+      background:rgba(12,12,28,0.92);
+      padding:8px 12px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.06);
+      backdrop-filter:blur(8px);
+      white-space:nowrap; pointer-events:none;
+      opacity:0; transition:opacity 0.15s;
+      line-height:1;
+    }
+    .star-tooltip .tt-name {
+      font-size:13px; font-weight:600;
+      color:#ffd98a; margin-bottom:6px;
+      letter-spacing:0.02em;
+    }
+    .star-tooltip .tt-row {
+      display:flex; gap:10px; margin-bottom:3px;
+    }
+    .star-tooltip .tt-row:last-child { margin-bottom:0; }
+    .star-tooltip .tt-stat {
+      display:flex; align-items:center; gap:3px;
+      color:#8a849e;
+    }
+    .star-tooltip .tt-stat svg { opacity:0.7; flex-shrink:0; }
+    .star-tooltip .tt-val {
+      font-style:normal; font-weight:500;
+      color:#b0aacc; min-width:12px;
+    }
+  `
+  document.head.appendChild(ttStyle)
   const tooltipLabel = new CSS2DObject(tooltipEl)
   tooltipLabel.position.set(0, 0, 0)
   scene.add(tooltipLabel)
@@ -388,24 +420,35 @@ export function useSky(
           hoveredStarId = starId
           const star = stars[starId]
           if (star) {
-            tooltipEl.textContent = star.name || `${star.ra.toFixed(2)}h ${star.dec > 0 ? '+' : ''}${star.dec.toFixed(1)}°`
-            // tooltip 位置：星星位置略偏下方
+            // 更新 tooltip 内容
+            const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
+            const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+            nameEl.textContent = star.name || `${star.ra.toFixed(2)}h ${star.dec > 0 ? '+' : ''}${star.dec.toFixed(1)}°`
+            const stats = statsCache.get(star.id)
+            vals[0].textContent = stats?.stories.toString() || '--'
+            vals[1].textContent = stats?.resonance.toString() || '--'
+            vals[2].textContent = stats?.views.toString() || '--'
+            vals[3].textContent = stats?.favorites.toString() || '--'
+            // tooltip 位置：星星位置下方更远
             const pt = (hit.object as Points).geometry.getAttribute('position')
             const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
             const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
             const nx = ox/len * SPHERE_RADIUS, ny = oy/len * SPHERE_RADIUS, nz = oz/len * SPHERE_RADIUS
-            tooltipLabel.position.set(nx, ny - 14, nz)
+            tooltipLabel.position.set(nx, ny - 24, nz)
             tooltipEl.style.opacity = '1'
             // 辉光跟随星星
             hoverGlow.position.set(nx, ny, nz)
             hoverGlow.visible = true
             hoverGlowTargetOpacity = 0.95
+            // 通知外部
+            options?.onStarHover?.(starId)
           }
         }
       } else if (hoveredStarId !== -1) {
         hoveredStarId = -1
         tooltipEl.style.opacity = '0'
         hoverGlowTargetOpacity = 0
+        options?.onStarHover?.(null)
       }
     })
     canvas.addEventListener('pointerup', (e) => {
@@ -481,9 +524,14 @@ export function useSky(
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
+    setStarStatsCache(cache) {
+      statsCache.clear()
+      cache.forEach((v, k) => statsCache.set(k, v))
+    },
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()
+      ttStyle.remove()
       ;(labelRenderer as unknown as { dispose: () => void }).dispose()
       renderer.dispose()
       scene.clear()

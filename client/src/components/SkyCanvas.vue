@@ -14,11 +14,13 @@ const sky = shallowRef<SkyAPI | null>(null)
 
 const emit = defineEmits<{
   starClick: [starId: number]
+  starHover: [starId: number | null]
 }>()
 
 onMounted(() => {
   sky.value = useSky(canvasRef.value!, {
     onStarClick: (starId) => emit('starClick', starId),
+    onStarHover: (starId) => emit('starHover', starId),
   })
 })
 
