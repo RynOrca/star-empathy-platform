@@ -114,12 +114,14 @@ async function fetchStories() {
 
 onMounted(() => { fetchStories() })
 
-// stories 加载完成后注入统计缓存到星空（含重试）
+// ─── 点击处理 ───
+const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
+
+// stories 加载完成后注入统计缓存到星空
 let _statsInjected = false
 function tryInjectStats() {
   const map = storiesByStarId.value
-  if (!map.size) return
-  if (!skyRef.value?.sky) return
+  if (!map.size || !skyRef.value?.sky) return
   const cache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
   map.forEach((stories, starId) => {
     cache.set(starId, {
@@ -133,7 +135,6 @@ function tryInjectStats() {
   _statsInjected = true
 }
 watch(storiesByStarId, () => { _statsInjected = false; tryInjectStats() }, { immediate: true })
-// 如果 sky 组件挂载晚于 stories 加载，定期重试注入
 watch(() => skyRef.value?.sky, (sky) => {
   if (sky && !_statsInjected) tryInjectStats()
 }, { immediate: true })
@@ -153,7 +154,6 @@ function formatStarName(s: CatalogStar): string {
 }
 
 // ─── 点击处理 ───
-const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)

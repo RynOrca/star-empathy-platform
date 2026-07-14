@@ -451,10 +451,10 @@ export function useSky(
             const dm = Math.floor((Math.abs(star.dec) - dd) * 60)
             nameEl.textContent = star.name || `${rh}h${String(rm).padStart(2,'0')}m · ${ds}${dd}°${String(dm).padStart(2,'0')}′`
             const stats = statsCache.get(star.id)
-            vals[0].textContent = stats?.stories.toString() || '--'
-            vals[1].textContent = stats?.resonance.toString() || '--'
-            vals[2].textContent = stats?.views.toString() || '--'
-            vals[3].textContent = stats?.favorites.toString() || '--'
+            vals[0].textContent = stats ? String(stats.stories) : '0'
+            vals[1].textContent = stats ? String(stats.resonance) : '0'
+            vals[2].textContent = stats ? String(stats.views) : '0'
+            vals[3].textContent = stats ? String(stats.favorites) : '0'
             // tooltip 位置：星星位置下方更远
             tooltipLabel.position.set(bestNx * SPHERE_RADIUS, bestNy * SPHERE_RADIUS - 50, bestNz * SPHERE_RADIUS)
             tooltipEl.style.opacity = '1'
