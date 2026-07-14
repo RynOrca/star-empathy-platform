@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, onMounted, watch } from 'vue'
 import type { SkyAPI } from './composables/useSky'
 import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
@@ -114,22 +114,28 @@ async function fetchStories() {
 
 onMounted(() => { fetchStories() })
 
-// stories 加载完成后注入统计缓存到星空
-watch(storiesByStarId, (map) => {
+// stories 加载完成后注入统计缓存到星空（含重试）
+let _statsInjected = false
+function tryInjectStats() {
+  const map = storiesByStarId.value
   if (!map.size) return
-  nextTick(() => {
-    if (!skyRef.value?.sky) return
-    const cache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
-    map.forEach((stories, starId) => {
-      cache.set(starId, {
-        stories: stories.length,
-        resonance: stories.reduce((s, st) => s + st.resonanceCount, 0),
-        views: stories.reduce((s, st) => s + st.view_count, 0),
-        favorites: 0,
-      })
+  if (!skyRef.value?.sky) return
+  const cache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  map.forEach((stories, starId) => {
+    cache.set(starId, {
+      stories: stories.length,
+      resonance: stories.reduce((s, st) => s + st.resonanceCount, 0),
+      views: stories.reduce((s, st) => s + st.view_count, 0),
+      favorites: 0,
     })
-    skyRef.value.sky.setStarStatsCache(cache)
   })
+  skyRef.value.sky.setStarStatsCache(cache)
+  _statsInjected = true
+}
+watch(storiesByStarId, () => { _statsInjected = false; tryInjectStats() }, { immediate: true })
+// 如果 sky 组件挂载晚于 stories 加载，定期重试注入
+watch(() => skyRef.value?.sky, (sky) => {
+  if (sky && !_statsInjected) tryInjectStats()
 }, { immediate: true })
 
 // 格式化恒星显示名
