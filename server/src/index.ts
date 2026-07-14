@@ -2,6 +2,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import starsRouter from './routes/stars';
 import authRouter from './routes/auth';
+import statsRouter from './routes/stats';
+import profileRouter from './routes/profile';
+import searchRouter from './routes/search';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -18,8 +21,17 @@ app.get('/api/health', (_req: Request, res: Response) => {
 // 认证路由
 app.use('/api/auth', authRouter);
 
+// 统计
+app.use('/api/stats', statsRouter);
+
+// 搜索（放在 /api/stars 之前避免被 :id 匹配）
+app.use('/api/stars/search', searchRouter);
+
 // 星星路由
 app.use('/api/stars', starsRouter);
+
+// 个人主页
+app.use('/api/profile', profileRouter);
 
 // 全局错误处理中间件
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

@@ -18,9 +18,14 @@ export interface Star {
   origin: string | null;
 }
 
-// 获取所有星星
-export function getAllStars(): Star[] {
-  return db.prepare('SELECT * FROM stars ORDER BY created_at DESC').all() as unknown as Star[];
+// 获取所有星星（含用户名和标签）
+export function getAllStars(): (Star & { username: string | null; tag: string | null })[] {
+  return db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    ORDER BY s.created_at DESC
+  `).all() as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
 // 创建星星
@@ -29,11 +34,15 @@ export function createStar(
   title?: string,
   catalogStarId?: number,
   location?: { lat: number; lng: number },
+  userId?: number,
+  tag?: string,
 ): Star {
   const pos = generatePosition();
+  const validTags = ['思念', '等待', '离别', '愿望', '孤独'];
+  const safeTag = tag && validTags.includes(tag) ? tag : null;
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -42,6 +51,8 @@ export function createStar(
     catalogStarId ?? null,
     location?.lat ?? null,
     location?.lng ?? null,
+    userId ?? null,
+    safeTag,
   );
   return db.prepare('SELECT * FROM stars WHERE id = ?').get(result.lastInsertRowid) as unknown as Star;
 }
@@ -104,4 +115,29 @@ export function addFavorite(catalogStarId: number): void {
 // 取消收藏星星
 export function removeFavorite(catalogStarId: number): void {
   db.prepare('DELETE FROM favorites WHERE catalog_star_id = ?').run(catalogStarId);
+}
+
+// 全局统计
+export function getGlobalStats(): { starCount: number; userCount: number; totalResonance: number } {
+  const starRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as unknown as { cnt: number };
+  const userRow = db.prepare('SELECT COUNT(*) as cnt FROM users').get() as unknown as { cnt: number };
+  const resRow = db.prepare('SELECT COALESCE(SUM(resonance_count), 0) as cnt FROM stars').get() as unknown as { cnt: number };
+  return { starCount: starRow.cnt, userCount: userRow.cnt, totalResonance: resRow.cnt };
+}
+
+// 我的故事
+export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
+  return db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.user_id = ? ORDER BY s.created_at DESC
+  `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
+}
+
+// 我的收藏（返回收藏的星星 catalog_star_id 列表）
+export function getUserFavorites(userId: number): number[] {
+  // favorites 表存的是 catalog_star_id，不需要关联用户
+  // 这里简化：返回所有收藏的星星ID（平台级收藏，非用户级）
+  const rows = db.prepare('SELECT DISTINCT catalog_star_id FROM favorites ORDER BY catalog_star_id').all() as unknown as { catalog_star_id: number }[];
+  return rows.map(r => r.catalog_star_id);
 }

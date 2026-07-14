@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getAllStars, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
+import { authOptional } from '../middleware/auth';
 
 const router = Router();
 
@@ -14,10 +15,11 @@ router.get('/', (_req: Request, res: Response) => {
   }
 });
 
-// 投递心事/创建星星
-router.post('/story', (req: Request, res: Response) => {
+// 投递心事/创建星星（可选登录）
+router.post('/story', authOptional, (req: Request, res: Response) => {
   try {
-    const { title, content, catalog_star_id, location } = req.body;
+    const { title, content, catalog_star_id, location, tag } = req.body;
+    const user = (req as Request & { user?: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
       return res.status(400).json({ code: 400, message: 'content 不能为空', data: null });
@@ -49,8 +51,9 @@ router.post('/story', (req: Request, res: Response) => {
     });
     const safeContent = esc(trimmed);
     const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
+    const safeTag = typeof tag === 'string' ? tag : undefined;
 
-    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData);
+    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user?.id, safeTag);
     res.status(200).json({ code: 200, message: '故事已化作星光', data: star });
   } catch (error) {
     console.error('POST /api/stars/story error:', error);
