@@ -324,7 +324,7 @@ export function useSky(
     transparent: true,
     opacity: 0,
   }))
-  hoverGlow.scale.set(80, 80, 1)
+  hoverGlow.scale.set(45, 45, 1)
   hoverGlow.renderOrder = 100
   hoverGlow.visible = false
   scene.add(hoverGlow)
