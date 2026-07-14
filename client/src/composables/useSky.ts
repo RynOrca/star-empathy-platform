@@ -238,9 +238,9 @@ export function useSky(
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0x0a0e1a,
+      color: 0x080c18,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.72,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -302,11 +302,11 @@ export function useSky(
   }
 
   // ═══ 悬浮高亮点 ═══
-  const hoverGlowTex = glowTex('#ffd98a', 64)
+  const hoverGlowTex = glowTex('#ffe5a0', 96)
   const hoverGlowGeo = new BufferGeometry()
   hoverGlowGeo.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0]), 3))
   const hoverGlow = new Points(hoverGlowGeo, new PointsMaterial({
-    size: 18,
+    size: 28,
     map: hoverGlowTex,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -388,7 +388,7 @@ export function useSky(
             const posAttr = hoverGlowGeo.getAttribute('position')
             posAttr.setXYZ(0, ox, oy, oz)
             posAttr.needsUpdate = true
-            hoverGlowTargetOpacity = 0.7
+            hoverGlowTargetOpacity = 0.95
           }
         }
       } else if (hoveredStarId !== -1) {
