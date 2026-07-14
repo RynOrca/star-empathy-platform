@@ -233,9 +233,9 @@ export function useSky(
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0xb07890,
+      color: 0x0c0a06,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.85,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -276,12 +276,37 @@ export function useSky(
     }
   }
 
-  // ═══ 点击检测 ═══
+  // ═══ 悬浮名称 Tooltip ═══
+  const tooltipEl = document.createElement('div')
+  tooltipEl.style.cssText = [
+    'color:#f0ecf6',
+    'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
+    'font-size:12px',
+    'font-weight:400',
+    'letter-spacing:0.04em',
+    'background:rgba(15,15,30,0.88)',
+    'padding:3px 10px',
+    'border-radius:6px',
+    'border:1px solid rgba(255,255,255,0.08)',
+    'backdrop-filter:blur(6px)',
+    'white-space:nowrap',
+    'pointer-events:none',
+    'opacity:0',
+    'transition:opacity 0.15s',
+    'transform:translateY(8px)',
+  ].join(';')
+  const tooltipLabel = new CSS2DObject(tooltipEl)
+  tooltipLabel.position.set(0, 0, 0)
+  scene.add(tooltipLabel)
+
+  // ═══ 点击检测 + 悬浮检测 ═══
   {
     const raycaster = new Raycaster()
     const mouse = new Vector2()
     const DRAG_THRESHOLD = 5
     let clickDrag = false
+    let hoveredStarId = -1
+    let hoverCheckTimer = 0
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
@@ -289,6 +314,39 @@ export function useSky(
       if (dragging) {
         const dx = e.clientX - px, dy = e.clientY - py
         if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
+      }
+
+      // 悬浮检测（节流 50ms）
+      const now = performance.now()
+      if (now - hoverCheckTimer < 50) return
+      hoverCheckTimer = now
+
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(mouse, camera)
+      raycaster.params.Points!.threshold = 10
+      const hits = raycaster.intersectObjects(starPointsRefs)
+      if (hits.length) {
+        const hit = hits[0]
+        const tierIdx = hit.object.userData.tierIndex as number
+        const starId = tierStarIds[tierIdx][hit.index!]
+        if (starId !== hoveredStarId) {
+          hoveredStarId = starId
+          const star = stars[starId]
+          if (star?.name) {
+            tooltipEl.textContent = star.name
+            // tooltip 位置：星星位置略偏下方
+            const pt = (hit.object as Points).geometry.getAttribute('position')
+            const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
+            const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
+            tooltipLabel.position.set(ox/len * SPHERE_RADIUS, oy/len * SPHERE_RADIUS - 6, oz/len * SPHERE_RADIUS)
+            tooltipEl.style.opacity = '1'
+          }
+        }
+      } else if (hoveredStarId !== -1) {
+        hoveredStarId = -1
+        tooltipEl.style.opacity = '0'
       }
     })
     canvas.addEventListener('pointerup', (e) => {
