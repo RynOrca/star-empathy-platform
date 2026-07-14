@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import starsRouter from './routes/stars';
+import authRouter from './routes/auth';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -13,6 +14,9 @@ app.use(express.json());
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ code: 200, message: 'ok', data: null });
 });
+
+// 认证路由
+app.use('/api/auth', authRouter);
 
 // 星星路由
 app.use('/api/stars', starsRouter);
