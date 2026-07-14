@@ -444,7 +444,12 @@ export function useSky(
             // 更新 tooltip 内容
             const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
             const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
-            nameEl.textContent = star.name || `${star.ra.toFixed(2)}h ${star.dec > 0 ? '+' : ''}${star.dec.toFixed(1)}°`
+            const rh = Math.floor(star.ra)
+            const rm = Math.floor((star.ra - rh) * 60)
+            const ds = star.dec >= 0 ? '+' : '-'
+            const dd = Math.floor(Math.abs(star.dec))
+            const dm = Math.floor((Math.abs(star.dec) - dd) * 60)
+            nameEl.textContent = star.name || `${rh}h${String(rm).padStart(2,'0')}m · ${ds}${dd}°${String(dm).padStart(2,'0')}′`
             const stats = statsCache.get(star.id)
             vals[0].textContent = stats?.stories.toString() || '--'
             vals[1].textContent = stats?.resonance.toString() || '--'
