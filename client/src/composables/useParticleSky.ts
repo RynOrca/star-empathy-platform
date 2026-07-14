@@ -21,11 +21,11 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
   function init() {
     const el = canvas.value; if (!el) return
     sc = new THREE.Scene()
-    cam = new THREE.PerspectiveCamera(80, el.clientWidth / el.clientHeight, 0.5, 1200)
+    cam = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.5, 1200)
     cam.position.set(0, -40, 300)
     cam.lookAt(0, 0, 0)
     rend = new THREE.WebGLRenderer({ canvas: el, antialias: true, alpha: true })
-    rend.setSize(el.clientWidth, el.clientHeight)
+    rend.setSize(window.innerWidth, window.innerHeight)
     rend.setPixelRatio(Math.min(devicePixelRatio, 2))
 
     const tg = glowTex(72, 'rgba(255,217,138,1)')
@@ -123,8 +123,8 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
     }
     loop()
     addEventListener('resize', () => {
-      cam.aspect = el.clientWidth / el.clientHeight; cam.updateProjectionMatrix()
-      rend.setSize(el.clientWidth, el.clientHeight)
+      cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix()
+      rend.setSize(window.innerWidth, window.innerHeight)
     })
     loaded.value = true
   }

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, getUserById } from '../services/userService';
+import { register, login, guestLogin, getUserById } from '../services/userService';
 import { authRequired } from '../middleware/auth';
 
 const router = Router();
@@ -32,6 +32,16 @@ router.post('/login', (req: Request, res: Response) => {
     res.json({ code: 200, message: '登录成功', data: result });
   } catch (error: any) {
     res.status(400).json({ code: 400, message: error.message || '登录失败', data: null });
+  }
+});
+
+// 访客快捷登录
+router.post('/guest', (_req: Request, res: Response) => {
+  try {
+    const result = guestLogin();
+    res.json({ code: 200, message: '访客登录成功', data: result });
+  } catch (error: any) {
+    res.status(500).json({ code: 500, message: error.message || '访客登录失败', data: null });
   }
 });
 

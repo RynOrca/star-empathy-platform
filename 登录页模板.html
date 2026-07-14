@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星语穹庭 - 降临</title>
+    <style>
+        /* ================= 基础样式复位 ================= */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 极度深邃的宇宙底色 */
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #02040A; /* 深邃黑 */
+            color: #e2e8f0;
+        }
+
+        /* ================= 布局容器 ================= */
+        .split-container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* 左栏：品牌意境区 (完全透明，透出底层 3D 渲染) */
+        .left-panel {
+            flex: 6; 
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding-left: 10%;
+            padding-right: 5%;
+            z-index: 2;
+            background: transparent; 
+        }
+
+        .brand-title {
+            font-size: 4.5rem;
+            font-weight: 700;
+            letter-spacing: 0.6rem;
+            margin-bottom: 1.5rem;
+            /* 冷冽的星光渐变 */
+            background: linear-gradient(135deg, #ffffff 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 1.25rem;
+            color: #64748b; /* 更幽暗的灰色 */
+            letter-spacing: 0.2rem;
+            line-height: 1.8;
+            font-weight: 300;
+        }
+
+        /* 右栏：功能交互区 (深幽的隔离带) */
+        .right-panel {
+            flex: 4;
+            /* 极暗的深空蓝，带有微弱的透明度以备融合星空 */
+            background-color: rgba(6, 9, 18, 0.98); 
+            border-left: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 5%;
+            z-index: 3;
+            box-shadow: -15px 0 40px rgba(0, 0, 0, 0.8);
+        }
+
+        .form-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .form-header {
+            margin-bottom: 2.5rem;
+        }
+
+        .form-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            letter-spacing: 0.1rem;
+            margin-bottom: 0.5rem;
+            color: #f1f5f9;
+        }
+
+        /* ================= 标签页切换 ================= */
+        .tab-menu {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding-bottom: 0.5rem;
+        }
+
+        .tab-item {
+            font-size: 1rem;
+            color: #475569; /* 未选中时更暗 */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .tab-item:hover {
+            color: #94a3b8;
+        }
+
+        .tab-item.active {
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .tab-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #4f46e5;
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.5); /* 底部发光 */
+        }
+
+        /* ================= 表单内部元素 ================= */
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            letter-spacing: 0.05rem;
+        }
+
+        .form-input {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 0.85rem 1rem;
+            color: #ffffff;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background-color: rgba(79, 70, 229, 0.05);
+            box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2) inset;
+        }
+
+        .form-input::placeholder {
+            color: #334155; /* 极暗的占位符 */
+        }
+
+        /* ================= 按钮组 ================= */
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #3730a3 0%, #4f46e5 100%);
+            border: none;
+            color: #ffffff;
+            padding: 0.9rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 15px rgba(55, 48, 163, 0.3);
+        }
+
+        .submit-btn:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+        }
+
+        /* 分割线 */
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #334155; /* 深幽的分割线颜色 */
+            font-size: 0.85rem;
+            margin: 1.8rem 0;
+            letter-spacing: 0.1rem;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .divider:not(:empty)::before {
+            margin-right: 1em;
+        }
+
+        .divider:not(:empty)::after {
+            margin-left: 1em;
+        }
+
+        /* 匿名快捷体验按钮 - 宽度对齐，深邃质感 */
+        .guest-btn {
+            width: 100%; /* 核心改动：与表单输入框等宽 */
+            background-color: transparent;
+            border: 1px solid rgba(79, 70, 229, 0.3); /* 幽暗的紫蓝边框 */
+            color: #818cf8;
+            padding: 0.9rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 400;
+            letter-spacing: 0.05rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            text-decoration: none;
+            display: block; /* 确保作为块级元素填满容器 */
+        }
+
+        .guest-btn:hover {
+            background-color: rgba(79, 70, 229, 0.08); /* 悬浮时透出微弱紫光 */
+            color: #c7d2fe;
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 0 15px rgba(79, 70, 229, 0.15) inset;
+        }
+
+        /* ================= 辅助类 ================= */
+        .hidden {
+            display: none !important;
+        }
+
+        /* ================= 响应式 ================= */
+        @media (max-width: 768px) {
+            .split-container {
+                flex-direction: column;
+            }
+            .left-panel {
+                flex: 3;
+                padding: 2rem;
+                justify-content: flex-end;
+            }
+            .right-panel {
+                flex: 7;
+                padding: 2rem;
+            }
+            .brand-title {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="split-container">
+        
+        <div class="left-panel">
+            <h1 class="brand-title">星语穹庭</h1>
+            <p class="brand-subtitle">在这里，每颗星星都藏着一个秘密。</p>
+        </div>
+
+        <div class="right-panel">
+            <div class="form-container">
+                
+                <div class="form-header">
+                    <h2 class="form-title" id="formTitle">欢迎降临星系</h2>
+                </div>
+
+                <div class="tab-menu">
+                    <div class="tab-item active" id="tabLogin" onclick="switchMode('login')">登录</div>
+                    <div class="tab-item" id="tabRegister" onclick="switchMode('register')">注册</div>
+                </div>
+
+                <form class="auth-form" id="authForm" onsubmit="handleSubmit(event)">
+                    <div class="form-group">
+                        <label for="username">观测者账号</label>
+                        <input type="text" id="username" class="form-input" required placeholder="请输入账号或邮箱">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">引力密钥</label>
+                        <input type="password" id="password" class="form-input" required placeholder="请输入密码">
+                    </div>
+
+                    <div class="form-group hidden" id="confirmPasswordGroup">
+                        <label for="confirmPassword">确认密钥</label>
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="请再次输入密码">
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">校准并进入星系</button>
+                </form>
+
+                <div class="divider">或</div>
+
+                <button class="guest-btn" onclick="handleGuestAccess()">匿名快捷体验</button>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let currentMode = 'login';
+
+        function switchMode(mode) {
+            currentMode = mode;
+            const tabLogin = document.getElementById('tabLogin');
+            const tabRegister = document.getElementById('tabRegister');
+            const confirmPasswordGroup = document.getElementById('confirmPasswordGroup');
+            const confirmInput = document.getElementById('confirmPassword');
+            const submitBtn = document.getElementById('submitBtn');
+            const formTitle = document.getElementById('formTitle');
+
+            if (mode === 'login') {
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+                confirmPasswordGroup.classList.add('hidden');
+                confirmInput.removeAttribute('required');
+                submitBtn.innerText = '校准并进入星系';
+                formTitle.innerText = '欢迎降临星系';
+            } else {
+                tabLogin.classList.remove('active');
+                tabRegister.classList.add('active');
+                confirmPasswordGroup.classList.remove('hidden');
+                confirmInput.setAttribute('required', 'required');
+                submitBtn.innerText = '铸造星籍并启航';
+                formTitle.innerText = '开启新星籍';
+            }
+        }
+
+        function handleSubmit(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (currentMode === 'register') {
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                if (password !== confirmPassword) {
+                    alert('两次输入的引力密钥不一致');
+                    return;
+                }
+                console.log('执行注册请求:', { username, password });
+            } else {
+                console.log('执行登录请求:', { username, password });
+            }
+        }
+
+        function handleGuestAccess() {
+            console.log('执行匿名快捷体验流程');
+        }
+    </script>
+</body>
+</html>

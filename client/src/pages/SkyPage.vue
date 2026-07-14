@@ -2,9 +2,6 @@
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
-      <div class="nav-left">
-        <span class="nav-logo">⭐ 星语穹庭</span>
-      </div>
       <div class="nav-center">
         <div class="search-box">
           <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" />
@@ -209,8 +206,8 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
   display: flex; justify-content: space-between; align-items: center;
   padding: 0.6rem 1.5rem;
-  background: rgba(7,8,22,0.7); backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(48,55,87,0.4);
+  background: transparent;
+  border-bottom: none;
 }
 .nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
 .nav-right { display: flex; align-items: center; gap: 0.75rem; }

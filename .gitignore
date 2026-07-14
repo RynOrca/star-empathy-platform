@@ -10,3 +10,5 @@ dist/
 .design/
 .uploads/
 *.db
+.playwright-mcp/
+.omo/run-continuation/

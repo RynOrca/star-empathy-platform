@@ -36,6 +36,22 @@ export function login(username: string, password: string): { user: ReturnType<ty
   return { user: publicUser(user), token: signToken(user) };
 }
 
+// 访客登录：自动创建/登录内置访客账号
+const GUEST_USERNAME = '星穹访客'
+const GUEST_PASSWORD = 'star-guest-2026'
+
+export function guestLogin(): { user: ReturnType<typeof publicUser>; token: string } {
+  const existing = db.prepare('SELECT * FROM users WHERE username = ?').get(GUEST_USERNAME) as unknown as (User & { password_hash: string }) | undefined
+  if (existing) {
+    return { user: publicUser(existing), token: signToken(existing) }
+  }
+  // 不存在则自动创建
+  const hash = bcrypt.hashSync(GUEST_PASSWORD, 10)
+  const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(GUEST_USERNAME, hash)
+  const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as unknown as User
+  return { user: publicUser(user), token: signToken(user) }
+}
+
 // 获取用户信息
 export function getUserById(id: number): ReturnType<typeof publicUser> | null {
   const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(id) as unknown as User | undefined;
