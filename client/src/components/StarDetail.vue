@@ -21,15 +21,26 @@
             />
             <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''"><X :size="12" /></button>
           </div>
-          <div class="sort-group">
+          <div class="sort-group" ref="sortGroupRef">
             <ArrowUpDown :size="13" class="sort-icon" />
-            <select v-model="sortKey" class="sort-select" @change="onSortChange">
-              <option value="time">发布时间</option>
-              <option value="distance">发布距离</option>
-              <option value="resonance">共鸣数</option>
-              <option value="views">浏览数</option>
-              <option value="random">随机排序</option>
-            </select>
+            <button class="sort-btn" @click="sortOpen = !sortOpen">
+              <span>{{ sortLabels[sortKey] }}</span>
+              <ChevronDown :size="12" class="sort-chevron" :class="{ open: sortOpen }" />
+            </button>
+            <Transition name="dropdown">
+              <ul v-if="sortOpen" class="sort-dropdown">
+                <li
+                  v-for="(label, key) in sortLabels"
+                  :key="key"
+                  class="sort-option"
+                  :class="{ active: sortKey === key }"
+                  @click="sortKey = key as SortKey; sortOpen = false; onSortChange()"
+                >
+                  <Check v-if="sortKey === key" :size="12" />
+                  <span>{{ label }}</span>
+                </li>
+              </ul>
+            </Transition>
           </div>
         </div>
         <!-- 详情标题 -->
@@ -220,8 +231,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown } from 'lucide-vue-next'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps<{
   stories: Array<{
@@ -269,6 +280,15 @@ const filteredStories = computed(() => {
 // ─── 排序 ───
 type SortKey = 'time' | 'distance' | 'resonance' | 'views' | 'random'
 const sortKey = ref<SortKey>('time')
+const sortOpen = ref(false)
+const sortGroupRef = ref<HTMLElement | null>(null)
+const sortLabels: Record<SortKey, string> = {
+  time: '发布时间',
+  distance: '发布距离',
+  resonance: '共鸣数',
+  views: '浏览数',
+  random: '随机排序',
+}
 const randomSeed = ref(Date.now())
 
 function onSortChange() {
@@ -351,7 +371,20 @@ onMounted(() => {
       { timeout: 5000 },
     )
   }
+
+  // 点击外部关闭排序下拉
+  document.addEventListener('click', onDocumentClick)
 })
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick)
+})
+
+function onDocumentClick(e: MouseEvent) {
+  if (sortOpen.value && sortGroupRef.value && !sortGroupRef.value.contains(e.target as Node)) {
+    sortOpen.value = false
+  }
+}
 
 function onResonate(story: { id: number; resonanceCount: number }) {
   emit('resonate', story.id)
@@ -635,19 +668,63 @@ const generatedTags = computed<string[]>(() => {
   flex-shrink: 0;
 }
 .sort-icon { color: var(--muted-light); }
-.sort-select {
-  padding: 7px 8px;
+.sort-btn {
+  padding: 7px 10px 7px 8px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--ink);
+  color: var(--ink-secondary);
   font-family: var(--font);
   font-size: 0.78rem;
-  outline: none;
   cursor: pointer;
-  appearance: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: border-color 0.15s;
 }
-.sort-select:focus { border-color: var(--accent-border); }
+.sort-btn:hover { border-color: var(--accent-border); }
+.sort-chevron {
+  color: var(--muted-light);
+  transition: transform 0.2s;
+}
+.sort-chevron.open { transform: rotate(180deg); }
+
+/* ─── Sort Dropdown ─── */
+.sort-group { position: relative; }
+.sort-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 120px;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 50;
+}
+.sort-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.sort-option:hover { background: rgba(255, 255, 255, 0.04); }
+.sort-option.active { color: var(--accent); }
+
+/* ─── Dropdown Transition ─── */
+.dropdown-enter-active { transition: opacity 0.15s, transform 0.15s; }
+.dropdown-leave-active { transition: opacity 0.1s, transform 0.1s; }
+.dropdown-enter-from { opacity: 0; transform: translateY(-6px); }
+.dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ─── Back Button ─── */
 .back-btn {
