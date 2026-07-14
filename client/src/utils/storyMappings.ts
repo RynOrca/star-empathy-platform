@@ -71,6 +71,63 @@ const SEED_STAR_MAP: Record<string, string> = {
 
   // 仙王座 α（Alderamin / 天钩五）—— 皇室四星座
   '皇室四星座': 'Alderamin',
+
+  // ── 西方亮星的名字由来（v3）──────────────────────────────
+  '尾刺·Shaula':        'Shaula',        // 天蝎座 λ
+  '十字横臂·Gacrux':     'Gacrux',        // 南十字座 γ
+  '撞角·Elnath':         'Elnath',        // 金牛座 β / 御夫座 ζ
+  '平静之水·Miaplacidus': 'Miaplacidus',  // 船底座 β
+  '亮者·Alnair':         'Alnair',        // 天鹤座 α
+  '重量·Wezen':          'Wezen',         // 大犬座 δ
+  '手肘·Mirfak':         'Mirfak',        // 英仙座 α
+  '南弓·Kaus Australis': 'Kaus Australis',// 人马座 ε
+  '航海家·Avior':        'Avior',         // 船底座 ε
+  '古名·Sargas':         'Sargas',        // 天蝎座 θ
+  '缰绳之肩·Menkalinan': 'Menkalinan',    // 御夫座 β
+  '三角之首·Atria':      'Atria',         // 南三角座 α
+  '印记·Alhena':         'Alhena',        // 双子座 γ
+  '孔雀之首·Peacock':    'Peacock',       // 孔雀座 α
+  '先驱·Mirzam':         'Mirzam',        // 大犬座 β
+  '孤独者·Alphard':      'Alphard',       // 长蛇座 α
+  '羔羊·Hamal':          'Hamal',         // 白羊座 α
+  '狮鬃·Algieba':        'Algieba',       // 狮子座 γ
+  '火星之敌·Antares':    'Antares',       // 天蝎座 α
+
+  // ── 次亮西方星名由来（v3b）────────────────────────────────
+  '狮尾·Denebola':             'Denebola',         // 狮子座 β
+  '腰肋·Zosma':                'Zosma',            // 狮子座 ζ
+  '第二蛙·Diphda':             'Diphda',           // 鲸鱼座 β
+  '腰带·Mirach':               'Mirach',           // 仙女座 β
+  '飞马之脐·Alpheratz':        'Alpheratz',        // 仙女/飞马 α
+  '查理之心·Cor Caroli':      'Cor Caroli',      // 猎犬座 α
+  '缠蛇者之头·Rasalhague':     'Rasalhague',      // 蛇夫座 α
+  '断冕之珠·Alphecca':         'Alphecca',         // 北冕座 α
+  '织带·Izar':                 'Izar',             // 牧夫座 ε
+  '龙首·Eltanin':              'Eltanin',          // 天龙座 γ
+  '南爪·Zubenelgenubi':        'Zubenelgenubi',   // 天秤座 α
+  '弓之中段·Kaus Media':       'Kaus Media',      // 人马座 δ
+  '蛇喉·Unukalhai':            'Unukalhai',       // 巨蛇座 γ
+  '乌喙·Kraz':                 'Kraz',            // 乌鸦座 β
+  '苍蝇座·Mus':               'Mus',              // 苍蝇座 α
+  '猎鹰·Tarazed':              'Tarazed',         // 天鹰座 ζ
+  '帆船·Alsephina':            'Alsephina',       // 船帆座 γ
+
+  // ── 剩余西方亮星分组（v3c）──────────────────────────────
+  '天蝎之冠·Dschubba':  'Dschubba',    // 天蝎座 δ
+  '仙后之座·Schedar':   'Schedar',     // 仙后座 α
+  '飞马大四方形·Enif':  'Enif',        // 飞马座 ε
+  '联星之美·Almach':    'Almach',      // 仙女座 γ
+  '医神之犬·Sabik':     'Sabik',       // 蛇夫座 η
+  '南斗之弓·Nunki':     'Nunki',       // 人马座 σ
+  '耕者之腿·Muphrid':   'Muphrid',     // 牧夫座 η
+  '小熊之腰·Pherkad':   'Pherkad',     // 小熊座 γ
+  '天鹅之心·Sadr':      'Sadr',        // 天鹅座 γ
+  '众尾星·Gienah':      'Gienah',      // 乌鸦座 γ
+  '羊角尖·Sheratan':    'Sheratan',    // 白羊座 β
+  '龙尾·Rastaban':      'Rastaban',    // 天龙座 β
+  '天秤双臂·Zubeneschamali':'Zubeneschamali', // 天秤座 β
+  '南方补漏·HyiTuc':    ' Hyi',        // 长蛇座 β
+  '南天多层命名·AraPhe':'Ankaa',       // 凤凰座 α
 }
 
 // ─── 补充：新故事所用到的星表精确名称（findStar 模糊匹配用）───
