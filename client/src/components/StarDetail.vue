@@ -8,6 +8,30 @@
           <span class="panel-title">故事</span>
           <span class="panel-count" v-if="hasRealStory">{{ realStories.length }} 条</span>
         </div>
+
+        <!-- 搜索 + 排序（仅列表视图） -->
+        <div class="list-toolbar" v-if="!detailStory && hasRealStory">
+          <div class="search-box">
+            <Search :size="13" class="search-icon" />
+            <input
+              v-model="searchQuery"
+              class="search-input"
+              placeholder="搜索故事..."
+              @input="onSearchInput"
+            />
+            <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''"><X :size="12" /></button>
+          </div>
+          <div class="sort-group">
+            <ArrowUpDown :size="13" class="sort-icon" />
+            <select v-model="sortKey" class="sort-select" @change="onSortChange">
+              <option value="time">发布时间</option>
+              <option value="distance">发布距离</option>
+              <option value="resonance">共鸣数</option>
+              <option value="views">浏览数</option>
+              <option value="random">随机排序</option>
+            </select>
+          </div>
+        </div>
         <!-- 详情标题 -->
         <div class="panel-header" v-else>
           <button class="back-btn" @click="detailStoryId = null">
@@ -20,7 +44,7 @@
         <template v-if="!detailStoryId">
           <div v-if="hasRealStory" class="story-list">
             <div
-              v-for="story in realStories"
+              v-for="story in displayedStories"
               :key="story.id"
               class="story-card"
                 @click="openStoryDetail(story)"
@@ -54,6 +78,12 @@
                 <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
               </div>
             </div>
+          </div>
+
+          <!-- 搜索无结果 -->
+          <div v-else-if="searchQuery && hasRealStory" class="empty-state">
+            <Search :size="20" class="empty-icon" />
+            <p class="empty-text">没有匹配的故事</p>
           </div>
 
           <div v-else class="empty-state">
@@ -191,7 +221,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown } from 'lucide-vue-next'
 
 const props = defineProps<{
   stories: Array<{
@@ -224,6 +254,74 @@ const emit = defineEmits<{
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
+
+// ─── 搜索 ───
+const searchQuery = ref('')
+const filteredStories = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return realStories.value
+  return realStories.value.filter(s =>
+    (s.title || '').toLowerCase().includes(q) ||
+    s.content.toLowerCase().includes(q)
+  )
+})
+
+// ─── 排序 ───
+type SortKey = 'time' | 'distance' | 'resonance' | 'views' | 'random'
+const sortKey = ref<SortKey>('time')
+const randomSeed = ref(Date.now())
+
+function onSortChange() {
+  if (sortKey.value === 'random') randomSeed.value = Date.now()
+}
+function onSearchInput() { /* reactive */ }
+
+// 稳定随机排序（同一 seed 不变）
+function seededRandom(seed: number): () => number {
+  let s = seed
+  return () => {
+    s = (s * 16807 + 0) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
+
+// 排序后的列表：来自星河始终置顶
+const displayedStories = computed(() => {
+  const history = filteredStories.value.filter(s => s.type === 'history')
+  const user = filteredStories.value.filter(s => s.type !== 'history')
+
+  const sortFn = getSortFn(sortKey.value)
+  return [...history, ...user.sort(sortFn)]
+})
+
+function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof filteredStories.value[0]) => number {
+  switch (key) {
+    case 'time':
+      return (a, b) => b.created_at.localeCompare(a.created_at)
+    case 'distance': {
+      return (a, b) => {
+        const da = formatDistance(a.location_lat, a.location_lng)
+        const db2 = formatDistance(b.location_lat, b.location_lng)
+        // 有距离的排前面，无距离的排后面
+        if (da.text && !db2.text) return -1
+        if (!da.text && db2.text) return 1
+        if (!da.text && !db2.text) return 0
+        // 解析距离数值比较（简化：用 text 里的数字）
+        const na = parseFloat(da.text) || 0
+        const nb = parseFloat(db2.text) || 0
+        return na - nb
+      }
+    }
+    case 'resonance':
+      return (a, b) => b.resonanceCount - a.resonanceCount
+    case 'views':
+      return (a, b) => getStoryViewCount(b.id) - getStoryViewCount(a.id)
+    case 'random': {
+      const rng = seededRandom(randomSeed.value)
+      return () => rng() - 0.5
+    }
+  }
+}
 
 // 本地浏览数覆盖（乐观更新）
 const viewCountOverrides = reactive(new Map<number, number>())
@@ -482,9 +580,74 @@ const generatedTags = computed<string[]>(() => {
   color: var(--muted-light);
   background: rgba(255, 255, 255, 0.04);
   padding: 2px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--rule);
 }
+
+/* ─── List Toolbar (Search + Sort) ─── */
+.list-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.search-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted-light);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 7px 28px 7px 30px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.search-input::placeholder { color: var(--muted-light); opacity: 0.6; }
+.search-input:focus { border-color: var(--accent-border); }
+.search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--muted-light);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.sort-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sort-icon { color: var(--muted-light); }
+.sort-select {
+  padding: 7px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+}
+.sort-select:focus { border-color: var(--accent-border); }
 
 /* ─── Back Button ─── */
 .back-btn {
