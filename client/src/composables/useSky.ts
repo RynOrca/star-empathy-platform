@@ -402,16 +402,18 @@ export function useSky(
         if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
       }
 
-      // 悬浮检测（节流 50ms）
-      const now = performance.now()
-      if (now - hoverCheckTimer < 50) return
-      hoverCheckTimer = now
-
+      // 始终更新 mouse 坐标
       const rect = canvas.getBoundingClientRect()
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      // 悬浮检测（节流 80ms）
+      const now = performance.now()
+      if (now - hoverCheckTimer < 80) return
+      hoverCheckTimer = now
+
       raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 10
+      raycaster.params.Points!.threshold = 8
       const hits = raycaster.intersectObjects(starPointsRefs)
       if (hits.length) {
         const hit = hits[0]
