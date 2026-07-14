@@ -5,3 +5,8 @@
 *.log
 /tmp/
 data/
+node_modules/
+dist/
+.design/
+.uploads/
+*.db

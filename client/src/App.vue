@@ -14,9 +14,13 @@
         :stories="selectedStories"
         :active-index="activeStoryIndex"
         :star-info="selectedStarInfo"
+        :catalog-stats="catalogStats"
+        :catalog-star-id="selectedCatalogStarId"
         :resonating="resonating"
         @switch="onSwitchStory"
         @resonate="onResonate"
+        @refresh-stories="fetchStories"
+        @update-stats="catalogStats = $event"
         @close="onCloseDetail"
         @write-story="onWriteStory"
       />
@@ -38,6 +42,7 @@ import SkyCanvas from './components/SkyCanvas.vue'
 import StarDetail from './components/StarDetail.vue'
 import StoryForm from './components/StoryForm.vue'
 import catalogData from './data/stars.json'
+import { constellationNames, starDistances } from './data/starInfo'
 
 // ─── 星表查询 ───
 interface CatalogStar {
@@ -48,14 +53,15 @@ interface CatalogStar {
   ra: number
   dec: number
   x: number; y: number; z: number
+  color: string
 }
 const catalogStarLookup = new Map<number, CatalogStar>()
 for (const s of catalogData.stars) {
-  catalogStarLookup.set(s.id, { id: s.id, name: s.name, con: s.con, mag: s.mag, ra: s.ra, dec: s.dec, x: s.x, y: s.y, z: s.z })
+  catalogStarLookup.set(s.id, { id: s.id, name: s.name, con: s.con, mag: s.mag, ra: s.ra, dec: s.dec, x: s.x, y: s.y, z: s.z, color: s.color })
 }
 
 // ─── 无故事时的占位 ───
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1 }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1, created_at: '', location_lat: null, location_lng: null, type: '', view_count: 0, origin: null }
 
 // ─── 故事查询 ───
 interface StoryData {
@@ -64,10 +70,16 @@ interface StoryData {
   content: string
   resonanceCount: number
   catalog_star_id: number
+  created_at: string
+  location_lat: number | null
+  location_lng: number | null
+  type: string
+  view_count: number
+  origin: string | null
 }
 const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
 
-onMounted(async () => {
+async function fetchStories() {
   try {
     const res = await fetch('/api/stars')
     const json = await res.json()
@@ -82,6 +94,12 @@ onMounted(async () => {
           content: s.content,
           resonanceCount: s.resonance_count,
           catalog_star_id: cid,
+          created_at: s.created_at || '',
+          location_lat: s.location_lat ?? null,
+          location_lng: s.location_lng ?? null,
+          type: s.type || 'user',
+          view_count: s.view_count ?? 0,
+          origin: s.origin ?? null,
         })
       }
     }
@@ -89,7 +107,9 @@ onMounted(async () => {
   } catch (e) {
     console.error('获取故事失败:', e)
   }
-})
+}
+
+onMounted(() => { fetchStories() })
 
 // 格式化恒星显示名
 function formatStarName(s: CatalogStar): string {
@@ -109,9 +129,12 @@ function formatStarName(s: CatalogStar): string {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
-const selectedStarInfo = ref<{ displayName: string; con: string; mag: number } | null>(null)
+const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
 const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
+
+// 星星统计数据
+const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 
 // 写故事表单
 const showForm = ref(false)
@@ -123,13 +146,55 @@ function onStarClick(starId: number) {
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
-  selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag }
+  selectedStarInfo.value = {
+    displayName: formatStarName(star),
+    con: star.con,
+    mag: star.mag,
+    conName: constellationNames[star.con] || star.con || '未知星座',
+    distance: starDistances[star.id] ?? null,
+    ra: star.ra,
+    dec: star.dec,
+    color: star.color || '#fff6e8',
+  }
   selectedCatalogStarId.value = starId
+
+  // 获取统计 + 记录星星级浏览
+  fetchCatalogStats(starId)
+  fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
+
+  // 前端降级：从已有故事数据计算统计
+  const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
+  if (realStories.length > 0) {
+    catalogStats.value = {
+      storyCount: realStories.length,
+      totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0),
+      totalViews: 0,
+      starViews: catalogStats.value?.starViews ?? 0,
+      favoriteCount: catalogStats.value?.favoriteCount ?? 0,
+    }
+  }
+}
+
+async function fetchCatalogStats(starId: number) {
+  try {
+    const res = await fetch(`/api/stars/${starId}/stats`)
+    const json = await res.json()
+    if (json.code === 200) {
+      catalogStats.value = {
+        storyCount: json.data.storyCount ?? 0,
+        totalResonance: json.data.totalResonance ?? 0,
+        totalViews: json.data.totalViews ?? 0,
+        starViews: json.data.starViews ?? 0,
+        favoriteCount: json.data.favoriteCount ?? 0,
+      }
+    }
+  } catch { /* 静默 */ }
 }
 
 function onCloseDetail() {
   selectedStories.value = []
   selectedStarInfo.value = null
+  catalogStats.value = null
 }
 
 function onWriteStory() {

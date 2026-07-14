@@ -54,7 +54,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalog_star_id: number }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalog_star_id: number; created_at: string; location_lat: number | null; location_lng: number | null; type: string; view_count: number; origin: string | null }]
 }>()
 
 const title = ref('')
@@ -62,9 +62,20 @@ const content = ref('')
 const submitting = ref(false)
 const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const userLocation = ref<{ lat: number; lng: number } | null>(null)
 
 onMounted(() => {
   textareaRef.value?.focus()
+  // 尝试获取用户位置
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userLocation.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      },
+      () => { /* 用户拒绝或不可用，静默忽略 */ },
+      { timeout: 5000 },
+    )
+  }
 })
 
 async function onSubmit() {
@@ -83,6 +94,7 @@ async function onSubmit() {
         catalog_star_id: props.catalogStarId,
         title: trimmedTitle,
         content: trimmed,
+        location: userLocation.value,
       }),
     })
     const json = await res.json()
@@ -93,6 +105,12 @@ async function onSubmit() {
         content: json.data.content,
         resonanceCount: json.data.resonance_count,
         catalog_star_id: json.data.catalog_star_id,
+        created_at: json.data.created_at || '',
+        location_lat: json.data.location_lat ?? null,
+        location_lng: json.data.location_lng ?? null,
+        type: 'user',
+        view_count: 0,
+        origin: null,
       })
     } else {
       error.value = json.message || '提交失败，再试一次吧'

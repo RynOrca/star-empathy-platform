@@ -23,7 +23,7 @@
               v-for="story in realStories"
               :key="story.id"
               class="story-card"
-              @click="detailStoryId = story.id"
+                @click="openStoryDetail(story)"
             >
               <div class="story-head">
                 <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
@@ -39,7 +39,19 @@
               </div>
               <p class="story-excerpt">{{ story.content }}</p>
               <div class="story-meta">
+                <span v-if="story.type === 'history'" class="meta-history">
+                  来自星河
+                  <template v-if="story.origin"> · {{ story.origin }}</template>
+                </span>
+                <template v-else>
+                  <span v-if="formatTime(story.created_at)" class="meta-time">{{ formatTime(story.created_at) }}</span>
+                  <span v-if="formatTime(story.created_at) && formatDistance(story.location_lat, story.location_lng).text" class="meta-sep">·</span>
+                  <span v-if="formatDistance(story.location_lat, story.location_lng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.location_lat, story.location_lng).near }">{{ formatDistance(story.location_lat, story.location_lng).text }}</span>
+                </template>
+                <span class="meta-sep" v-if="(story.type === 'history' || formatTime(story.created_at) || formatDistance(story.location_lat, story.location_lng).text)">·</span>
                 <Sparkles :size="12" /> <span>{{ story.resonanceCount }}</span>
+                <span class="meta-sep">·</span>
+                <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
               </div>
             </div>
           </div>
@@ -53,6 +65,17 @@
         <!-- ─── 详情视图 ─── -->
         <div v-else-if="detailStory" class="detail-view">
           <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+          <div class="detail-info-bar">
+            <span v-if="detailStory.type === 'history'" class="meta-history">
+              来自星河
+              <template v-if="detailStory.origin"> · {{ detailStory.origin }}</template>
+            </span>
+            <template v-else>
+              <span v-if="formatTime(detailStory.created_at)">{{ formatTime(detailStory.created_at) }}</span>
+              <span v-if="formatTime(detailStory.created_at) && formatDistance(detailStory.location_lat, detailStory.location_lng).text">·</span>
+              <span v-if="formatDistance(detailStory.location_lat, detailStory.location_lng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.location_lat, detailStory.location_lng).near }">{{ formatDistance(detailStory.location_lat, detailStory.location_lng).text }}</span>
+            </template>
+          </div>
           <div class="detail-body">{{ detailStory.content }}</div>
           <div class="detail-footer">
             <button
@@ -72,9 +95,76 @@
       <!-- 右：恒星信息 -->
       <div class="panel panel-info">
         <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
-        <div class="star-name">{{ starInfo?.displayName }}</div>
-        <div class="star-meta" v-if="starInfo">{{ starInfo.con }} · {{ starInfo.mag.toFixed(1) }} 等星</div>
 
+        <!-- 星名 -->
+        <div class="star-header">
+          <div class="star-color-dot" :style="{ background: starInfo?.color || '#fff6e8' }"></div>
+          <div>
+            <div class="star-name">{{ starInfo?.displayName }}</div>
+            <div class="star-subtitle" v-if="starInfo">{{ starInfo.conName }}</div>
+          </div>
+        </div>
+
+        <!-- 详细信息行 -->
+        <div class="info-rows" v-if="starInfo">
+          <div class="info-row">
+            <Sun :size="14" class="info-icon" />
+            <div class="info-row-content">
+              <span class="info-row-label">视星等</span>
+              <span class="info-row-value">{{ starInfo.mag.toFixed(1) }} 等</span>
+            </div>
+          </div>
+
+          <div class="info-row" v-if="starInfo.distance">
+            <Navigation :size="14" class="info-icon" />
+            <div class="info-row-content">
+              <span class="info-row-label">距离</span>
+              <span class="info-row-value">{{ starInfo.distance }} 光年</span>
+            </div>
+          </div>
+
+          <div class="info-row">
+            <Thermometer :size="14" class="info-icon" />
+            <div class="info-row-content">
+              <span class="info-row-label">色温</span>
+              <span class="info-row-value">{{ getStarTemperature(starInfo.color) }}</span>
+            </div>
+          </div>
+
+          <div class="info-row">
+            <Sparkles :size="14" class="info-icon" />
+            <div class="info-row-content">
+              <span class="info-row-label">亮度</span>
+              <span class="info-row-value">{{ getBrightnessLabel(starInfo.mag) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 统计行 -->
+        <div class="stats-row" v-if="catalogStats">
+          <div class="stat-item">
+            <BookOpen :size="13" class="stat-icon" />
+            <span class="stat-num">{{ catalogStats.storyCount }}</span>
+            <span class="stat-label">故事</span>
+          </div>
+          <div class="stat-item">
+            <Heart :size="13" class="stat-icon" />
+            <span class="stat-num">{{ catalogStats.totalResonance }}</span>
+            <span class="stat-label">共鸣</span>
+          </div>
+          <div class="stat-item">
+            <Eye :size="13" class="stat-icon" />
+            <span class="stat-num">{{ catalogStats.starViews }}</span>
+            <span class="stat-label">访问</span>
+          </div>
+          <div class="stat-item">
+            <Star :size="13" class="stat-icon" :class="{ 'is-favorited': isFavorited }" />
+            <span class="stat-num">{{ catalogStats.favoriteCount }}</span>
+            <span class="stat-label">收藏</span>
+          </div>
+        </div>
+
+        <!-- 标签 -->
         <div class="info-section">
           <div class="info-label">标签</div>
           <div class="info-tags">
@@ -83,32 +173,65 @@
           </div>
         </div>
 
-        <button class="write-btn" @click="onWriteStory"><PenSquare :size="14" /> 写我的故事</button>
+        <div class="action-buttons">
+          <button class="write-btn" @click="onWriteStory"><PenSquare :size="14" /> 写我的故事</button>
+          <button
+            class="fav-btn"
+            :class="{ favorited: isFavorited }"
+            @click="toggleFavorite"
+          >
+            <Star :size="14" :fill="isFavorited ? 'currentColor' : 'none'" />
+            <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft } from 'lucide-vue-next'
+import { computed, ref, reactive, onMounted } from 'vue'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye } from 'lucide-vue-next'
 
 const props = defineProps<{
-  stories: Array<{ id: number; title: string | null; content: string; resonanceCount: number }>
+  stories: Array<{
+    id: number
+    title: string | null
+    content: string
+    resonanceCount: number
+    created_at: string
+    location_lat: number | null
+    location_lng: number | null
+    type: string
+    view_count: number
+    origin: string | null
+  }>
   activeIndex: number
-  starInfo: { displayName: string; con: string; mag: number } | null
+  starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
+  catalogStats: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null
+  catalogStarId: number
   resonating: boolean
 }>()
 
 const emit = defineEmits<{
   switch: [index: number]
   resonate: [id: number]
+  refreshStories: []
+  updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
 }>()
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
+
+// 本地浏览数覆盖（乐观更新）
+const viewCountOverrides = reactive(new Map<number, number>())
+function getStoryViewCount(storyId: number): number {
+  if (viewCountOverrides.has(storyId)) return viewCountOverrides.get(storyId)!
+  const s = props.stories.find(s => s.id === storyId)
+  return s?.view_count ?? 0
+}
 
 const detailStoryId = ref<number | null>(null)
 const detailStory = computed(() => {
@@ -117,13 +240,165 @@ const detailStory = computed(() => {
 })
 const justResonatedId = ref<number | null>(null)
 
+// ─── 用户当前位置（用于计算距离） ───
+const userPosition = ref<{ lat: number; lng: number } | null>(null)
+
+onMounted(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userPosition.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      },
+      () => { /* 静默 */ },
+      { timeout: 5000 },
+    )
+  }
+})
+
 function onResonate(story: { id: number; resonanceCount: number }) {
   emit('resonate', story.id)
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
 }
 
+// ─── 收藏 ───
+const isFavorited = ref(false)
+
+async function toggleFavorite() {
+  const prev = isFavorited.value
+  isFavorited.value = !prev
+  try {
+    const method = prev ? 'DELETE' : 'POST'
+    await fetch(`/api/stars/${props.catalogStarId}/favorite`, { method })
+    emit('refreshStories')
+    fetchCatalogStatsFromFront()
+  } catch {
+    isFavorited.value = prev
+  }
+}
+
+async function fetchCatalogStatsFromFront() {
+  try {
+    const res = await fetch(`/api/stars/${props.catalogStarId}/stats`)
+    const json = await res.json()
+    if (json.code === 200) {
+      // 通知父组件更新
+      emit('updateStats', json.data)
+    }
+  } catch { /* 静默 */ }
+}
+
 function onWriteStory() { emit('writeStory') }
+
+// 打开故事详情 + 记录浏览（乐观更新）
+function openStoryDetail(story: { id: number }) {
+  detailStoryId.value = story.id
+  // 乐观更新浏览数
+  const current = getStoryViewCount(story.id)
+  viewCountOverrides.set(story.id, current + 1)
+  // 后端记录 + 重新拉取
+  fetch(`/api/stars/story/${story.id}/view`, { method: 'POST' })
+    .then(() => emit('refreshStories'))
+    .catch(() => {
+      // 失败回滚
+      viewCountOverrides.set(story.id, current)
+    })
+}
+
+// ─── 时间格式化 ───
+function formatTime(createdAt: string): string {
+  if (!createdAt) return ''
+  const date = new Date(createdAt + 'Z') // SQLite datetime is UTC
+  const now = Date.now()
+  const diff = now - date.getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} 天前`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} 个月前`
+  return `${Math.floor(months / 12)} 年前`
+}
+
+// ─── 赤经格式化 ───
+function formatRA(ra: number): string {
+  const h = Math.floor(ra)
+  const m = Math.floor((ra - h) * 60)
+  const s = Math.floor(((ra - h) * 60 - m) * 60)
+  return `${h}h ${m}m ${s}s`
+}
+
+// ─── 赤纬格式化 ───
+function formatDEC(dec: number): string {
+  const sign = dec >= 0 ? '+' : '-'
+  const abs = Math.abs(dec)
+  const d = Math.floor(abs)
+  const m = Math.floor((abs - d) * 60)
+  return `${sign}${d}° ${m}′`
+}
+
+// ─── 恒星色温（从颜色字段推导光谱类型） ───
+function getStarTemperature(color: string): string {
+  const map: Record<string, string> = {
+    '#9bb0ff': 'O型 · 30000K+ · 蓝白巨星',
+    '#aabfff': 'B型 · 10000~30000K · 蓝白',
+    '#cad7ff': 'A型 · 7500~10000K · 白色',
+    '#f8f7ff': 'F型 · 6000~7500K · 黄白',
+    '#fff4ea': 'G型 · 5200~6000K · 黄色（类太阳）',
+    '#ffd2a1': 'K型 · 3700~5200K · 橙色',
+    '#ffcc6f': 'K型 · 3700~5200K · 橙色',
+    '#ffb56c': 'K型 · 3700~5200K · 橙色',
+    '#ffa64d': 'K型 · 3700~5200K · 橙色',
+    '#ff8b3c': 'M型 · 2400~3700K · 红矮星',
+    '#ff7124': 'M型 · 2400~3700K · 红矮星',
+    '#ffc878': 'K型 · 3700~5200K · 橙色',
+    '#ffe0b0': 'G/K型 · 5200K · 黄白',
+    '#fff6e8': 'F/G型 · 6000K · 白黄',
+    '#ffc470': 'K型 · 3700~5200K · 橙色',
+    '#c8d8ff': 'A型 · 7500~10000K · 白色',
+    '#ff8a60': 'M型 · 2400~3700K · 红矮星',
+    '#f0f0ff': 'A型 · 7500~10000K · 白色',
+    '#a0b8ff': 'B型 · 10000~30000K · 蓝白',
+  }
+  return map[color] || '未知光谱型'
+}
+
+// ─── 亮度等级描述 ───
+function getBrightnessLabel(mag: number): string {
+  if (mag < 0) return '极亮（负星等）'
+  if (mag < 1) return '一等亮星'
+  if (mag < 2) return '二等亮星'
+  if (mag < 3) return '三等星'
+  if (mag < 4) return '四等星（肉眼清晰）'
+  if (mag < 5) return '五等星（肉眼可见）'
+  if (mag < 6) return '六等星（肉眼极限）'
+  return '暗星（需望远镜）'
+}
+
+// ─── 距离格式化（Haversine 公式） ───
+interface DistanceResult { text: string; near: boolean }
+
+function formatDistance(lat: number | null, lng: number | null): DistanceResult {
+  if (lat == null || lng == null || !userPosition.value) return { text: '', near: false }
+  return calcDistance(userPosition.value.lat, userPosition.value.lng, lat, lng)
+}
+
+function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): DistanceResult {
+  const R = 6371 // km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const km = R * c
+  if (km < 1) return { text: '<1km', near: true }
+  if (km < 100) return { text: `${km.toFixed(1)}km`, near: true }
+  return { text: `${Math.round(km)}km`, near: false }
+}
 
 const generatedTags = computed<string[]>(() => {
   if (!hasRealStory.value) return []
@@ -280,6 +555,8 @@ const generatedTags = computed<string[]>(() => {
   font-weight: 500;
   color: var(--ink);
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ─── Resonate Button ─── */
@@ -317,6 +594,8 @@ const generatedTags = computed<string[]>(() => {
   color: var(--ink-secondary);
   font-size: 0.85rem;
   line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -328,6 +607,18 @@ const generatedTags = computed<string[]>(() => {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.meta-time { color: var(--muted-light); }
+.meta-dist { color: var(--star-blue); }
+.meta-near { color: var(--accent); font-weight: 500; }
+.meta-sep { opacity: 0.4; }
+.meta-history {
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(202, 167, 255, 0.1);
+  border: 1px solid rgba(202, 167, 255, 0.15);
+  color: var(--star-purple);
 }
 
 /* ─── Detail View ─── */
@@ -355,20 +646,34 @@ const generatedTags = computed<string[]>(() => {
   background: rgba(255, 255, 255, 0.18);
 }
 .detail-title {
-  margin: 0 0 16px;
+  margin: 0 0 4px;
   font-size: 1.08rem;
   font-weight: 600;
   color: var(--ink);
   line-height: 1.5;
-  padding-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--rule);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
+.detail-info-bar {
+  font-size: 0.78rem;
+  color: var(--muted-light);
+  padding-top: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.detail-info-bar span:nth-child(1n+3) { color: var(--star-blue); }
 .detail-body {
   flex: 1;
   color: var(--ink-secondary);
   font-size: 0.9rem;
   line-height: 1.85;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 .detail-footer {
   flex-shrink: 0;
@@ -402,23 +707,111 @@ const generatedTags = computed<string[]>(() => {
 
 /* ─── Right: Info Panel ─── */
 .panel-info {
-  width: 320px;
+  width: 340px;
   flex-shrink: 0;
   padding: 24px;
   position: relative;
 }
+
+/* ─── Star Header ─── */
+.star-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.star-color-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.08);
+}
 .star-name {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--ink);
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
-.star-meta {
-  font-size: 0.8rem;
+.star-subtitle {
+  font-size: 0.78rem;
   color: var(--muted);
   margin-top: 2px;
 }
+
+/* ─── Info Rows ─── */
+.info-rows {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.info-icon {
+  color: var(--muted-light);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.info-row-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.info-row-label {
+  font-size: 0.72rem;
+  color: var(--muted-light);
+  line-height: 1;
+}
+.info-row-value {
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* ─── Stats Row ─── */
+.stats-row {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+}
+.stat-item {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.015);
+  border-right: 1px solid var(--rule);
+}
+.stat-item:last-child { border-right: none; }
+.stat-icon {
+  color: var(--muted-light);
+}
+.stat-num {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--muted-light);
+}
+
 .info-section {
   margin-top: 24px;
   padding-top: 16px;
@@ -448,10 +841,14 @@ const generatedTags = computed<string[]>(() => {
   font-style: italic;
 }
 
-/* ─── Write Button ─── */
-.write-btn {
+/* ─── Action Buttons ─── */
+.action-buttons {
   margin-top: 20px;
-  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+.write-btn {
+  flex: 1;
   padding: 10px 0;
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -472,6 +869,43 @@ const generatedTags = computed<string[]>(() => {
 }
 .write-btn:active {
   transform: scale(0.98);
+}
+
+/* ─── Favorite Button ─── */
+.fav-btn {
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.fav-btn:hover {
+  background: var(--accent-subtle);
+}
+.fav-btn.favorited {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.fav-btn:active {
+  transform: scale(0.98);
+}
+.fav-count {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-left: -2px;
+}
+.stat-icon.is-favorited {
+  color: var(--accent);
 }
 
 /* ─── Close Button ─── */
