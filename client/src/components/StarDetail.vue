@@ -43,7 +43,6 @@
               </ul>
             </Transition>
           </div>
-          </Transition>
         </div>
         <!-- 详情标题 -->
         <div class="panel-header" v-else>
