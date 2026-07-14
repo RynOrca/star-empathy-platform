@@ -7,7 +7,7 @@ import {
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
-import { dateToJD, lstDeg, orientationEuler } from '../utils/astro'
+import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, trueObliquityRad } from '../utils/astro'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
@@ -229,13 +229,17 @@ export function useSky(
     scene.add(new Line(g, new LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.25, depthTest: true, depthWrite: false })))
   }
 
-  // ═══ 黄道 (虚线) ═══
+  // ═══ 黄道 (虚线, 当日真黄赤交角, 整圆、下半被地平面挡) ═══
+  let eclipticLine: Line | null = null
+  let eclipticRefreshAccum = 0
   {
     const v: number[] = []
+    const base: number[] = []
     for (let i = 0; i <= 360; i++) {
-      const { ra, dec } = eclipticToRaDec(i)
+      const { ra, dec } = eclipticToRaDecJD(i, new Date())
       const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
       v.push(p.x, p.y, p.z)
+      base.push(p.x, p.y, p.z)
     }
     const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
     g.computeBoundingSphere()
@@ -249,8 +253,10 @@ export function useSky(
       depthWrite: false,
     })
     const line = new Line(g, mat)
+    ;(line.userData as { basePos?: Float32Array }).basePos = new Float32Array(base)
     line.computeLineDistances()
     scene.add(line)
+    eclipticLine = line
   }
 
   // ═══ 银河 ═══
@@ -566,7 +572,7 @@ export function useSky(
     rotY += (e.clientX - px) * 0.004
     rotX += (e.clientY - py) * 0.004
     rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
-    camera.rotation.set(rotX, rotY, 0, 'YXZ')
+    if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
     px = e.clientX; py = e.clientY
   })
   canvas.addEventListener('pointerup', (e) => { dragging = false; canvas.releasePointerCapture(e.pointerId) })
@@ -613,6 +619,23 @@ export function useSky(
         0,
         'YXZ',
       )
+      // 每日同步一次黄道顶点（岁差 + 真黄赤交角年变化，约 0.003°/年）
+      eclipticRefreshAccum += 16
+      if (eclipticRefreshAccum > 1000 * 60 * 60 * 24 && eclipticLine) {
+        eclipticRefreshAccum = 0
+        const now = new Date()
+        const v: number[] = []
+        for (let i = 0; i <= 360; i++) {
+          const { ra, dec } = eclipticToRaDecJD(i, now)
+          const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
+          v.push(p.x, p.y, p.z)
+        }
+        const next = new Float32Array(v)
+        ;(eclipticLine.userData as { basePos: Float32Array }).basePos = next
+        eclipticLine.geometry.setAttribute('position', new BufferAttribute(next, 3))
+        eclipticLine.geometry.computeBoundingSphere()
+        eclipticLine.computeLineDistances()
+      }
     }
     // hover glow opacity lerp
     const sm = hoverGlow.material as SpriteMaterial

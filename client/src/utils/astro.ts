@@ -62,3 +62,26 @@ export function orientationEuler(latDeg: number, lstDegValue: number): { rotX: n
     rotY: -(lstDegValue / 15) * D2R,
   }
 }
+
+// ─── 真黄赤交角（按日期） ───
+// IAU 2000B 简化式，精度 ~0.1″，足够星图用。
+export function trueObliquityRad(date: Date): number {
+  const T = (dateToJD(date) - 2451545.0) / 36525
+  const eps0 = (84381.406 - 46.836769 * T - 0.0001831 * T * T + 0.00200340 * T * T * T) / 3600 * D2R
+  return eps0
+}
+
+/** 黄道（当日真 ε）→ 赤道坐标（时 / 度），带日期入参 */
+export function eclipticToRaDecJD(lonDeg: number, date: Date): { ra: number; dec: number } {
+  const ε = trueObliquityRad(date)
+  const λ = lonDeg * D2R
+  const ra = Math.atan2(Math.sin(λ) * Math.cos(ε), Math.cos(λ))
+  const dec = Math.asin(Math.sin(λ) * Math.sin(ε))
+  return { ra: (ra + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2) * 24, dec: dec / R2D }
+}
+
+/** 某黄道经纬度（当日）相对观测者的 alt/az — 供可见弧段筛选 */
+export function eclipticAltAz(lonDeg: number, obs: { lat: number; lon: number }, date: Date) {
+  const { ra, dec } = eclipticToRaDecJD(lonDeg, date)
+  return altAz(ra, dec, obs.lat, lstDeg(dateToJD(date), obs.lon))
+}
