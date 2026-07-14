@@ -28,6 +28,19 @@ function glowTex(inner: string, sz: number): CanvasTexture {
   return new CanvasTexture(c)
 }
 
+function bloomTex(color: string, sz: number): CanvasTexture {
+  const c = document.createElement('canvas'); c.width = c.height = sz
+  const ctx = c.getContext('2d')!, h = sz/2
+  const g = ctx.createRadialGradient(h,h,0, h,h,h)
+  g.addColorStop(0, color)
+  g.addColorStop(0.15, color)
+  g.addColorStop(0.4, 'rgba(255,225,160,0.3)')
+  g.addColorStop(0.7, 'rgba(255,225,160,0.08)')
+  g.addColorStop(1, 'transparent')
+  ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz)
+  return new CanvasTexture(c)
+}
+
 // RA(时)/Dec(°) → 天球 3D
 const D2R = Math.PI / 180
 function raDecXYZ(raH: number, decD: number, R: number) {
@@ -238,9 +251,9 @@ export function useSky(
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0x080c18,
+      color: 0x2a1e3a,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.65,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -301,13 +314,13 @@ export function useSky(
     }
   }
 
-  // ═══ 悬浮高亮点 ═══
-  const hoverGlowTex = glowTex('#ffe5a0', 96)
+  // ═══ 悬浮高亮辉光 ═══
+  const hoverBloomTex = bloomTex('#ffe5a0', 128)
   const hoverGlowGeo = new BufferGeometry()
   hoverGlowGeo.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0]), 3))
   const hoverGlow = new Points(hoverGlowGeo, new PointsMaterial({
-    size: 28,
-    map: hoverGlowTex,
+    size: 40,
+    map: hoverBloomTex,
     blending: AdditiveBlending,
     depthWrite: false,
     depthTest: false,
