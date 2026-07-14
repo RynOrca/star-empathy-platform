@@ -5,6 +5,21 @@
       <div class="nav-left">
         <span class="nav-logo">⭐ 星语穹庭</span>
       </div>
+      <div class="nav-center">
+        <div class="search-box">
+          <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" />
+          <div v-if="searchOpen && searchResults.length" class="search-dropdown">
+            <div v-for="r in searchResults" :key="r.id" class="search-item" @click="flyToStar(r.id); searchOpen = false; searchQuery = ''">
+              <span class="sr-name">{{ r.name || r.conName }}</span>
+              <span class="sr-con">{{ r.conName }}</span>
+              <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+            </div>
+          </div>
+          <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
+            <div class="search-item muted">未找到匹配的星星</div>
+          </div>
+        </div>
+      </div>
       <div class="nav-right">
         <span v-if="username" class="nav-user" @click="$router.push('/profile')">
           👤 {{ username }}
@@ -79,6 +94,31 @@ onMounted(async () => {
 function doLogout() {
   localStorage.removeItem('token')
   router.push('/')
+}
+
+// ─── 搜索星星 ───
+const searchQuery = ref('')
+const searchOpen = ref(false)
+const searching = ref(false)
+const searchResults = ref<any[]>([])
+
+async function onSearchInput() {
+  const q = searchQuery.value.trim()
+  if (!q) { searchResults.value = []; return }
+  searching.value = true
+  try {
+    const res = await fetch(`/api/stars/search?q=${encodeURIComponent(q)}`)
+    const json = await res.json()
+    if (json.code === 200) searchResults.value = json.data
+  } catch { searchResults.value = [] }
+  finally { searching.value = false }
+}
+
+async function flyToStar(starId: number) {
+  const star = catalogStarLookup.get(starId)
+  if (!star) return
+  // 模拟点击该星
+  onStarClick(starId)
 }
 
 interface CatalogStar {
@@ -182,6 +222,31 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   color: #7a759c; font-size: 0.8rem; cursor: pointer;
 }
 .nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
+.nav-center { flex: 1; display: flex; justify-content: center; }
+.search-box { position: relative; width: 240px; }
+.search-input {
+  width: 100%; padding: 0.35rem 0.8rem; border-radius: 10px;
+  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.06);
+  color: #f6f1ff; font-size: 0.82rem; outline: none;
+}
+.search-input:focus { border-color: #ffd98a; background: rgba(255,255,255,0.1); }
+.search-input::placeholder { color: #5a5580; }
+.search-dropdown {
+  position: absolute; top: 110%; left: 0; right: 0;
+  background: rgba(16,20,43,0.98); border: 1px solid rgba(48,55,87,0.5);
+  border-radius: 10px; max-height: 200px; overflow-y: auto; z-index: 30;
+}
+.search-item {
+  padding: 0.5rem 0.8rem; display: flex; justify-content: space-between;
+  align-items: center; cursor: pointer; font-size: 0.8rem;
+  border-bottom: 1px solid rgba(48,55,87,0.2);
+}
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: rgba(255,255,255,0.06); }
+.search-item.muted { color: #5a5580; cursor: default; padding: 0.6rem 0.8rem; }
+.sr-name { color: #ffd98a; font-weight: 500; }
+.sr-con { color: #7a759c; }
+.sr-mag { color: #5a5580; font-size: 0.7rem; }
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;

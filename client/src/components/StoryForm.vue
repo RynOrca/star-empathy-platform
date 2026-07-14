@@ -32,6 +32,20 @@
           </div>
         </div>
 
+        <!-- 情绪标签 -->
+        <div class="field">
+          <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
+          <div class="tag-picker">
+            <button
+              v-for="t in tagOptions"
+              :key="t"
+              class="tag-btn"
+              :class="{ active: selectedTag === t, ['tag-' + t]: true }"
+              @click="selectedTag = selectedTag === t ? null : t"
+            >{{ t }}</button>
+          </div>
+        </div>
+
         <p v-if="error" class="form-error">{{ error }}</p>
 
         <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
@@ -54,7 +68,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalog_star_id: number; created_at: string; location_lat: number | null; location_lng: number | null; type: string; view_count: number; origin: string | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalog_star_id: number; created_at: string; location_lat: number | null; location_lng: number | null; type: string; view_count: number; origin: string | null; username: string | null; tag: string | null }]
 }>()
 
 const title = ref('')
@@ -63,6 +77,8 @@ const submitting = ref(false)
 const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const userLocation = ref<{ lat: number; lng: number } | null>(null)
+const selectedTag = ref<string | null>(null)
+const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
 
 onMounted(() => {
   textareaRef.value?.focus()
@@ -87,14 +103,18 @@ async function onSubmit() {
   error.value = ''
 
   try {
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
     const res = await fetch('/api/stars/story', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         catalog_star_id: props.catalogStarId,
         title: trimmedTitle,
         content: trimmed,
         location: userLocation.value,
+        tag: selectedTag.value,
       }),
     })
     const json = await res.json()
@@ -111,6 +131,8 @@ async function onSubmit() {
         type: 'user',
         view_count: 0,
         origin: null,
+        username: json.data.username ?? null,
+        tag: json.data.tag ?? selectedTag.value,
       })
     } else {
       error.value = json.message || '提交失败，再试一次吧'
@@ -296,6 +318,21 @@ async function onSubmit() {
 .submit-btn:active:not(:disabled) {
   transform: scale(0.98);
 }
+
+.tag-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag-btn {
+  padding: 4px 12px; border-radius: 14px; border: 1px solid rgba(48,55,87,0.4);
+  background: rgba(255,255,255,0.04); color: #7a759c; font-size: 0.78rem;
+  cursor: pointer; transition: all 0.15s;
+}
+.tag-btn:hover { border-color: rgba(48,55,87,0.7); color: #b9b4d6; }
+.tag-btn.active { border-color: transparent; }
+.tag-btn.tag-思念.active { background: rgba(255,139,125,0.2); color: #ff8b7d; }
+.tag-btn.tag-等待.active { background: rgba(134,168,255,0.2); color: #86a8ff; }
+.tag-btn.tag-离别.active { background: rgba(202,167,255,0.2); color: #caa7ff; }
+.tag-btn.tag-愿望.active { background: rgba(255,217,138,0.2); color: #ffd98a; }
+.tag-btn.tag-孤独.active { background: rgba(149,240,192,0.2); color: #95f0c0; }
+.optional { color: #5a5580; font-size: 0.75rem; font-weight: 400; }
 .submit-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
