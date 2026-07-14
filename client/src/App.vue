@@ -1,6 +1,6 @@
 <template>
   <div class="app">
-    <SkyCanvas ref="skyRef" @star-click="onStarClick" />
+    <SkyCanvas ref="skyRef" @star-click="onStarClick" @star-hover="onStarHover" />
     <div class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
@@ -139,6 +139,43 @@ watch(() => skyRef.value?.sky, (sky) => {
   if (sky && !_statsInjected) tryInjectStats()
 }, { immediate: true })
 
+// 当 detail 面板获取到最新统计时，同步到 tooltip 缓存
+function syncStatToCache(starId: number, stats: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }) {
+  if (!skyRef.value?.sky) return
+  const cache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  cache.set(starId, {
+    stories: stats.storyCount,
+    resonance: stats.totalResonance,
+    views: stats.totalViews,
+    favorites: stats.favoriteCount,
+  })
+  skyRef.value.sky.setStarStatsCache(cache)
+}
+
+// hover 时如果该星没有缓存数据，主动获取
+async function fetchStarStatsForTooltip(starId: number) {
+  try {
+    const res = await fetch(`/api/stars/${starId}/stats`)
+    const json = await res.json()
+    if (json.code === 200) {
+      syncStatToCache(starId, json.data)
+    }
+  } catch { /* 静默 */ }
+}
+
+function onStarHover(starId: number | null) {
+  if (starId !== null && skyRef.value?.sky) {
+    // 检查是否已有缓存，没有则主动获取
+    // statsCache 在 useSky 内部，我们无法直接读取
+    // 用一个 Set 记录已请求过的 id 避免重复请求
+    if (!_fetchedStats.has(starId)) {
+      _fetchedStats.add(starId)
+      fetchStarStatsForTooltip(starId)
+    }
+  }
+}
+const _fetchedStats = new Set<number>()
+
 // 格式化恒星显示名
 function formatStarName(s: CatalogStar): string {
   if (s.name) return s.name
@@ -217,6 +254,8 @@ async function fetchCatalogStats(starId: number) {
         starViews: json.data.starViews ?? 0,
         favoriteCount: json.data.favoriteCount ?? 0,
       }
+      // 同步到 tooltip 缓存
+      syncStatToCache(starId, catalogStats.value)
     }
   } catch { /* 静默 */ }
 }
