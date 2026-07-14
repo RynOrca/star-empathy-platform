@@ -1,6 +1,7 @@
 <template>
-  <div class="overlay" @click.self="$emit('close')">
-    <div class="detail-wrap">
+  <Transition name="overlay">
+    <div class="overlay" @click.self="$emit('close')">
+      <div class="detail-wrap">
       <!-- 左：故事面板 -->
       <div class="panel panel-stories">
         <!-- 列表标题 -->
@@ -42,6 +43,7 @@
               </ul>
             </Transition>
           </div>
+          </Transition>
         </div>
         <!-- 详情标题 -->
         <div class="panel-header" v-else>
@@ -55,9 +57,10 @@
         <template v-if="!detailStoryId">
           <div v-if="hasRealStory" class="story-list">
             <div
-              v-for="story in displayedStories"
+              v-for="(story, index) in displayedStories"
               :key="story.id"
               class="story-card"
+              :style="{ animationDelay: `${index * 30}ms` }"
                 @click="openStoryDetail(story)"
             >
               <div class="story-head">
@@ -104,7 +107,8 @@
         </template>
 
         <!-- ─── 详情视图 ─── -->
-        <div v-else-if="detailStory" class="detail-view">
+        <Transition name="detail" mode="out-in">
+          <div v-if="detailStory" :key="detailStory.id" class="detail-view">
           <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
           <div class="detail-info-bar">
             <span v-if="detailStory.type === 'history'" class="meta-history">
@@ -130,7 +134,7 @@
               <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
             </button>
           </div>
-        </div>
+        </Transition>
       </div>
 
       <!-- 右：恒星信息 -->
@@ -227,7 +231,7 @@
         </div>
       </div>
     </div>
-  </div>
+    </Transition>
 </template>
 
 <script setup lang="ts">
@@ -564,9 +568,10 @@ const generatedTags = computed<string[]>(() => {
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 0.15s ease-out;
 }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.overlay-enter-active { transition: opacity 0.2s ease-out; }
+.overlay-leave-active { transition: opacity 0.12s ease-in; }
+.overlay-enter-from, .overlay-leave-to { opacity: 0; }
 
 /* ─── Container ─── */
 .detail-wrap {
@@ -732,6 +737,12 @@ const generatedTags = computed<string[]>(() => {
 .dropdown-enter-from { opacity: 0; transform: translateY(-6px); }
 .dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
 
+/* ─── Detail View Transition ─── */
+.detail-enter-active { transition: opacity 0.2s ease-out, transform 0.2s ease-out; }
+.detail-leave-active { transition: opacity 0.12s ease-in, transform 0.12s ease-in; }
+.detail-enter-from { opacity: 0; transform: translateX(12px); }
+.detail-leave-to { opacity: 0; transform: translateX(-8px); }
+
 /* ─── Back Button ─── */
 .back-btn {
   background: none;
@@ -780,12 +791,20 @@ const generatedTags = computed<string[]>(() => {
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
+  animation: cardIn 0.25s ease-out both;
 }
 .story-card:hover {
   border-color: var(--rule);
   background: rgba(255, 255, 255, 0.02);
+}
+.story-card:active {
+  transform: scale(0.99);
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .story-head {
@@ -817,7 +836,7 @@ const generatedTags = computed<string[]>(() => {
   font-family: var(--font);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -825,9 +844,12 @@ const generatedTags = computed<string[]>(() => {
 .resonate-btn:hover:not(:disabled) {
   background: rgba(255, 217, 138, 0.15);
 }
+.resonate-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
 .resonate-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.6;
+  cursor: wait;
 }
 .resonate-btn.done {
   border-color: rgba(149, 240, 192, 0.25);
