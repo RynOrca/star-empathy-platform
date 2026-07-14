@@ -12,6 +12,8 @@ import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
 interface CatData { stars: CatStar[]; lines: [number, number][] }
 import rawCatalog from '../data/stars.json'
+import newLinesData from '../data/new_lines.json'
+import constellationLabels from '../data/constellation_labels.json'
 const CAT = rawCatalog as unknown as CatData
 
 const hexRGB = (h: string): [number, number, number] =>
@@ -172,11 +174,14 @@ export function useSky(
   }
 
   // ═══ 星座连线 ═══
-  if (CAT.lines?.length) {
-    const v: number[] = []
-    for (const [a,b] of CAT.lines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
-    const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+  {
+    const allLines: [number, number][] = [...(CAT.lines || []), ...(newLinesData as [number, number][])]
+    if (allLines.length) {
+      const v: number[] = []
+      for (const [a,b] of allLines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
+      const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+    }
   }
 
 
@@ -229,13 +234,13 @@ export function useSky(
     })))
   }
 
-  // ═══ 地平面以下暖色滤镜 ═══
+  // ═══ 地平面以下暖色区分 ═══
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0x0c0a06,
+      color: 0x0a0e1a,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.45,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -243,6 +248,26 @@ export function useSky(
     const mask = new Mesh(maskGeo, maskMat)
     mask.renderOrder = 9999
     scene.add(mask)
+  }
+
+  // ═══ 星座名称标签 ═══
+  {
+    for (const cl of constellationLabels) {
+      const el = document.createElement('div')
+      el.textContent = cl.label
+      el.style.cssText = [
+        'color:rgba(102,119,170,0.6)',
+        'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
+        'font-size:10px',
+        'font-weight:300',
+        'letter-spacing:0.12em',
+        'white-space:nowrap',
+        'pointer-events:none',
+      ].join(';')
+      const label = new CSS2DObject(el)
+      label.position.set(cl.x, cl.y, cl.z)
+      scene.add(label)
+    }
   }
 
   // ═══ 东南西北标注 ═══
@@ -334,13 +359,13 @@ export function useSky(
         if (starId !== hoveredStarId) {
           hoveredStarId = starId
           const star = stars[starId]
-          if (star?.name) {
-            tooltipEl.textContent = star.name
+          if (star) {
+            tooltipEl.textContent = star.name || `${star.ra.toFixed(2)}h ${star.dec > 0 ? '+' : ''}${star.dec.toFixed(1)}°`
             // tooltip 位置：星星位置略偏下方
             const pt = (hit.object as Points).geometry.getAttribute('position')
             const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
             const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
-            tooltipLabel.position.set(ox/len * SPHERE_RADIUS, oy/len * SPHERE_RADIUS - 6, oz/len * SPHERE_RADIUS)
+            tooltipLabel.position.set(ox/len * SPHERE_RADIUS, oy/len * SPHERE_RADIUS - 14, oz/len * SPHERE_RADIUS)
             tooltipEl.style.opacity = '1'
           }
         }
