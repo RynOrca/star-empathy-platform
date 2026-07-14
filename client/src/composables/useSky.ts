@@ -3,7 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial,
+  Raycaster, Vector2, Vector3, Sprite, SpriteMaterial,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -387,12 +387,21 @@ export function useSky(
 
   // ═══ 点击检测 + 悬浮检测 ═══
   {
-    const raycaster = new Raycaster()
     const mouse = new Vector2()
     const DRAG_THRESHOLD = 5
     let clickDrag = false
     let hoveredStarId = -1
     let hoverCheckTimer = 0
+
+    // 预计算所有星的归一化位置（用于屏幕投影）
+    const allStarNorms: { id: number; nx: number; ny: number; nz: number }[] = []
+    for (const s of stars) {
+      const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
+      if (len > 0) allStarNorms.push({ id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len })
+    }
+
+    // 临时向量（避免每帧分配）
+    const _v = new Vector3()
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
@@ -412,16 +421,25 @@ export function useSky(
       if (now - hoverCheckTimer < 80) return
       hoverCheckTimer = now
 
-      raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const hits = raycaster.intersectObjects(starPointsRefs)
-      if (hits.length) {
-        const hit = hits[0]
-        const tierIdx = hit.object.userData.tierIndex as number
-        const starId = tierStarIds[tierIdx][hit.index!]
-        if (starId !== hoveredStarId) {
-          hoveredStarId = starId
-          const star = stars[starId]
+      // 用屏幕投影找最近的星
+      camera.updateMatrixWorld()
+      camera.updateProjectionMatrix()
+      let bestDist = Infinity
+      let bestId = -1
+      let bestNx = 0, bestNy = 0, bestNz = 0
+      for (const sn of allStarNorms) {
+        _v.set(sn.nx, sn.ny, sn.nz).project(camera)
+        if (_v.z > 1) continue // 在相机后面
+        const dx = _v.x - mouse.x
+        const dy = _v.y - mouse.y
+        const d = dx*dx + dy*dy
+        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
+      }
+      // 阈值：NDC 空间 0.03 ≈ 屏幕中心 1.5% 宽度
+      if (bestDist < 0.0015 && bestId !== -1) {
+        if (bestId !== hoveredStarId) {
+          hoveredStarId = bestId
+          const star = stars[bestId]
           if (star) {
             // 更新 tooltip 内容
             const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
@@ -433,18 +451,14 @@ export function useSky(
             vals[2].textContent = stats?.views.toString() || '--'
             vals[3].textContent = stats?.favorites.toString() || '--'
             // tooltip 位置：星星位置下方更远
-            const pt = (hit.object as Points).geometry.getAttribute('position')
-            const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
-            const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
-            const nx = ox/len * SPHERE_RADIUS, ny = oy/len * SPHERE_RADIUS, nz = oz/len * SPHERE_RADIUS
-            tooltipLabel.position.set(nx, ny - 50, nz)
+            tooltipLabel.position.set(bestNx * SPHERE_RADIUS, bestNy * SPHERE_RADIUS - 50, bestNz * SPHERE_RADIUS)
             tooltipEl.style.opacity = '1'
             // 辉光跟随星星
-            hoverGlow.position.set(nx, ny, nz)
+            hoverGlow.position.set(bestNx * SPHERE_RADIUS, bestNy * SPHERE_RADIUS, bestNz * SPHERE_RADIUS)
             hoverGlow.visible = true
             hoverGlowTargetOpacity = 0.95
             // 通知外部
-            options?.onStarHover?.(starId)
+            options?.onStarHover?.(bestId)
           }
         }
       } else if (hoveredStarId !== -1) {
