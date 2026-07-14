@@ -1,28 +1,28 @@
 :root {
-  /* ─── Background layers (PrimeVue Aura dark) ─── */
+  /* ─── Background layers ─── */
   --bg: #070816;
   --bg2: #10142b;
-  --surface: #1a1e35;
-  --surface-hover: #222847;
+  --surface: rgba(16, 20, 43, 0.82);
+  --surface-hover: rgba(34, 40, 71, 0.9);
   --surface-ground: #0e1120;
 
   /* ─── Text ─── */
-  --ink: #f0ecf6;
-  --ink-secondary: #b8b2cc;
+  --ink: #f6f1ff;
+  --ink-secondary: #b9b4d6;
   --muted: #9994ad;
   --muted-light: #757090;
 
   /* ─── Borders & Rules ─── */
-  --rule: rgba(255, 255, 255, 0.06);
-  --rule-hover: rgba(255, 255, 255, 0.12);
+  --rule: rgba(48, 55, 87, 0.6);
+  --rule-hover: rgba(48, 55, 87, 0.85);
   --rule-focus: rgba(255, 217, 138, 0.5);
 
-  /* ─── Accent (warm gold) ─── */
+  /* ─── Accent (warm gold — from mockup) ─── */
   --accent: #ffd98a;
   --accent-hover: #ffc94d;
   --accent-subtle: rgba(255, 217, 138, 0.08);
-  --accent-border: rgba(255, 217, 138, 0.15);
-  --accent-glow: rgba(255, 217, 138, 0.2);
+  --accent-border: rgba(255, 217, 138, 0.44);
+  --accent-glow: rgba(255, 217, 138, 0.34);
 
   /* ─── Star category colors ─── */
   --star-blue: #86a8ff;
@@ -30,23 +30,24 @@
   --star-green: #95f0c0;
   --star-red: #ff8b7d;
 
-  /* ─── Shadows (subtle, PrimeVue-like) ─── */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+  /* ─── Shadows ─── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.32);
   --shadow-glow: 0 0 16px rgba(255, 217, 138, 0.12);
 
-  /* ─── Radius (PrimeVue uses rem, slightly less rounded) ─── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* ─── Radius ─── */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
 
   /* ─── Motion ─── */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ─── Typography ─── */
   --font: "Inter", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-display: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 
   /* ─── Transitions ─── */

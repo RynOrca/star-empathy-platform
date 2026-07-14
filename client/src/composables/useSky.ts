@@ -3,7 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
-  Raycaster, Vector2, Vector3, Sprite, SpriteMaterial,
+  Raycaster, Vector2, Vector3, Sprite, SpriteMaterial, DoubleSide,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -194,7 +194,16 @@ export function useSky(
       const v: number[] = []
       for (const [a,b] of allLines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
       const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+      // main — muted slate
+      scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.28, depthTest:true, depthWrite:false })))
+      // warm-gold glow pass underneath
+      const vg = v.slice()
+      const lg2 = new BufferGeometry(); lg2.setAttribute('position', new BufferAttribute(new Float32Array(vg), 3))
+      const glow = new LineSegments(lg2, new LineBasicMaterial({
+        color:0xffd98a, transparent:true, opacity:0.12, blending:AdditiveBlending, depthWrite:false, depthTest:false,
+      }))
+      glow.scale.setScalar(1.003)
+      scene.add(glow)
     }
   }
 
@@ -242,9 +251,19 @@ export function useSky(
     g.setAttribute('position', new BufferAttribute(new Float32Array(verts), 3))
     g.setIndex(indices)
     g.computeVertexNormals()
-    scene.add(new Mesh(g, new MeshBasicMaterial({
-      color: 0xaaccff, transparent: true, opacity: 0.12,
-      blending: AdditiveBlending, depthWrite: false, depthTest: true, side: 2, // DoubleSide
+    const mwMesh = new Mesh(g, new MeshBasicMaterial({
+      color: 0x8bb9ff, transparent: true, opacity: 0.09,
+      blending: AdditiveBlending, depthWrite: false, depthTest: true, side: DoubleSide,
+    }))
+    scene.add(mwMesh)
+    // warm-gold inner band (brighter core of the ribbon)
+    const core = milkyWayRibbon(SPHERE_RADIUS, 7, 360)
+    const cg = new BufferGeometry()
+    cg.setAttribute('position', new BufferAttribute(new Float32Array(core.verts), 3))
+    cg.setIndex(core.indices)
+    scene.add(new Mesh(cg, new MeshBasicMaterial({
+      color: 0xffd98a, transparent: true, opacity: 0.10,
+      blending: AdditiveBlending, depthWrite: false, depthTest: false, side: DoubleSide,
     })))
   }
 
