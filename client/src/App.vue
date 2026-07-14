@@ -158,21 +158,19 @@ function onStarClick(starId: number) {
   }
   selectedCatalogStarId.value = starId
 
-  // 获取统计 + 记录星星级浏览
+  // 前端降级：从已有故事数据计算统计（确保统计行始终显示）
+  const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
+  catalogStats.value = {
+    storyCount: realStories.length,
+    totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0),
+    totalViews: 0,
+    starViews: 0,
+    favoriteCount: 0,
+  }
+
+  // 异步获取真实统计（覆盖降级值）
   fetchCatalogStats(starId)
   fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
-
-  // 前端降级：从已有故事数据计算统计
-  const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
-  if (realStories.length > 0) {
-    catalogStats.value = {
-      storyCount: realStories.length,
-      totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0),
-      totalViews: 0,
-      starViews: catalogStats.value?.starViews ?? 0,
-      favoriteCount: catalogStats.value?.favoriteCount ?? 0,
-    }
-  }
 }
 
 async function fetchCatalogStats(starId: number) {
