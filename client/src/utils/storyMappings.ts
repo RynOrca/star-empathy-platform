@@ -10,9 +10,13 @@ interface CatalogStar {
 
 const CATALOG: CatalogStar[] = (catalogData as { stars: CatalogStar[] }).stars
 
-/** 根据名字模糊查找星表恒星 */
+/** 根据名字模糊查找星表恒星；精确匹配优先于子串匹配；其次选星等更亮（数值更小）的 */
 function findStar(namePattern: string): CatalogStar | null {
-  return CATALOG.find(s => s.name?.includes(namePattern)) ?? null
+  const hit = CATALOG.filter(s => s.name?.includes(namePattern))
+  if (hit.length === 0) return null
+  const exact = hit.find(s => s.name === namePattern)
+  if (exact) return exact
+  return hit.reduce((a, b) => a.mag <= b.mag ? a : b)
 }
 
 /**
@@ -128,6 +132,104 @@ const SEED_STAR_MAP: Record<string, string> = {
   '天秤双臂·Zubeneschamali':'Zubeneschamali', // 天秤座 β
   '南方补漏·HyiTuc':    ' Hyi',        // 长蛇座 β
   '南天多层命名·AraPhe':'Ankaa',       // 凤凰座 α
+
+  // ── v3d / v3e / v3f ───────────────────────────────────────
+  '第二撞角·ElnathA':            'Elnath',          // 金牛座 β Elnath
+  '宇航员之花·Navi':             'Navi',            // 仙后座 γ
+  '古船·Naos':                   'Naos',            // 船尾座 ζ
+  '手掌·Caph':                   'Caph',            // 仙后座 β
+  '火凤凰·Ankaa':                'Ankaa',           // 凤凰座 α
+  '胫骨·Scheat':                 'Scheat',          // 飞马座 β
+  '马腹·Algenib':                'Algenib',         // 飞马座 γ
+  '马鞍·Markab':                 'Markab',          // 飞马座 α
+  '天兔·Arneb':                  'Arneb',           // 天兔座 α
+  '跪膝者之头·Rasalgethi':       'Rasalgethi',      // 武仙座 α
+  '蝎钳·Graffias':               'Graffias',        // 天蝎座 β
+  '蝎咬·Lesath':                 'Lesath',          // 天蝎座 υ
+  '惊星·Mira':                   'Mira',            // 鲸鱼座 ο
+  '鲸鼻·Menkar':                 'Menkar',          // 鲸鱼座 α
+  '少女星群·Aludra':             'Aludra',          // 大犬座 η
+  '渴驼·Nihal':                  'Nihal',           // 天兔座 β
+  '贝壳星·Imai':                 'Imai',            // 南十字底座
+  '山羊尾·DenebAlgedi':          'Deneb Algedi',    // 摩羯座 δ
+  '宇航员帆·Regor':              'Regor',           // 船帆座 γ
+  '持蛇神掌·Cebalrai':           'Cebalrai',        // 蛇夫座 θ
+  '古龙·Thuban':                 'Thuban',          // 天龙座 α
+  '棍棒·Kornephoros':            'Kornephoros',     // 武仙座 β
+  '最幸之幸·Sadalsuud':          'Sadalsuud',       // 水瓶座 β
+  '万幸之王·Sadalmelik':         'Sadalmelik',      // 水瓶座 α
+  '壶腿·Skat':                   'Skat',            // 水瓶座 δ
+  '熊轭·Alioth':                 'Alioth',          // 大熊座 ε
+  '斗柄首领·Alkaid':             'Alkaid',          // 大熊座 η
+  '熊之腰布·Mizar':              'Mizar',           // 大熊座 ζ
+  '狮君·Regulus':                'Regulus',         // 狮子座 α
+  '狮子脊柱·ZosmaSpin':          'Zosma',           // 狮子座 ζ
+  '天鹅的彩羽·Aljanah':          'Aljanah',         // 天鹅座 ε
+  '仙后之剑·Segin':              'Segin',           // 仙后座 ε
+  '七姐妹之父·Atlas':            'Atlas',           // 金牛座 ζ(昴团)
+  '象鼻·Hassaleh':               'Hassaleh',        // 御夫座 ι
+  '狮子短须·Chertan':            'Chertan',         // 狮子座 θ
+  '丰收女神组·Porrima':          'Porrima',         // 室女座 γ
+  '山羊分叉·Dabih':              'Dabih',           // 摩羯座 β
+  '牧夫第二膝·Seginus':          'Seginus',         // 牧夫座 γ
+  '射手之臂·Ascella':            'Ascella',         // 人马座 ζ
+  '环鸽·Phact':                  'Phact',           // 天鸽座 α
+  '联结·Alrescha':               'Alrescha',        // 双鱼座 α
+  '武仙左足座·Rasalgethi2':      'Rasalgethi',      // 武仙座 α
+  '蟹钳·Acubens':                'Acubens',         // 巨蟹座 α
+  '蟹目·Altarf':                 'Altarf',          // 巨蟹座 β
+  '狮子裙角·Zaniah':             'Zaniah',          // 室女座 η
+  '坠落的星·Wasat':              'Wasat',           // 双子座 δ
+  '空杯·Alkes':                  'Alkes',           // 巨爵座 α
+  '盾击·Rukbat':                 'Rukbat',          // 人马座 β
+  '画架与望远镜·PicDor':         'Pic',             // 绘架座 α
+  '仙王之子·Alfirk':             'Alfirk',          // 仙王座 β
+  '独角兽与幼狮·CamLMi':         '46 LMi',         // 小狮座
+  '箭与狐·SgeVul':               'Sge',             // 天箭座 α
+  '度量之具·SexAnt':            'Sex',             // 六分仪座 α
+  '炉火与淬火·ForInd':           'For',             // 天炉座 α
+  '南角小众·MenTrA':             'α Men',           // 山案座 α（精确匹配；不与 Menkar/Menkalinan 冲突）
+  '水蛇与巨嘴鸟·TucHyiAra':       'Tuc',             // 杜鹃座 α
+  '近代南天极小星补遗·IndCrA':   'Ind',             // 印第安座 α
+
+  // ── v3g 全量收尾 ─────────────────────────────────────────
+  '天鹅左翼·Fawaris':         'Fawaris',         // 天鹅座 δ
+  '仙后裙摆·Ruchbah':         'Ruchbah',         // 仙后座 δ
+  '新收妇人·Vindemiatrix':    'Vindemiatrix',    // 室女座 ε
+  '祭坛火·AraBeta':           'Ara',             // 祭坛座 β
+  '祭坛火二·AraBeta2':        ' Ara',            // 祭坛座 β（id=133）
+  '天鹅金喉·Albireo':         'Albireo',         // 天鹅座 β
+  '双子的爪子·Mebsuta':       'Mebsuta',         // 双子座 ε
+  '鹿角之尖·Sheratan2':       'Ari',             // 白羊座 β
+  '印度孤星·IndAlpha':        'Ind',             // 印第安座 α
+  '天猫之眼·LynAlpha':        'Lyn',             // 天猫座 α
+  '圆规之轴·CirAlpha':        'Cir',             // 圆规座 α
+  '琴上之龟·Sulafat':         'Sulafat',         // 天琴座 γ
+  '剑鱼之牙·DorAlpha':        'Dor',             // 剑鱼座 α
+  '网罟·RetAlpha':            'Ret',             // 网罟座 α
+  '三角之首·TriAlpha':        'Tri',             // 三角座 α
+  '琴弦·Sheliak':             'Sheliak',         // 天琴座 β
+  '海豚献词·Rotanev':         'Rotanev',         // 海豚座 β
+  '罗盘卡尺·PyxAlpha':        'Pyx',             // 罗盘座 α
+  '昴团之母·Electra':         'Electra',         // 金牛座 η(昴团)
+  '茶隼·Alshain':             'Alshain',         // 天鹰座 β
+  '天鹅泡·LacAlpha':          'Lac',             // 蝎虎座 α
+  '麒麟之角·MonBeta':         'Mon',             // 麒麟座 β
+  '海豚反写·Sualocin':        'Sualocin',        // 海豚座 α
+  '小狮第四十六·LMi46':       '46 LMi',         // 小狮座
+  '炉火之焰·ForAlpha':        'For',             // 天炉座 α
+  '南极之路·ApsAlpha':        'Aps',             // 天燕座 α
+  '盾火星·SctAlpha':          'Sct',             // 盾牌座 α
+  '昴团长女·Maia':            'Maia',            // 金牛座 ζ(昴团)
+  '小马方尖碑·Kitalpha':      'Kitalpha',        // 小马座 α
+  '麒麟之首·MonAlpha':        'Mon',             // 麒麟座 α
+  '蝘蜓之首·ChaAlpha':        'Cha',             // 蝘蜓座 α
+  '昴团五妹·Merope':          'Merope',          // 金牛座 η(昴团)
+  '后发之冠·ComBeta':         'Com',             // 后发座 β
+  '昴团四妹·Taygeta':         'Taygeta',         // 金牛座 ζ(昴团)
+  '勺形之槽·SclAlpha':        'Scl',             // 玉夫座 α
+  '狐狸之焰·VulAlpha':        'Vul',             // 狐狸座 α
+  '雕具沉默·CaeAlpha':        'Cae',             // 雕具座 α
 }
 
 // ─── 补充：新故事所用到的星表精确名称（findStar 模糊匹配用）───

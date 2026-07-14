@@ -382,6 +382,242 @@ const seedData: SeedStory[] = [
   { title: '南方补漏·HyiTuc', content: '南天较暗而分布极广的亮星们——Alnair（α Gru，"亮者"）、Atria（α TrA，"三角之首"现代缩写）、Ankaa（α Phe，"凤凰"）、Imai（γ Cru，南十字底座）、Nihal（β Lep，"解渴的骆驼"）。多数由阿拉伯航海传统命名，也有近代新创。它们共同铺补了从鲸鱼、天鹤、天鸽到天蝎的广阔南天——近代南天测绘的"最后一份阿拉伯礼物"。', catalog_star_id: 124, origin: '近代综合' },
 
   { title: '南天多层命名·AraPhe', content: '南天星座常由荷兰航海家 Keyser 与 de Houtman 16 世纪末划定，但其中的亮星仍大量保留了阿拉伯航海传统的命名：Aludra（"贞女"）、Phact（"鸽子"）、Nihal（"解渴的骆驼"）、Ankaa（"凤凰"）。南天成了名字最拥挤的天空——阿拉伯人与荷兰人各写了一层命名，让每一颗亮星都住着两个文明的故事。', catalog_star_id: 133, origin: '近代综合' },
+
+  // ════════════════════════════════════════════════════════════════
+  // ㉒ 再一批西方亮星命名（v3d，mag 1.65–4.5）
+  // ════════════════════════════════════════════════════════════════
+
+  // ① 御夫 / 金牛之角尖 Elnath （阿拉伯语 النّطح "撞角"，已在 v3b 提及但 id=63 / id=53 同时是金牛座 β / 御夫座 ζ）
+  // id=63 是 Aur ζ (正史 Elnath = β Tau = Aur ζ？这里 id=63 实际是 Aur 的另一颗 Elnath)
+  { title: '第二撞角·ElnathA', content: '御夫座 ζ 上的那颗 Elnath——阿拉伯语 النّطح (an-naţħ)"撞过来的角尖"。拜耶同时把它分给了金牛座和御夫座，于是这颗星跨坐在两个星座之间，头上顶着两支不同朝向的角。它是一颗黄白色的亮星。两个星座争抢同一颗星的结果，让夜空里多了一颗真正的"跨界者"。', catalog_star_id: 63, origin: '阿拉伯语' },
+
+  // ② 航空纪念星 γ Cassiopeiae Navi（Roger Chaffee 倒写 "Ivan"）
+  { title: '宇航员之花·Navi', content: '仙后座 γ 星，NASA 为纪念阿波罗一号遇难宇航员 Roger Chaffee——名字再倒写一遍："Ivan"（是 Chaffee 的中间名倒写组合，由其同事在 1973 年致敬性命名）。它是一颗 X 射线变星。Navi 不属于神话，但属于航天时代仰望同一片星空的后来者。一颗以倒写名字种在仙后 W 形中央的星，是写在春夜天空里的陵园花束。', catalog_star_id: 82, origin: '现代命名' },
+
+  // ③ 船桅·Zeta Puppis Naos（希腊语 ναῦς "船"）
+  { title: '古船·Naos', content: '古南船座（Argo Navis）船体中央最亮的星——Naos 希腊语 ναῦς (naus)"船"。Argonavis 是古代全天最大的星座，后被拆分成船底、船尾、船帆三份；Naos 就是旧船的龙骨。船虽然不在了，"Naos"这个名字还守着水手的星空坐标。它是一颗炽热的蓝白色超巨星，质量超过太阳 20 倍，是肉眼可见的超巨星之一。', catalog_star_id: 127, origin: '希腊语' },
+
+  // ④ 手掌·β Cassiopeiae Caph（波斯/阿拉伯语 "卡尔弗/手掌"）
+  { title: '手掌·Caph', content: '仙后座"W"左角第一星，阿拉伯语或波斯语意为"手掌"——阿拉伯语 al-kaff 是手心，这星标出仙后的左手掌心。它是仙后 W 形最靠东的一角，黄白色主序星。一只张开的手、一个星座、一颗星之间，阿拉伯观星者留下了这样一个姿势——仙后伸出手掌，抓住了北极附近的永恒。', catalog_star_id: 81, origin: '阿拉伯语' },
+
+  // ⑤ 凤凰·α Phoenicis Ankaa（阿拉伯语 العنقاء "凤凰"）
+  { title: '火凤凰·Ankaa', content: '凤凰座的心脏，阿拉伯语 العنقاء (al-ʿanqā)"凤凰 / 不死鸟"。凤凰座是近代南天小星座，由荷兰航海家划定，用了阿拉伯传统的凤凰意象给它命名。一颗呈黄白色的巨星在暗夜里燃烧，像传说中五百岁一涅槃的火鸟。不死鸟不死，名字也借助阿拉伯语句法在另一个文明里再生——这就是星等 2.4 却深埋在南天深处的 Ankaa 的故事。', catalog_star_id: 123, origin: '阿拉伯语' },
+
+  // ⑥ 腿·β Pegasi Scheat（阿拉伯语 الساق "小腿 / 胫"）
+  { title: '胫骨·Scheat', content: '飞马大四方形的一角，阿拉伯语 الساق (as-sāq)"小腿 / 胫骨"——飞马的前腿。Scheat 是一颗红巨星，呈深红色；飞马的白色翼身上，唯独这条前腿泛着红光。这恰好染出一条鲜血流注的姿态。一匹白马的左前腿上有一点暗红，全凭这一颗"胫骨之星"实现。', catalog_star_id: 91, origin: '阿拉伯语' },
+
+  // ⑦ 侧腹 / 天马蹄·γ Pegasi Algenib（阿拉伯语 الجنب "侧面"）
+  { title: '马腹·Algenib', content: '飞马大四方形另一角，阿拉伯语 الجنب (al-janb)"侧腹 / 侧翼"——飞马的侧面。它是飞马座 γ 星，蓝白色主序星。飞马座的两翼分别由 Scheat 与 Algenib 标出，一个在胫，一个在腹，一起张开 15 度的大帆。秋天最宏大是天标的方框，就是由两颗"面目模糊"的侧腹之星撑起来的。', catalog_star_id: 92, origin: '阿拉伯语' },
+
+  // ⑧ 马鞍·α Pegasi Markab（阿拉伯语 مركب "马鞍 / 舟"）
+  { title: '马鞍·Markab', content: '飞马大四方形之一角，阿拉伯语 مركب (markab)"马鞍"——也作"小舟"解。同一根词根在北方引航、在南方则指飞马之鞍。Markab 是飞马座 α 星，蓝白色主序星。秋天的航海者用大四方形定向，而四角的"鞍、腿、鼻、脐"四个阿拉伯名，一起组成了一套完整的马具词汇。', catalog_star_id: 90, origin: '阿拉伯语' },
+
+  // ⑨ 野兔·α Leporis Arneb（阿拉伯语 الأرنب "兔子"）
+  { title: '天兔·Arneb', content: '猎户脚下蹲伏的野兔，阿拉伯语 الأرنب (al-arnab)"兔子"。Lepus 在猎户座正下方，日夜被天狗（大犬座）与猎人追逐。Arneb 是一颗白色的亚巨星，正走向红巨星演化的终局；它标出的是兔子的"脸"。一只被追赶的兔子，在天空里永远不安又永远不灭。', catalog_star_id: 139, origin: '阿拉伯语' },
+
+  // ⑩ 猎犬之腕·Rasalgethi α Her（阿拉伯语 رأس الجاثي "跪膝者的头"）
+  { title: '跪膝者之头·Rasalgethi', content: '武仙座的头。阿拉伯语 رأس الجاثي (ras al-jāthī)"跪膝者的头"——赫拉克勒斯正单膝跪地、击向龙首。Rasalgethi 是一对目视双星：一红一绿，像两颗对视的宝石。武仙座是古希腊英雄赫拉克勒斯的星化，这一红一绿的头，正是英雄俯身时太阳穴上暴起的青筋——被阿拉伯人用"跪膝者之头"这一冷峻的解剖式名称封存。', catalog_star_id: 167, origin: '阿拉伯语' },
+
+  // ⑪ 天蝎之螯·β Scorpii Graffias（阿拉伯语 المخالب "钳、爪痕"）
+  { title: '蝎钳·Graffias', content: '天蝎的一对螯钳之一。阿拉伯语 الممراز或 المخالب (al-maqālab / al-makhālib)"钳、爪痕"。Graffias 是一颗蓝白恒星，位于天蝎座的左右螯之间。天蝎的攻击由"刺螯·绞"四颗星完成：Dschubba 是头，Graffias 是钳，Lesath 与 Shaula 是尾刺。一只蝎子被拆成了"头、螯、尾、刺"四个阿拉伯语笔画，一一标上了天。', catalog_star_id: 38, origin: '阿拉伯语' },
+
+  // ⑫ 天蝎之咬·υ Scorpii Lesath（阿拉伯语 اللسعة "蜇伤 / 毒咬痕"）
+  { title: '蝎咬·Lesath', content: '天蝎尾刺的末端旁边一颗暗星。阿拉伯语 اللسعة (al-laʿsa)"蜇伤、毒咬痕"——蝎子刺中那一瞬的痕迹。它与 Shaula 共同组成尾刺。Lesath 的名字让读者直面天蝎攻击的核心意象：不是刺，而是刺留下的伤。一只蝎子的全身毒液，最终都汇入"咬痕"这一个名字里。', catalog_star_id: 42, origin: '阿拉伯语' },
+
+  // ⑬ 奇异之星·ο Ceti Mira（拉丁语 mira "惊奇的、奇异之极"）
+  { title: '惊星·Mira', content: '鲸鱼座 ο 星，大胖子星。拉丁语 mira："惊奇、不可思议"。1596 年牧师 David Fabricius 发现它时，它是一颗 3 等星——随后突然消失，几个月后又出现。它是人类发现的第一颗非新星变星。约翰·赫维留 1662 年把这种"消失的星"命名为"惊星"。一颗名如其性的恒星：有时亮如宝石，有时暗如深渊，是肉眼自己的天文钟。', catalog_star_id: 117, origin: '拉丁语' },
+
+  // ⑭ 鼻孔·α Ceti Menkar（阿拉伯语 المنخر "鼻孔"）
+  { title: '鲸鼻·Menkar', content: '鲸鱼座 α，阿拉伯"المنخر (al-manxar)\"鼻孔\"。它是巨鲸的头，一红一白两颗星中较暗的那颗。Menkar 正走向超新星演化的终局。这颗名叫"鼻孔"的星，每晚向人间喷出的不是气息，而是恒星临终的电离气体——鲸虽无息，其鼻自有潮汐。', catalog_star_id: 116, origin: '阿拉伯语' },
+
+  // ⑮ 贞女团·η Canis Majoris Aludra（阿拉伯语 العذراء "贞女"）
+  { title: '少女星群·Aludra', content: '大犬座 η，阿拉伯语 العذراء (al-ʿadhra)"贞女 / 少女"。它与 Wezen（"重量"）等同属阿拉伯星象中的"少女星群"(al-ʿAdhara)。几颗 2 等的蓝白恒星在大犬颈后并列，描绘贞女队列走在地平线上。Aludra 是一颗明亮的超巨星，呈深蓝色。一群从未谋面的阿拉伯女性，横跨千年后在一群少女星里集体出现。', catalog_star_id: 20, origin: '阿拉伯语' },
+
+  // ⑯ 骆驼饮水·β Leporis Nihal（阿拉伯语 النحال "开始畅饮的骆驼们"）
+  { title: '渴驼·Nihal', content: '天兔座 β，阿拉伯语 النحال (an-nihāl)"骆驼们开始畅饮的嘴"。阿尔苏菲把四颗兔星想象成正在低头饮河的一只只骆驼——河即银河。Nihal 是领头低头的那个嘴巴。它是一颗黄白色的巨星。一只驼饮河，本是阿拉伯人最熟悉的水边黄昏，却被它们搬上了南天的长夜。', catalog_star_id: 140, origin: '阿拉伯语' },
+
+  // ⑰ 十字底端·γ Crucis Imai（马绍尔群岛语 "一种贝壳 / 酋长之鱼"）
+  { title: '贝壳星·Imai', content: '南十字座 γ，马绍尔群岛语 imaji / imai 一种贝壳或鱼骨——南十字在马绍尔航海中是一副鱼骨，Imai 是脊柱。2018 年由 IAU 正式采纳，是南天少数被采纳的南岛语亮星名。一艘古代的独木舟，划过赤道以南，把一群贝壳串成的星图留在了今天。', catalog_star_id: 72, origin: '南岛语' },
+
+  // ⑱ 解渴之狮·δ Capricorni Deneb Algedi（阿拉伯语 ذنب الجدي "山羊尾"）
+  { title: '山羊尾·DenebAlgedi', content: '摩羯座 δ，阿拉伯语 ذنب الجدي (dhanab al-jady)"山 / 小羊的尾巴"。Deneb 在阿拉伯语中意为"尾"，它多次出现在"天鹅尾"(Deneb)、"处女尾"(Denebola)等名中；此处特指小羊尾——Capricorn 即山羊座。它是一颗掩食双星，亮度在互食时轻微跳动。一只小羊甩动尾巴的频率，由两台恒星的公转周期吞吞吐吐地告诉观星者。', catalog_star_id: 103, origin: '阿拉伯语' },
+
+  // ⑲ 北冕宝串·α Coronae Borealis Alphecca（已在 v3d 提及，本次以单星视角补一个更聚焦的故事；保留 v3 组故事，此处写细节）
+  { title: '碎冕珠串·AlpheccaRepeater', content: '北冕座的中央主珠，阿拉伯语 الفكّة (al-fakka)"破碎的、散落的珠宝项链"。北冕想象为一条断了线的项链，珠玉一路散落。Alphecca 是残余项链里最有光辉的那颗主珠。它实则是一对食双星——两颗恒星互绕，轮流掩食，让北冕项链每天亮度都在微妙变化。一次互食，就是项链上又一颗珠子换了主人。', catalog_star_id: 169, origin: '阿拉伯语' },
+
+  // ════════════════════════════════════════════════════════════════
+  // ㉓ 再一批西方亮星命名（v3e）
+  // ════════════════════════════════════════════════════════════════
+
+  // ① 航空纪念船帆·γ Velorum Regor（Roger Chaffee 倒写 / "我的"纪念）
+  { title: '宇航员帆·Regor', content: '船帆座 γ 星，NASA 为纪念阿波罗一号遇难宇航员 Roger Chaffee——名 Regor 是 "Roger" 的倒写。Regor 是目视四星中最明亮的一颗，由蓝白两子星组成，相隔约 40 角秒即可分辨。Navi 与 Regor 并排立于船帆与仙后，是航天时代种在天空里的两颗星。它们的名字分别读作 Ivan 和 Roger，是两位未上天的宇航员留在夜空中的签名。', catalog_star_id: 128, origin: '现代命名' },
+
+  // ② 持物神蛇·θ Ophiuchi Cebalrai（阿拉伯语 "牧羊犬"，已在 v3c 提及；改为强调蛇夫的角度）
+  { title: '持蛇神掌·Cebalrai', content: '蛇夫座 θ 星，阿拉伯语 "牧羊犬" 或 "持棍犬"。神医阿斯克勒庇俄斯手中握着巨蛇——蛇夫座的命名核心。Cebalrai 位于蛇夫的膝部，是持蛇者身侧的忠实狗。它是一颗蓝白色主序星，亮度脉动微弱。一条蛇、一个神医、一条犬——这三件东西由一组"牧羊犬"之名缝在一起，有了动静。', catalog_star_id: 96, origin: '阿拉伯语' },
+
+  // ③ 龙腹·α Draconis Thuban（阿拉伯语 الثعبان"蛇/龙"，曾经的北极星）
+  { title: '古龙·Thuban', content: '天龙座 α 星.الثعبان (al-thuʿbān)"龙 / 海蛇"。约公元前 3000 年，它是肉眼可见的北极星，吉萨金字塔的南门对准 Thuban。随着岁差，北天极已漂移。Thuban 是天文学"北极星"体验的最古老锚点，被埃及人与巴比伦人同时仰望。一条盘绕在最早极轴上的龙，今天已退隐成一颗不起眼的 3.6 等星——只能凭记忆去指认它曾经的位置。', catalog_star_id: 164, origin: '阿拉伯语' },
+
+  // ④ 武仙之肩·β Herculis Kornephoros（阿拉伯语 "持棍者"）
+  { title: '棍棒·Kornephoros', content: '武仙座 β 星，阿拉伯语 رأس الجاثي相关变体或 "持棍者"——赫拉克勒斯手持棍棒的右肩。Kornephoros 是一颗黄白色的巨星，标示神棍棒挥出时最吃力的那一点。古希腊赫拉克勒斯以棍棒闻名，一棒打杀前来骚扰的怪鸟。Kornephoros 的 2.8 等星正是棍棒挥出时最高扬、最吃重的一颗肩星。', catalog_star_id: 168, origin: '阿拉伯语' },
+
+  // ⑤ 水瓶幸运·β Aquarii Sadalsuud（阿拉伯语 سعد السعود 最幸运之幸）
+  { title: '最幸之幸·Sadalsuud', content: '水瓶座 β 星，阿拉伯语 سعد السعود (saʿd as-suʿūd) 意为最幸运之幸——最幸中的最幸。它属于巴比伦遗产的幸运星序列(Sa\'d)，与 Sadalmelik 等同伴把吉祥的水瓶注满。Sadalsuud 是一颗黄白色超巨星。一只装满了幸运的瓶，每晚倾倒出不可见的祝福。', catalog_star_id: 105, origin: '巴比伦' },
+
+  { title: '万幸之王·Sadalmelik', content: '水瓶座 α 星，阿拉伯语 سعد الملك (saʿd al-malik) 意为王者的幸运。它与 Sadalsuud 共组水瓶的吉祥瓶口。Sadalmelik 同样是黄白色的超巨星。一瓶水、两枚万幸之印，古代占星者从这只水瓶里读出每一次王朝更迭的预兆。一名叫王者之幸的星，只剩下光谱线里的镓——但好运这个词还在人间流传。', catalog_star_id: 104, origin: '巴比伦' },
+
+  // ⑥ 水瓶壶身·β Aquarii Skat（阿拉伯语 الساق "腿"）
+  { title: '壶腿·Skat', content: '水瓶座 δ 星，阿拉伯语 الساق (as-sāq) 脚/腿——水瓶的下方支柱。Skat 是一颗蓝白色主序星。与 Markab、Scheat 共享同一根阿拉伯词根——同一只腿在飞马与水瓶之间被复用，让两个星座共享一段骨架。', catalog_star_id: 106, origin: '阿拉伯语' },
+
+  // ⑦ 大熊之肩·ε Ursae Majoris Alioth（阿拉伯语 "孟买的牛/驮羊尾"变体或异说）
+  { title: '熊轭·Alioth', content: '北斗第五星，阿拉伯语变体名，一说来自"辔头"或"骆驼的尾鬃"；历代解释多有分歧。最稳妥的说法是：它是北斗七星中最亮的一颗（1.77 等），在阿尔苏菲《恒星之书》中属"熊大车的驾轭"。无论具体母语如何，Alioth 是北斗核心的一颗：它既是最亮，又是四季星辰的中轴——斗柄指向围绕它展开。', catalog_star_id: 4, origin: '阿拉伯语' },
+
+  // ⑧ 大熊之斗柄·η Ursae Majoris Alkaid（阿拉伯语 القائد "首领 / 哀悼之女"）
+  { title: '斗柄首领·Alkaid', content: '北斗柄端最后一星，阿拉伯语 القائد (al-qāʾid)"首领、队长"——又作"哀悼的妇女"解。不论哪一说，它标记的是万物之终结：斗柄指向西，就是秋收与丧悼。Alkaid 是一颗炽热的蓝白色主序星，是北斗七星里最年轻、最热的一颗。一颗"首领"站在北斗队列的最末尾，带领整队七星一起坠入地平。', catalog_star_id: 6, origin: '阿拉伯语' },
+
+  // ⑨ 小熊座 · ζ Ursae Majoris Mizar（阿拉伯语 المئزر"腰布/围裙"，与 Alcor 目视双星）
+  { title: '熊之腰布·Mizar', content: '北斗斗柄倒数第二星，阿拉伯语 المئزر (miʾzar) 围裙——测试视力者用 Mizar 与其旁的辅星 Alcor 挑战肉眼分辨率。Mizar 本身又是望远镜下第一组被发现的目视双星。一颗围裙之下藏着双星套双星的层层嵌套，夜空中少数真正考验观察力的点心。', catalog_star_id: 5, origin: '阿拉伯语' },
+
+  // ⑩ 狮子第二亮·α Leonis Regulus（拉丁语 regulus "小君 / 王子"）
+  { title: '狮君·Regulus', content: '狮子座 α，拉丁语 regulus"小君、小王子"。它位于狮的心脏，视星等 1.35，是夜空最亮的恒星之一。中文名"轩辕十四"出自中国古代星官"轩辕"；西方则视其为狮子座的皇者之心——"狮心"。它是一颗高速自转的蓝白主序星，自转快到把自己压成扁球状。一头以"小君"与"轩辕"双名的狮子，俯卧在黄道之上，心脏处闪着两颗文化共同的敬畏。', catalog_star_id: 64, origin: '拉丁语' },
+
+  // ⑪ 狮子尾·α Leonis Zosma（已在 v3b 单独写了；本处用 ζ Zosma 第2个名字视角—这已是覆盖故事，保留一份狮子尾部的"速度"故事作为 Zosma 副故事）
+  { title: '狮子脊柱·ZosmaSpin', content: 'ζ 狮子座星 Zosma，前述已记"狮背/腰肋"；此故事强调狮子座的脊柱结构：从头到尾的完整脊柱由 Algieba（额）、Zosma（腰肋）、Denebola（尾）三枚阿拉伯名串起。Zosma 是一颗蓝白主序星，自转极快——赤道速度超过每秒 200 公里。脊柱的高速旋转让夜空里的狮子仿佛正在甩动鬃毛，带着一身金光冲向地平东端。', catalog_star_id: 67, origin: '阿拉伯语' },
+
+  // ════════════════════════════════════════════════════════════════
+  // ㉔ 最后一批西方亮星命名（v3f，全部剩余 61 颗，按星座分组）
+  // ════════════════════════════════════════════════════════════════
+
+  // 天鹅座组（Aljanah / Fawaris / Albireo / Sulafat / Sheliak）
+  // Aljanah 意为"翅膀"，Fawaris 意为"骑士"，Albireo 源自阿拉伯文 rib al-ʿuqād（一说"蜂鸟/食虫鸟"的古文讹变），Sulafat"乌龟"，Sheliak"琴/竖琴"
+  { title: '天鹅的彩羽·Aljanah', content: '天鹅座的身体由一串阿拉伯名铺成：Aljanah（ε，"翅膀"），Fawaris（δ，"骑手"），Albireo（β，西方称"蜂鸟"，实为阿拉伯文 rib 的讹变），Sadr（γ，"心脏"，另文），而天琴座的Sulafat（γ，"乌龟"）与Sheliak（β，"竖琴琴弦"）是南夜中阿拉伯文明的记忆拼图。五颗阿拉伯名撑起北天十字到夏天的琴与鹤——一条星汉的名字，连成阿拉伯古天文学最绵密的注解。', catalog_star_id: 32, origin: '阿拉伯语' },
+
+  // 仙后座补充 Segin 与 Ruchbah（"膝"）与 Segin（"剑"）—— 此组大多已在 Schedar 故事中提及，此处补述 Ruchbah 与那把"剑"
+  { title: '仙后之剑·Segin', content: '仙后座的第五颗主星，阿拉伯语 Segin（"剑"或古阿拉伯名）是 W 形南端靠外那一角。Ruchbah（δ，"膝"）与它一同仙后裙摆。几颗星组成一字 W，共指仙后仰躺的身姿。一把"剑"与一枚"膝"缀在仙后身上——她既是跪坐的王后，也是失手掉落了佩剑的妇人。两种解读，共用一条 W 形光线。', catalog_star_id: 84, origin: '阿拉伯语' },
+
+  // 金牛座 Alcyone 星团（Atlas / Electra / Maia / Merope / Taygeta / Alcyone 混中文名已覆盖 Alcyone）
+  { title: '七姐妹之父·Atlas', content: '金牛座昴星团里的父亲星，Atlas（希腊神话中的擎天巨人）是七姐妹（普勒阿得斯）的父亲。Electra、Maia、Merope、Taygeta 是他与女儿们。Atlas 名副其实地矗立于姐妹团中央。这一团七姐妹早在古希腊、古巴比伦、古埃及的星图里就被独立命名——汉语昴星团同样。同一团星，人类先后叫它"葫芦花""七姊妹""七姐妹""雨之星"……父亲 Atlas 居中,女儿们环绕——一段跨文明的星空家族。', catalog_star_id: 55, origin: '希腊语' },
+
+  // 金牛座肩尖·Hassaleh 与被"割出来的角尖" (Elnath已覆盖 β Tau; Hassaleh 是 Aur ι，阿拉伯"大象的鼻端"或"剑尖")
+  { title: '象鼻·Hassaleh', content: '御夫座 ι 星，阿拉伯语 Hassaleh 意为"象鼻或剑尖"——御夫的右肩尖。御夫是古希腊的发明牛犁者。Hassaleh 蓝白橙三色反差明显。一角由"鼻尖"与"剑"两端组成——御夫一手持犁，一手擎矛，肩上的星则名"象鼻"。一段农耕文明的记忆被搬上天。', catalog_star_id: 62, origin: '阿拉伯语' },
+
+  // 狮子座剩余·Chertan
+  { title: '狮子短须·Chertan', content: '狮子的下颌短须，阿拉伯语 al-ḫarātān（"两颗小星"）或肋骨上的小节。Chertan 是一颗蓝白主序星。狮子的脸全由 Algieba、Zosma、Chertan 这些"额头、肋骨、短须"拼成——阿拉伯观星者像解剖一头舞狮那样，为每一片鬃毛与骨骼都取了小名。一颗"短须"星，拼到最后成就了这张雄狮的脸。', catalog_star_id: 68, origin: '阿拉伯语' },
+
+  // 处女座组 Porrima / Vindemiatrix / Zaniah
+  { title: '丰收女神组·Porrima', content: '室女座的一颗目视双星：Porrima（罗马神谕女神，收获季预言夫人）。Vindemiatrix（ε，"摘葡萄的妇人"）标出秋收开始的时刻。Zaniah（η，"角落/角"）与它们一同持握室女神的丰盈之手。"神谕、摘葡萄、角落"——三枚名字拼出秋收开始那天的仪式。她们把谷穗举到正午，再交给天秤。', catalog_star_id: 44, origin: '罗马语' },
+
+  // 摩羯座组·Dabih / Deneb Algedi（Deneb Algedi 已在 v3d 提及）
+  { title: '山羊分叉·Dabih', content: '摩羯座 β 星，阿拉伯语 ad-dāḥī（"屠夫"或"牺牲者"）或"吉祥的献祭者"。山羊座的前角由 Dabih 标记。与"小山羊尾" Deneb Algedi 一同组成一头牺牲的山羊头部。Dabih 是一颗明亮的黄白色巨星。"牺牲者"这个名字，把秋末冬至的寒夜写成了祭坛。', catalog_star_id: 102, origin: '阿拉伯语' },
+
+  // 牧夫座 Seginus
+  { title: '牧夫第二膝·Seginus', content: '牧夫座 γ 星，Seginus，一说源自希腊神话中"发明犁的人"的阿拉伯化异写，或来自"塞古斯"地名。它是一颗蓝白色主序星。牧夫的膝由 Seginus、Muphrid 共构，脚踩大角的方向。"持犁者"的膝弯是一组阿拉伯名字，守在北斗七星不远、大角下方。', catalog_star_id: 36, origin: '希腊语' },
+
+  // 半人马座 Ascella 与人马尾部 Kaus Media（已在 v3d 写 Ascella 与 Kaus Media；此处补 Ascella 专名）
+  { title: '射手之臂·Ascella', content: '人马座 ζ 星，拉丁语 Ascella 意为"手臂/腋窝"——射手的左手肘。Kaus 三兄弟（北、中、南、Australis）共持那把指向银河中心的弓。Ascella 标出射手伸臂拉满弓弦时的腋窝。Kaus 序列的"北、中、南、臂"——一段阿拉伯化与拉丁语拼合的天空描写。', catalog_star_id: 99, origin: '阿拉伯语' },
+
+  // 凤凰座补充·Phact 与天鸽（alpha Col）
+  { title: '环鸽·Phact', content: '天鸽座 α 星，阿拉伯语 al-faḫkhār 或 Phact，意为"环鸽/驯养的鸽子"。天鸽座是近代南天暗星座，由荷兰航海家划定。Phact 是一颗蓝白色主鸽。鸽子自古是人类携带的信使，这颗"环鸽"在夜空里为南来北往的航班通信——至少古代航海家希望如此。', catalog_star_id: 141, origin: '阿拉伯语' },
+
+  // 双鱼座 Alrescha
+  { title: '联结·Alrescha', content: '双鱼座 α 星，阿拉伯语 al-rishāʾ 意为绳/系泊绳——双鱼被一根绳拴在一起的那根绳。Alrescha 是一对目视双星，两星紧密互绕，带结一般永不松开。两鱼由一根绳缚于蛇夫座的裙角。一颗绳结，把两条反向游动的鱼锁在同一根线上。', catalog_star_id: 107, origin: '阿拉伯语' },
+
+  // 天蝎座补充·Dschubba 与 Graffias 同属"头等大事"组（见 v3c "天蝎之冠"）
+  // 武仙组 RasalhagueHer（Her）与 Rasalgethi，此组已由 Sabik / Cebalrai 故事覆盖——此为 Rasalgethi 的武仙视角
+  { title: '武仙左足座·Rasalgethi', content: '武仙座 α 星 Rasalgethi（阿拉伯语"跪膝者的头"——一颗红巨星与一颗绿子星并排，组成著名的目视双星）。武仙座 Rasalhague（"持蛇者的头"）与 Rasalgethi（"跪膝者"）同名异译，两座不同的"头"。一对红绿双星是夜空中最美的目视组合之一。两颗恒星互相绕行，一红一绿，为英雄赫拉克勒斯的额头添了一道永不消退的光晕。', catalog_star_id: 167, origin: '阿拉伯语' },
+
+  // 巨蟹座组·Acubens 与 Altarf
+  { title: '蟹钳·Acubens', content: '巨蟹座 α 星，阿拉伯语 al-zubānā（"蟹钳/螯"），再次用上"螯"这根同源词。同源的 Zubenelgenubi 与 Zubeneschamali 是天秤座的南北爪。Acubens 是一颗白色的亚巨星，位于黄道之上，日月行星多次经过它。一只小蟹白天偶被看见，夜晚则靠"蟹钳"之名占一份小心。', catalog_star_id: 110, origin: '阿拉伯语' },
+
+  // 巨蟹座 β Altarf
+  { title: '蟹目·Altarf', content: '巨蟹座 β 星，阿拉伯语 al-ṭarf意为"眼睛 / 瞥见"。螃蟹的两只眼由 Altarf 代表，与 Acubens（"蟹钳"）共组巨蟹头脸。Altarf 是一颗黄白色的巨星，在巨蟹座方向——反方向即为黄道。一只"被瞥见的蟹"，在行星合日时偶露面，是占星与天文学的临界点。', catalog_star_id: 111, origin: '阿拉伯语' },
+
+  // 狮子座东段·Zaniah
+  { title: '狮子裙角·Zaniah', content: '室女座 η 星，阿拉伯语 zāwiyah（"角落"或"庙宇的一角"）。Porrima、Vindemiatrix、Zaniah 共同为室女（处女）定下节日的顺序。"角落"意味着转折——在这颗星的指引下，秋收之节。它是一颗蓝白色的小星，位于天秤与狮子之间——更黄道的角落。', catalog_star_id: 46, origin: '阿拉伯语' },
+
+  // 巨蟹座/飞马座·Wasat 与天鹰 Alshain
+  { title: '坠落的星·Wasat', content: '双子座 δ 星，阿拉伯语 Wasat 意为"中间"或"坠落的星"。Wasat 靠近黄道，时常被月球遮蔽。Alshain（天鹰座 β，阿拉伯语"茶隼/鹰隼"与 Tarazed 同行"猎鹰"）。两颗一组：一颗"中间"，一只"茶隼"——分别是"停驻"与"俯冲"的两类鸟类与位置意象。', catalog_star_id: 50, origin: '阿拉伯语' },
+
+  // 长蛇座（第二 Alkes 等补充） 乌鸦座 Alkes "杯子"
+  { title: '空杯·Alkes', content: '巨爵座 α 星，阿拉伯语 al-kaʼs（"杯子/酒爵"）。巨爵是"承接水瓶之水的那只杯"。Alkes 是一颗红巨星的光。它与水瓶座的 Skat（"腿"）、Dabih（"屠夫"）共组成秋夜南天的液体流程——从水瓶倾倒，穿过巨爵，化为夜天银河。空杯象征着"接受"，而非拥有。', catalog_star_id: 120, origin: '阿拉伯语' },
+
+  // 盾牌座·π Sagittarii Rukbat 等
+  { title: '盾击·Rukbat', content: '人马座 β 星，阿拉伯语 Rukbat意为"膝"或"打击"。它是人马座"茶壶"左下方的钮扣星。人马的膝由 Rukbat 标记，与 Ascella（"手臂"）、Nunki 共组射手的腿与膝。一脚踩稳银河，一脚抬起搭弦——那颗名为"膝"的星，便是射手拉开弓时受力的支点。', catalog_star_id: 101, origin: '阿拉伯语' },
+
+  // 绘架座/天鸽/天燕/山案/网罟/蚂蚁/玉夫/狐狸绘架/盾牌/望远镜座组 (α Dor α Pic 等)
+  { title: '画架与望远镜·PicDor', content: '17–18 世纪科学工具被送上天空：绘架座（Pic，"画架"）标志荷兰画家伦勃朗；望远镜座（Tel，"望远镜"）纪念伽利略；圆规座、望远镜座、显微镜座、山案座、天罴座——全套科学器具化作星辰。绘架座 α（天鸽）、望远镜座、山案座（Men）、网罟座（Ret）、案天罟；夜空中科学革命的纪念碑群。\n\n绘架 α Pic、圆规 α Cir、天鹅补遗，它们组成南天亮夜里最安静的工具箱。', catalog_star_id: 142, origin: '近代综合' },
+
+  // 北冕/天鹅仙后幕间  Alfirk（Cep β）
+  { title: '仙王之子·Alfirk', content: '仙王座 β 星，阿拉伯语 al-firqah意为"羊群"。Alderamin（α，"右臂"）是仙王的右臂， Alfirk 是羊群——仙王领着羊群在北极附近踱步。Alderamin Alfirk 共组仙王座。一对仙王领着羊群，在北极附近永世绕行——把最早放牧的记忆匀上了天顶。', catalog_star_id: 163, origin: '阿拉伯语' },
+
+  // 小狮座/天罴 Leo Minor / Camelopardalis
+  { title: '独角兽与幼狮·CamLMi', content: 'Camelopardalis（"长颈鹿"）是 17 世纪新增的北天鹿形星座， β Cam 是它的第二亮星。Leo Minor（小狮座）由 17 天文学家 Hevelius 划定，LMi 是其中一颗暗星。两个"近代弱星座"，各自代表了 17 世纪天文学家争夺北天弱星的共同趣味。北天极附近的象限上，近代天文学家贡献了几十颗幼鹿般的小星。', catalog_star_id: 153, origin: '近代综合' },
+
+  // 狐狸 Vul / 天箭 Sge / 天鹰 Alshain（部分已覆盖）  Umbrella；狐狸座 α Vul，天箭 α Sge
+  { title: '箭与狐·SgeVul', content: '天箭座（Sce，"箭"）由托勒密划定， α Sge 意为"天鹅与鹰之间的那支箭"。狐狸座（Vul，"狐狸"）由 17 世纪 Hevelius 划定， α Vul 与 Sge 同处北天。Sualocin/α Del 与 Rotanev/β Del 是一对倒写名——纪念意大利天文学家 Nicolaus Venator。一对倒写星名，是近代天文学留下的文字游戏。', catalog_star_id: 157, origin: '近代综合' },
+
+  // 六分仪/矩尺/绘架/天罴/玉夫/南极/南三角补充 Sex Ant Pyx Scl Tuc Hyi 等
+  { title: '度量之具·SexAnt', content: '六分仪座（Sex，"六分仪"，测角仪器）、矩尺座（Nor，"矩尺"）、天罴座（Scl，"雕塑家的工作室"）、南极座（Oct，"八分仪"）。这些星座多数由法国天文学家拉卡伊 18 世纪南天航行时划定，以精密测量仪器命名。它们校准天球的赤道与黄道，是近代天文测量的基础工具。六分仪、八分仪、矩尺、工作室、南极——一套精密仪器化作南天工具匣。', catalog_star_id: 150, origin: '近代综合' },
+
+  // 天炉/绘架/网罟/玉夫/南极 等补充（For Ret Cha CrA Ind Men TrA 等）
+  { title: '炉火与淬火·ForInd', content: '天炉座（For，"化学炉"）、印第安座（Ind，"印第安人"由 Keyser 划定）、天罴座（Scl）、南极座（Oct）——拉卡伊南天新星座代表。炉火与淬火——化学炉；印第安——南半球民族；现代天文学以这些名字纪念其源头。它们是近代南天天文学最显著的标识。', catalog_star_id: 131, origin: '近代综合' },
+
+  // 天角/绘架/南极/南极 Men/TrA/Tuc 等  Maria
+  { title: '南角小众·MenTrA', content: '山案座（Men，"桌山"）、杜鹃座（Tuc，"巨嘴鸟"）、天罴座（Scl）。南天近代星座中最安静的一群，多以物种或地理标志命名。α Men 是其中较暗的代表。现代天文学以"桌山、巨嘴鸟"为名的星座，是南半球物种志在天空上的投影。', catalog_star_id: 144, origin: '近代综合' },
+
+  // Hyi β 与 Tuc / Ara 补充
+  { title: '水蛇与巨嘴鸟·TucHyiAra', content: '水蛇座（Hyi，"小水蛇"）是荷兰航海家划定，β Hyi 是它的第二亮星。杜鹃座（Tuc，"巨嘴鸟"）α Tuc 代表南半球鸟类遗产。Ara（"祭坛"）是托勒密早已在册的南天古星座。几组南天近代/近代+古典星座，由物种、器物、神话拼出一片南天万花筒。', catalog_star_id: 125, origin: '近代综合' },
+
+  // 天鹰/天鹅 共有的 Albireo 视角 已覆盖
+
+  // 总结——再查漏补缺：覆盖标记
+
+  // 总补遗·告知仍极少数未覆盖的极暗星（α Ind α Cha α CrA 等近代星）
+  { title: '近代南天极小星补遗·IndCrA', content: '南天近代星座中较暗（3.5 等以下）的亮星们：印第安座（Ind）、蝘蜓座（Cha）、南冕座（CrA），以及天鹅座 δ Fawaris 等补遗。它们均由近代 Keyser、拉卡伊、Hevelius 等划定。这些微调大小的近代星座南天组，是近代天文测量留给天空最后的几块拼图。', catalog_star_id: 134, origin: '近代综合' },
+
+  // ════════════════════════════════════════════════════════════════
+  // ㉕ 全量收尾覆盖（v3g）
+  // ════════════════════════════════════════════════════════════════
+  // 补一束"纯西方名"的最后 35 颗散落亮星
+  // 每星座一颗代表
+
+  { title: '天鹅左翼·Fawaris', content: '天鹅座 δ 星 Fawaris，阿拉伯语"骑手"——北十字的左翼。它与 Sadr（"心脏"）、Aljanah（"翅膀"）一同撑起北天十字。Fawaris 是一颗大质量的蓝白主光点。', catalog_star_id: 31, origin: '阿拉伯语' },
+  { title: '仙后裙摆·Ruchbah', content: '仙后座 δ 星 Ruchbah（"膝"），与 Caph（"手掌"）、Schedar（"胸"）共组 W 形裙摆一角。Ruchbah 黄白主序星。', catalog_star_id: 83, origin: '阿拉伯语' },
+  { title: '新收妇人·Vindemiatrix', content: '室女座 ε 星 Vindemiatrix（"摘葡萄的妇人"），与 Porrima（神谕女神）、Zaniah（"角落"）共组秋收开始的黄道信号。Vindemiatrix 黄白色巨星。', catalog_star_id: 45, origin: '阿拉伯语' },
+  { title: '祭坛火·AraBeta', content: '南天祭坛座 β 星，祭坛座（Ara）是托勒密古星座之一。Rab 意为"炭火/祭火"。Ara 蓝白主序星。', catalog_star_id: 132, origin: '阿拉伯语' },
+  { title: '祭坛火二·AraBeta2', content: '祭坛座 β 星 (Ara 第二祭坛)——祭坛座是托勒密古星座之一。祭坛 β 星代表祭火的另一角度，与 α 祭坛座并排。', catalog_star_id: 133, origin: '阿拉伯语' },
+  { title: '天鹅金喉·Albireo', content: '天鹅座 β 星 Albireo。西方观鸟者称为"蜂鸟"——实为阿拉伯文"rišš 相关的讹变"。它是一对极美的目视双星：一蓝一黄，被观测者视为夜空中颜色对照最优美的双星。', catalog_star_id: 29, origin: '阿拉伯语' },
+  { title: '双子的爪子·Mebsuta', content: '双子座 ε 星 Mebsuta（阿拉伯语"伸出的爪子"——双足神之一只伸出的手）。猎户座 β Elnath 同属"手/爪"阿拉伯语意象。Mebsuta 黄色超巨星。', catalog_star_id: 51, origin: '阿拉伯语' },
+  { title: '鹿角之尖·Sheratan2', content: '白羊座 β Sheratan（已在 v3d 详述）。同属羊角尖星的 Elnath（金牛座 β/Aur ζ）是一组"撞角"故事。两者共写出春天羊与牛的两只起簧角。', catalog_star_id: 109, origin: '阿拉伯语' },
+  { title: '印度孤星·IndAlpha', content: '印第安座 α 星。印第安座由 Keyser 16 世纪末划定，是近代纪念南半球族群的少数星座。', catalog_star_id: 135, origin: '近代综合' },
+  { title: '天猫之眼·LynAlpha', content: '天猫座 α 星，是猫形星座"天猫座"（由 Hevelius 划定）中最亮代表。天猫由 Hevelius 从相邻星空中圈出——并非古星座的一部分。', catalog_star_id: 152, origin: '近代综合' },
+  { title: '圆规之轴·CirAlpha', content: '圆规座 α 星 σφαιροειδές——由拉卡伊 18 世纪以"绘图圆规"划定。圆规座属于拉卡伊"科学器具组"之一。', catalog_star_id: 147, origin: '近代综合' },
+  { title: '琴上之龟·Sulafat', content: '天琴座 γ Sulafat，阿拉伯语"乌龟"——琴弦下压着的一只龟壳（传说中赫耳墨斯发明里拉琴即蒙以龟壳）。它与 Sheliak（"琴弦"）并排于天琴。', catalog_star_id: 27, origin: '阿拉伯语' },
+  { title: '剑鱼之牙·DorAlpha', content: '剑鱼座 α 星。剑鱼座是 Keyser 划定的近代南天星座，取名自大洋中的剑鱼。', catalog_star_id: 126, origin: '近代综合' },
+  { title: '网罟·RetAlpha', content: '网罟座 α 星。网罟座原由 Hevelius 以"网罟（sjö）"划定，是近代仪器/工具命名法的一部分。', catalog_star_id: 143, origin: '近代综合' },
+  { title: '三角之首·TriAlpha', content: '三角座 α 星。三角座是北天小"三角"由托勒密划定（一说 Hevelius），α Tri 为其首星。', catalog_star_id: 172, origin: '近代综合' },
+  { title: '琴弦·Sheliak', content: '天琴座 β Sheliak，意为"琴弦 / 竖琴"，与 Sulafat（"乌龟"）同属天琴座的阿拉伯双名。Sheliak 是一颗变星（食双星），亮度随互掩变化。', catalog_star_id: 26, origin: '阿拉伯语' },
+  { title: '海豚献词·Rotanev', content: '海豚座 β 星 Rotanev，是纪念意大利天文学家 Nicolaus Venator（Nicola Cotoner 姓名倒写），与 Sualocin 为一对近代文字游戏星云。它们是现代天文爱好者破解的一组"反写铭文"。', catalog_star_id: 158, origin: '近代综合' },
+  { title: '罗盘卡尺·PyxAlpha', content: '罗盘座 α 星（Pyxis，"罗盘卡尺"）。拉卡伊 18 世纪划定，属"科学器具组"。它是南天航海罗盘器具的一个明亮代表。', catalog_star_id: 130, origin: '近代综合' },
+  { title: '昴团之母·Electra', content: '金牛座昴星团之——Electra 是七姐妹之一，提坦神阿特拉斯与女儿们的"母亲点亮天空"。Electra 是一颗亮蓝星（昴星团主蓝星之一）。', catalog_star_id: 56, origin: '希腊语' },
+  { title: '茶隼·Alshain', content: '天鹰座 β Alshain，阿拉伯语"茶隼"——天鹰座中一颗黄色主序星。它与 Tarazed（"猎鹰"）是同一把阿拉伯鹰隼命名——"猎鹰"与"茶隼"同属鹰隼属。', catalog_star_id: 23, origin: '阿拉伯语' },
+  { title: '天鹅泡·LacAlpha', content: '蝎虎座 α 星。蝎虎座的"壁虎/蜥蜴"由 Hevelius 划定，α Lac 是其首星。壁虎形与附近的天鹅、飞马组成秋夜北天的动物圈。', catalog_star_id: 161, origin: '近代综合' },
+  { title: '麒麟之角·MonBeta', content: '麒麟座 β 星。麒麟座由 Hevelius 划定，取名"西方独角兽"，是北天近代代表星座之一。', catalog_star_id: 173, origin: '近代综合' },
+  { title: '海豚反写·Sualocin', content: '海豚座 α Sualocin——即"Nicolaus（the vendor 反写）"——与 Rotanev 共同组成近代天文的一段反写文字游戏。', catalog_star_id: 159, origin: '近代综合' },
+  { title: '小狮第四十六·LMi46', content: '小狮座 46 LMi（"小狮座第 46 星"）属 Hevelius 划定的小狮座。它由希腊字母命名法转为数字命名，是星表中"数字命名表示非主星"的代表。', catalog_star_id: 151, origin: '近代综合' },
+  { title: '炉火之焰·ForAlpha', content: '天炉座 α 星。天炉座（Fornax）由拉卡伊划定，意为"化学炉火"——属拉卡伊"近代器具命名"传统。一簇南天暗星组成一只化学炉火。', catalog_star_id: 137, origin: '近代综合' },
+  { title: '南极之路·ApsAlpha', content: '天燕座 α 星。天燕座（Tucana"巨嘴鸟"邻座）由 Keyser 划定，代表"天堂鸟"——南天的几种鸟类之一。', catalog_star_id: 149, origin: '近代综合' },
+  { title: '盾火星·SctAlpha', content: '盾牌座 α 星。盾牌座由 Hevelius 划定，取名"索别斯基之盾"——纪念波兰王索别斯基。它是近代"纪念命名"的代表之一。', catalog_star_id: 171, origin: '近代综合' },
+  { title: '昴团长女·Maia', content: '昴星团 α Maia，七姐妹中的长女，提坦神阿特拉斯之女。Maia 是一颗蓝白色的主序星，是昴星团中最亮的几颗之一。母群"七姐妹"由古希腊人通称为"阿特拉提得斯"。', catalog_star_id: 57, origin: '希腊语' },
+  { title: '小马方尖碑·Kitalpha', content: '小马座 α Kitalpha，阿拉伯语变体名。小马座是托勒密古星座之一，乃海马的头部——Kitalpha 是它的首星。', catalog_star_id: 160, origin: '阿拉伯语' },
+  { title: '麒麟之首·MonAlpha', content: '麒麟座 α 星 Monoceros（"独角兽"）。Hevelius 划定，列入北天弱星座。', catalog_star_id: 174, origin: '近代综合' },
+  { title: '蝘蜓之首·ChaAlpha', content: '蝘蜓座 α 星。蝘蜓座由 Keyser 划定，意为"壁虎/变龙"——南天物种分类近代星座之一。', catalog_star_id: 145, origin: '近代综合' },
+  { title: '昴团五妹·Merope', content: '昴星团 ε Merope——七姐妹中的"蒙面女"。传说她因嫁凡人而羞于见他星，被星芒里一层暗星云（Merope 星云）遮掩。她实际裹在一团反射蓝光的暗星云之中。', catalog_star_id: 58, origin: '希腊语' },
+  { title: '后发之冠·ComBeta', content: '后发座 β 星。后发（Coma Berenices）是古埃及王后贝伦尼柯之发——托勒密即已入册，由王后剪发谢神之故事命名。', catalog_star_id: 154, origin: '希腊语' },
+  { title: '昴团四妹·Taygeta', content: '昴星团 Taygeta（"泰革塔"），七姐妹之一，与 Maia、Electra、Merope 共组普勒阿得斯。泰革塔是希腊神话中阿特拉斯七个女儿之一。', catalog_star_id: 59, origin: '希腊语' },
+  { title: '勺形之槽·SclAlpha', content: '玉夫座 α 星（Sculptor，"雕塑家的工作室"）。由拉卡伊 18 世纪划定，属南天"科学工作室器具组"代表。', catalog_star_id: 136, origin: '近代综合' },
+  { title: '狐狸之焰·VulAlpha', content: '狐狸座 α 星。狐狸座由 Hevelius 划定，代表一只蹲踞的"狐狸"及旁边的"鹅"——北天一组近代动物星座。', catalog_star_id: 156, origin: '近代综合' },
+  { title: '雕具沉默·CaeAlpha', content: '雕具座 α 星。雕具座（Caelum，"凿子/刻刀"）由拉卡伊划定，属近代天文"雕刻工具组"。', catalog_star_id: 138, origin: '近代综合' },
 ];
 
 function seed() {
