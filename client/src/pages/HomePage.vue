@@ -1,55 +1,35 @@
 <template>
   <div class="home-page">
     <canvas ref="canvasRef" class="particle-bg" />
-    
     <div class="overlay">
-      <!-- 文案区 -->
-      <div class="hero-text">
-        <h1 class="title">星语穹庭</h1>
-        <p class="subtitle">有多久没有抬头看星星了？</p>
+      <div class="hero">
+        <h1 class="brand">星语穹庭</h1>
+        <p class="tagline">有多久没有抬头看星星了？</p>
         <p class="desc">把你的故事挂上星空，让心事化作星光</p>
       </div>
 
-      <!-- 登录/注册卡片 -->
-      <div class="auth-cards">
-        <!-- 登录 -->
-        <div class="auth-card">
-          <h3>进入星空</h3>
-          <form @submit.prevent="handleLogin">
-            <input v-model="loginForm.username" type="text" placeholder="用户名" maxlength="20" required />
-            <input v-model="loginForm.password" type="password" placeholder="密码" maxlength="50" required />
-            <p v-if="loginError" class="error">{{ loginError }}</p>
-            <button type="submit" class="btn primary" :disabled="loginLoading">
-              {{ loginLoading ? '...' : '进入星空' }}
-            </button>
-          </form>
+      <div class="form-card">
+        <div class="tabs">
+          <button :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button>
+          <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button>
         </div>
-
-        <!-- 注册 -->
-        <div class="auth-card">
-          <h3>创建账号</h3>
-          <form @submit.prevent="handleRegister">
-            <input v-model="regForm.username" type="text" placeholder="用户名 (2~20字)" maxlength="20" required />
-            <input v-model="regForm.password" type="password" placeholder="密码 (6~50字)" maxlength="50" required />
-            <input v-model="regForm.password2" type="password" placeholder="确认密码" maxlength="50" required />
-            <p v-if="regError" class="error">{{ regError }}</p>
-            <button type="submit" class="btn secondary" :disabled="regLoading">
-              {{ regLoading ? '...' : '注册账号' }}
-            </button>
-          </form>
-        </div>
+        <form @submit.prevent="mode === 'login' ? handleLogin() : handleRegister()">
+          <div class="fields">
+            <input v-model="username" type="text" placeholder="用户名" maxlength="20" required autocomplete="username" />
+            <input v-model="password" type="password" placeholder="密码" maxlength="50" required autocomplete="current-password" />
+            <input v-if="mode === 'register'" v-model="password2" type="password" placeholder="确认密码" maxlength="50" required autocomplete="new-password" />
+          </div>
+          <p v-if="error" class="error">{{ error }}</p>
+          <button type="submit" class="btn-submit" :disabled="loading">
+            {{ loading ? '请稍候...' : (mode === 'login' ? '进入星空' : '创建账号') }}
+          </button>
+        </form>
       </div>
 
-      <!-- 匿名入口 -->
-      <div class="anonymous-entry">
-        <div class="divider"><span>或者</span></div>
-        <button class="btn ghost" @click="enterAnonymously">匿名进入 · 不登录</button>
-      </div>
+      <div class="divider"><span>或者</span></div>
+      <button class="btn-anon" @click="enterAnonymously">匿名进入 · 不登录</button>
 
-      <!-- 底部统计 -->
-      <div class="footer-stats">
-        <p v-if="stats">已有 {{ stats.starCount }} 颗历史星 · {{ stats.totalResonance }} 次共鸣</p>
-      </div>
+      <p class="footer" v-if="stats">已有 {{ stats.starCount }} 颗历史星 · {{ stats.totalResonance }} 次共鸣</p>
     </div>
   </div>
 </template>
@@ -62,254 +42,123 @@ import { useAuth } from '../stores/auth'
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { loaded } = useParticleSky(canvasRef as { value: HTMLCanvasElement | null })
+useParticleSky(canvasRef as { value: HTMLCanvasElement | null })
 const { login, register } = useAuth()
 
-const loginForm = reactive({ username: '', password: '' })
-const regForm = reactive({ username: '', password: '', password2: '' })
-const loginLoading = ref(false)
-const regLoading = ref(false)
-const loginError = ref('')
-const regError = ref('')
+const mode = ref<'login' | 'register'>('login')
+const username = ref('')
+const password = ref('')
+const password2 = ref('')
+const loading = ref(false)
+const error = ref('')
 const stats = ref<{ starCount: number; totalResonance: number } | null>(null)
 
 async function handleLogin() {
-  loginError.value = ''
-  if (!loginForm.username.trim() || !loginForm.password) return
-  loginLoading.value = true
-  try {
-    await login(loginForm.username.trim(), loginForm.password)
-    router.push('/sky')
-  } catch (e: any) {
-    loginError.value = e.message || '登录失败'
-  } finally {
-    loginLoading.value = false
-  }
+  error.value = ''
+  if (!username.value.trim() || !password.value) return
+  loading.value = true
+  try { await login(username.value.trim(), password.value); router.push('/sky') }
+  catch (e: any) { error.value = e.message || '登录失败' }
+  finally { loading.value = false }
 }
 
 async function handleRegister() {
-  regError.value = ''
-  const u = regForm.username.trim()
-  if (u.length < 2 || u.length > 20) { regError.value = '用户名需 2~20 个字符'; return }
-  if (regForm.password.length < 6 || regForm.password.length > 50) { regError.value = '密码需 6~50 个字符'; return }
-  if (regForm.password !== regForm.password2) { regError.value = '两次密码不一致'; return }
-  regLoading.value = true
-  try {
-    await register(u, regForm.password)
-    router.push('/sky')
-  } catch (e: any) {
-    regError.value = e.message || '注册失败'
-  } finally {
-    regLoading.value = false
-  }
+  error.value = ''
+  const u = username.value.trim()
+  if (u.length < 2 || u.length > 20) { error.value = '用户名需 2~20 个字符'; return }
+  if (password.value.length < 6 || password.value.length > 50) { error.value = '密码需 6~50 个字符'; return }
+  if (password.value !== password2.value) { error.value = '两次密码不一致'; return }
+  loading.value = true
+  try { await register(u, password.value); router.push('/sky') }
+  catch (e: any) { error.value = e.message || '注册失败' }
+  finally { loading.value = false }
 }
 
-function enterAnonymously() {
-  router.push('/sky')
-}
+function enterAnonymously() { router.push('/sky') }
 
 onMounted(async () => {
-  try {
-    const res = await fetch('/api/stats')
-    const json = await res.json()
-    if (json.code === 200) stats.value = json.data
-  } catch { /* 静默 */ }
+  try { const res = await fetch('/api/stats'); const json = await res.json(); if (json.code === 200) stats.value = json.data } catch {}
 })
 </script>
 
 <style scoped>
-.home-page {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  overflow: hidden;
-  background: #070816;
-  font-family: var(--font, "Microsoft YaHei", sans-serif);
-}
+.home-page { width: 100vw; height: 100dvh; position: relative; overflow: hidden; background: #070816; font-family: "Microsoft YaHei","PingFang SC",sans-serif; }
+.particle-bg { position: absolute; inset: 0; z-index: 0; }
+.overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem 1.5rem; pointer-events: none; }
+.overlay > * { pointer-events: auto; }
 
-.particle-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+.hero { text-align: center; margin-bottom: 2.5rem; }
+.brand {
+  font-size: clamp(3.5rem, 8vw, 7rem); font-weight: 800; letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fff 20%, #ffd98a 60%, #bb8844 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  line-height: 1.05; margin: 0;
+  animation: titlePulse 4s ease-in-out infinite alternate;
 }
-
-.overlay {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 2rem 1rem;
-  pointer-events: none;
+@keyframes titlePulse {
+  from { filter: drop-shadow(0 0 12px rgba(255,217,138,0.25)); }
+  to   { filter: drop-shadow(0 0 28px rgba(255,217,138,0.45)); }
 }
-
-.overlay > * {
-  pointer-events: auto;
+.tagline {
+  font-size: clamp(1.1rem, 2vw, 1.5rem); color: #c4bfe0; margin: 0.8rem 0 0.3rem;
+  font-weight: 300; letter-spacing: 0.03em; opacity: 0.85;
 }
-
-.hero-text {
-  text-align: center;
-  margin-bottom: 2.5rem;
-}
-
-.title {
-  font-size: clamp(3rem, 8vw, 6rem);
-  font-weight: 700;
-  background: linear-gradient(135deg, #ffd98a, #f6f1ff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.1;
-  animation: glow 3s ease-in-out infinite alternate;
-}
-
-@keyframes glow {
-  from { filter: drop-shadow(0 0 8px rgba(255,217,138,0.3)); }
-  to { filter: drop-shadow(0 0 20px rgba(255,217,138,0.6)); }
-}
-
-.subtitle {
-  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
-  color: #b9b4d6;
-  margin-top: 0.5rem;
-}
-
 .desc {
-  font-size: 0.95rem;
-  color: #7a759c;
-  margin-top: 0.5rem;
+  font-size: 0.9rem; color: #6b678a; margin: 0; font-weight: 300;
 }
 
-.auth-cards {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  justify-content: center;
+.form-card {
+  background: rgba(12,16,36,0.78); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 18px; padding: 1.8rem 2rem; width: 360px; max-width: 100%;
+  backdrop-filter: blur(20px);
 }
-
-.auth-card {
-  background: rgba(16, 20, 43, 0.85);
-  border: 1px solid rgba(48, 55, 87, 0.6);
-  border-radius: 24px;
-  padding: 1.75rem 2rem;
-  width: 320px;
-  backdrop-filter: blur(16px);
+.tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-radius: 10px; background: rgba(255,255,255,0.04); padding: 3px; }
+.tabs button {
+  flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b678a;
+  font-size: 0.9rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;
 }
+.tabs button.active { background: rgba(255,217,138,0.12); color: #ffd98a; }
+.tabs button:hover:not(.active) { color: #a09bbf; }
 
-.auth-card h3 {
-  color: #ffd98a;
-  font-size: 1.1rem;
-  margin-bottom: 1.25rem;
-  text-align: center;
-}
-
-.auth-card input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(48,55,87,0.5);
-  border-radius: 12px;
-  color: #f6f1ff;
-  font-size: 0.9rem;
+.fields input {
+  width: 100%; padding: 0.75rem 0.9rem; margin-bottom: 0.7rem;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; color: #e8e4ff; font-size: 0.9rem; outline: none;
   transition: border-color 0.2s;
 }
+.fields input:focus { border-color: #ffd98a; background: rgba(255,255,255,0.06); }
+.fields input::placeholder { color: #4a4568; }
 
-.auth-card input:focus {
-  outline: none;
-  border-color: #ffd98a;
+.error { color: #ff7b6d; font-size: 0.78rem; margin: 0 0 0.5rem; }
+
+.btn-submit {
+  width: 100%; padding: 0.75rem; border: none; border-radius: 10px;
+  background: #ffd98a; color: #1a1528; font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; margin-top: 0.3rem;
 }
-
-.auth-card input::placeholder {
-  color: #5a5580;
-}
-
-.error {
-  color: #ff8b7d;
-  font-size: 0.82rem;
-  margin-bottom: 0.5rem;
-}
-
-.btn {
-  width: 100%;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn.primary {
-  background: linear-gradient(135deg, #996633, #cc8844);
-  color: #fff;
-}
-
-.btn.primary:hover {
-  background: linear-gradient(135deg, #aa7744, #ddaa55);
-}
-
-.btn.secondary {
-  background: rgba(255,255,255,0.08);
-  color: #b9b4d6;
-}
-
-.btn.secondary:hover {
-  background: rgba(255,255,255,0.14);
-}
-
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.anonymous-entry {
-  text-align: center;
-  margin-top: 1.5rem;
-}
+.btn-submit:hover { background: #ffe4a8; }
+.btn-submit:active { transform: scale(0.98); }
+.btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .divider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  color: #5a5580;
-  font-size: 0.85rem;
-  margin-bottom: 0.75rem;
+  display: flex; align-items: center; gap: 0.8rem; margin: 1.5rem 0 0.8rem;
+  color: #4a4568; font-size: 0.8rem; width: 360px; max-width: 100%;
 }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
 
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: rgba(48,55,87,0.4);
+.btn-anon {
+  background: transparent; border: 1px solid rgba(255,255,255,0.06); color: #5b5790;
+  padding: 0.45rem 2rem; border-radius: 20px; font-size: 0.82rem; cursor: pointer;
+  transition: all 0.2s;
 }
+.btn-anon:hover { border-color: rgba(255,255,255,0.14); color: #8b85c0; }
 
-.btn.ghost {
-  width: auto;
-  background: transparent;
-  color: #7a759c;
-  padding: 0.5rem 2rem;
-  font-weight: 400;
-  font-size: 0.9rem;
-  border: 1px solid rgba(48,55,87,0.3);
-  border-radius: 20px;
+.footer {
+  position: absolute; bottom: 1.2rem; color: #3d3860; font-size: 0.72rem;
+  margin: 0; letter-spacing: 0.03em;
 }
-
-.btn.ghost:hover {
-  color: #b9b4d6;
-  border-color: rgba(48,55,87,0.6);
-}
-
-.footer-stats {
-  position: absolute;
-  bottom: 1.5rem;
-  color: #5a5580;
-  font-size: 0.78rem;
-}
-
-@media (max-width: 720px) {
-  .auth-cards { flex-direction: column; align-items: center; }
-  .auth-card { width: 100%; max-width: 320px; }
+@media (max-width: 480px) {
+  .form-card { width: 100%; padding: 1.4rem 1.2rem; }
+  .divider { width: 100%; }
 }
 </style>
