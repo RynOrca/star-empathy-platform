@@ -700,7 +700,7 @@ const generatedTags = computed<string[]>(() => {
   list-style: none;
   margin: 0;
   padding: 4px;
-  background: var(--panel);
+  background: rgba(15, 15, 25, 0.95);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
