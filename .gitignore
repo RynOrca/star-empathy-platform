@@ -4,7 +4,7 @@
 *.png
 *.log
 /tmp/
-data/
+server/data/
 node_modules/
 dist/
 .design/
