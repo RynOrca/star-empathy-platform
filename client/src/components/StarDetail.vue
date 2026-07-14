@@ -1,7 +1,6 @@
 <template>
-  <Transition name="overlay">
-    <div class="overlay" @click.self="$emit('close')">
-      <div class="detail-wrap">
+  <div class="overlay" @click.self="$emit('close')">
+    <div class="detail-wrap">
       <!-- 左：故事面板 -->
       <div class="panel panel-stories">
         <!-- 列表标题 -->
@@ -231,7 +230,7 @@
         </div>
       </div>
     </div>
-    </Transition>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -568,10 +567,9 @@ const generatedTags = computed<string[]>(() => {
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: fadeIn 0.15s ease-out;
 }
-.overlay-enter-active { transition: opacity 0.2s ease-out; }
-.overlay-leave-active { transition: opacity 0.12s ease-in; }
-.overlay-enter-from, .overlay-leave-to { opacity: 0; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ─── Container ─── */
 .detail-wrap {
