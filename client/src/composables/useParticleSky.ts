@@ -21,8 +21,9 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
   function init() {
     const el = canvas.value; if (!el) return
     sc = new THREE.Scene()
-    cam = new THREE.PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.5, 900)
-    cam.position.set(0, 0, 350)
+    cam = new THREE.PerspectiveCamera(80, el.clientWidth / el.clientHeight, 0.5, 1200)
+    cam.position.set(0, -40, 300)
+    cam.lookAt(0, 0, 0)
     rend = new THREE.WebGLRenderer({ canvas: el, antialias: true, alpha: true })
     rend.setSize(el.clientWidth, el.clientHeight)
     rend.setPixelRatio(Math.min(devicePixelRatio, 2))

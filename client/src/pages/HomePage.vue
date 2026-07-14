@@ -1,41 +1,40 @@
 <template>
   <div class="home-page">
     <canvas ref="canvasRef" class="particle-bg" />
+    <div class="glow-orb" />
     <div class="overlay">
-      <div class="card">
-        <div class="tabs">
-          <button :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
-          <button :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
-        </div>
-
-        <h1 class="title">星语穹庭</h1>
-        <p class="slogan">有多久没有抬头看星星了？</p>
-
-        <form @submit.prevent="handleSubmit" autocomplete="off">
-          <div class="fields">
-            <div class="input-line">
-              <input v-model="username" type="text" required :placeholder="mode === 'register' ? '设置用户名' : '请输入用户名'" maxlength="20" autocomplete="username" />
-            </div>
-            <div class="input-line">
-              <input v-model="password" type="password" required :placeholder="mode === 'register' ? '设置密码' : '请输入密码'" maxlength="50" autocomplete="current-password" />
-            </div>
-            <div v-if="mode === 'register'" class="input-line">
-              <input v-model="password2" type="password" required placeholder="再次输入密码" maxlength="50" autocomplete="new-password" />
-            </div>
+      <div class="double-outer" :class="{ entered: entered }">
+        <div class="double-inner">
+          <div class="tabs">
+            <button :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
+            <button :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
           </div>
 
-          <p v-if="error" class="error">{{ error }}</p>
+          <h1 class="title">星语穹庭</h1>
+          <p class="slogan">有多久没有抬头看星星了？</p>
 
-          <button type="submit" class="btn-submit" :disabled="loading">
-            <span v-if="loading">请稍候...</span>
-            <span v-else>{{ mode === 'login' ? '进 入 星 空' : '创 建 账 号' }}</span>
-          </button>
-        </form>
+          <form @submit.prevent="handleSubmit" autocomplete="off">
+            <div class="fields">
+              <div class="input-line">
+                <input v-model="username" type="text" required :placeholder="mode === 'register' ? '设置用户名' : '请输入用户名'" maxlength="20" autocomplete="username" />
+              </div>
+              <div class="input-line">
+                <input v-model="password" type="password" required :placeholder="mode === 'register' ? '设置密码' : '请输入密码'" maxlength="50" autocomplete="current-password" />
+              </div>
+              <div v-if="mode === 'register'" class="input-line">
+                <input v-model="password2" type="password" required placeholder="再次输入密码" maxlength="50" autocomplete="new-password" />
+              </div>
+            </div>
+            <p v-if="error" class="error">{{ error }}</p>
+            <button type="submit" class="btn-submit" :disabled="loading">
+              <span v-if="loading">请稍候...</span>
+              <span v-else>{{ mode === 'login' ? '进入星空' : '创建账号' }}</span>
+            </button>
+          </form>
 
-        <div class="footer">
-          <button class="btn-anon" @click="enterAnonymously">
-            <span class="anon-label">等</span>
-          </button>
+          <div class="bottom-text" @click="enterAnonymously">
+            匿 名 浏 览 —— 不 需 登 录
+          </div>
           <p class="stats" v-if="stats">{{ stats.starCount }} 颗星 · {{ stats.totalResonance }} 次共鸣</p>
         </div>
       </div>
@@ -61,9 +60,11 @@ const password2 = ref('')
 const loading = ref(false)
 const error = ref('')
 const stats = ref<{ starCount: number; totalResonance: number } | null>(null)
+const entered = ref(false)
 
 function switchMode(m: 'login' | 'register') {
-  mode.value = m; error.value = ''
+  mode.value = m
+  error.value = ''
 }
 
 async function handleSubmit() {
@@ -94,120 +95,210 @@ async function handleRegister() {
 
 function enterAnonymously() { router.push('/sky') }
 
-onMounted(async () => {
-  try { const res = await fetch('/api/stats'); const json = await res.json(); if (json.code === 200) stats.value = json.data } catch {}
+onMounted(() => {
+  requestAnimationFrame(() => { entered.value = true })
+  fetch('/api/stats')
+    .then(r => r.json())
+    .then(j => { if (j.code === 200) stats.value = j.data })
+    .catch(() => {})
 })
 </script>
 
 <style scoped>
 .home-page {
-  width: 100vw; height: 100dvh; position: relative; overflow: hidden;
-  background: linear-gradient(to bottom, #070816, #10142b);
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  width: 100vw;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  background: #050508;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
+  color: #f6f1ff;
 }
-.particle-bg { position: absolute; inset: 0; z-index: 0; }
-
+.particle-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.glow-orb {
+  position: absolute;
+  width: 80vh;
+  height: 80vh;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 217, 138, 0.06) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
 .overlay {
-  position: relative; z-index: 1;
-  display: flex; align-items: center; justify-content: center;
-  height: 100%; padding: 2rem 1.5rem;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem 1.5rem;
 }
-
-.card {
-  width: 400px; max-width: 100%;
-  background: rgba(16, 20, 43, 0.45);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 217, 138, 0.15);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  padding: 2.2rem 2rem 1.8rem;
+.double-outer {
+  width: 400px;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 217, 138, 0.08);
+  border-radius: 28px;
+  padding: 2px;
+  opacity: 0;
+  transform: translateY(14px);
+  filter: blur(4px);
+  transition: opacity 900ms cubic-bezier(0.32, 0.72, 0, 1),
+              transform 900ms cubic-bezier(0.32, 0.72, 0, 1),
+              filter 900ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-
-/* ── 标签页 ── */
+.double-outer.entered {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+.double-inner {
+  background: rgba(8, 11, 30, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 26px;
+  padding: 2rem 2rem 1.6rem;
+}
 .tabs {
-  display: flex; gap: 0; margin-bottom: 1.8rem;
-  border-radius: 20px; background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.8rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
   padding: 3px;
 }
 .tabs button {
-  flex: 1; padding: 0.42rem 0; border: none; background: transparent;
-  color: rgba(246, 241, 255, 0.38); font-size: 0.88rem; cursor: pointer;
-  border-radius: 18px; transition: all 0.35s ease;
+  flex: 1;
+  padding: 0.42rem 0;
+  border: none;
+  background: transparent;
+  color: rgba(246, 241, 255, 0.35);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-radius: 18px;
+  letter-spacing: 0.06em;
+  transition: all 400ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 .tabs button.active {
-  background: rgba(255, 217, 138, 0.10); color: #ffd98a;
-  box-shadow: 0 0 8px rgba(255, 217, 138, 0.12);
+  background: rgba(255, 217, 138, 0.1);
+  color: #ffd98a;
+  box-shadow: 0 0 8px rgba(255, 217, 138, 0.08);
 }
-.tabs button:hover:not(.active) { color: rgba(246, 241, 255, 0.6); }
-
-/* ── 标题 ── */
+.tabs button:hover:not(.active) {
+  color: rgba(246, 241, 255, 0.6);
+}
 .title {
-  text-align: center; font-size: 2.2rem; font-weight: 700;
-  letter-spacing: 0.15em; color: #f6f1ff; margin: 0 0 0.35rem;
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  margin: 0 0 0.4rem;
+  background: linear-gradient(180deg, #fff 0%, #ffd98a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .slogan {
-  text-align: center; font-size: 0.82rem; color: #b9b4d6;
-  letter-spacing: 0.06em; margin: 0 0 1.8rem;
-  font-weight: 300; line-height: 1.6;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #b9b4d6;
+  letter-spacing: 0.08em;
+  margin: 0 0 1.8rem;
+  font-weight: 300;
+  line-height: 1.8;
 }
-
-/* ── 输入框 —— 极简底边线 ── */
-.fields { margin-bottom: 0.5rem; }
-.input-line { margin-bottom: 0.65rem; position: relative; }
-.input-line::after {
-  content: ''; position: absolute; bottom: 0; left: 50%; translate: -50% 0;
-  width: 0; height: 1px;
-  background: #ffd98a; transition: width 0.4s ease;
-  box-shadow: 0 0 6px rgba(255, 217, 138, 0.6);
+.fields {
+  margin-bottom: 0.6rem;
 }
-.input-line:focus-within::after { width: 100%; }
-
+.input-line {
+  margin-bottom: 0.7rem;
+}
 .input-line input {
-  width: 100%; padding: 0.65rem 0.1rem 0.65rem 0;
-  background: transparent; border: none; border-bottom: 1px solid rgba(246, 241, 255, 0.12);
-  color: #f6f1ff; font-size: 0.92rem; outline: none;
-  transition: border-color 0.4s ease;
+  width: 100%;
+  padding: 0.65rem 0.1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(246, 241, 255, 0.08);
+  color: #f6f1ff;
+  font-size: 0.92rem;
+  outline: none;
+  transition: all 0.5s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.input-line input:focus { border-bottom-color: transparent; }
-.input-line input::placeholder { color: rgba(185, 180, 214, 0.4); }
-
-/* ── 按钮 ── */
+.input-line input::placeholder {
+  color: rgba(185, 180, 214, 0.35);
+}
+.input-line input:focus {
+  border-bottom: 1px solid #ffd98a;
+  box-shadow: 0 4px 14px rgba(255, 217, 138, 0.07);
+}
 .btn-submit {
-  width: 100%; padding: 0.7rem 0; border: none; border-radius: 50px;
-  background: linear-gradient(135deg, rgba(139, 185, 255, 0.25), rgba(255, 217, 138, 0.18));
-  color: #ffd98a; font-size: 0.95rem; font-weight: 600;
-  letter-spacing: 0.1em; cursor: pointer;
-  transition: all 0.4s ease; margin-top: 1.2rem;
+  width: 100%;
+  padding: 0.7rem 0;
+  border: none;
+  border-radius: 50px;
+  background: rgba(255, 217, 138, 0.08);
   border: 1px solid rgba(255, 217, 138, 0.18);
+  color: #ffd98a;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+  margin-top: 1.2rem;
 }
 .btn-submit:hover:not(:disabled) {
-  box-shadow: 0 0 15px rgba(255, 217, 138, 0.5), 0 0 30px rgba(139, 185, 255, 0.15);
+  background: rgba(255, 217, 138, 0.14);
+  box-shadow: 0 0 20px rgba(255, 217, 138, 0.18),
+              inset 0 0 20px rgba(255, 217, 138, 0.04);
+  color: #ffe6b3;
+  transform: translateY(-1px);
 }
-.btn-submit:active:not(:disabled) { transform: scale(0.98); }
-.btn-submit:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* ── 错误 ── */
-.error { color: #ff8b7d; font-size: 0.78rem; margin: 0.5rem 0 0; text-align: center; }
-
-/* ── 底部 ── */
-.footer { display: flex; align-items: center; justify-content: space-between; margin-top: 1.2rem; }
-.btn-anon {
-  width: 38px; height: 38px; border-radius: 50%;
-  border: 1px solid rgba(255, 217, 138, 0.12);
-  background: rgba(255, 217, 138, 0.04);
-  color: #b9b4d6; font-size: 0.85rem; cursor: pointer;
-  transition: all 0.35s ease;
-  display: flex; align-items: center; justify-content: center;
+.btn-submit:active:not(:disabled) {
+  transform: scale(0.985);
 }
-.btn-anon:hover {
-  border-color: rgba(255, 217, 138, 0.35);
-  color: #ffd98a; box-shadow: 0 0 12px rgba(255, 217, 138, 0.2);
+.btn-submit:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
-.stats { color: rgba(185, 180, 214, 0.35); font-size: 0.7rem; margin: 0; letter-spacing: 0.04em; }
-
+.error {
+  color: #ff8b7d;
+  font-size: 0.76rem;
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+.bottom-text {
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 217, 138, 0.3);
+  margin-top: 1.2rem;
+  cursor: pointer;
+  transition: color 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.bottom-text:hover {
+  color: rgba(255, 217, 138, 0.6);
+}
+.stats {
+  color: rgba(246, 241, 255, 0.2);
+  font-size: 0.68rem;
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
 @media (max-width: 480px) {
-  .card { padding: 1.6rem 1.3rem 1.4rem; }
-  .title { font-size: 1.8rem; }
+  .double-inner {
+    padding: 1.5rem 1.3rem 1.3rem;
+  }
+  .title {
+    font-size: 1.8rem;
+    letter-spacing: 0.12em;
+  }
 }
 </style>
