@@ -2,40 +2,49 @@
   <div class="home-page">
     <canvas ref="canvasRef" class="particle-bg" />
     <div class="overlay">
-      <div class="hero">
-        <h1 class="brand">星语穹庭</h1>
-        <p class="tagline">有多久没有抬头看星星了？</p>
-        <p class="desc">把你的故事挂上星空，让心事化作星光</p>
-      </div>
-
-      <div class="form-card">
+      <div class="card">
         <div class="tabs">
-          <button :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button>
-          <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button>
+          <button :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
+          <button :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
         </div>
-        <form @submit.prevent="mode === 'login' ? handleLogin() : handleRegister()">
+
+        <h1 class="title">星语穹庭</h1>
+        <p class="slogan">有多久没有抬头看星星了？</p>
+
+        <form @submit.prevent="handleSubmit" autocomplete="off">
           <div class="fields">
-            <input v-model="username" type="text" placeholder="用户名" maxlength="20" required autocomplete="username" />
-            <input v-model="password" type="password" placeholder="密码" maxlength="50" required autocomplete="current-password" />
-            <input v-if="mode === 'register'" v-model="password2" type="password" placeholder="确认密码" maxlength="50" required autocomplete="new-password" />
+            <div class="input-line">
+              <input v-model="username" type="text" required :placeholder="mode === 'register' ? '设置用户名' : '请输入用户名'" maxlength="20" autocomplete="username" />
+            </div>
+            <div class="input-line">
+              <input v-model="password" type="password" required :placeholder="mode === 'register' ? '设置密码' : '请输入密码'" maxlength="50" autocomplete="current-password" />
+            </div>
+            <div v-if="mode === 'register'" class="input-line">
+              <input v-model="password2" type="password" required placeholder="再次输入密码" maxlength="50" autocomplete="new-password" />
+            </div>
           </div>
+
           <p v-if="error" class="error">{{ error }}</p>
+
           <button type="submit" class="btn-submit" :disabled="loading">
-            {{ loading ? '请稍候...' : (mode === 'login' ? '进入星空' : '创建账号') }}
+            <span v-if="loading">请稍候...</span>
+            <span v-else>{{ mode === 'login' ? '进 入 星 空' : '创 建 账 号' }}</span>
           </button>
         </form>
+
+        <div class="footer">
+          <button class="btn-anon" @click="enterAnonymously">
+            <span class="anon-label">等</span>
+          </button>
+          <p class="stats" v-if="stats">{{ stats.starCount }} 颗星 · {{ stats.totalResonance }} 次共鸣</p>
+        </div>
       </div>
-
-      <div class="divider"><span>或者</span></div>
-      <button class="btn-anon" @click="enterAnonymously">匿名进入 · 不登录</button>
-
-      <p class="footer" v-if="stats">已有 {{ stats.starCount }} 颗历史星 · {{ stats.totalResonance }} 次共鸣</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth } from '../stores/auth'
@@ -52,6 +61,15 @@ const password2 = ref('')
 const loading = ref(false)
 const error = ref('')
 const stats = ref<{ starCount: number; totalResonance: number } | null>(null)
+
+function switchMode(m: 'login' | 'register') {
+  mode.value = m; error.value = ''
+}
+
+async function handleSubmit() {
+  if (mode.value === 'login') await handleLogin()
+  else await handleRegister()
+}
 
 async function handleLogin() {
   error.value = ''
@@ -82,83 +100,114 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-page { width: 100vw; height: 100dvh; position: relative; overflow: hidden; background: #070816; font-family: "Microsoft YaHei","PingFang SC",sans-serif; }
+.home-page {
+  width: 100vw; height: 100dvh; position: relative; overflow: hidden;
+  background: linear-gradient(to bottom, #070816, #10142b);
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
 .particle-bg { position: absolute; inset: 0; z-index: 0; }
-.overlay { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem 1.5rem; pointer-events: none; }
-.overlay > * { pointer-events: auto; }
 
-.hero { text-align: center; margin-bottom: 2.5rem; }
-.brand {
-  font-size: clamp(3.5rem, 8vw, 7rem); font-weight: 800; letter-spacing: 0.04em;
-  background: linear-gradient(180deg, #fff 20%, #ffd98a 60%, #bb8844 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  line-height: 1.05; margin: 0;
-  animation: titlePulse 4s ease-in-out infinite alternate;
-}
-@keyframes titlePulse {
-  from { filter: drop-shadow(0 0 12px rgba(255,217,138,0.25)); }
-  to   { filter: drop-shadow(0 0 28px rgba(255,217,138,0.45)); }
-}
-.tagline {
-  font-size: clamp(1.1rem, 2vw, 1.5rem); color: #c4bfe0; margin: 0.8rem 0 0.3rem;
-  font-weight: 300; letter-spacing: 0.03em; opacity: 0.85;
-}
-.desc {
-  font-size: 0.9rem; color: #6b678a; margin: 0; font-weight: 300;
+.overlay {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; padding: 2rem 1.5rem;
 }
 
-.form-card {
-  background: rgba(12,16,36,0.78); border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 18px; padding: 1.8rem 2rem; width: 360px; max-width: 100%;
-  backdrop-filter: blur(20px);
+.card {
+  width: 400px; max-width: 100%;
+  background: rgba(16, 20, 43, 0.45);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  padding: 2.2rem 2rem 1.8rem;
 }
-.tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-radius: 10px; background: rgba(255,255,255,0.04); padding: 3px; }
+
+/* ── 标签页 ── */
+.tabs {
+  display: flex; gap: 0; margin-bottom: 1.8rem;
+  border-radius: 20px; background: rgba(255, 255, 255, 0.03);
+  padding: 3px;
+}
 .tabs button {
-  flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b678a;
-  font-size: 0.9rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;
+  flex: 1; padding: 0.42rem 0; border: none; background: transparent;
+  color: rgba(246, 241, 255, 0.38); font-size: 0.88rem; cursor: pointer;
+  border-radius: 18px; transition: all 0.35s ease;
 }
-.tabs button.active { background: rgba(255,217,138,0.12); color: #ffd98a; }
-.tabs button:hover:not(.active) { color: #a09bbf; }
-
-.fields input {
-  width: 100%; padding: 0.75rem 0.9rem; margin-bottom: 0.7rem;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px; color: #e8e4ff; font-size: 0.9rem; outline: none;
-  transition: border-color 0.2s;
+.tabs button.active {
+  background: rgba(255, 217, 138, 0.10); color: #ffd98a;
+  box-shadow: 0 0 8px rgba(255, 217, 138, 0.12);
 }
-.fields input:focus { border-color: #ffd98a; background: rgba(255,255,255,0.06); }
-.fields input::placeholder { color: #4a4568; }
+.tabs button:hover:not(.active) { color: rgba(246, 241, 255, 0.6); }
 
-.error { color: #ff7b6d; font-size: 0.78rem; margin: 0 0 0.5rem; }
+/* ── 标题 ── */
+.title {
+  text-align: center; font-size: 2.2rem; font-weight: 700;
+  letter-spacing: 0.15em; color: #f6f1ff; margin: 0 0 0.35rem;
+}
+.slogan {
+  text-align: center; font-size: 0.82rem; color: #b9b4d6;
+  letter-spacing: 0.06em; margin: 0 0 1.8rem;
+  font-weight: 300; line-height: 1.6;
+}
 
+/* ── 输入框 —— 极简底边线 ── */
+.fields { margin-bottom: 0.5rem; }
+.input-line { margin-bottom: 0.65rem; position: relative; }
+.input-line::after {
+  content: ''; position: absolute; bottom: 0; left: 50%; translate: -50% 0;
+  width: 0; height: 1px;
+  background: #ffd98a; transition: width 0.4s ease;
+  box-shadow: 0 0 6px rgba(255, 217, 138, 0.6);
+}
+.input-line:focus-within::after { width: 100%; }
+
+.input-line input {
+  width: 100%; padding: 0.65rem 0.1rem 0.65rem 0;
+  background: transparent; border: none; border-bottom: 1px solid rgba(246, 241, 255, 0.12);
+  color: #f6f1ff; font-size: 0.92rem; outline: none;
+  transition: border-color 0.4s ease;
+}
+.input-line input:focus { border-bottom-color: transparent; }
+.input-line input::placeholder { color: rgba(185, 180, 214, 0.4); }
+
+/* ── 按钮 ── */
 .btn-submit {
-  width: 100%; padding: 0.75rem; border: none; border-radius: 10px;
-  background: #ffd98a; color: #1a1528; font-size: 0.92rem; font-weight: 700;
-  cursor: pointer; transition: all 0.2s; margin-top: 0.3rem;
+  width: 100%; padding: 0.7rem 0; border: none; border-radius: 50px;
+  background: linear-gradient(135deg, rgba(139, 185, 255, 0.25), rgba(255, 217, 138, 0.18));
+  color: #ffd98a; font-size: 0.95rem; font-weight: 600;
+  letter-spacing: 0.1em; cursor: pointer;
+  transition: all 0.4s ease; margin-top: 1.2rem;
+  border: 1px solid rgba(255, 217, 138, 0.18);
 }
-.btn-submit:hover { background: #ffe4a8; }
-.btn-submit:active { transform: scale(0.98); }
-.btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.divider {
-  display: flex; align-items: center; gap: 0.8rem; margin: 1.5rem 0 0.8rem;
-  color: #4a4568; font-size: 0.8rem; width: 360px; max-width: 100%;
+.btn-submit:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(255, 217, 138, 0.5), 0 0 30px rgba(139, 185, 255, 0.15);
 }
-.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+.btn-submit:active:not(:disabled) { transform: scale(0.98); }
+.btn-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ── 错误 ── */
+.error { color: #ff8b7d; font-size: 0.78rem; margin: 0.5rem 0 0; text-align: center; }
+
+/* ── 底部 ── */
+.footer { display: flex; align-items: center; justify-content: space-between; margin-top: 1.2rem; }
 .btn-anon {
-  background: transparent; border: 1px solid rgba(255,255,255,0.06); color: #5b5790;
-  padding: 0.45rem 2rem; border-radius: 20px; font-size: 0.82rem; cursor: pointer;
-  transition: all 0.2s;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid rgba(255, 217, 138, 0.12);
+  background: rgba(255, 217, 138, 0.04);
+  color: #b9b4d6; font-size: 0.85rem; cursor: pointer;
+  transition: all 0.35s ease;
+  display: flex; align-items: center; justify-content: center;
 }
-.btn-anon:hover { border-color: rgba(255,255,255,0.14); color: #8b85c0; }
+.btn-anon:hover {
+  border-color: rgba(255, 217, 138, 0.35);
+  color: #ffd98a; box-shadow: 0 0 12px rgba(255, 217, 138, 0.2);
+}
+.stats { color: rgba(185, 180, 214, 0.35); font-size: 0.7rem; margin: 0; letter-spacing: 0.04em; }
 
-.footer {
-  position: absolute; bottom: 1.2rem; color: #3d3860; font-size: 0.72rem;
-  margin: 0; letter-spacing: 0.03em;
-}
 @media (max-width: 480px) {
-  .form-card { width: 100%; padding: 1.4rem 1.2rem; }
-  .divider { width: 100%; }
+  .card { padding: 1.6rem 1.3rem 1.4rem; }
+  .title { font-size: 1.8rem; }
 }
 </style>
