@@ -3,7 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
-  Raycaster, Vector2,
+  Raycaster, Vector2, Sprite, SpriteMaterial,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -316,19 +316,17 @@ export function useSky(
 
   // ═══ 悬浮高亮辉光 ═══
   const hoverBloomTex = bloomTex('#ffe5a0', 128)
-  const hoverGlowGeo = new BufferGeometry()
-  hoverGlowGeo.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0]), 3))
-  const hoverGlow = new Points(hoverGlowGeo, new PointsMaterial({
-    size: 40,
+  const hoverGlow = new Sprite(new SpriteMaterial({
     map: hoverBloomTex,
     blending: AdditiveBlending,
     depthWrite: false,
     depthTest: false,
     transparent: true,
     opacity: 0,
-    sizeAttenuation: true,
   }))
+  hoverGlow.scale.set(80, 80, 1)
   hoverGlow.renderOrder = 100
+  hoverGlow.visible = false
   scene.add(hoverGlow)
 
   // ═══ 悬浮名称 Tooltip ═══
@@ -395,12 +393,12 @@ export function useSky(
             const pt = (hit.object as Points).geometry.getAttribute('position')
             const ox = pt.getX(hit.index!), oy = pt.getY(hit.index!), oz = pt.getZ(hit.index!)
             const len = Math.sqrt(ox*ox+oy*oy+oz*oz)
-            tooltipLabel.position.set(ox/len * SPHERE_RADIUS, oy/len * SPHERE_RADIUS - 14, oz/len * SPHERE_RADIUS)
+            const nx = ox/len * SPHERE_RADIUS, ny = oy/len * SPHERE_RADIUS, nz = oz/len * SPHERE_RADIUS
+            tooltipLabel.position.set(nx, ny - 14, nz)
             tooltipEl.style.opacity = '1'
-            // 高亮点跟随星星位置
-            const posAttr = hoverGlowGeo.getAttribute('position')
-            posAttr.setXYZ(0, ox, oy, oz)
-            posAttr.needsUpdate = true
+            // 辉光跟随星星
+            hoverGlow.position.set(nx, ny, nz)
+            hoverGlow.visible = true
             hoverGlowTargetOpacity = 0.95
           }
         }
@@ -467,8 +465,12 @@ export function useSky(
     camera.fov = userFov + breath
     camera.updateProjectionMatrix()
     // hover glow opacity lerp
-    const mat = hoverGlow.material as PointsMaterial
-    mat.opacity += (hoverGlowTargetOpacity - mat.opacity) * 0.15
+    const sm = hoverGlow.material as SpriteMaterial
+    sm.opacity += (hoverGlowTargetOpacity - sm.opacity) * 0.2
+    if (sm.opacity < 0.01 && hoverGlowTargetOpacity === 0) {
+      sm.opacity = 0
+      hoverGlow.visible = false
+    }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
