@@ -63,6 +63,9 @@
             >
               <div class="story-head">
                 <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+                <span v-else class="story-sender is-anon">匿名星语</span>
+                <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
                 <button
                   class="resonate-btn"
                   :class="{ done: justResonatedId === story.id }"
@@ -249,6 +252,8 @@ const props = defineProps<{
     type: string
     view_count: number
     origin: string | null
+    username: string | null
+    tag: string | null
   }>
   activeIndex: number
   starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -1192,6 +1197,25 @@ const generatedTags = computed<string[]>(() => {
   transition: color 0.15s, border-color 0.15s;
   padding: 0;
 }
+
+/* ── 发送者 ── */
+.story-sender {
+  display: inline-block; font-size: 0.72rem; color: #7a8cc0;
+  margin-left: auto; opacity: 0.7;
+}
+.story-sender.is-anon { color: #5a5580; }
+
+/* ── 情绪标签色 ── */
+.story-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 500; margin-left: 4px;
+  background: rgba(255,255,255,0.08); color: #7a759c;
+}
+.story-tag.tag-思念 { color: #ff8b7d; }
+.story-tag.tag-等待 { color: #86a8ff; }
+.story-tag.tag-离别 { color: #caa7ff; }
+.story-tag.tag-愿望 { color: #ffd98a; }
+.story-tag.tag-孤独 { color: #95f0c0; }
 .close-btn:hover {
   color: var(--ink);
   border-color: var(--rule-hover);

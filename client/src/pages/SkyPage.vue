@@ -1,5 +1,18 @@
 <template>
   <div class="sky-page">
+    <!-- 导航栏 -->
+    <nav class="sky-nav">
+      <div class="nav-left">
+        <span class="nav-logo">⭐ 星语穹庭</span>
+      </div>
+      <div class="nav-right">
+        <span v-if="username" class="nav-user" @click="$router.push('/profile')">
+          👤 {{ username }}
+        </span>
+        <button v-if="username" class="nav-btn" @click="doLogout">退出</button>
+      </div>
+    </nav>
+
     <SkyCanvas ref="skyRef" @star-click="onStarClick" />
     <div class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
@@ -40,12 +53,33 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
 import StoryForm from '../components/StoryForm.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
+
+const router = useRouter()
+const username = ref('')
+
+onMounted(async () => {
+  fetchStories()
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
+      const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      if (json.code === 200) username.value = json.data.username
+    } catch {}
+  }
+})
+
+function doLogout() {
+  localStorage.removeItem('token')
+  router.push('/')
+}
 
 interface CatalogStar {
   id: number; name: string | null; con: string; mag: number
@@ -60,8 +94,9 @@ interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
   catalog_star_id: number; created_at: string; location_lat: number | null
   location_lng: number | null; type: string; view_count: number; origin: string | null
+  username: string | null; tag: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1, created_at: '', location_lat: null, location_lng: null, type: '', view_count: 0, origin: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1, created_at: '', location_lat: null, location_lng: null, type: '', view_count: 0, origin: null, username: null, tag: null }
 const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
 
 async function fetchStories() {
@@ -73,7 +108,7 @@ async function fetchStories() {
       const cid = s.catalog_star_id
       if (cid != null) {
         if (!map.has(cid)) map.set(cid, [])
-        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonance_count, catalog_star_id: cid, created_at: s.created_at || '', location_lat: s.location_lat ?? null, location_lng: s.location_lng ?? null, type: s.type || 'user', view_count: s.view_count ?? 0, origin: s.origin ?? null })
+        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonance_count, catalog_star_id: cid, created_at: s.created_at || '', location_lat: s.location_lat ?? null, location_lng: s.location_lng ?? null, type: s.type || 'user', view_count: s.view_count ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
       }
     }
     storiesByStarId.value = map
@@ -130,6 +165,23 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: var(--bg); font-family: var(--font); color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
+.sky-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 1.5rem;
+  background: rgba(7,8,22,0.7); backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(48,55,87,0.4);
+}
+.nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
+.nav-right { display: flex; align-items: center; gap: 0.75rem; }
+.nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; }
+.nav-user:hover { color: #f6f1ff; }
+.nav-btn {
+  padding: 0.3rem 0.8rem; border-radius: 8px;
+  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05);
+  color: #7a759c; font-size: 0.8rem; cursor: pointer;
+}
+.nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;
