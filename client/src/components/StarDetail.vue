@@ -108,30 +108,31 @@
         <!-- ─── 详情视图 ─── -->
         <Transition name="detail" mode="out-in">
           <div v-if="detailStory" :key="detailStory.id" class="detail-view">
-          <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
-          <div class="detail-info-bar">
-            <span v-if="detailStory.type === 'history'" class="meta-history">
-              来自星河
-              <template v-if="detailStory.origin"> · {{ detailStory.origin }}</template>
-            </span>
-            <template v-else>
-              <span v-if="formatTime(detailStory.created_at)">{{ formatTime(detailStory.created_at) }}</span>
-              <span v-if="formatTime(detailStory.created_at) && formatDistance(detailStory.location_lat, detailStory.location_lng).text">·</span>
-              <span v-if="formatDistance(detailStory.location_lat, detailStory.location_lng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.location_lat, detailStory.location_lng).near }">{{ formatDistance(detailStory.location_lat, detailStory.location_lng).text }}</span>
-            </template>
-          </div>
-          <div class="detail-body">{{ detailStory.content }}</div>
-          <div class="detail-footer">
-            <button
-              class="resonate-btn detail-resonate"
-              :class="{ done: justResonatedId === detailStory.id }"
-              :disabled="resonating"
-              @click.stop="onResonate(detailStory)"
-            >
-              <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
-              <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
-              <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
-            </button>
+            <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+            <div class="detail-info-bar">
+              <span v-if="detailStory.type === 'history'" class="meta-history">
+                来自星河
+                <template v-if="detailStory.origin"> · {{ detailStory.origin }}</template>
+              </span>
+              <template v-else>
+                <span v-if="formatTime(detailStory.created_at)">{{ formatTime(detailStory.created_at) }}</span>
+                <span v-if="formatTime(detailStory.created_at) && formatDistance(detailStory.location_lat, detailStory.location_lng).text">·</span>
+                <span v-if="formatDistance(detailStory.location_lat, detailStory.location_lng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.location_lat, detailStory.location_lng).near }">{{ formatDistance(detailStory.location_lat, detailStory.location_lng).text }}</span>
+              </template>
+            </div>
+            <div class="detail-body">{{ detailStory.content }}</div>
+            <div class="detail-footer">
+              <button
+                class="resonate-btn detail-resonate"
+                :class="{ done: justResonatedId === detailStory.id }"
+                :disabled="resonating"
+                @click.stop="onResonate(detailStory)"
+              >
+                <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
+              </button>
+            </div>
           </div>
         </Transition>
       </div>
