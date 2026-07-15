@@ -15,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 // 生产环境：托管前端静态文件
-const clientDist = path.resolve(__dirname, '../../client/dist')
+const clientDist = path.resolve(__dirname, '../../../client/dist')
 app.use(express.static(clientDist))
 
 // 健康检查
