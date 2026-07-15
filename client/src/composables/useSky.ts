@@ -122,7 +122,7 @@ export interface SkyAPI {
   zoomIn: () => void
   zoomOut: () => void
   dispose: () => void
-  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number }>) => void
+  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
 }
 
 export function useSky(
@@ -349,10 +349,32 @@ export function useSky(
   }
 
   // ═══ 悬浮 Tooltip ═══
-  const statsCache = new Map<number, { stories: number; resonance: number }>()
+  const statsCache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
   const tooltipEl = document.createElement('div')
-  tooltipEl.style.cssText = 'font-family:Inter,"Microsoft YaHei",sans-serif;font-size:11px;color:#c8c2d8;background:rgba(12,12,28,0.92);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(8px);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s;line-height:1;margin-top:1rem;'
-  tooltipEl.innerHTML = '<div class="tt-name" style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;margin-bottom:4px;"></div><div class="tt-stats" style="display:flex;gap:10px;color:#8a849e;"></div>'
+  tooltipEl.style.cssText = 'font-family:Inter,"Microsoft YaHei",sans-serif;font-size:11px;color:#b0aacc;background:rgba(10,10,26,0.94);padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(10px);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s;line-height:1;margin-top:1rem;box-shadow:0 4px 20px rgba(0,0,0,0.5);'
+  tooltipEl.innerHTML = `
+    <div class="tt-name" style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;margin-bottom:8px;text-align:center;"></div>
+    <div class="tt-row" style="display:flex;gap:14px;margin-bottom:4px;justify-content:center;">
+      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
+      </span>
+      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
+      </span>
+    </div>
+    <div class="tt-row" style="display:flex;gap:14px;justify-content:center;">
+      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
+      </span>
+      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
+      </span>
+    </div>
+  `
   const tooltipLabel = new CSS2DObject(tooltipEl)
   tooltipLabel.position.set(0, 0, 0)
   scene.add(tooltipLabel)
@@ -392,7 +414,7 @@ export function useSky(
       const star = stars[starId]
       if (!star) return hideTooltip()
       const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
-      const statsEl = tooltipEl.querySelector('.tt-stats') as HTMLElement
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
       if (star.name) {
         nameEl.textContent = star.name
       } else {
@@ -402,9 +424,10 @@ export function useSky(
         nameEl.textContent = `${rh}h${String(rm).padStart(2,'0')}m ${ds}${dd}°${String(dm).padStart(2,'0')}′`
       }
       const stats = statsCache.get(star.id)
-      statsEl.innerHTML = stats
-        ? `<span>📖 ${stats.stories}</span><span>💓 ${stats.resonance}</span>`
-        : ''
+      vals[0].textContent = stats ? String(stats.stories) : '0'
+      vals[1].textContent = stats ? String(stats.resonance) : '0'
+      vals[2].textContent = stats ? String(stats.views) : '0'
+      vals[3].textContent = stats ? String(stats.favorites) : '0'
       _w.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld)
       tooltipLabel.position.set(_w.x, _w.y - 50, _w.z)
       hoverGlow.position.set(_w.x, _w.y, _w.z)
@@ -678,7 +701,7 @@ export function useSky(
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
-    setStarStatsCache(cache: Map<number, { stories: number; resonance: number }>) { cache.forEach((v,k) => statsCache.set(k,v)) },
+    setStarStatsCache(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) { cache.forEach((v,k) => statsCache.set(k,v)) },
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()

@@ -32,7 +32,7 @@ onBeforeUnmount(() => {
   sky.value?.dispose()
 })
 
-defineExpose({ sky, setStarStatsCache: (cache: Map<number, { stories: number; resonance: number }>) => sky.value?.setStarStatsCache(cache) })
+defineExpose({ sky, setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => sky.value?.setStarStatsCache(cache) })
 </script>
 
 <style scoped>
