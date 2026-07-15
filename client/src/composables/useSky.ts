@@ -134,6 +134,7 @@ export interface SkyAPI {
   zoomOut: () => void
   dispose: () => void
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
+  updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
 }
 
 export function useSky(
@@ -528,9 +529,14 @@ export function useSky(
   // 注意：不能用 Euler 'YXZ' 因为 THREE.js intrinsic YXZ 实际应用顺序是先 X 后 Y
   // 必须手动构建旋转矩阵 M = Rx(rotX) * Ry(rotY)（先 Y 后 X）
   {
-    const lat = options?.observerLat ?? 39.9
-    const lng = options?.observerLng ?? 116.4
-    const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
+    const lat = options?.observerLat
+    const lng = options?.observerLng
+    if (lat == null || lng == null) {
+      // 没有经纬度时不做地平旋转，保持赤道坐标
+      skyGroup.matrixAutoUpdate = false
+      skyGroup.matrix.identity()
+    } else {
+      const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
     const lstRad = lstHours / 24 * Math.PI * 2
     const latRad = lat * D2R
     const ry = lstRad - Math.PI / 2  // 绕 Y 的旋转角
@@ -548,6 +554,7 @@ export function useSky(
     )
     skyGroup.matrixAutoUpdate = false
     skyGroup.matrix.copy(m)
+    }
   }
 
   // ═══ 相机 ═══
@@ -736,6 +743,27 @@ export function useSky(
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
     setStarStatsCache(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) { cache.forEach((v,k) => statsCache.set(k,v)) },
+    updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
+      if (lat == null || lng == null) {
+        skyGroup.matrix.identity()
+        return
+      }
+      const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
+      const lstRad = lstHours / 24 * Math.PI * 2
+      const latRad = lat * D2R
+      const ry = lstRad - Math.PI / 2
+      const rx = Math.PI / 2 - latRad
+      const cy = Math.cos(ry), sy = Math.sin(ry)
+      const cx = Math.cos(rx), sx = Math.sin(rx)
+      const m = new Matrix4()
+      m.set(
+        cy,      -sx*sy,  cx*sy,  0,
+        0,        cx,      sx,     0,
+        -sy,     -sx*cy,  cx*cy,  0,
+        0,        0,        0,     1,
+      )
+      skyGroup.matrix.copy(m)
+    },
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()

@@ -30,6 +30,11 @@ onMounted(() => {
   })
 })
 
+// 经纬度变化时重新计算天球旋转
+watch(() => [props.observerLat, props.observerLng], () => {
+  sky.value?.updateHorizonRotation(props.observerLat, props.observerLng)
+})
+
 onBeforeUnmount(() => {
   sky.value?.dispose()
 })
