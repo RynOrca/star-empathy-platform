@@ -48,6 +48,16 @@ function raDecXYZ(raH: number, decD: number, R: number) {
   return { x: R * cd * Math.cos(ra), y: R * Math.sin(dec), z: -R * cd * Math.sin(ra) }
 }
 
+// ─── GMST 计算（Meeus 公式，精度 <0.1s） ───
+function gmstHours(date: Date): number {
+  const jd = date.getTime() / 86400000 + 2440587.5
+  const jd0 = Math.floor(jd - 0.5) + 0.5
+  const T = (jd0 - 2451545.0) / 36525.0
+  const gmst0 = 6.697374558 + 0.06570982441908 * (jd0 - 2451545.0) + 0.000025930 * T * T - 0.0000000018 * T * T * T
+  const ut = (jd - jd0) * 24
+  return ((gmst0 + ut * 1.002737909350795) % 24 + 24) % 24
+}
+
 // ─── 黄道坐标 → 赤道坐标 (ε = 23.44°) ───
 const OBLIQUITY = 23.44 * D2R
 function eclipticToRaDec(lonDeg: number): { ra: number; dec: number } {
@@ -517,17 +527,16 @@ export function useSky(
   // 推导：raDecXYZ 中 CCW rotY 将角度从 theta 变为 theta - rotY
   // 要使 RA=LST 的子午线面向相机(-Z=南)，需要 rotY = lstRad - PI/2
   // rotX = PI/2 - latRad 使北天极高度 = 纬度
-  import('astronomy-engine').then((A) => {
-    const now = new Date()
-    const gmstHours: number = A.SiderealTime(now)
-    const lngHours = (options?.observerLng ?? 0) / 15
-    const lstHours = ((gmstHours + lngHours) % 24 + 24) % 24
+  {
+    const lat = options?.observerLat ?? 39.9  // 默认北京纬度
+    const lng = options?.observerLng ?? 116.4 // 默认北京经度
+    const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
     const lstRad = lstHours / 24 * Math.PI * 2
-    const latRad = (options?.observerLat ?? 0) * D2R
+    const latRad = lat * D2R
     skyGroup.rotation.order = 'YXZ'
     skyGroup.rotation.y = lstRad - Math.PI / 2
     skyGroup.rotation.x = Math.PI / 2 - latRad
-  })
+  }
 
   // ═══ 相机 ═══
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
