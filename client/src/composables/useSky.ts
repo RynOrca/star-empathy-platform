@@ -4,7 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
   SphereGeometry, RingGeometry, BackSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -523,19 +523,31 @@ export function useSky(
   }
 
   // ═══ 地平旋转（赤道坐标 → 地平坐标） ═══
-  // 根据 LST 和纬度计算 Euler 角，旋转 skyGroup 使天球正确对齐地平
-  // 推导：raDecXYZ 中 CCW rotY 将角度从 theta 变为 theta - rotY
-  // 要使 RA=LST 的子午线面向相机(-Z=南)，需要 rotY = lstRad - PI/2
-  // rotX = PI/2 - latRad 使北天极高度 = 纬度
+  // 根据 LST 和纬度旋转 skyGroup 使天球正确对齐地平
+  // 旋转顺序：先绕 Y 轴（将 RA=LST 子午线转到 -Z/南方），再绕 X 轴（使 NCP 高度 = 纬度）
+  // 注意：不能用 Euler 'YXZ' 因为 THREE.js intrinsic YXZ 实际应用顺序是先 X 后 Y
+  // 必须手动构建旋转矩阵 M = Rx(rotX) * Ry(rotY)（先 Y 后 X）
   {
-    const lat = options?.observerLat ?? 39.9  // 默认北京纬度
-    const lng = options?.observerLng ?? 116.4 // 默认北京经度
+    const lat = options?.observerLat ?? 39.9
+    const lng = options?.observerLng ?? 116.4
     const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
     const lstRad = lstHours / 24 * Math.PI * 2
     const latRad = lat * D2R
-    skyGroup.rotation.order = 'YXZ'
-    skyGroup.rotation.y = lstRad - Math.PI / 2
-    skyGroup.rotation.x = Math.PI / 2 - latRad
+    const ry = lstRad - Math.PI / 2  // 绕 Y 的旋转角
+    const rx = Math.PI / 2 - latRad  // 绕 X 的旋转角
+    const cy = Math.cos(ry), sy = Math.sin(ry)
+    const cx = Math.cos(rx), sx = Math.sin(rx)
+    // M = Rx * Ry (column-major for THREE.js Matrix4)
+    // 先Y后X: x'=x*cy-z*sy, y'=-sx*sy*x+cx*y-sx*cy*z, z'=cx*sy*x+sx*y+cx*cy*z
+    const m = new Matrix4()
+    m.set(
+      cy,      -sx*sy,  cx*sy,  0,
+      0,        cx,      sx,     0,
+      -sy,     -sx*cy,  cx*cy,  0,
+      0,        0,        0,     1,
+    )
+    skyGroup.matrixAutoUpdate = false
+    skyGroup.matrix.copy(m)
   }
 
   // ═══ 相机 ═══
