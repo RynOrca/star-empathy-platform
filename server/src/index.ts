@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import path from 'path';
 import starsRouter from './routes/stars';
 import authRouter from './routes/auth';
 import statsRouter from './routes/stats';
@@ -12,6 +13,10 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 // 中间件
 app.use(cors());
 app.use(express.json());
+
+// 生产环境：托管前端静态文件
+const clientDist = path.resolve(__dirname, '../../client/dist')
+app.use(express.static(clientDist))
 
 // 健康检查
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -32,6 +37,11 @@ app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// SPA 回退：非 API 路径返回 index.html
+app.get('*', (_req: Request, res: Response) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
 
 // 全局错误处理中间件
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
