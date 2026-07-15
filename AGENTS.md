@@ -92,3 +92,18 @@ npm run preview    # 预览构建产物
 ## 版本管理
 
 Git 仓库已初始化，commit 记录在 `CHANGELOG.md`。每个功能完成请 commit。
+
+## 识图能力
+
+底层模型不具备原生识图能力。遇到图片时用 `vision.js`：
+
+```bash
+node vision.js "<图片路径>" "用中文描述这张图片"
+```
+
+触发场景：用户分享图片路径或 URL、消息中出现截图/附件、要求分析/描述/识别图片内容。
+
+配置：API Key 已写入 `vision.js`，模型默认 `qwen-vl-max`。可通过环境变量覆盖：
+- `VISION_API_KEY` — API Key
+- `VISION_MODEL` — 模型名
+- `VISION_BASE_URL` — API 地址
