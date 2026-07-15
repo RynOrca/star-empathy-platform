@@ -4,7 +4,8 @@
     <nav class="sky-nav">
       <div class="nav-center">
         <div class="search-box">
-          <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" />
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" style="padding-left: 2rem" />
           <div v-if="searchOpen && searchResults.length" class="search-dropdown">
             <div v-for="r in searchResults" :key="r.id" class="search-item" @click="flyToStar(r.id); searchOpen = false; searchQuery = ''">
               <span class="sr-name">{{ r.name || r.conName }}</span>
@@ -220,30 +221,53 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
 .nav-center { flex: 1; display: flex; justify-content: center; }
-.search-box { position: relative; width: 240px; }
-.search-input {
-  width: 100%; padding: 0.35rem 0.8rem; border-radius: 10px;
-  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.06);
-  color: #f6f1ff; font-size: 0.82rem; outline: none;
+.search-box { position: relative; width: 260px; }
+.search-icon {
+  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
+  color: var(--muted-light); pointer-events: none; z-index: 1;
 }
-.search-input:focus { border-color: #ffd98a; background: rgba(255,255,255,0.1); }
-.search-input::placeholder { color: #5a5580; }
+.search-input {
+  width: 100%; padding: 0.45rem 0.9rem; border-radius: var(--radius-lg);
+  border: 1px solid var(--rule); background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: var(--ink); font-size: 0.82rem; outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.search-input:focus {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-glow);
+  background: rgba(255,255,255,0.08);
+}
+.search-input::placeholder { color: var(--muted-light); }
 .search-dropdown {
   position: absolute; top: 110%; left: 0; right: 0;
-  background: rgba(16,20,43,0.98); border: 1px solid rgba(48,55,87,0.5);
-  border-radius: 10px; max-height: 200px; overflow-y: auto; z-index: 30;
+  background: rgba(16,20,43,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--rule); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto; z-index: 30;
 }
+.search-dropdown::-webkit-scrollbar { width: 4px; }
+.search-dropdown::-webkit-scrollbar-track { background: transparent; }
+.search-dropdown::-webkit-scrollbar-thumb { background: rgba(255,217,138,0.2); border-radius: 4px; }
+.search-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(255,217,138,0.4); }
 .search-item {
-  padding: 0.5rem 0.8rem; display: flex; justify-content: space-between;
+  padding: 0.5rem 0.8rem 0.5rem 1.6rem; display: flex; justify-content: space-between;
   align-items: center; cursor: pointer; font-size: 0.8rem;
   border-bottom: 1px solid rgba(48,55,87,0.2);
+  position: relative;
+}
+.search-item::before {
+  content: ''; position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--muted-light); transition: background 0.15s ease;
 }
 .search-item:last-child { border-bottom: none; }
-.search-item:hover { background: rgba(255,255,255,0.06); }
-.search-item.muted { color: #5a5580; cursor: default; padding: 0.6rem 0.8rem; }
-.sr-name { color: #ffd98a; font-weight: 500; }
-.sr-con { color: #7a759c; }
-.sr-mag { color: #5a5580; font-size: 0.7rem; }
+.search-item:hover { background: var(--accent-subtle); }
+.search-item:hover::before { background: var(--accent); }
+.search-item.muted { color: var(--muted-light); cursor: default; padding: 0.6rem 0.8rem 0.6rem 1.6rem; }
+.search-item.muted::before { display: none; }
+.sr-name { color: var(--accent); font-weight: 500; }
+.sr-con { color: var(--ink-secondary); }
+.sr-mag { color: var(--muted-light); font-size: 0.7rem; }
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;
