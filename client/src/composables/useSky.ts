@@ -330,13 +330,14 @@ export function useSky(
     scene.add(mask)
   }
 
-  /* ═══ 东南西北标注 ═══
+  // ═══ 东南西北标注（地平坐标，不随 skyGroup 旋转） ═══
   {
+    // 旋转后: +Z=北, -Z=南, +X=西, -X=东
     const cardinals = [
-      { text: 'N', sub: '北', x: 0, z: -1 },
-      { text: 'S', sub: '南', x: 0, z: 1 },
-      { text: 'E', sub: '东', x: 1, z: 0 },
-      { text: 'W', sub: '西', x: -1, z: 0 },
+      { text: 'N', sub: '北', x: 0, z: 1 },
+      { text: 'S', sub: '南', x: 0, z: -1 },
+      { text: 'E', sub: '东', x: -1, z: 0 },
+      { text: 'W', sub: '西', x: 1, z: 0 },
     ]
     for (const c of cardinals) {
       const el = document.createElement('div')
@@ -359,7 +360,7 @@ export function useSky(
       label.position.set(c.x * SPHERE_RADIUS, 3, c.z * SPHERE_RADIUS)
       scene.add(label)
     }
-  } */
+  }
 
   // ═══ 悬浮 Tooltip ═══
   const statsCache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
@@ -511,10 +512,22 @@ export function useSky(
     })
   }
 
-  // ═══ 地平旋转 ═══
-  // TODO: 需要用 astronomy-engine 的 Rotation_EQD_HOR 正确实现
-  // 当前 raDecXYZ 坐标系与标准 EQJ 有 Y/Z 轴互换差异，直接使用旋转矩阵会得到错误结果
-  // 暂时禁用地平旋转，使用纯赤道坐标系视图
+  // ═══ 地平旋转（赤道坐标 → 地平坐标） ═══
+  // 根据 LST 和纬度计算 Euler 角，旋转 skyGroup 使天球正确对齐地平
+  // 推导：raDecXYZ 中 CCW rotY 将角度从 theta 变为 theta - rotY
+  // 要使 RA=LST 的子午线面向相机(-Z=南)，需要 rotY = lstRad - PI/2
+  // rotX = PI/2 - latRad 使北天极高度 = 纬度
+  import('astronomy-engine').then((A) => {
+    const now = new Date()
+    const gmstHours: number = A.SiderealTime(now)
+    const lngHours = (options?.observerLng ?? 0) / 15
+    const lstHours = ((gmstHours + lngHours) % 24 + 24) % 24
+    const lstRad = lstHours / 24 * Math.PI * 2
+    const latRad = (options?.observerLat ?? 0) * D2R
+    skyGroup.rotation.order = 'YXZ'
+    skyGroup.rotation.y = lstRad - Math.PI / 2
+    skyGroup.rotation.x = Math.PI / 2 - latRad
+  })
 
   // ═══ 相机 ═══
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
