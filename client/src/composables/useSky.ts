@@ -4,7 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
   SphereGeometry, RingGeometry, BackSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -116,6 +116,13 @@ export function useSky(
   options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; observerLat?: number; observerLng?: number }
 ): SkyAPI {
   const scene = new Scene()
+
+  // ═══ 天球组（用于地平旋转） ═══
+  const skyGroup = new Group()
+  scene.add(skyGroup)
+
+  scene.add(new AmbientLight(0xffffff, 0.5))
+
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
   camera.position.set(0,0,0)
 
@@ -169,7 +176,7 @@ export function useSky(
     }))
     pts.userData.tierIndex = t
     starPointsRefs.push(pts)
-    scene.add(pts)
+    skyGroup.add(pts)
   }
 
   // ═══ 星座连线 ═══
@@ -177,7 +184,7 @@ export function useSky(
     const v: number[] = []
     for (const [a,b] of CAT.lines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
     const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    scene.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+    skyGroup.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
   }
 
 
@@ -190,7 +197,7 @@ export function useSky(
       v.push(p.x, p.y, p.z)
     }
     const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    scene.add(new Line(g, new LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.25, depthTest: true, depthWrite: false })))
+    skyGroup.add(new Line(g, new LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.25, depthTest: true, depthWrite: false })))
   }
 
   // ═══ 黄道 (虚线) ═══
@@ -216,8 +223,45 @@ export function useSky(
       })
       const line = new Line(g, mat)
       line.computeLineDistances()
-      scene.add(line)
+      skyGroup.add(line)
     })
+  }
+
+  // ═══ 地平圈 ═══
+  {
+    const lat = options?.observerLat ?? 0
+    if (lat !== 0 || options?.observerLng != null) {
+      // 计算本地恒星时（度）
+      const jd = Date.now() / 86400000 + 2440587.5
+      const gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
+      const lng = options?.observerLng ?? 0
+      const lst = ((gmst + lng) % 360 + 360) % 360
+
+      const latR = lat * D2R
+      const v: number[] = []
+      for (let i = 0; i <= 360; i++) {
+        // 地平圈在赤道坐标系中的位置
+        // 对于每个方位角 H（度），计算对应的 Dec
+        const H = i * D2R
+        const dec = Math.atan2(-Math.cos(H) * Math.cos(latR), Math.sin(latR))
+        const raH = ((lst - i / 15) % 24 + 24) % 24
+        const p = raDecXYZ(raH, dec / D2R, SPHERE_RADIUS)
+        v.push(p.x, p.y, p.z)
+      }
+      const g = new BufferGeometry()
+      g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      const hLine = new Line(g, new LineDashedMaterial({
+        color: 0x446688,
+        dashSize: 4,
+        gapSize: 2,
+        transparent: true,
+        opacity: 0.35,
+        depthTest: true,
+        depthWrite: false,
+      }))
+      hLine.computeLineDistances()
+      skyGroup.add(hLine)
+    }
   }
 
   // ═══ 银河 ═══
@@ -227,7 +271,7 @@ export function useSky(
     g.setAttribute('position', new BufferAttribute(new Float32Array(verts), 3))
     g.setIndex(indices)
     g.computeVertexNormals()
-    scene.add(new Mesh(g, new MeshBasicMaterial({
+    skyGroup.add(new Mesh(g, new MeshBasicMaterial({
       color: 0xaaccff, transparent: true, opacity: 0.12,
       blending: AdditiveBlending, depthWrite: false, depthTest: true, side: 2, // DoubleSide
     })))
@@ -324,6 +368,35 @@ export function useSky(
         options?.onStarClick?.(starId)
       }
     })
+  }
+
+  // ═══ 地平旋转：赤道坐标系 → 地平坐标系 ═══
+  {
+    const lat = options?.observerLat ?? 0
+    const lng = options?.observerLng ?? 0
+    if (lat !== 0 || lng !== 0) {
+      // 计算本地恒星时
+      const jd = Date.now() / 86400000 + 2440587.5
+      const gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
+      const lst = ((gmst + lng) % 360 + 360) % 360
+      const lstRad = lst * D2R
+      const latRad = lat * D2R
+
+      // 旋转天球组：
+      // 1. 绕 Y 轴旋转，将本地子午圈对准相机前方（-Z 方向）
+      //    本地子午圈的 RA = LST，在 raDecXYZ 中角度 = LST*15°
+      //    -Z 方向对应 RA=6h = 90°，所以旋转角 = 90° - LST*15°
+      //    但 raDecXYZ 中 RA 转弧度是 raH/24*2π = raH * π/12
+      //    LST 是度，转弧度：lstRad = lst * π/180
+      //    旋转角 = π/2 - lstRad
+      //
+      // 2. 绕 X 轴旋转，将天北极倾斜到正确仰角
+      //    天北极从 +Y（天顶）倾斜到仰角 = 纬度
+      //    旋转角 = 90° - lat
+      skyGroup.rotation.order = 'YXZ'
+      skyGroup.rotation.y = Math.PI / 2 - lstRad
+      skyGroup.rotation.x = Math.PI / 2 - latRad
+    }
   }
 
   // ═══ 相机 ═══
@@ -458,7 +531,7 @@ export function useSky(
       const mat = new MeshLambertMaterial({ map: createPlanetTexture(planet.name, planet.color) })
       const mesh = new Mesh(geo, mat)
       mesh.position.set(x, y, z)
-      scene.add(mesh)
+      skyGroup.add(mesh)
       // 太阳发���光晕
       if (planet.name === 'Sun') {
         const glowGeo = new SphereGeometry(planet.size * 2.5, 16, 12)
@@ -468,7 +541,7 @@ export function useSky(
         })
         const glow = new Mesh(glowGeo, glowMat)
         glow.position.copy(mesh.position)
-        scene.add(glow)
+        skyGroup.add(glow)
       }
       // 土星环
       if (planet.ringColor) {
@@ -480,7 +553,7 @@ export function useSky(
         const ring = new Mesh(ringGeo, ringMat)
         ring.position.copy(mesh.position)
         ring.rotation.x = Math.PI * 0.45
-        scene.add(ring)
+        skyGroup.add(ring)
       }
       // 标签
       const el = document.createElement('div')
@@ -489,7 +562,7 @@ export function useSky(
       const label = new CSS2DObject(el)
       const len = Math.sqrt(x*x + y*y + z*z)
       label.position.set(x * (1 + 6/len), y * (1 + 6/len), z * (1 + 6/len))
-      scene.add(label)
+      skyGroup.add(label)
     }
   })
 
