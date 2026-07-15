@@ -28,26 +28,28 @@
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
 
-    <!-- 叙事引导栏 -->
-    <div v-if="locationReady" class="guide-bar">
-      <div class="guide-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <span>历史里的星</span>
+    <!-- 三张叙事引导牌 -->
+    <div v-if="locationReady" class="guide-cards">
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <p class="guide-title">历史里的星</p>
+        <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
       </div>
-      <div class="guide-sep"></div>
-      <div class="guide-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        <span>路过别人的星光</span>
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <p class="guide-title">路过别人的星光</p>
+        <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
       </div>
-      <div class="guide-sep"></div>
-      <div class="guide-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-        <span>挂上我的故事</span>
-      </div>
-      <div class="guide-sep"></div>
-      <div class="guide-item guide-action">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-        <span>点开星星，看看故事，书写心事</span>
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        </div>
+        <p class="guide-title">挂上我的故事</p>
+        <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
       </div>
     </div>
 
@@ -376,53 +378,49 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .hint p { margin: 0; }
 .hint p span { opacity: 0.6; }
 
-/* ─── 底部引导栏 ─── */
-.guide-bar {
+/* ─── 叙事引导牌（大号黄色悬浮卡片） ─── */
+.guide-cards {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 15;
+  bottom: 3.2rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.55rem 1rem;
-  background: rgba(7, 8, 22, 0.75);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-top: 1px solid rgba(48, 55, 87, 0.25);
+  gap: 0.75rem;
+  z-index: 15;
   pointer-events: none;
 }
-.guide-item {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--muted-light, #7a759c);
-  font-size: 0.74rem;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
+.guide-card {
+  width: 180px;
+  padding: 1rem 1.1rem 0.85rem;
+  border-radius: var(--radius-lg, 12px);
+  background: rgba(40, 35, 18, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 217, 138, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 24px rgba(255, 200, 80, 0.06);
+  text-align: left;
 }
-.guide-item svg {
-  opacity: 0.5;
-  flex-shrink: 0;
-}
-.guide-sep {
-  width: 1px;
-  height: 12px;
-  background: rgba(48, 55, 87, 0.35);
-  flex-shrink: 0;
-}
-.guide-action {
+.guide-icon {
   color: var(--accent, #ffd98a);
-  opacity: 0.7;
+  margin-bottom: 0.55rem;
+  opacity: 0.85;
 }
-.guide-action svg {
-  opacity: 0.7;
+.guide-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent, #ffd98a);
+  margin: 0 0 0.35rem;
+  letter-spacing: 0.02em;
 }
+.guide-desc {
+  font-size: 0.76rem;
+  line-height: 1.65;
+  color: rgba(246, 241, 255, 0.6);
+  margin: 0;
+}
+
 @media (max-width: 640px) {
-  .guide-bar { gap: 0.3rem; padding: 0.45rem 0.5rem; }
-  .guide-item { font-size: 0.65rem; gap: 0.25rem; }
-  .guide-item svg { width: 13px; height: 13px; }
+  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.5rem; }
+  .guide-card { width: 160px; padding: 0.75rem 0.85rem 0.65rem; }
 }
 </style>
