@@ -488,7 +488,7 @@ export function useSky(
         const d = dx*dx + dy*dy
         if (d < bestDist) { bestDist = d; bestId = sn.id }
       }
-      if (bestDist < 0.0008 && bestId !== -1) {
+      if (bestDist < 0.003 && bestId !== -1) {
         if (bestId !== hoveredStarId) showTooltip(bestId)
       } else {
         hideTooltip()
