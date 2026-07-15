@@ -3,16 +3,18 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
-  SphereGeometry, RingGeometry, BackSide,
+  SphereGeometry, RingGeometry, BackSide, DoubleSide,
   Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
+import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, trueObliquityRad } from '../utils/astro'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
 interface CatData { stars: CatStar[]; lines: [number, number][] }
 import rawCatalog from '../data/stars.json'
+import newLinesData from '../data/new_lines.json'
 import constellationLabels from '../data/constellation_labels.json'
 const CAT = rawCatalog as unknown as CatData
 
@@ -128,18 +130,27 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 }
 
 // ═══════════════════════════════════════════
+export interface ObserverLoc { lat: number; lon: number }
+
 export interface SkyAPI {
   camera: PerspectiveCamera
   zoomIn: () => void
   zoomOut: () => void
   dispose: () => void
+  setObserver: (obs: ObserverLoc | null) => void
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
 }
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; onPlanetClick?: (name: string, nameCN: string) => void; observerLat?: number; observerLng?: number }
+  options?: {
+    onStarClick?: (starId: number) => void
+    onStarHover?: (starId: number | null) => void
+    onPlanetClick?: (name: string, nameCN: string) => void
+    observerLat?: number
+    observerLng?: number
+  }
 ): SkyAPI {
   const scene = new Scene()
 
@@ -207,35 +218,40 @@ export function useSky(
     skyGroup.add(pts)
   }
 
-  // ═══ 悬浮辉光精灵 ═══
+  // ═══ 悬浮高亮辉光（加到 scene，不随 skyGroup 旋转） ═══
+  const hoverBloomTex = bloomTex('#ffe5a0', 128)
   const hoverGlow = new Sprite(new SpriteMaterial({
-    map: bloomTex('#ffffff', 256),
-    blending: AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, opacity: 0,
+    map: hoverBloomTex,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+    opacity: 0,
   }))
-  hoverGlow.scale.set(100, 100, 1)
+  hoverGlow.scale.set(10, 10, 1)
   hoverGlow.renderOrder = 100
   hoverGlow.visible = false
-  skyGroup.add(hoverGlow)
+  scene.add(hoverGlow)
 
   // ═══ 星座连线 ═══
-  if (CAT.lines?.length) {
-    const v: number[] = []
-    for (const [a,b] of CAT.lines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
-    const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    skyGroup.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+  {
+    const allLines: [number, number][] = [...(CAT.lines || []), ...(newLinesData as [number, number][])]
+    if (allLines.length) {
+      const v: number[] = []
+      for (const [a,b] of allLines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
+      const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      // main — muted slate
+      skyGroup.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.28, depthTest:true, depthWrite:false })))
+      // warm-gold glow pass underneath
+      const vg = v.slice()
+      const lg2 = new BufferGeometry(); lg2.setAttribute('position', new BufferAttribute(new Float32Array(vg), 3))
+      const glow = new LineSegments(lg2, new LineBasicMaterial({
+        color:0xffd98a, transparent:true, opacity:0.12, blending:AdditiveBlending, depthWrite:false, depthTest:false,
+      }))
+      glow.scale.setScalar(1.003)
+      skyGroup.add(glow)
+    }
   }
-
-  // ═══ 星座标签 ═══
-  for (const lb of constellationLabels as { con: string; label: string; x: number; y: number; z: number }[]) {
-    const el = document.createElement('div')
-    el.textContent = lb.label
-    el.style.cssText = `font-family:Inter,"Microsoft YaHei",sans-serif;font-size:10px;color:rgba(130,160,200,0.55);letter-spacing:0.08em;white-space:nowrap;pointer-events:none;text-shadow:0 0 6px rgba(80,120,180,0.3);`
-    const label = new CSS2DObject(el)
-    label.position.set(lb.x, lb.y, lb.z)
-    skyGroup.add(label)
-  }
-
-
 
   // ═══ 天赤道 (Dec=0°) ═══
   {
@@ -248,90 +264,66 @@ export function useSky(
     skyGroup.add(new Line(g, new LineBasicMaterial({ color: 0x335577, transparent: true, opacity: 0.25, depthTest: true, depthWrite: false })))
   }
 
-  // ═══ 黄道 (虚线) ═══
+  // ═══ 黄道 (虚线, 当日真黄赤交角, 整圆、下半被地平面挡) ═══
+  let eclipticLine: Line | null = null
+  let eclipticRefreshAccum = 0
   {
-    import('../data/planets').then(async ({ getEclipticToEquatorTransform }) => {
-      const eclToEq = await getEclipticToEquatorTransform()
-      const v: number[] = []
-      for (let i = 0; i <= 360; i++) {
-        const { ra, dec } = eclToEq(i)
-        const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
-        v.push(p.x, p.y, p.z)
-      }
-      const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      g.computeBoundingSphere()
-      const mat = new LineDashedMaterial({
-        color: 0xcc8844,
-        dashSize: 2.5,
-        gapSize: 1.5,
-        transparent: true,
-        opacity: 0.55,
-        depthTest: true,
-        depthWrite: false,
-      })
-      const line = new Line(g, mat)
-      line.computeLineDistances()
-      skyGroup.add(line)
+    const v: number[] = []
+    const base: number[] = []
+    for (let i = 0; i <= 360; i++) {
+      const { ra, dec } = eclipticToRaDecJD(i, new Date())
+      const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
+      v.push(p.x, p.y, p.z)
+      base.push(p.x, p.y, p.z)
+    }
+    const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+    g.computeBoundingSphere()
+    const mat = new LineDashedMaterial({
+      color: 0xcc8844,
+      dashSize: 2.5,
+      gapSize: 1.5,
+      transparent: true,
+      opacity: 0.55,
+      depthTest: true,
+      depthWrite: false,
     })
+    const line = new Line(g, mat)
+    ;(line.userData as { basePos?: Float32Array }).basePos = new Float32Array(base)
+    line.computeLineDistances()
+    skyGroup.add(line)
+    eclipticLine = line
   }
 
-  /* ═══ 地平圈 ═══
-  {
-    const lat = options?.observerLat ?? 0
-    if (lat !== 0 || options?.observerLng != null) {
-      // 计算本地恒星时（度）
-      const jd = Date.now() / 86400000 + 2440587.5
-      const gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
-      const lng = options?.observerLng ?? 0
-      const lst = ((gmst + lng) % 360 + 360) % 360
-
-      const latR = lat * D2R
-      const v: number[] = []
-      for (let i = 0; i <= 360; i++) {
-        // 地平圈在赤道坐标系中的位置
-        // 对于每个方位角 H（度），计算对应的 Dec
-        const H = i * D2R
-        const dec = Math.atan2(-Math.cos(H) * Math.cos(latR), Math.sin(latR))
-        const raH = ((lst - i / 15) % 24 + 24) % 24
-        const p = raDecXYZ(raH, dec / D2R, SPHERE_RADIUS)
-        v.push(p.x, p.y, p.z)
-      }
-      const g = new BufferGeometry()
-      g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      const hLine = new Line(g, new LineDashedMaterial({
-        color: 0x446688,
-        dashSize: 4,
-        gapSize: 2,
-        transparent: true,
-        opacity: 0.35,
-        depthTest: true,
-        depthWrite: false,
-      }))
-      hLine.computeLineDistances()
-      skyGroup.add(hLine)
-    }
-  } */
-
-  // ═══ 银河 ═══
+  // ═══ 银河 ribbon ═══
   {
     const { verts, indices } = milkyWayRibbon(SPHERE_RADIUS, 22, 360)
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array(verts), 3))
     g.setIndex(indices)
     g.computeVertexNormals()
-    skyGroup.add(new Mesh(g, new MeshBasicMaterial({
-      color: 0xaaccff, transparent: true, opacity: 0.12,
-      blending: AdditiveBlending, depthWrite: false, depthTest: true, side: 2, // DoubleSide
+    const mwMesh = new Mesh(g, new MeshBasicMaterial({
+      color: 0x8bb9ff, transparent: true, opacity: 0.09,
+      blending: AdditiveBlending, depthWrite: false, depthTest: true, side: DoubleSide,
+    }))
+    skyGroup.add(mwMesh)
+    // warm-gold inner band (brighter core of the ribbon)
+    const core = milkyWayRibbon(SPHERE_RADIUS, 7, 360)
+    const cg = new BufferGeometry()
+    cg.setAttribute('position', new BufferAttribute(new Float32Array(core.verts), 3))
+    cg.setIndex(core.indices)
+    skyGroup.add(new Mesh(cg, new MeshBasicMaterial({
+      color: 0xffd98a, transparent: true, opacity: 0.10,
+      blending: AdditiveBlending, depthWrite: false, depthTest: false, side: DoubleSide,
     })))
   }
 
-  // ═══ 地平面以下暖色滤镜 ═══
+  // ═══ 地平面以下暖色区分 ═══
   {
     const maskGeo = new SphereGeometry(SPHERE_RADIUS * 1.001, 64, 32, 0, Math.PI*2, Math.PI/2, Math.PI/2)
     const maskMat = new MeshBasicMaterial({
-      color: 0xb07890,
+      color: 0x2a1e3a,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.65,
       side: BackSide,
       depthWrite: false,
       depthTest: false,
@@ -341,9 +333,29 @@ export function useSky(
     scene.add(mask)
   }
 
-  // ═══ 东南西北标注（地平坐标，不随 skyGroup 旋转） ═══
+  // ═══ 星座名称标签 ═══
   {
-    // 旋转后: +Z=北, -Z=南, +X=西, -X=东
+    for (const cl of constellationLabels) {
+      const el = document.createElement('div')
+      el.textContent = cl.label
+      el.style.cssText = [
+        'color:rgba(102,119,170,0.6)',
+        'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
+        'font-size:10px',
+        'font-weight:300',
+        'letter-spacing:0.12em',
+        'white-space:nowrap',
+        'pointer-events:none',
+      ].join(';')
+      const label = new CSS2DObject(el)
+      label.position.set(cl.x, cl.y, cl.z)
+      skyGroup.add(label)
+    }
+  }
+
+  // ═══ 东南西北标注（地平坐标，不随 skyGroup 旋转） ═══
+  // skyGroup Matrix4 旋转后: +Z=北, -Z=南, +X=西, -X=东
+  {
     const cardinals = [
       { text: 'N', sub: '北', x: 0, z: 1 },
       { text: 'S', sub: '南', x: 0, z: -1 },
@@ -375,38 +387,61 @@ export function useSky(
 
   // ═══ 悬浮 Tooltip ═══
   const statsCache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+
   const tooltipEl = document.createElement('div')
-  tooltipEl.style.cssText = 'font-family:Inter,"Microsoft YaHei",sans-serif;font-size:11px;color:#b0aacc;background:rgba(10,10,26,0.94);padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(10px);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s;line-height:1;margin-top:1rem;box-shadow:0 4px 20px rgba(0,0,0,0.5);'
+  tooltipEl.className = 'star-tooltip'
   tooltipEl.innerHTML = `
-    <div class="tt-name" style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;margin-bottom:8px;text-align:center;"></div>
-    <div class="tt-row" style="display:flex;gap:14px;margin-bottom:4px;justify-content:center;">
-      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
-      </span>
-      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
-      </span>
+    <div class="tt-name"></div>
+    <div class="tt-row">
+      <span class="tt-stat" title="故事"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><em class="tt-val">0</em></span>
+      <span class="tt-stat" title="共鸣"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><em class="tt-val">0</em></span>
     </div>
-    <div class="tt-row" style="display:flex;gap:14px;justify-content:center;">
-      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
-      </span>
-      <span class="tt-stat" style="display:flex;align-items:center;gap:4px;color:#8a849e;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <em class="tt-val" style="font-style:normal;font-weight:500;color:#c8c2d8;min-width:14px;">0</em>
-      </span>
+    <div class="tt-row">
+      <span class="tt-stat" title="访问"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><em class="tt-val">0</em></span>
+      <span class="tt-stat" title="收藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><em class="tt-val">0</em></span>
     </div>
   `
+  // 注入 tooltip 样式
+  const ttStyle = document.createElement('style')
+  ttStyle.textContent = `
+    .star-tooltip {
+      font-family:"Inter","Microsoft YaHei",system-ui,sans-serif;
+      font-size:11px; color:#c8c2d8;
+      background:rgba(12,12,28,0.92);
+      padding:8px 12px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.06);
+      backdrop-filter:blur(8px);
+      white-space:nowrap; pointer-events:none;
+      opacity:0; transition:opacity 0.15s;
+      line-height:1;
+      margin-top: 1rem;
+    }
+    .star-tooltip .tt-name {
+      font-size:13px; font-weight:600;
+      color:#ffd98a; margin-bottom:6px;
+      letter-spacing:0.02em;
+    }
+    .star-tooltip .tt-row {
+      display:flex; gap:10px; margin-bottom:3px;
+    }
+    .star-tooltip .tt-row:last-child { margin-bottom:0; }
+    .star-tooltip .tt-stat {
+      display:flex; align-items:center; gap:3px;
+      color:#8a849e;
+    }
+    .star-tooltip .tt-stat svg { opacity:0.7; flex-shrink:0; }
+    .star-tooltip .tt-val {
+      font-style:normal; font-weight:500;
+      color:#b0aacc; min-width:12px;
+    }
+  `
+  document.head.appendChild(ttStyle)
   const tooltipLabel = new CSS2DObject(tooltipEl)
   tooltipLabel.position.set(0, 0, 0)
   scene.add(tooltipLabel)
 
-  // ═══ 点击 + 悬停检测 ═══
+  // ═══ 点击检测 + 悬浮检测 ═══
   {
-    const raycaster = new Raycaster()
     const mouse = new Vector2()
     const _v = new Vector3()
     const _w = new Vector3()
@@ -415,110 +450,126 @@ export function useSky(
     let hoveredStarId = -1
     let hoverCheckTimer = 0
 
-    // 预计算所有星的归一化屏幕投影方向
-    const starScreenNorms: { id: number; nx: number; ny: number; nz: number }[] = []
+    // 预计算所有星的归一化位置（用于屏幕投影）
+    const allStarNorms: { id: number; nx: number; ny: number; nz: number }[] = []
     const starNormMap = new Map<number, { nx: number; ny: number; nz: number }>()
     for (const s of stars) {
       const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
       if (len > 0) {
         const norm = { id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len }
-        starScreenNorms.push(norm)
+        allStarNorms.push(norm)
         starNormMap.set(s.id, norm)
       }
     }
 
-    function hideTooltip() {
-      tooltipEl.style.opacity = '0'
-      hoverGlow.visible = false
-      hoveredStarId = -1
-      options?.onStarHover?.(null)
-    }
-
-    function showTooltip(starId: number) {
+    // tooltip 内容更新函数
+    let _lastStatsKey = ''
+    function updateTooltipContent(starId: number) {
       const star = stars[starId]
-      if (!star) return hideTooltip()
+      if (!star) return
       const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
       const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
-      if (star.name) {
-        nameEl.textContent = star.name
-      } else {
-        const rh = Math.floor(star.ra), rm = Math.floor((star.ra - rh) * 60)
-        const ds = star.dec >= 0 ? '+' : '-'
-        const dd = Math.floor(Math.abs(star.dec)), dm = Math.floor((Math.abs(star.dec) - dd) * 60)
-        nameEl.textContent = `${rh}h${String(rm).padStart(2,'0')}m ${ds}${dd}°${String(dm).padStart(2,'0')}′`
-      }
+      const rh = Math.floor(star.ra)
+      const rm = Math.floor((star.ra - rh) * 60)
+      const ds = star.dec >= 0 ? '+' : '-'
+      const dd = Math.floor(Math.abs(star.dec))
+      const dm = Math.floor((Math.abs(star.dec) - dd) * 60)
+      nameEl.textContent = star.name || `${rh}h${String(rm).padStart(2,'0')}m · ${ds}${dd}°${String(dm).padStart(2,'0')}′`
       const stats = statsCache.get(star.id)
       vals[0].textContent = stats ? String(stats.stories) : '0'
       vals[1].textContent = stats ? String(stats.resonance) : '0'
       vals[2].textContent = stats ? String(stats.views) : '0'
       vals[3].textContent = stats ? String(stats.favorites) : '0'
-      // 用星的实际坐标（已在 skyGroup 内），经过 matrixWorld 变换后设置位置
+      _lastStatsKey = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
+      // tooltip + hoverGlow 位置（通过 skyGroup.matrixWorld 变换到世界坐标）
       const sn = starNormMap.get(starId)
       if (sn) {
-        const wx = sn.nx * SPHERE_RADIUS, wy = sn.ny * SPHERE_RADIUS, wz = sn.nz * SPHERE_RADIUS
-        _w.set(wx, wy, wz).applyMatrix4(skyGroup.matrixWorld)
+        _w.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld)
         tooltipLabel.position.set(_w.x, _w.y - 50, _w.z)
         hoverGlow.position.set(_w.x, _w.y, _w.z)
       }
       tooltipEl.style.opacity = '1'
       hoverGlow.visible = true
-      ;(hoverGlow.material as SpriteMaterial).opacity = 1.0
-      hoveredStarId = starId
+      hoverGlowTargetOpacity = 0.95
       options?.onStarHover?.(starId)
+    }
+    function refreshTooltipStats(starId: number) {
+      const stats = statsCache.get(starId)
+      const key = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
+      if (key === _lastStatsKey) return // 没变化
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+      vals[0].textContent = stats ? String(stats.stories) : '0'
+      vals[1].textContent = stats ? String(stats.resonance) : '0'
+      vals[2].textContent = stats ? String(stats.views) : '0'
+      vals[3].textContent = stats ? String(stats.favorites) : '0'
+      _lastStatsKey = key
     }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
+      // 给拖动标记距离，由 pointerup 判读是否是点击
       if (dragging) {
         const dx = e.clientX - px, dy = e.clientY - py
         if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
-        hideTooltip(); return
       }
+
+      // 始终更新 mouse 坐标
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      // 悬浮检测（节流 80ms）
       const now = performance.now()
       if (now - hoverCheckTimer < 80) return
       hoverCheckTimer = now
-      const rect = canvas.getBoundingClientRect()
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      // 屏幕空间投影（考虑 skyGroup 旋转）
+
+      // 用屏幕投影找最近的星（考虑 skyGroup 旋转）
       skyGroup.updateMatrixWorld()
       camera.updateMatrixWorld()
-      let bestDist = Infinity, bestId = -1, bestNx = 0, bestNy = 0, bestNz = 0
-      for (const sn of starScreenNorms) {
-        _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
-        _v.applyMatrix4(skyGroup.matrixWorld)
-        _v.project(camera)
-        if (_v.z > 1) continue
-        const dx = _v.x - mouse.x, dy = _v.y - mouse.y
+      camera.updateProjectionMatrix()
+      let bestDist = Infinity
+      let bestId = -1
+      let bestNx = 0, bestNy = 0, bestNz = 0
+      for (const sn of allStarNorms) {
+        _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld).project(camera)
+        if (_v.z > 1) continue // 在相机后面
+        const dx = _v.x - mouse.x
+        const dy = _v.y - mouse.y
         const d = dx*dx + dy*dy
-        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = _v.x; bestNy = _v.y; bestNz = _v.z }
+        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
       }
-      if (bestDist < 0.003 && bestId !== -1) {
-        if (bestId !== hoveredStarId) showTooltip(bestId)
-      } else {
-        hideTooltip()
+      // 阈值
+      if (bestDist < 0.0015 && bestId !== -1) {
+        if (bestId !== hoveredStarId) {
+          hoveredStarId = bestId
+          updateTooltipContent(bestId)
+        } else {
+          // 同一颗星：检查 stats 是否有更新
+          refreshTooltipStats(bestId)
+        }
+      } else if (hoveredStarId !== -1) {
+        hoveredStarId = -1
+        tooltipEl.style.opacity = '0'
+        hoverGlowTargetOpacity = 0
+        options?.onStarHover?.(null)
       }
     })
-    canvas.addEventListener('pointerleave', hideTooltip)
     canvas.addEventListener('pointerup', (e) => {
-      if (clickDrag) return
-      const rect = canvas.getBoundingClientRect()
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const hits = raycaster.intersectObjects(starPointsRefs)
-      if (hits.length) {
-        const hit = hits[0]
-        const tierIdx = hit.object.userData.tierIndex as number
-        const starId = tierStarIds[tierIdx][hit.index!]
-        options?.onStarClick?.(starId)
+      if (clickDrag) return // 是拖动不是点击
+      if (hoveredStarId !== -1) {
+        options?.onStarClick?.(hoveredStarId)
       }
       // 检测行星点击
-      if (!hits.length && planetMeshes.length) {
-        const planetHits = raycaster.intersectObjects(planetMeshes)
-        if (planetHits.length) {
-          const pm = planetHits[0].object as Mesh
+      if (hoveredStarId === -1 && planetMeshes.length) {
+        const rect = canvas.getBoundingClientRect()
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+        const raycaster = new Raycaster()
+        raycaster.setFromCamera(mouse, camera)
+        raycaster.params.Points!.threshold = 8
+        const hits = raycaster.intersectObjects(planetMeshes)
+        if (hits.length) {
+          const pm = hits[0].object as Mesh
           const pd = pm.userData as { planetName: string; planetNameCN: string }
           if (pd.planetName) {
             options?.onPlanetClick?.(pd.planetName, pd.planetNameCN)
@@ -531,7 +582,6 @@ export function useSky(
   // ═══ 地平旋转（赤道坐标 → 地平坐标） ═══
   // 根据 LST 和纬度旋转 skyGroup 使天球正确对齐地平
   // 旋转顺序：先绕 Y 轴（将 RA=LST 子午线转到 -Z/南方），再绕 X 轴（使 NCP 高度 = 纬度）
-  // 注意：不能用 Euler 'YXZ' 因为 THREE.js intrinsic YXZ 实际应用顺序是先 X 后 Y
   // 必须手动构建旋转矩阵 M = Rx(rotX) * Ry(rotY)（先 Y 后 X）
   {
     const lat = options?.observerLat
@@ -542,29 +592,48 @@ export function useSky(
       skyGroup.matrix.identity()
     } else {
       const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
-    const lstRad = lstHours / 24 * Math.PI * 2
-    const latRad = lat * D2R
-    const ry = lstRad - Math.PI / 2  // 绕 Y 的旋转角
-    const rx = Math.PI / 2 - latRad  // 绕 X 的旋转角
-    const cy = Math.cos(ry), sy = Math.sin(ry)
-    const cx = Math.cos(rx), sx = Math.sin(rx)
-    // M = Rx * Ry (column-major for THREE.js Matrix4)
-    // 先Y后X: x'=x*cy-z*sy, y'=-sx*sy*x+cx*y-sx*cy*z, z'=cx*sy*x+sx*y+cx*cy*z
-    const m = new Matrix4()
-    m.set(
-      cy,      -sx*sy,  cx*sy,  0,
-      0,        cx,      sx,     0,
-      -sy,     -sx*cy,  cx*cy,  0,
-      0,        0,        0,     1,
-    )
-    skyGroup.matrixAutoUpdate = false
-    skyGroup.matrix.copy(m)
+      const lstRad = lstHours / 24 * Math.PI * 2
+      const latRad = lat * D2R
+      const ry = lstRad - Math.PI / 2  // 绕 Y 的旋转角
+      const rx = Math.PI / 2 - latRad  // 绕 X 的旋转角
+      const cy = Math.cos(ry), sy = Math.sin(ry)
+      const cx = Math.cos(rx), sx = Math.sin(rx)
+      // M = Rx * Ry (column-major for THREE.js Matrix4)
+      const m = new Matrix4()
+      m.set(
+        cy,      -sx*sy,  cx*sy,  0,
+        0,        cx,      sx,     0,
+        -sy,     -sx*cy,  cx*cy,  0,
+        0,        0,        0,     1,
+      )
+      skyGroup.matrixAutoUpdate = false
+      skyGroup.matrix.copy(m)
     }
   }
 
   // ═══ 相机 ═══
+  let baseRotX = 0.3, baseRotY = 0                 // 由 observer/lst 算出的「基础朝向」
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
   let userFov = DEFAULT_FOV
+  let observer: ObserverLoc | null = null
+  let lstRefDeg = 0                                 // 设定 observer 时的 LST，用于实时自转
+
+  /** 根据当前地点+真实时刻刷新基础朝向 */
+  function applyObserverRotation(now = new Date()) {
+    if (!observer) return
+    const jd = dateToJD(now)
+    const lst = lstDeg(jd, observer.lon)
+    const euler = orientationEuler(observer.lat, lst)
+    baseRotX = euler.rotX
+    baseRotY = euler.rotY
+    lstRefDeg = lst
+    camera.rotation.set(baseRotX + rotX - 0.3, baseRotY + rotY, 0, 'YXZ')
+  }
+
+  function setObserver(obs: ObserverLoc | null) {
+    observer = obs
+    if (obs) applyObserverRotation()
+  }
 
   canvas.addEventListener('pointerdown', (e) => {
     dragging = true; px = e.clientX; py = e.clientY; canvas.setPointerCapture(e.pointerId)
@@ -574,7 +643,7 @@ export function useSky(
     rotY += (e.clientX - px) * 0.004
     rotX += (e.clientY - py) * 0.004
     rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
-    camera.rotation.set(rotX, rotY, 0, 'YXZ')
+    if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
     px = e.clientX; py = e.clientY
   })
   canvas.addEventListener('pointerup', (e) => { dragging = false; canvas.releasePointerCapture(e.pointerId) })
@@ -592,7 +661,6 @@ export function useSky(
     renderer.setSize(canvas.clientWidth, canvas.clientHeight)
     labelRenderer.setSize(canvas.clientWidth, canvas.clientHeight)
   })
-
 
   // ═══ 太阳系行星 ═══
   import('../data/planets').then(async ({ planets, getBodyPosition }) => {
@@ -697,7 +765,7 @@ export function useSky(
       skyGroup.add(mesh)
       mesh.userData = { planetName: planet.name, planetNameCN: planet.nameCN }
       planetMeshes.push(mesh)
-      // 太阳发���光晕
+      // 太阳发光光晕
       if (planet.name === 'Sun') {
         const glowGeo = new SphereGeometry(planet.size * 2.5, 16, 12)
         const glowMat = new MeshBasicMaterial({
@@ -733,21 +801,71 @@ export function useSky(
 
   // ═══ 渲染 ═══
   let af = 0
+  let hoverGlowTargetOpacity = 0
+  let lstSyncAccum = 0
   function animate() {
     af = requestAnimationFrame(animate)
-    camera.fov = userFov
     camera.updateProjectionMatrix()
+
+    // 实时恒星漂移：按真实恒星时与基础 LST 的差修正 rotY
+    if (observer) {
+      lstSyncAccum += 16
+      if (lstSyncAccum >= 5000) {
+        lstSyncAccum = 0
+        const jd = dateToJD(new Date())
+        const cur = lstDeg(jd, observer.lon)
+        let d = cur - lstRefDeg
+        if (d > 180) d -= 360
+        if (d < -180) d += 360
+        baseRotY = -(cur / 15) * D2R
+        lstRefDeg = cur
+      }
+      // 基础朝向 + 用户拖动偏移
+      camera.rotation.set(
+        baseRotX + (rotX - 0.3),
+        baseRotY + rotY,
+        0,
+        'YXZ',
+      )
+      // 每日同步一次黄道顶点（岁差 + 真黄赤交角年变化，约 0.003°/年）
+      eclipticRefreshAccum += 16
+      if (eclipticRefreshAccum > 1000 * 60 * 60 * 24 && eclipticLine) {
+        eclipticRefreshAccum = 0
+        const now = new Date()
+        const v: number[] = []
+        for (let i = 0; i <= 360; i++) {
+          const { ra, dec } = eclipticToRaDecJD(i, now)
+          const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
+          v.push(p.x, p.y, p.z)
+        }
+        const next = new Float32Array(v)
+        ;(eclipticLine.userData as { basePos: Float32Array }).basePos = next
+        eclipticLine.geometry.setAttribute('position', new BufferAttribute(next, 3))
+        eclipticLine.geometry.computeBoundingSphere()
+        eclipticLine.computeLineDistances()
+      }
+    }
+    // hover glow opacity lerp
+    const sm = hoverGlow.material as SpriteMaterial
+    sm.opacity += (hoverGlowTargetOpacity - sm.opacity) * 0.2
+    if (sm.opacity < 0.01 && hoverGlowTargetOpacity === 0) {
+      sm.opacity = 0
+      hoverGlow.visible = false
+    }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
   animate()
-  camera.rotation.set(rotX, rotY, 0, 'YXZ')
+  if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
 
   return {
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
-    setStarStatsCache(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) { cache.forEach((v,k) => statsCache.set(k,v)) },
+    setObserver,
+    setStarStatsCache(cache) {
+      cache.forEach((v, k) => statsCache.set(k, v))
+    },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
       if (lat == null || lng == null) {
         skyGroup.matrix.identity()
@@ -772,6 +890,8 @@ export function useSky(
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()
+      ttStyle.remove()
+      ;(labelRenderer as unknown as { dispose: () => void }).dispose()
       renderer.dispose()
       scene.clear()
     },
