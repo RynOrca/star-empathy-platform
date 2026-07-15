@@ -3,6 +3,7 @@ import {
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
+  Raycaster, Vector2,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -111,7 +112,7 @@ export interface SkyAPI {
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void }
+  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; observerLat?: number; observerLng?: number }
 ): SkyAPI {
   const scene = new Scene()
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
@@ -275,7 +276,7 @@ export function useSky(
     }
   }
 
-  // ═══ 点击检测 ═══
+  // ═══ 点击 + 悬停检测 ═══
   {
     const raycaster = new Raycaster()
     const mouse = new Vector2()
@@ -284,10 +285,24 @@ export function useSky(
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
-      // 给拖动标记距离，由 pointerup 判读是否是点击
       if (dragging) {
         const dx = e.clientX - px, dy = e.clientY - py
         if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
+      }
+      if (!options?.onStarHover) return
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(mouse, camera)
+      raycaster.params.Points!.threshold = 8
+      const hits = raycaster.intersectObjects(starPointsRefs)
+      if (hits.length) {
+        const hit = hits[0]
+        const tierIdx = hit.object.userData.tierIndex as number
+        const starId = tierStarIds[tierIdx][hit.index!]
+        options.onStarHover(starId)
+      } else {
+        options.onStarHover(null)
       }
     })
     canvas.addEventListener('pointerup', (e) => {
