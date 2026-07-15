@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, guestLogin, getUserById } from '../services/userService';
+import { register, login, guestLogin, getUserById, updateSignature } from '../services/userService';
 import { authRequired } from '../middleware/auth';
 
 const router = Router();
@@ -51,6 +51,21 @@ router.get('/me', authRequired, (req: Request, res: Response) => {
   const info = getUserById(user.id);
   if (!info) return res.status(404).json({ code: 404, message: '用户不存在', data: null });
   res.json({ code: 200, message: 'success', data: info });
+});
+
+// 更新签名
+router.patch('/signature', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const { signature } = req.body;
+    if (typeof signature !== 'string') {
+      return res.status(400).json({ code: 400, message: '签名需为字符串', data: null });
+    }
+    const updated = updateSignature(user.id, signature);
+    res.json({ code: 200, message: '签名已更新', data: updated });
+  } catch (error: any) {
+    res.status(500).json({ code: 500, message: error.message || '更新失败', data: null });
+  }
 });
 
 export default router;

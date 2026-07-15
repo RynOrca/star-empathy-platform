@@ -10,6 +10,7 @@ db.exec(`
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    signature     TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -50,6 +51,7 @@ db.exec(`
 `);
 
 // 兼容旧数据库：添加新列
+try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lat REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lng REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0'); } catch {}

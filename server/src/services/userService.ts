@@ -6,11 +6,12 @@ import { JWT_SECRET } from '../middleware/auth';
 interface User {
   id: number;
   username: string;
+  signature: string | null;
   created_at: string;
 }
 
 function publicUser(u: User) {
-  return { id: u.id, username: u.username, created_at: u.created_at };
+  return { id: u.id, username: u.username, signature: u.signature || '', created_at: u.created_at };
 }
 
 function signToken(user: User) {
@@ -24,7 +25,7 @@ export function register(username: string, password: string): { user: ReturnType
   if (existing) throw new Error('用户名已存在');
   const hash = bcrypt.hashSync(password, 10);
   const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
-  const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as unknown as User;
+  const user = db.prepare('SELECT id, username, signature, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as unknown as User;
   return { user: publicUser(user), token: signToken(user) };
 }
 
@@ -48,12 +49,19 @@ export function guestLogin(): { user: ReturnType<typeof publicUser>; token: stri
   // 不存在则自动创建
   const hash = bcrypt.hashSync(GUEST_PASSWORD, 10)
   const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(GUEST_USERNAME, hash)
-  const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as unknown as User
+  const user = db.prepare('SELECT id, username, signature, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as unknown as User
   return { user: publicUser(user), token: signToken(user) }
 }
 
 // 获取用户信息
 export function getUserById(id: number): ReturnType<typeof publicUser> | null {
-  const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(id) as unknown as User | undefined;
+  const user = db.prepare('SELECT id, username, signature, created_at FROM users WHERE id = ?').get(id) as unknown as User | undefined;
   return user ? publicUser(user) : null;
+}
+
+// 更新签名
+export function updateSignature(id: number, signature: string): ReturnType<typeof publicUser> | null {
+  const trimmed = signature.trim().slice(0, 30)
+  db.prepare('UPDATE users SET signature = ? WHERE id = ?').run(trimmed, id)
+  return getUserById(id)
 }
