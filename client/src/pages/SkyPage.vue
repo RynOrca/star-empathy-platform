@@ -19,7 +19,7 @@
         </div>
       </div>
       <div class="nav-right">
-        <span v-if="username" class="nav-user" @click="$router.push('/profile')">
+        <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
           👤 {{ username }}
         </span>
         <button v-if="username" class="nav-btn" @click="doLogout">退出</button>

@@ -586,7 +586,6 @@ export function useSky(
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()
-      ;(labelRenderer as unknown as { dispose: () => void }).dispose()
       renderer.dispose()
       scene.clear()
     },

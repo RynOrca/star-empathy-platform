@@ -1,4 +1,4 @@
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as THREE from 'three'
 
 function glowTex(size: number, color: string) {
@@ -15,7 +15,7 @@ function glowTex(size: number, color: string) {
 
 export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
   const loaded = ref(false)
-  let id = 0; let sc: THREE.Scene; let cam: THREE.PerspectiveCamera; let rend: THREE.WebGLRenderer
+  let id = 0; let sc: THREE.Scene; let cam: THREE.PerspectiveCamera; let rend: THREE.WebGLRenderer; let onResize: (() => void) | null = null
   const twinklePhases: number[] = []
 
   function init() {
@@ -122,13 +122,14 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
       rend.render(sc, cam)
     }
     loop()
-    addEventListener('resize', () => {
+    let onResize: () => void
+    addEventListener('resize', onResize = () => {
       cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix()
       rend.setSize(window.innerWidth, window.innerHeight)
     })
     loaded.value = true
   }
-  onMounted(() => init())
-  onBeforeUnmount(() => { cancelAnimationFrame(id); rend?.dispose() })
+  onMounted(async () => { await nextTick(); requestAnimationFrame(() => init()) })
+  onBeforeUnmount(() => { cancelAnimationFrame(id); rend?.dispose(); if (onResize!) removeEventListener('resize', onResize) })
   return { loaded }
 }
