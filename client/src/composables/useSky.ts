@@ -452,9 +452,14 @@ export function useSky(
       vals[1].textContent = stats ? String(stats.resonance) : '0'
       vals[2].textContent = stats ? String(stats.views) : '0'
       vals[3].textContent = stats ? String(stats.favorites) : '0'
-      _w.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld)
-      tooltipLabel.position.set(_w.x, _w.y - 50, _w.z)
-      hoverGlow.position.set(_w.x, _w.y, _w.z)
+      // 用星的实际坐标（已在 skyGroup 内），经过 matrixWorld 变换后设置位置
+      const sn = starNormMap.get(starId)
+      if (sn) {
+        const wx = sn.nx * SPHERE_RADIUS, wy = sn.ny * SPHERE_RADIUS, wz = sn.nz * SPHERE_RADIUS
+        _w.set(wx, wy, wz).applyMatrix4(skyGroup.matrixWorld)
+        tooltipLabel.position.set(_w.x, _w.y - 50, _w.z)
+        hoverGlow.position.set(_w.x, _w.y, _w.z)
+      }
       tooltipEl.style.opacity = '1'
       hoverGlow.visible = true
       ;(hoverGlow.material as SpriteMaterial).opacity = 0.95
@@ -478,7 +483,7 @@ export function useSky(
       // 屏幕空间投影（考虑 skyGroup 旋转）
       skyGroup.updateMatrixWorld()
       camera.updateMatrixWorld()
-      let bestDist = Infinity, bestId = -1
+      let bestDist = Infinity, bestId = -1, bestNx = 0, bestNy = 0, bestNz = 0
       for (const sn of starScreenNorms) {
         _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
         _v.applyMatrix4(skyGroup.matrixWorld)
@@ -486,7 +491,7 @@ export function useSky(
         if (_v.z > 1) continue
         const dx = _v.x - mouse.x, dy = _v.y - mouse.y
         const d = dx*dx + dy*dy
-        if (d < bestDist) { bestDist = d; bestId = sn.id }
+        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = _v.x; bestNy = _v.y; bestNz = _v.z }
       }
       if (bestDist < 0.003 && bestId !== -1) {
         if (bestId !== hoveredStarId) showTooltip(bestId)
