@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@primevue/themes": "^4.5.3",
+    "astronomy-engine": "^2.1.19",
     "lucide-vue-next": "^0.577.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",

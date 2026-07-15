@@ -2,8 +2,9 @@ import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
-  AdditiveBlending, Color, Mesh, MeshBasicMaterial, SphereGeometry, BackSide,
-  Raycaster, Vector2,
+  AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
+  SphereGeometry, RingGeometry, BackSide,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -194,26 +195,29 @@ export function useSky(
 
   // ═══ 黄道 (虚线) ═══
   {
-    const v: number[] = []
-    for (let i = 0; i <= 360; i++) {
-      const { ra, dec } = eclipticToRaDec(i)
-      const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
-      v.push(p.x, p.y, p.z)
-    }
-    const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-    g.computeBoundingSphere()
-    const mat = new LineDashedMaterial({
-      color: 0xcc8844,
-      dashSize: 2.5,
-      gapSize: 1.5,
-      transparent: true,
-      opacity: 0.55,
-      depthTest: true,
-      depthWrite: false,
+    import('../data/planets').then(async ({ getEclipticToEquatorTransform }) => {
+      const eclToEq = await getEclipticToEquatorTransform()
+      const v: number[] = []
+      for (let i = 0; i <= 360; i++) {
+        const { ra, dec } = eclToEq(i)
+        const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
+        v.push(p.x, p.y, p.z)
+      }
+      const g = new BufferGeometry(); g.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      g.computeBoundingSphere()
+      const mat = new LineDashedMaterial({
+        color: 0xcc8844,
+        dashSize: 2.5,
+        gapSize: 1.5,
+        transparent: true,
+        opacity: 0.55,
+        depthTest: true,
+        depthWrite: false,
+      })
+      const line = new Line(g, mat)
+      line.computeLineDistances()
+      scene.add(line)
     })
-    const line = new Line(g, mat)
-    line.computeLineDistances()
-    scene.add(line)
   }
 
   // ═══ 银河 ═══
@@ -351,6 +355,142 @@ export function useSky(
     camera.updateProjectionMatrix()
     renderer.setSize(canvas.clientWidth, canvas.clientHeight)
     labelRenderer.setSize(canvas.clientWidth, canvas.clientHeight)
+  })
+
+
+  // ═══ 太阳系行星 ═══
+  import('../data/planets').then(async ({ planets, getBodyPosition }) => {
+    // 程序纹理生成
+    function createPlanetTexture(name: string, color: number): CanvasTexture {
+      const size = 128
+      const c = document.createElement('canvas')
+      c.width = c.height = size
+      const ctx = c.getContext('2d')!
+      const r = (color >> 16) & 0xff
+      const g = (color >> 8) & 0xff
+      const b = color & 0xff
+
+      // 基础填充
+      ctx.fillStyle = `rgb(${r},${g},${b})`
+      ctx.fillRect(0, 0, size, size)
+
+      if (name === 'Sun') {
+        // 太阳：渐变发光
+        const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2)
+        grad.addColorStop(0, '#fff8e0')
+        grad.addColorStop(0.4, '#ffdd88')
+        grad.addColorStop(0.8, '#ff9944')
+        grad.addColorStop(1, '#cc6600')
+        ctx.fillStyle = grad
+        ctx.fillRect(0, 0, size, size)
+      } else if (name === 'Moon') {
+        // 月球：灰色+陨石坑
+        ctx.fillStyle = '#b0b0b0'
+        ctx.fillRect(0, 0, size, size)
+        for (let i = 0; i < 30; i++) {
+          const cx = Math.random() * size
+          const cy = Math.random() * size
+          const cr = 2 + Math.random() * 6
+          ctx.beginPath()
+          ctx.arc(cx, cy, cr, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(80,80,80,${0.2 + Math.random() * 0.3})`
+          ctx.fill()
+        }
+      } else if (name === 'Venus') {
+        // 金星：旋涡云层
+        for (let y = 0; y < size; y += 2) {
+          const offset = Math.sin(y * 0.08) * 10
+          ctx.fillStyle = `rgba(${r + offset},${g + offset},${b},0.5)`
+          ctx.fillRect(0, y, size, 2)
+        }
+      } else if (name === 'Mars') {
+        // 火星：红色+暗色区域+极冠
+        for (let i = 0; i < 15; i++) {
+          const cx = Math.random() * size
+          const cy = Math.random() * size
+          const cr = 5 + Math.random() * 15
+          ctx.beginPath()
+          ctx.arc(cx, cy, cr, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(140,50,20,${0.15 + Math.random() * 0.2})`
+          ctx.fill()
+        }
+        // 北极冠
+        ctx.fillStyle = 'rgba(220,220,230,0.4)'
+        ctx.fillRect(0, 0, size, size * 0.08)
+      } else if (name === 'Jupiter') {
+        // 木星：条纹+大红斑
+        const bands = ['#cc9966','#b8865c','#ddbb88','#aa7744','#ccaa77','#bb9966','#ddcc99','#cc8855']
+        const bandH = size / bands.length
+        bands.forEach((col, i) => {
+          ctx.fillStyle = col
+          ctx.fillRect(0, i * bandH, size, bandH + 1)
+        })
+        // 大红斑
+        ctx.beginPath()
+        ctx.ellipse(size * 0.65, size * 0.55, 12, 8, 0, 0, Math.PI * 2)
+        ctx.fillStyle = '#cc6644'
+        ctx.fill()
+      } else if (name === 'Saturn') {
+        // 土星：淡黄色条纹
+        for (let y = 0; y < size; y += 3) {
+          const shade = 180 + Math.sin(y * 0.1) * 20
+          ctx.fillStyle = `rgb(${shade+20},${shade+10},${shade-20})`
+          ctx.fillRect(0, y, size, 3)
+        }
+      }
+
+      const tex = new CanvasTexture(c)
+      tex.colorSpace = 'srgb'
+      return tex
+    }
+
+    const lat = options?.observerLat ?? 0
+    const lng = options?.observerLng ?? 0
+    const R = SPHERE_RADIUS * 0.98
+
+    for (const planet of planets) {
+      const pos = await getBodyPosition(planet.name, lat, lng)
+      if (!pos) continue
+      const { ra, dec } = pos
+      const { x, y, z } = raDecXYZ(ra, dec, R)
+      // 行星球体
+      const geo = new SphereGeometry(planet.size, 16, 12)
+      const mat = new MeshLambertMaterial({ map: createPlanetTexture(planet.name, planet.color) })
+      const mesh = new Mesh(geo, mat)
+      mesh.position.set(x, y, z)
+      scene.add(mesh)
+      // 太阳发���光晕
+      if (planet.name === 'Sun') {
+        const glowGeo = new SphereGeometry(planet.size * 2.5, 16, 12)
+        const glowMat = new MeshBasicMaterial({
+          color: 0xffcc66, transparent: true, opacity: 0.2,
+          blending: AdditiveBlending, depthWrite: false,
+        })
+        const glow = new Mesh(glowGeo, glowMat)
+        glow.position.copy(mesh.position)
+        scene.add(glow)
+      }
+      // 土星环
+      if (planet.ringColor) {
+        const ringGeo = new RingGeometry(planet.ringSize! - 1, planet.ringSize! + 1, 32)
+        const ringMat = new MeshBasicMaterial({
+          color: planet.ringColor, side: 2, transparent: true, opacity: 0.6,
+          depthWrite: false,
+        })
+        const ring = new Mesh(ringGeo, ringMat)
+        ring.position.copy(mesh.position)
+        ring.rotation.x = Math.PI * 0.45
+        scene.add(ring)
+      }
+      // 标签
+      const el = document.createElement('div')
+      el.textContent = planet.nameCN
+      el.style.cssText = 'color:#ffd98a;font-size:11px;background:rgba(7,8,22,0.6);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,217,138,0.2);backdrop-filter:blur(4px);white-space:nowrap'
+      const label = new CSS2DObject(el)
+      const len = Math.sqrt(x*x + y*y + z*z)
+      label.position.set(x * (1 + 6/len), y * (1 + 6/len), z * (1 + 6/len))
+      scene.add(label)
+    }
   })
 
   // ═══ 渲染 ═══
