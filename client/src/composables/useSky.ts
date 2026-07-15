@@ -13,6 +13,7 @@ import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
 interface CatData { stars: CatStar[]; lines: [number, number][] }
 import rawCatalog from '../data/stars.json'
+import constellationLabels from '../data/constellation_labels.json'
 const CAT = rawCatalog as unknown as CatData
 
 const hexRGB = (h: string): [number, number, number] =>
@@ -209,6 +210,16 @@ export function useSky(
     for (const [a,b] of CAT.lines) { if (a<n&&b<n) { const sa=stars[a],sb=stars[b]; v.push(sa.x,sa.y,sa.z,sb.x,sb.y,sb.z) } }
     const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
     skyGroup.add(new LineSegments(lg, new LineBasicMaterial({ color:0x6677aa, transparent:true, opacity:0.35, depthTest:true, depthWrite:false })))
+  }
+
+  // ═══ 星座标签 ═══
+  for (const lb of constellationLabels as { con: string; label: string; x: number; y: number; z: number }[]) {
+    const el = document.createElement('div')
+    el.textContent = lb.label
+    el.style.cssText = `font-family:Inter,"Microsoft YaHei",sans-serif;font-size:10px;color:rgba(130,160,200,0.55);letter-spacing:0.08em;white-space:nowrap;pointer-events:none;text-shadow:0 0 6px rgba(80,120,180,0.3);`
+    const label = new CSS2DObject(el)
+    label.position.set(lb.x, lb.y, lb.z)
+    skyGroup.add(label)
   }
 
 
