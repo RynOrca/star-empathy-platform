@@ -4,11 +4,11 @@
 *.png
 *.log
 /tmp/
-server/data/
+
 node_modules/
 dist/
 .design/
 .uploads/
-*.db
+
 .playwright-mcp/
 .omo/run-continuation/
