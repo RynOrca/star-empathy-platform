@@ -113,7 +113,7 @@ export interface SkyAPI {
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void }
+  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; observerLat?: number; observerLng?: number }
 ): SkyAPI {
   const scene = new Scene()
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
@@ -317,7 +317,29 @@ export function useSky(
   }
 
   // ═══ 相机 ═══
-  let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
+  // 根据经纬度计算本地恒星时 + 初始朝向
+  const D2R = Math.PI / 180
+  let rotX = 0, rotY = 0
+  if (options?.observerLat != null && options?.observerLng != null) {
+    const lat = options.observerLat
+    const lng = options.observerLng
+    const now = new Date()
+    const jd = Date.now() / 86400000 + 2440587.5
+    // 格林尼治恒星时（度）
+    const T = (jd - 2451545.0) / 36525
+    const gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * T * T
+    // 本地恒星时（度）
+    const lst = ((gmst + lng) % 360 + 360) % 360
+    // rotY: 朝向本地子午圈（南点方向对应的 RA）
+    // rotX: 仰角 = 90 - |纬度|（纬度越高仰角越大，正看天顶）
+    rotY = -(lst * D2R) + Math.PI
+    // 纬度 > 0 北半球: 看南边天球，rotX = 纬度（弧度）
+    // 纬度 < 0 南半球: 看北边天球
+    rotX = lat * D2R
+  } else {
+    rotX = 0.3 // 默认
+  }
+  let dragging = false, px = 0, py = 0
   let userFov = DEFAULT_FOV
 
   canvas.addEventListener('pointerdown', (e) => {

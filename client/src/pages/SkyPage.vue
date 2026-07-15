@@ -26,12 +26,12 @@
       </div>
     </nav>
 
-    <SkyCanvas ref="skyRef" @star-click="onStarClick" />
-    <div class="zoom-controls">
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" />
+    <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div class="hint">
+    <div v-if="locationReady" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
@@ -76,6 +76,20 @@ import { constellationNames, starDistances } from '../data/starInfo'
 
 const router = useRouter()
 const username = ref('')
+const userLat = ref<number | undefined>(undefined)
+const userLng = ref<number | undefined>(undefined)
+const locationReady = ref(false)
+
+// 获取用户地理位置用于天球朝向
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { userLat.value = pos.coords.latitude; userLng.value = pos.coords.longitude; locationReady.value = true },
+    () => { locationReady.value = true }, // 定位失败也继续
+    { timeout: 5000 },
+  )
+} else {
+  locationReady.value = true
+}
 
 onMounted(async () => {
   fetchStories()
