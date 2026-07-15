@@ -201,7 +201,7 @@ export function useSky(
     map: bloomTex('#ffe5a0', 128),
     blending: AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, opacity: 0,
   }))
-  hoverGlow.scale.set(10, 10, 1)
+  hoverGlow.scale.set(22, 22, 1)
   hoverGlow.renderOrder = 100
   hoverGlow.visible = false
   skyGroup.add(hoverGlow)
@@ -264,7 +264,7 @@ export function useSky(
     })
   }
 
-  // ═══ 地平圈 ═══
+  /* ═══ 地平圈 ═══
   {
     const lat = options?.observerLat ?? 0
     if (lat !== 0 || options?.observerLng != null) {
@@ -299,7 +299,7 @@ export function useSky(
       hLine.computeLineDistances()
       skyGroup.add(hLine)
     }
-  }
+  } */
 
   // ═══ 银河 ═══
   {
@@ -330,7 +330,7 @@ export function useSky(
     scene.add(mask)
   }
 
-  // ═══ 东南西北标注 ═══
+  /* ═══ 东南西北标注 ═══
   {
     const cardinals = [
       { text: 'N', sub: '北', x: 0, z: -1 },
@@ -340,7 +340,7 @@ export function useSky(
     ]
     for (const c of cardinals) {
       const el = document.createElement('div')
-      el.textContent = `${c.text} ${c.sub}`
+      el.textContent = `${c.text} ${c.sub}`
       el.style.cssText = [
         'color:#dd8844',
         'font-family:"Inter","Helvetica Neue",system-ui,sans-serif',
@@ -359,7 +359,7 @@ export function useSky(
       label.position.set(c.x * SPHERE_RADIUS, 3, c.z * SPHERE_RADIUS)
       scene.add(label)
     }
-  }
+  } */
 
   // ═══ 悬浮 Tooltip ═══
   const statsCache = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
@@ -511,34 +511,10 @@ export function useSky(
     })
   }
 
-  // ═══ 地平旋转：赤道坐标系 → 地平坐标系 ═══
-  {
-    const lat = options?.observerLat ?? 0
-    const lng = options?.observerLng ?? 0
-    if (lat !== 0 || lng !== 0) {
-      // 计算本地恒星时
-      const jd = Date.now() / 86400000 + 2440587.5
-      const gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
-      const lst = ((gmst + lng) % 360 + 360) % 360
-      const lstRad = lst * D2R
-      const latRad = lat * D2R
-
-      // 旋转天球组：
-      // 1. 绕 Y 轴旋转，将本地子午圈对准相机前方（-Z 方向）
-      //    本地子午圈的 RA = LST，在 raDecXYZ 中角度 = LST*15°
-      //    -Z 方向对应 RA=6h = 90°，所以旋转角 = 90° - LST*15°
-      //    但 raDecXYZ 中 RA 转弧度是 raH/24*2π = raH * π/12
-      //    LST 是度，转弧度：lstRad = lst * π/180
-      //    旋转角 = π/2 - lstRad
-      //
-      // 2. 绕 X 轴旋转，将天北极倾斜到正确仰角
-      //    天北极从 +Y（天顶）倾斜到仰角 = 纬度
-      //    旋转角 = 90° - lat
-      skyGroup.rotation.order = 'YXZ'
-      skyGroup.rotation.y = Math.PI / 2 - lstRad
-      skyGroup.rotation.x = Math.PI / 2 - latRad
-    }
-  }
+  // ═══ 地平旋转 ═══
+  // TODO: 需要用 astronomy-engine 的 Rotation_EQD_HOR 正确实现
+  // 当前 raDecXYZ 坐标系与标准 EQJ 有 Y/Z 轴互换差异，直接使用旋转矩阵会得到错误结果
+  // 暂时禁用地平旋转，使用纯赤道坐标系视图
 
   // ═══ 相机 ═══
   let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
