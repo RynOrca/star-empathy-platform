@@ -26,7 +26,35 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick; guidesVisible=false" @planet-click="onPlanetClick; guidesVisible=false" />
+
+    <!-- 三张叙事引导牌 -->
+    <Transition name="guides">
+      <div v-if="locationReady && guidesVisible" class="guide-cards">
+        <div class="guide-card" @click="guidesVisible=false">
+          <div class="guide-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <p class="guide-title">历史里的星</p>
+          <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
+        </div>
+        <div class="guide-card" @click="guidesVisible=false">
+          <div class="guide-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+          <p class="guide-title">路过别人的星光</p>
+          <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
+        </div>
+        <div class="guide-card" @click="guidesVisible=false">
+          <div class="guide-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          </div>
+          <p class="guide-title">挂上我的故事</p>
+          <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
+        </div>
+      </div>
+    </Transition>
+
     <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
@@ -79,6 +107,7 @@ const username = ref('')
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
+const guidesVisible = ref(true)
 
 // 获取用户地理位置用于天球朝向
 if (navigator.geolocation) {
@@ -351,4 +380,63 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .hint p { margin: 0; }
 .hint p span { opacity: 0.6; }
+
+/* ─── 叙事引导牌 ─── */
+.guide-cards {
+  position: fixed;
+  bottom: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.75rem;
+  z-index: 15;
+  pointer-events: auto;
+}
+.guide-card {
+  width: 180px;
+  padding: 1rem 1.1rem 0.85rem;
+  border-radius: var(--radius-lg, 12px);
+  background: rgba(16, 20, 43, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(48, 55, 87, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  text-align: left;
+}
+.guide-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 217, 138, 0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 217, 138, 0.06);
+}
+.guide-icon {
+  color: var(--accent, #ffd98a);
+  margin-bottom: 0.55rem;
+  opacity: 0.85;
+}
+.guide-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink, #f6f1ff);
+  margin: 0 0 0.35rem;
+  letter-spacing: 0.02em;
+}
+.guide-desc {
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--muted-light, #7a759c);
+  margin: 0;
+}
+.guides-enter-active { transition: opacity 0.6s ease, transform 0.6s ease; }
+.guides-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+.guides-enter-from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+.guides-leave-to { opacity: 0; transform: translateX(-50%) translateY(10px); }
+
+@media (max-width: 640px) {
+  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.5rem; }
+  .guide-card { width: 160px; padding: 0.75rem 0.85rem 0.65rem; }
+  .guides-enter-from { transform: translateY(20px); }
+  .guides-leave-to { transform: translateY(10px); }
+}
 </style>
