@@ -26,7 +26,7 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" />
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
     <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
@@ -209,6 +209,41 @@ function onStarClick(starId: number) {
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
   fetchCatalogStats(starId)
   fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
+}
+
+// 行星数据映射（用于故事详情展示）
+const PLANET_INFO: Record<string, { color: string; conName: string }> = {
+  'Sun':     { color: '#ffdd88', conName: '太阳' },
+  'Moon':    { color: '#cccccc', conName: '月球' },
+  'Venus':   { color: '#e8cda0', conName: '金星' },
+  'Mars':    { color: '#dd6644', conName: '火星' },
+  'Jupiter': { color: '#ddaa77', conName: '木星' },
+  'Saturn':  { color: '#ddcc99', conName: '土星' },
+}
+const PLANET_ID_MAP: Record<string, number> = {
+  'Sun': -100, 'Moon': -101, 'Venus': -102, 'Mars': -103, 'Jupiter': -104, 'Saturn': -105,
+}
+
+function onPlanetClick(name: string, nameCN: string) {
+  const planetId = PLANET_ID_MAP[name]
+  if (planetId == null) return
+  const info = PLANET_INFO[name]
+  const stories = storiesByStarId.value.get(planetId)
+  selectedStories.value = stories?.length ? stories : [NO_STORY]
+  activeStoryIndex.value = 0
+  selectedStarInfo.value = {
+    displayName: nameCN,
+    con: '',
+    mag: 0,
+    conName: nameCN,
+    distance: null,
+    ra: 0,
+    dec: 0,
+    color: info?.color || '#ffdd88',
+  }
+  selectedCatalogStarId.value = planetId
+  const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
+  catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
 }
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/stars/${starId}/stats`); const json = await res.json(); if (json.code === 200) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}

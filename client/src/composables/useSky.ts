@@ -128,7 +128,7 @@ export interface SkyAPI {
 
 export function useSky(
   canvas: HTMLCanvasElement,
-  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; observerLat?: number; observerLng?: number }
+  options?: { onStarClick?: (starId: number) => void; onStarHover?: (starId: number | null) => void; onPlanetClick?: (name: string, nameCN: string) => void; observerLat?: number; observerLng?: number }
 ): SkyAPI {
   const scene = new Scene()
 
@@ -137,6 +137,8 @@ export function useSky(
   scene.add(skyGroup)
 
   scene.add(new AmbientLight(0xffffff, 0.5))
+
+  const planetMeshes: Mesh[] = []
 
   const camera = new PerspectiveCamera(DEFAULT_FOV, canvas.clientWidth/canvas.clientHeight, 0.5, SPHERE_RADIUS*3)
   camera.position.set(0,0,0)
@@ -405,7 +407,6 @@ export function useSky(
     const starScreenNorms: { id: number; nx: number; ny: number; nz: number }[] = []
     const starNormMap = new Map<number, { nx: number; ny: number; nz: number }>()
     for (const s of stars) {
-      if (!s.name && !s.con) continue
       const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
       if (len > 0) {
         const norm = { id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len }
@@ -495,6 +496,17 @@ export function useSky(
         const tierIdx = hit.object.userData.tierIndex as number
         const starId = tierStarIds[tierIdx][hit.index!]
         options?.onStarClick?.(starId)
+      }
+      // 检测行星点击
+      if (!hits.length && planetMeshes.length) {
+        const planetHits = raycaster.intersectObjects(planetMeshes)
+        if (planetHits.length) {
+          const pm = planetHits[0].object as Mesh
+          const pd = pm.userData as { planetName: string; planetNameCN: string }
+          if (pd.planetName) {
+            options?.onPlanetClick?.(pd.planetName, pd.planetNameCN)
+          }
+        }
       }
     })
   }
@@ -661,6 +673,8 @@ export function useSky(
       const mesh = new Mesh(geo, mat)
       mesh.position.set(x, y, z)
       skyGroup.add(mesh)
+      mesh.userData = { planetName: planet.name, planetNameCN: planet.nameCN }
+      planetMeshes.push(mesh)
       // 太阳发���光晕
       if (planet.name === 'Sun') {
         const glowGeo = new SphereGeometry(planet.size * 2.5, 16, 12)

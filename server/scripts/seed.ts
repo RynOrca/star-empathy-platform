@@ -161,6 +161,33 @@ function seed() {
   const count = db.prepare("SELECT COUNT(*) as count FROM stars WHERE type = 'history'").get() as { count: number };
   console.log(`  ✅ 成功注入 ${count.count} 条历史星`);
   console.log(`  总计星星数: ${(db.prepare('SELECT COUNT(*) as count FROM stars').get() as { count: number }).count}`);
+
+  // ═══ 注入行星数据 ═══
+  const planetInsert = db.prepare(`
+    INSERT OR IGNORE INTO stars (type, title, content, resonance_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
+    VALUES ('planet', ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const planetSeeds = [
+    { id: -100, name: '太阳', content: '太阳是太阳系的中心恒星，一颗G2V型黄矮星。它的质量占太阳系总质量的99.86%，直径约139万公里，表面温度约5500°C。太阳每秒将约400万吨物质转化为能量，照亮整个太阳系。古人崇拜太阳为神——古埃及的拉（Ra）、古希腊的赫利俄斯（Helios）、中国的羲和。在中国古代天文体系中，太阳被称为"日"，是十天干中"甲"的本命星辰。', resonance: 256 },
+    { id: -101, name: '月球', content: '月球是地球唯一的天然卫星，直径约3474公里，距地球平均38.4万公里。它是夜空中最亮的天体，表面布满陨石坑，暗色区域被称为"月海"。月球以27.3天为周期绕地球公转，其引力引起地球上的潮汐。李白"举头望明月，低头思故乡"道尽了月与人之间最深的情感连接。在中国古代，月球又称"太阴"、"蟾宫"、"广寒宫"。', resonance: 198 },
+    { id: -102, name: '金星', content: '金星是太阳系中最亮的行星，古代被称为"启明星"（晨见东方）和"长庚星"（暮见西方），即"东有启明，西有长庚"（《诗经·小雅》）。金星是地球的"姊妹星"，大小和质量与地球相近，但表面温度高达460°C，大气压是地球的90倍。其厚密的二氧化碳大气层造成极端温室效应。金星逆向自转，在金星上太阳从西边升起。', resonance: 142 },
+    { id: -103, name: '火星', content: '火星因表面氧化铁呈红色，在中国古代被称为"荧惑"，是七大曜之一。火星有太阳系最高的山——奥林匹斯山（高约21公里），以及最大的峡谷——水手号峡谷。火星两极有冰盖，科学家已在火星上发现古代水流痕迹。古代中国人以火星的亮度变化预测吉凶——"荧惑守心"被视为大凶之兆。如今火星是人类探索最多的行星之一。', resonance: 178 },
+    { id: -104, name: '木星', content: '木星是太阳系最大的行星，质量是其他所有行星总和的2.5倍。在中国古代，木星被称为"岁星"，因它约12年绕天一周，古人据此纪年（"岁星纪年"）。木星标志性的大红斑是一个持续了至少350年的巨型风暴，直径可容纳两个地球。木星拥有至少95颗卫星，其中四颗伽利略卫星（木卫一至四）由伽利略在1610年发现。', resonance: 165 },
+    { id: -105, name: '土星', content: '土星以壮观的环系统闻名，这些环主要由冰粒和岩石碎片组成。在中国古代，土星被称为"镇星"或"填星"，是五大行星中运行最慢的，约29.5年绕天一周。土星的密度比水还低（0.687 g/cm³），是太阳系中唯一能漂浮在水上的行星。土星拥有至少146颗已知卫星，其中最大的土卫六（泰坦）拥有浓厚大气层和液态甲烷湖泊。', resonance: 134 },
+  ];
+
+  // 检查行星数据是否已存在
+  const existingPlanets = db.prepare("SELECT catalog_star_id FROM stars WHERE catalog_star_id < 0").all() as { catalog_star_id: number }[];
+  const existingIds = new Set(existingPlanets.map(p => p.catalog_star_id));
+
+  for (const p of planetSeeds) {
+    if (existingIds.has(p.id)) continue;
+    planetInsert.run(p.name, p.content, p.resonance, 0, 0, 0, p.id, `planet:${p.name}`);
+  }
+
+  const planetCount = db.prepare("SELECT COUNT(*) as count FROM stars WHERE type = 'planet'").get() as { count: number };
+  console.log(`  ✅ 行星数据: ${planetCount.count} 条`);
 }
 
 seed();
