@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue'
+import { ref, shallowRef, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -168,6 +168,7 @@ async function fetchStories() {
       }
     }
     storiesByStarId.value = map
+    pendingStatsMap.value = statsMap
     skyRef.value?.sky?.setStarStatsCache(statsMap)
   } catch (e) { console.error('获取故事失败:', e) }
 }
@@ -182,6 +183,14 @@ function formatStarName(s: CatalogStar): string {
 }
 
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
+const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
+
+// 当 SkyCanvas 渲染完成后，传入等待的统计数据
+watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
+  if (sRef?.sky && statsMap) {
+    sRef.sky.setStarStatsCache(statsMap)
+  }
+})
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
