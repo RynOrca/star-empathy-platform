@@ -233,6 +233,45 @@ export function useSky(
   hoverGlow.visible = false
   scene.add(hoverGlow)
 
+  // ═══ 有故事的星星：呼吸辉光 ═══
+  // 每颗有故事的星都有一个独立的 Sprite，用随机周期和相位做呼吸动画
+  const storyBreathTex = bloomTex('#ffe5a0', 128)
+  const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
+  const STORY_GLOW_SCALE = 6 // hover 是 10，这是 60%
+  const STORY_GLOW_MAX_OPACITY = 0.35
+
+  function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
+    // 记录已存在的 starId
+    const existing = new Set<number>()
+    for (const sg of storyGlows) existing.add(sg.sprite.userData.starId as number)
+
+    for (const [starId, stats] of cache) {
+      if (stats.stories === 0) continue
+      if (existing.has(starId)) continue // 已有辉光，跳过
+      const star = stars[starId]
+      if (!star) continue
+      const sp = new Sprite(new SpriteMaterial({
+        map: storyBreathTex,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        transparent: true,
+        opacity: 0,
+      }))
+      sp.scale.set(STORY_GLOW_SCALE, STORY_GLOW_SCALE, 1)
+      sp.renderOrder = 50
+      sp.userData.starId = starId
+      // 位置用 skyGroup 内坐标，加到 skyGroup 里
+      sp.position.set(star.x, star.y, star.z)
+      skyGroup.add(sp)
+      storyGlows.push({
+        sprite: sp,
+        phase: Math.random() * Math.PI * 2, // 随机初始相位
+        period: 3000 + Math.random() * 4000, // 随机周期 3-7 秒
+      })
+    }
+  }
+
   // ═══ 星座连线 ═══
   {
     const allLines: [number, number][] = [...(CAT.lines || []), ...(newLinesData as [number, number][])]
@@ -852,6 +891,14 @@ export function useSky(
       sm.opacity = 0
       hoverGlow.visible = false
     }
+    // story breath glow animation
+    const now = performance.now()
+    for (const sg of storyGlows) {
+      const t = ((now + sg.phase * 1000) % sg.period) / sg.period
+      // smooth sine breathing: 0 → 1 → 0
+      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+      ;(sg.sprite.material as SpriteMaterial).opacity = breath * STORY_GLOW_MAX_OPACITY
+    }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
@@ -865,6 +912,7 @@ export function useSky(
     setObserver,
     setStarStatsCache(cache) {
       cache.forEach((v, k) => statsCache.set(k, v))
+      updateStoryGlows(cache)
     },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
       if (lat == null || lng == null) {
