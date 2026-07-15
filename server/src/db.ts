@@ -6,6 +6,13 @@ const db = new DatabaseSync(DB_PATH);
 
 // 建表
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS stars (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     type            TEXT NOT NULL DEFAULT 'user',
@@ -26,7 +33,6 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
   CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
-  CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id);
 
   CREATE TABLE IF NOT EXISTS catalog_visits (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,13 +47,6 @@ db.exec(`
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_favorites ON favorites(catalog_star_id);
-
-  CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    username      TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  );
 `);
 
 // 兼容旧数据库：添加新列
@@ -57,5 +56,7 @@ try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 
 try { db.exec('ALTER TABLE stars ADD COLUMN origin TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN tag TEXT'); } catch {}
+// 兼容旧数据库：添加新索引
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
 
 export default db;
