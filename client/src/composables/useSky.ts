@@ -209,10 +209,10 @@ export function useSky(
 
   // ═══ 悬浮辉光精灵 ═══
   const hoverGlow = new Sprite(new SpriteMaterial({
-    map: bloomTex('#ffe5a0', 128),
+    map: bloomTex('#ffffff', 256),
     blending: AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, opacity: 0,
   }))
-  hoverGlow.scale.set(22, 22, 1)
+  hoverGlow.scale.set(100, 100, 1)
   hoverGlow.renderOrder = 100
   hoverGlow.visible = false
   skyGroup.add(hoverGlow)
@@ -462,7 +462,7 @@ export function useSky(
       }
       tooltipEl.style.opacity = '1'
       hoverGlow.visible = true
-      ;(hoverGlow.material as SpriteMaterial).opacity = 0.95
+      ;(hoverGlow.material as SpriteMaterial).opacity = 1.0
       hoveredStarId = starId
       options?.onStarHover?.(starId)
     }
