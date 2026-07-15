@@ -233,41 +233,33 @@ export function useSky(
   hoverGlow.visible = false
   scene.add(hoverGlow)
 
-  // ═══ 有故事的星星：呼吸辉光 ═══
-  // 每颗有故事的星都有一个独立的 Sprite，用随机周期和相位做呼吸动画
-  const storyBreathTex = bloomTex('#ffe5a0', 128)
+  // ═══ 有故事的星星：呼吸辉光（同款 bloomTex，复用 hoverGlow 的方式） ═══
   const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
-  const STORY_GLOW_SCALE = 16 // 呼吸辉光半径
-  const STORY_GLOW_MAX_OPACITY = 0.7
-
   function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
-    // 记录已存在的 starId
     const existing = new Set<number>()
     for (const sg of storyGlows) existing.add(sg.sprite.userData.starId as number)
-
     for (const [starId, stats] of cache) {
       if (stats.stories === 0) continue
-      if (existing.has(starId)) continue // 已有辉光，跳过
+      if (existing.has(starId)) continue
       const star = stars[starId]
       if (!star) continue
       const sp = new Sprite(new SpriteMaterial({
-        map: storyBreathTex,
+        map: bloomTex('#ffe5a0', 128),
         blending: AdditiveBlending,
         depthWrite: false,
         depthTest: false,
         transparent: true,
         opacity: 0,
       }))
-      sp.scale.set(STORY_GLOW_SCALE, STORY_GLOW_SCALE, 1)
+      sp.scale.set(10, 10, 1) // 同 hoverGlow 一样大
       sp.renderOrder = 50
       sp.userData.starId = starId
-      // 位置用 skyGroup 内坐标，加到 skyGroup 里
       sp.position.set(star.x, star.y, star.z)
       skyGroup.add(sp)
       storyGlows.push({
         sprite: sp,
-        phase: Math.random() * Math.PI * 2, // 随机初始相位
-        period: 3000 + Math.random() * 4000, // 随机周期 3-7 秒
+        phase: Math.random() * Math.PI * 2,
+        period: 3000 + Math.random() * 4000,
       })
     }
   }
@@ -891,13 +883,12 @@ export function useSky(
       sm.opacity = 0
       hoverGlow.visible = false
     }
-    // story breath glow animation
-    const now = performance.now()
+    // 有故事的星：呼吸辉光动画
+    const _now = performance.now()
     for (const sg of storyGlows) {
-      const t = ((now + sg.phase * 1000) % sg.period) / sg.period
-      // smooth sine breathing: 0.15 → 0.7 → 0.15 (始终可见)
-      const breath = 0.15 + (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5 * (STORY_GLOW_MAX_OPACITY - 0.15)
-      ;(sg.sprite.material as SpriteMaterial).opacity = breath
+      const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
+      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+      ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
     }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
