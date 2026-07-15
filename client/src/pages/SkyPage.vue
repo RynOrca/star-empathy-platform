@@ -156,14 +156,20 @@ async function fetchStories() {
     const res = await fetch('/api/stars')
     const json = await res.json()
     const map = new Map<number, StoryData[]>()
+    const statsMap = new Map<number, { stories: number; resonance: number }>()
     for (const s of json.data ?? []) {
       const cid = s.catalog_star_id
       if (cid != null) {
         if (!map.has(cid)) map.set(cid, [])
         map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonance_count, catalog_star_id: cid, created_at: s.created_at || '', location_lat: s.location_lat ?? null, location_lng: s.location_lng ?? null, type: s.type || 'user', view_count: s.view_count ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
+        // 累加统计
+        const cur = statsMap.get(cid) || { stories: 0, resonance: 0 }
+        cur.stories++; cur.resonance += s.resonance_count || 0
+        statsMap.set(cid, cur)
       }
     }
     storiesByStarId.value = map
+    skyRef.value?.sky?.setStarStatsCache(statsMap)
   } catch (e) { console.error('获取故事失败:', e) }
 }
 onMounted(() => { fetchStories() })

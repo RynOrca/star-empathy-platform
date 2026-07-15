@@ -122,6 +122,7 @@ export interface SkyAPI {
   zoomIn: () => void
   zoomOut: () => void
   dispose: () => void
+  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number }>) => void
 }
 
 export function useSky(
@@ -348,9 +349,10 @@ export function useSky(
   }
 
   // ═══ 悬浮 Tooltip ═══
+  const statsCache = new Map<number, { stories: number; resonance: number }>()
   const tooltipEl = document.createElement('div')
   tooltipEl.style.cssText = 'font-family:Inter,"Microsoft YaHei",sans-serif;font-size:11px;color:#c8c2d8;background:rgba(12,12,28,0.92);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(8px);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s;line-height:1;margin-top:1rem;'
-  tooltipEl.innerHTML = '<span style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;"></span>'
+  tooltipEl.innerHTML = '<div class="tt-name" style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;margin-bottom:4px;"></div><div class="tt-stats" style="display:flex;gap:10px;color:#8a849e;"></div>'
   const tooltipLabel = new CSS2DObject(tooltipEl)
   tooltipLabel.position.set(0, 0, 0)
   scene.add(tooltipLabel)
@@ -360,6 +362,7 @@ export function useSky(
     const raycaster = new Raycaster()
     const mouse = new Vector2()
     const _v = new Vector3()
+    const _w = new Vector3()
     const DRAG_THRESHOLD = 5
     let clickDrag = false
     let hoveredStarId = -1
@@ -369,6 +372,7 @@ export function useSky(
     const starScreenNorms: { id: number; nx: number; ny: number; nz: number }[] = []
     const starNormMap = new Map<number, { nx: number; ny: number; nz: number }>()
     for (const s of stars) {
+      if (!s.name && !s.con) continue
       const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
       if (len > 0) {
         const norm = { id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len }
@@ -384,20 +388,26 @@ export function useSky(
       options?.onStarHover?.(null)
     }
 
-    function showTooltip(starId: number, sn: { nx: number; ny: number; nz: number }) {
+    function showTooltip(starId: number) {
       const star = stars[starId]
       if (!star) return hideTooltip()
-      const ts = tooltipEl.querySelector('span')!
+      const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
+      const statsEl = tooltipEl.querySelector('.tt-stats') as HTMLElement
       if (star.name) {
-        ts.textContent = star.name
+        nameEl.textContent = star.name
       } else {
         const rh = Math.floor(star.ra), rm = Math.floor((star.ra - rh) * 60)
         const ds = star.dec >= 0 ? '+' : '-'
         const dd = Math.floor(Math.abs(star.dec)), dm = Math.floor((Math.abs(star.dec) - dd) * 60)
-        ts.textContent = `${rh}h${String(rm).padStart(2,'0')}m ${ds}${dd}°${String(dm).padStart(2,'0')}′`
+        nameEl.textContent = `${rh}h${String(rm).padStart(2,'0')}m ${ds}${dd}°${String(dm).padStart(2,'0')}′`
       }
-      tooltipLabel.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS - 50, sn.nz * SPHERE_RADIUS)
-      hoverGlow.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+      const stats = statsCache.get(star.id)
+      statsEl.innerHTML = stats
+        ? `<span>📖 ${stats.stories}</span><span>💓 ${stats.resonance}</span>`
+        : ''
+      _w.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld)
+      tooltipLabel.position.set(_w.x, _w.y - 50, _w.z)
+      hoverGlow.position.set(_w.x, _w.y, _w.z)
       tooltipEl.style.opacity = '1'
       hoverGlow.visible = true
       ;(hoverGlow.material as SpriteMaterial).opacity = 0.95
@@ -418,18 +428,21 @@ export function useSky(
       const rect = canvas.getBoundingClientRect()
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      // 屏幕空间投影：遍历预计算的归一化向量，投影到屏幕，找最近的星
+      // 屏幕空间投影（考虑 skyGroup 旋转）
+      skyGroup.updateMatrixWorld()
       camera.updateMatrixWorld()
-      let bestDist = Infinity, bestId = -1, bestNx = 0, bestNy = 0, bestNz = 0
+      let bestDist = Infinity, bestId = -1
       for (const sn of starScreenNorms) {
-        _v.set(sn.nx, sn.ny, sn.nz).project(camera)
+        _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+        _v.applyMatrix4(skyGroup.matrixWorld)
+        _v.project(camera)
         if (_v.z > 1) continue
         const dx = _v.x - mouse.x, dy = _v.y - mouse.y
         const d = dx*dx + dy*dy
-        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
+        if (d < bestDist) { bestDist = d; bestId = sn.id }
       }
-      if (bestDist < 0.0015 && bestId !== -1) {
-        if (bestId !== hoveredStarId) showTooltip(bestId, { nx: bestNx, ny: bestNy, nz: bestNz })
+      if (bestDist < 0.0008 && bestId !== -1) {
+        if (bestId !== hoveredStarId) showTooltip(bestId)
       } else {
         hideTooltip()
       }
@@ -665,6 +678,7 @@ export function useSky(
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
+    setStarStatsCache(cache: Map<number, { stories: number; resonance: number }>) { cache.forEach((v,k) => statsCache.set(k,v)) },
     dispose() {
       cancelAnimationFrame(af)
       lrEl.remove()
