@@ -259,7 +259,7 @@ export function useSky(
       storyGlows.push({
         sprite: sp,
         phase: Math.random() * Math.PI * 2,
-        period: 3000 + Math.random() * 4000,
+        period: 3000 + Math.random() * 2000,
       })
     }
   }
