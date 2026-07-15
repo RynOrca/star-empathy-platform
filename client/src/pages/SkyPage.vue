@@ -26,10 +26,25 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+
+    <!-- 定位加载/失败 -->
+    <div v-if="!locationReady" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">正在获取你的位置...</p>
+    </div>
+    <div v-if="locationFailed" class="location-fallback">
+      <p class="fallback-title">无法获取你的位置</p>
+      <p class="fallback-desc">请在浏览器地址栏允许位置权限，或手动选择一个城市：</p>
+      <div class="city-grid">
+        <button v-for="c in cities" :key="c.name" class="city-btn" @click="selectCity(c)">
+          {{ c.name }}
+        </button>
+      </div>
+    </div>
 
     <!-- 三张叙事引导牌 -->
-    <div v-if="locationReady" class="guide-cards">
+    <div v-if="userLat != null" class="guide-cards">
       <div class="guide-card">
         <div class="guide-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -60,11 +75,11 @@
       </div>
     </div>
 
-    <div v-if="locationReady" class="zoom-controls">
+    <div v-if="userLat != null" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div v-if="locationReady" class="hint">
+    <div v-if="userLat != null" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
@@ -112,16 +127,48 @@ const username = ref('')
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
+const locationFailed = ref(false)
 
-// 获取用户地理位置用于天球朝向
+const cities = [
+  { name: '北京', lat: 39.9, lng: 116.4 },
+  { name: '上海', lat: 31.2, lng: 121.5 },
+  { name: '广州', lat: 23.1, lng: 113.3 },
+  { name: '深圳', lat: 22.5, lng: 114.1 },
+  { name: '成都', lat: 30.6, lng: 104.1 },
+  { name: '杭州', lat: 30.3, lng: 120.2 },
+  { name: '武汉', lat: 30.6, lng: 114.3 },
+  { name: '西安', lat: 34.3, lng: 108.9 },
+  { name: '南京', lat: 32.1, lng: 118.8 },
+  { name: '重庆', lat: 29.6, lng: 106.5 },
+  { name: '长沙', lat: 28.2, lng: 113.0 },
+  { name: '哈尔滨', lat: 45.8, lng: 126.7 },
+]
+
+function selectCity(c: { lat: number; lng: number }) {
+  userLat.value = c.lat
+  userLng.value = c.lng
+  locationFailed.value = false
+  locationReady.value = true
+}
+
+// 获取用户地理位置
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
-    (pos) => { userLat.value = pos.coords.latitude; userLng.value = pos.coords.longitude; locationReady.value = true },
-    () => { locationReady.value = true }, // 定位失败也继续
-    { timeout: 5000 },
+    (pos) => {
+      userLat.value = pos.coords.latitude
+      userLng.value = pos.coords.longitude
+      locationReady.value = true
+    },
+    (err) => {
+      console.warn('Geolocation failed:', err.message)
+      locationReady.value = true
+      locationFailed.value = true
+    },
+    { timeout: 10000, enableHighAccuracy: false },
   )
 } else {
   locationReady.value = true
+  locationFailed.value = true
 }
 
 onMounted(async () => {
@@ -384,6 +431,82 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .hint p { margin: 0; }
 .hint p span { opacity: 0.6; }
+
+/* ─── 定位加载 ─── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-deep, #070816);
+  gap: 1.2rem;
+}
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid rgba(255, 217, 138, 0.15);
+  border-top-color: var(--accent, #ffd98a);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  color: var(--muted-light, #7a759c);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ─── 城市选择 ─── */
+.location-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-deep, #070816);
+  gap: 0.8rem;
+  padding: 1rem;
+}
+.fallback-title {
+  color: var(--ink, #f6f1ff);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.fallback-desc {
+  color: var(--muted-light, #7a759c);
+  font-size: 0.8rem;
+  margin: 0;
+  text-align: center;
+  max-width: 320px;
+}
+.city-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  max-width: 360px;
+}
+.city-btn {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(48, 55, 87, 0.4);
+  background: rgba(16, 20, 43, 0.6);
+  color: var(--ink, #f6f1ff);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.city-btn:hover {
+  border-color: rgba(255, 217, 138, 0.4);
+  background: rgba(40, 35, 18, 0.5);
+}
 
 /* ─── 叙事引导牌（大号黄色悬浮卡片） ─── */
 .guide-cards {
