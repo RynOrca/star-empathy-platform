@@ -397,8 +397,8 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   pointer-events: none;
 }
 .guide-card {
-  width: 180px;
-  padding: 1rem 1.1rem 0.85rem;
+  width: 220px;
+  padding: 0.65rem 0.9rem 0.55rem;
   border-radius: var(--radius-lg, 12px);
   background: rgba(40, 35, 18, 0.55);
   backdrop-filter: blur(16px);
@@ -409,19 +409,19 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .guide-icon {
   color: var(--accent, #ffd98a);
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.35rem;
   opacity: 0.85;
 }
 .guide-title {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--accent, #ffd98a);
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.2rem;
   letter-spacing: 0.02em;
 }
 .guide-desc {
-  font-size: 0.76rem;
-  line-height: 1.65;
+  font-size: 0.7rem;
+  line-height: 1.55;
   color: rgba(246, 241, 255, 0.6);
   margin: 0;
 }
@@ -432,7 +432,8 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 
 @media (max-width: 640px) {
-  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.5rem; }
-  .guide-card { width: 160px; padding: 0.75rem 0.85rem 0.65rem; }
+  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }
+  .guide-card { width: 180px; padding: 0.5rem 0.7rem 0.45rem; }
+  .guide-card svg { width: 16px; height: 16px; }
 }
 </style>
