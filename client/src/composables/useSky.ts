@@ -27,6 +27,19 @@ function glowTex(inner: string, sz: number): CanvasTexture {
   return new CanvasTexture(c)
 }
 
+function bloomTex(color: string, sz: number): CanvasTexture {
+  const c = document.createElement('canvas'); c.width = c.height = sz
+  const ctx = c.getContext('2d')!, h = sz/2
+  const g = ctx.createRadialGradient(h,h,0, h,h,h)
+  g.addColorStop(0, color)
+  g.addColorStop(0.15, color)
+  g.addColorStop(0.4, 'rgba(255,225,160,0.3)')
+  g.addColorStop(0.7, 'rgba(255,225,160,0.08)')
+  g.addColorStop(1, 'transparent')
+  ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz)
+  return new CanvasTexture(c)
+}
+
 // RA(时)/Dec(°) → 天球 3D
 const D2R = Math.PI / 180
 function raDecXYZ(raH: number, decD: number, R: number) {
@@ -179,6 +192,16 @@ export function useSky(
     skyGroup.add(pts)
   }
 
+  // ═══ 悬浮辉光精灵 ═══
+  const hoverGlow = new Sprite(new SpriteMaterial({
+    map: bloomTex('#ffe5a0', 128),
+    blending: AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, opacity: 0,
+  }))
+  hoverGlow.scale.set(10, 10, 1)
+  hoverGlow.renderOrder = 100
+  hoverGlow.visible = false
+  skyGroup.add(hoverGlow)
+
   // ═══ 星座连线 ═══
   if (CAT.lines?.length) {
     const v: number[] = []
@@ -324,37 +347,96 @@ export function useSky(
     }
   }
 
+  // ═══ 悬浮 Tooltip ═══
+  const tooltipEl = document.createElement('div')
+  tooltipEl.style.cssText = 'font-family:Inter,"Microsoft YaHei",sans-serif;font-size:11px;color:#c8c2d8;background:rgba(12,12,28,0.92);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(8px);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s;line-height:1;margin-top:1rem;'
+  tooltipEl.innerHTML = '<span style="font-size:13px;font-weight:600;color:#ffd98a;letter-spacing:0.02em;"></span>'
+  const tooltipLabel = new CSS2DObject(tooltipEl)
+  tooltipLabel.position.set(0, 0, 0)
+  scene.add(tooltipLabel)
+
   // ═══ 点击 + 悬停检测 ═══
   {
     const raycaster = new Raycaster()
     const mouse = new Vector2()
+    const _v = new Vector3()
     const DRAG_THRESHOLD = 5
     let clickDrag = false
+    let hoveredStarId = -1
+    let hoverCheckTimer = 0
+
+    // 预计算所有星的归一化屏幕投影方向
+    const starScreenNorms: { id: number; nx: number; ny: number; nz: number }[] = []
+    const starNormMap = new Map<number, { nx: number; ny: number; nz: number }>()
+    for (const s of stars) {
+      const len = Math.sqrt(s.x*s.x + s.y*s.y + s.z*s.z)
+      if (len > 0) {
+        const norm = { id: s.id, nx: s.x/len, ny: s.y/len, nz: s.z/len }
+        starScreenNorms.push(norm)
+        starNormMap.set(s.id, norm)
+      }
+    }
+
+    function hideTooltip() {
+      tooltipEl.style.opacity = '0'
+      hoverGlow.visible = false
+      hoveredStarId = -1
+      options?.onStarHover?.(null)
+    }
+
+    function showTooltip(starId: number, sn: { nx: number; ny: number; nz: number }) {
+      const star = stars[starId]
+      if (!star) return hideTooltip()
+      const ts = tooltipEl.querySelector('span')!
+      if (star.name) {
+        ts.textContent = star.name
+      } else {
+        const rh = Math.floor(star.ra), rm = Math.floor((star.ra - rh) * 60)
+        const ds = star.dec >= 0 ? '+' : '-'
+        const dd = Math.floor(Math.abs(star.dec)), dm = Math.floor((Math.abs(star.dec) - dd) * 60)
+        ts.textContent = `${rh}h${String(rm).padStart(2,'0')}m ${ds}${dd}°${String(dm).padStart(2,'0')}′`
+      }
+      tooltipLabel.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS - 50, sn.nz * SPHERE_RADIUS)
+      hoverGlow.position.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+      tooltipEl.style.opacity = '1'
+      hoverGlow.visible = true
+      ;(hoverGlow.material as SpriteMaterial).opacity = 0.95
+      hoveredStarId = starId
+      options?.onStarHover?.(starId)
+    }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false })
     canvas.addEventListener('pointermove', (e) => {
       if (dragging) {
         const dx = e.clientX - px, dy = e.clientY - py
         if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) clickDrag = true
+        hideTooltip(); return
       }
-      if (!options?.onStarHover) return
+      const now = performance.now()
+      if (now - hoverCheckTimer < 80) return
+      hoverCheckTimer = now
       const rect = canvas.getBoundingClientRect()
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const hits = raycaster.intersectObjects(starPointsRefs)
-      if (hits.length) {
-        const hit = hits[0]
-        const tierIdx = hit.object.userData.tierIndex as number
-        const starId = tierStarIds[tierIdx][hit.index!]
-        options.onStarHover(starId)
+      // 屏幕空间投影：遍历预计算的归一化向量，投影到屏幕，找最近的星
+      camera.updateMatrixWorld()
+      let bestDist = Infinity, bestId = -1, bestNx = 0, bestNy = 0, bestNz = 0
+      for (const sn of starScreenNorms) {
+        _v.set(sn.nx, sn.ny, sn.nz).project(camera)
+        if (_v.z > 1) continue
+        const dx = _v.x - mouse.x, dy = _v.y - mouse.y
+        const d = dx*dx + dy*dy
+        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
+      }
+      if (bestDist < 0.0015 && bestId !== -1) {
+        if (bestId !== hoveredStarId) showTooltip(bestId, { nx: bestNx, ny: bestNy, nz: bestNz })
       } else {
-        options.onStarHover(null)
+        hideTooltip()
       }
     })
+    canvas.addEventListener('pointerleave', hideTooltip)
     canvas.addEventListener('pointerup', (e) => {
-      if (clickDrag) return // 是拖动不是点击
+      if (clickDrag) return
       const rect = canvas.getBoundingClientRect()
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
