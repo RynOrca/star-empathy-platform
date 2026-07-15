@@ -237,8 +237,8 @@ export function useSky(
   // 每颗有故事的星都有一个独立的 Sprite，用随机周期和相位做呼吸动画
   const storyBreathTex = bloomTex('#ffe5a0', 128)
   const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
-  const STORY_GLOW_SCALE = 6 // hover 是 10，这是 60%
-  const STORY_GLOW_MAX_OPACITY = 0.35
+  const STORY_GLOW_SCALE = 16 // 呼吸辉光半径
+  const STORY_GLOW_MAX_OPACITY = 0.7
 
   function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
     // 记录已存在的 starId
@@ -895,9 +895,9 @@ export function useSky(
     const now = performance.now()
     for (const sg of storyGlows) {
       const t = ((now + sg.phase * 1000) % sg.period) / sg.period
-      // smooth sine breathing: 0 → 1 → 0
-      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-      ;(sg.sprite.material as SpriteMaterial).opacity = breath * STORY_GLOW_MAX_OPACITY
+      // smooth sine breathing: 0.15 → 0.7 → 0.15 (始终可见)
+      const breath = 0.15 + (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5 * (STORY_GLOW_MAX_OPACITY - 0.15)
+      ;(sg.sprite.material as SpriteMaterial).opacity = breath
     }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
