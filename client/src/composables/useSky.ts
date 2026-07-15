@@ -688,8 +688,7 @@ export function useSky(
   let af = 0
   function animate() {
     af = requestAnimationFrame(animate)
-    const breath = Math.sin(performance.now() * 0.0008) * 1.5
-    camera.fov = userFov + breath
+    camera.fov = userFov
     camera.updateProjectionMatrix()
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
