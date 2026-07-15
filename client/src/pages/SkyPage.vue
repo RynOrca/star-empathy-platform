@@ -51,6 +51,13 @@
         <p class="guide-title">挂上我的故事</p>
         <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
       </div>
+      <div class="guide-card guide-action-card">
+        <div class="guide-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+        </div>
+        <p class="guide-title">点开一颗星</p>
+        <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
+      </div>
     </div>
 
     <div v-if="locationReady" class="zoom-controls">
@@ -417,6 +424,11 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   line-height: 1.65;
   color: rgba(246, 241, 255, 0.6);
   margin: 0;
+}
+.guide-action-card {
+  background: rgba(60, 50, 15, 0.6);
+  border-color: rgba(255, 217, 138, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
 
 @media (max-width: 640px) {
