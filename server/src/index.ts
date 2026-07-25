@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import rateLimit from 'express-rate-limit';
 import starsRouter from './routes/stars';
@@ -13,9 +14,27 @@ import { ok, serverError } from './utils/response';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
+const isDev = process.env.NODE_ENV !== 'production';
+
+const allowedOrigins = isDev
+  ? ['http://localhost:5173', 'http://localhost:4173']
+  : (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []);
 
 // 中间件
-app.use(cors());
+app.use(helmet({
+  contentSecurityPolicy: isDev ? false : undefined,
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || isDev) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '100kb' }));
 
 // ═══ 限流 ═══

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
+import { getAllStars, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, serverError } from '../utils/response';
 
@@ -12,6 +12,33 @@ router.get('/', (_req: Request, res: Response) => {
     ok(res, 'success', stars);
   } catch (error) {
     console.error('GET /api/stars error:', error);
+    serverError(res);
+  }
+});
+
+// 单条故事详情（旧路由兼容）
+router.get('/story/:storyId', (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const story = getStoryById(storyId);
+    if (!story) return notFound(res, '故事不存在');
+    ok(res, 'success', story);
+  } catch (error) {
+    console.error('GET /api/stars/story/:storyId error:', error);
+    serverError(res);
+  }
+});
+
+// 单星下的所有故事（旧路由兼容）
+router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const stories = getStoriesByCatalogStarId(catalogStarId);
+    ok(res, 'success', stories);
+  } catch (error) {
+    console.error('GET /api/stars/:catalogStarId/stories error:', error);
     serverError(res);
   }
 });

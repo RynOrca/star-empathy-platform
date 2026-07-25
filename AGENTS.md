@@ -35,6 +35,7 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 | 方法 | 路径 | 说明 | 鉴权 |
 |---|---|---|---|
 | GET | `/api/stories` | 获取所有故事 | 无 |
+| GET | `/api/stories/:storyId` | 单条故事详情 | 无 |
 | POST | `/api/stories` | 投递故事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`/`tag`） | 可选 |
 | POST | `/api/stories/:storyId/resonate` | 共鸣 +1 | 无 |
 | POST | `/api/stories/:storyId/view` | 记录故事浏览 | 无 |
@@ -45,6 +46,7 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 |---|---|---|---|
 | GET | `/api/catalog/stars/search?q=` | 搜索恒星 | 无 |
 | GET | `/api/catalog/stars/:catalogStarId/stats` | 获取某恒星的聚合统计 | 无 |
+| GET | `/api/catalog/stars/:catalogStarId/stories` | 获取某恒星下的所有故事 | 无 |
 | POST | `/api/catalog/stars/:catalogStarId/visit` | 记录恒星浏览 | 无 |
 | POST | `/api/catalog/stars/:catalogStarId/favorite` | 收藏恒星 | 必须 |
 | DELETE | `/api/catalog/stars/:catalogStarId/favorite` | 取消收藏 | 必须 |

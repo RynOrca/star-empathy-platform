@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, createStar, resonate, recordStoryView } from '../services/starService';
+import { getAllStars, getStoryById, createStar, resonate, recordStoryView } from '../services/starService';
 import { authOptional } from '../middleware/auth';
 import { ok, badRequest, notFound, serverError } from '../utils/response';
 
@@ -12,6 +12,20 @@ router.get('/', (_req: Request, res: Response) => {
     ok(res, 'success', stories);
   } catch (error) {
     console.error('GET /api/stories error:', error);
+    serverError(res);
+  }
+});
+
+// 单条故事详情
+router.get('/:storyId', (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const story = getStoryById(storyId);
+    if (!story) return notFound(res, '故事不存在');
+    ok(res, 'success', story);
+  } catch (error) {
+    console.error('GET /api/stories/:storyId error:', error);
     serverError(res);
   }
 });

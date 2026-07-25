@@ -1,9 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { recordCatalogVisit, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
+import { recordCatalogVisit, getCatalogStats, getStoriesByCatalogStarId, addFavorite, removeFavorite } from '../services/starService';
 import { authRequired } from '../middleware/auth';
 import { ok, badRequest, serverError } from '../utils/response';
 
 const router = Router();
+
+// 获取某恒星下的所有故事
+router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const stories = getStoriesByCatalogStarId(catalogStarId);
+    ok(res, 'success', stories);
+  } catch (error) {
+    console.error('GET /api/catalog/stars/:catalogStarId/stories error:', error);
+    serverError(res);
+  }
+});
 
 // 获取恒星统计数据（按 catalog_star_id 聚合）
 router.get('/:catalogStarId/stats', (req: Request, res: Response) => {

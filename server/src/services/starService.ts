@@ -134,6 +134,28 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
   return { starCount: starRow.cnt, userCount: userRow.cnt, totalResonance: resRow.cnt };
 }
 
+// 单条故事详情
+export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
+  const row = db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.id = ?
+  `).get(storyId) as unknown as (Star & { username: string | null; tag: string | null }) | undefined;
+  return row ?? null;
+}
+
+// 单星下的所有故事
+export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
+  return db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.catalog_star_id = ?
+    ORDER BY s.created_at DESC
+  `).all(catalogStarId) as unknown as (Star & { username: string | null; tag: string | null })[];
+}
+
 // 我的故事
 export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
