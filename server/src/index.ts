@@ -9,6 +9,7 @@ import authRouter from './routes/auth';
 import statsRouter from './routes/stats';
 import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
+import { ok, serverError } from './utils/response';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -24,7 +25,7 @@ const globalLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { code: 429, message: '请求过于频繁，请稍后再试', data: null },
+  message: { message: '请求过于频繁，请稍后再试', data: null },
 });
 app.use('/api/', globalLimiter);
 
@@ -34,7 +35,7 @@ const writeLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { code: 429, message: '操作过于频繁，请稍后再试', data: null },
+  message: { message: '操作过于频繁，请稍后再试', data: null },
 });
 
 // 登录/注册更严格：每分钟 10 次/IP
@@ -43,7 +44,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { code: 429, message: '登录尝试过于频繁，请稍后再试', data: null },
+  message: { message: '登录尝试过于频繁，请稍后再试', data: null },
 });
 
 // 生产环境：托管前端静态文件
@@ -52,7 +53,7 @@ app.use(express.static(clientDist))
 
 // 健康检查
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ code: 200, message: 'ok', data: null });
+  ok(res, 'ok');
 });
 
 // 认证路由
@@ -99,7 +100,7 @@ app.get('*', (_req: Request, res: Response) => {
 // 全局错误处理中间件
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+  serverError(res);
 });
 
 // 启动服务

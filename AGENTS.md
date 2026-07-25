@@ -77,7 +77,7 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 
 `/api/stars`、`/api/stars/story`、`/api/stars/:id/resonate`、`/api/stars/:id/stats`、`/api/stars/:id/visit`、`/api/stars/story/:id/view`、`/api/stars/:id/favorite`、`/api/stars/search`
 
-响应统一格式：`{ code: 200|400|401|404|429|500, message: "...", data: ... }`
+响应统一格式：`{ message: "...", data: ... }`，通过 HTTP 状态码（200|400|401|404|429|500）表示结果。数据字段统一使用 camelCase（如 `resonanceCount`、`catalogStarId`、`viewCount`、`createdAt`）。
 
 ### 限流策略
 

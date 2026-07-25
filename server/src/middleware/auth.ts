@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { unauthorized } from '../utils/response';
 
 const envSecret = process.env.JWT_SECRET;
 const isDev = process.env.NODE_ENV !== 'production';
@@ -25,7 +26,7 @@ export interface AuthUser {
 export function authRequired(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ code: 401, message: '请先登录', data: null });
+    return unauthorized(res, '请先登录');
   }
   const token = header.slice(7);
   try {
@@ -33,7 +34,7 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
     (req as Request & { user: AuthUser }).user = decoded;
     next();
   } catch {
-    return res.status(401).json({ code: 401, message: '登录已过期', data: null });
+    return unauthorized(res, '登录已过期');
   }
 }
 

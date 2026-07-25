@@ -178,7 +178,7 @@ onMounted(async () => {
     try {
       const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
       const json = await res.json()
-      if (json.code === 200) username.value = json.data.username
+      if (res.ok) username.value = json.data.username
     } catch {}
   }
 })
@@ -201,7 +201,7 @@ async function onSearchInput() {
   try {
     const res = await fetch(`/api/stars/search?q=${encodeURIComponent(q)}`)
     const json = await res.json()
-    if (json.code === 200) searchResults.value = json.data
+    if (res.ok) searchResults.value = json.data
   } catch { searchResults.value = [] }
   finally { searching.value = false }
 }
@@ -224,11 +224,11 @@ for (const s of catalogData.stars) {
 
 interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
-  catalog_star_id: number; created_at: string; location_lat: number | null
-  location_lng: number | null; type: string; view_count: number; origin: string | null
+  catalogStarId: number; createdAt: string; locationLat: number | null
+  locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1, created_at: '', location_lat: null, location_lng: null, type: '', view_count: 0, origin: null, username: null, tag: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
 const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
 
 async function fetchStories() {
@@ -238,12 +238,12 @@ async function fetchStories() {
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
     for (const s of json.data ?? []) {
-      const cid = s.catalog_star_id
+      const cid = s.catalogStarId
       if (cid != null) {
         if (!map.has(cid)) map.set(cid, [])
-        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonance_count, catalog_star_id: cid, created_at: s.created_at || '', location_lat: s.location_lat ?? null, location_lng: s.location_lng ?? null, type: s.type || 'user', view_count: s.view_count ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
+        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount, catalogStarId: cid, createdAt: s.createdAt || '', locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null, type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
         const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
-        cur.stories++; cur.resonance += s.resonance_count || 0; cur.views += s.view_count || 0
+        cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
         statsMap.set(cid, cur)
       }
     }
@@ -326,16 +326,16 @@ function onPlanetClick(name: string, nameCN: string) {
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
 }
 async function fetchCatalogStats(starId: number) {
-  try { const res = await fetch(`/api/stars/${starId}/stats`); const json = await res.json(); if (json.code === 200) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
+  try { const res = await fetch(`/api/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
 function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
-function onStorySubmitted(story: StoryData) { const cid = story.catalog_star_id; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
+function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
 function onDecrementFavorites() { if (catalogStats.value && catalogStats.value.favoriteCount > 0) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount - 1 } }
-async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stars/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (json.code === 200) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonance_count; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
+async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stars/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>

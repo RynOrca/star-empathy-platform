@@ -83,11 +83,11 @@
                   <template v-if="story.origin"> · {{ story.origin }}</template>
                 </span>
                 <template v-else>
-                  <span v-if="formatTime(story.created_at)" class="meta-time">{{ formatTime(story.created_at) }}</span>
-                  <span v-if="formatTime(story.created_at) && formatDistance(story.location_lat, story.location_lng).text" class="meta-sep">·</span>
-                  <span v-if="formatDistance(story.location_lat, story.location_lng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.location_lat, story.location_lng).near }">{{ formatDistance(story.location_lat, story.location_lng).text }}</span>
+                  <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
+                  <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
+                  <span v-if="formatDistance(story.locationLat, story.locationLng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.locationLat, story.locationLng).near }">{{ formatDistance(story.locationLat, story.locationLng).text }}</span>
                 </template>
-                <span class="meta-sep" v-if="(story.type === 'history' || formatTime(story.created_at) || formatDistance(story.location_lat, story.location_lng).text)">·</span>
+                <span class="meta-sep" v-if="(story.type === 'history' || formatTime(story.createdAt) || formatDistance(story.locationLat, story.locationLng).text)">·</span>
                 <Sparkles :size="12" /> <span>{{ story.resonanceCount }}</span>
                 <span class="meta-sep">·</span>
                 <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
@@ -117,9 +117,9 @@
                 <template v-if="detailStory.origin"> · {{ detailStory.origin }}</template>
               </span>
               <template v-else>
-                <span v-if="formatTime(detailStory.created_at)">{{ formatTime(detailStory.created_at) }}</span>
-                <span v-if="formatTime(detailStory.created_at) && formatDistance(detailStory.location_lat, detailStory.location_lng).text">·</span>
-                <span v-if="formatDistance(detailStory.location_lat, detailStory.location_lng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.location_lat, detailStory.location_lng).near }">{{ formatDistance(detailStory.location_lat, detailStory.location_lng).text }}</span>
+                <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
               </template>
             </div>
             <div class="detail-body">{{ detailStory.content }}</div>
@@ -246,11 +246,11 @@ const props = defineProps<{
     title: string | null
     content: string
     resonanceCount: number
-    created_at: string
-    location_lat: number | null
-    location_lng: number | null
+    createdAt: string
+    locationLat: number | null
+    locationLng: number | null
     type: string
-    view_count: number
+    viewCount: number
     origin: string | null
     username: string | null
     tag: string | null
@@ -328,11 +328,11 @@ const displayedStories = computed(() => {
 function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof filteredStories.value[0]) => number {
   switch (key) {
     case 'time':
-      return (a, b) => b.created_at.localeCompare(a.created_at)
+      return (a, b) => b.createdAt.localeCompare(a.createdAt)
     case 'distance': {
       return (a, b) => {
-        const da = formatDistance(a.location_lat, a.location_lng)
-        const db2 = formatDistance(b.location_lat, b.location_lng)
+        const da = formatDistance(a.locationLat, a.locationLng)
+        const db2 = formatDistance(b.locationLat, b.locationLng)
         // 有距离的排前面，无距离的排后面
         if (da.text && !db2.text) return -1
         if (!da.text && db2.text) return 1
@@ -359,7 +359,7 @@ const viewCountOverrides = reactive(new Map<number, number>())
 function getStoryViewCount(storyId: number): number {
   if (viewCountOverrides.has(storyId)) return viewCountOverrides.get(storyId)!
   const s = props.stories.find(s => s.id === storyId)
-  return s?.view_count ?? 0
+  return s?.viewCount ?? 0
 }
 
 const detailStoryId = ref<number | null>(null)
@@ -424,7 +424,7 @@ async function fetchCatalogStatsFromFront() {
   try {
     const res = await fetch(`/api/stars/${props.catalogStarId}/stats`)
     const json = await res.json()
-    if (json.code === 200) {
+    if (res.ok) {
       // 通知父组件更新
       emit('updateStats', json.data)
     }

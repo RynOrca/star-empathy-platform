@@ -68,7 +68,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalog_star_id: number; created_at: string; location_lat: number | null; location_lng: number | null; type: string; view_count: number; origin: string | null; username: string | null; tag: string | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null }]
 }>()
 
 const title = ref('')
@@ -110,7 +110,7 @@ async function onSubmit() {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        catalog_star_id: props.catalogStarId,
+        catalogStarId: props.catalogStarId,
         title: trimmedTitle,
         content: trimmed,
         location: userLocation.value,
@@ -118,18 +118,18 @@ async function onSubmit() {
       }),
     })
     const json = await res.json()
-    if (json.code === 200) {
+    if (res.ok) {
       emit('submitted', {
         id: json.data.id,
         title: json.data.title,
         content: json.data.content,
-        resonanceCount: json.data.resonance_count,
-        catalog_star_id: json.data.catalog_star_id,
-        created_at: json.data.created_at || '',
-        location_lat: json.data.location_lat ?? null,
-        location_lng: json.data.location_lng ?? null,
+        resonanceCount: json.data.resonanceCount,
+        catalogStarId: json.data.catalogStarId,
+        createdAt: json.data.createdAt || '',
+        locationLat: json.data.locationLat ?? null,
+        locationLng: json.data.locationLng ?? null,
         type: 'user',
-        view_count: 0,
+        viewCount: 0,
         origin: null,
         username: json.data.username ?? null,
         tag: json.data.tag ?? selectedTag.value,

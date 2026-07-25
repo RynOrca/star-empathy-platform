@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getAllStars, createStar, resonate, recordStoryView } from '../services/starService';
 import { authOptional } from '../middleware/auth';
+import { ok, badRequest, notFound, serverError } from '../utils/response';
 
 const router = Router();
 
@@ -8,10 +9,10 @@ const router = Router();
 router.get('/', (_req: Request, res: Response) => {
   try {
     const stories = getAllStars();
-    res.json({ code: 200, message: 'success', data: stories });
+    ok(res, 'success', stories);
   } catch (error) {
     console.error('GET /api/stories error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 
@@ -22,12 +23,12 @@ router.post('/', authOptional, (req: Request, res: Response) => {
     const user = (req as Request & { user?: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
-      return res.status(400).json({ code: 400, message: 'content 不能为空', data: null });
+      return badRequest(res, 'content 不能为空');
     }
 
     const trimmed = content.trim();
     if (trimmed.length === 0 || trimmed.length > 300) {
-      return res.status(400).json({ code: 400, message: 'content 长度需在 1~300 字之间', data: null });
+      return badRequest(res, 'content 长度需在 1~300 字之间');
     }
 
     const catalogStarId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
@@ -54,10 +55,10 @@ router.post('/', authOptional, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
 
     const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user?.id, safeTag);
-    res.status(200).json({ code: 200, message: '故事已化作星光', data: story });
+    ok(res, '故事已化作星光', story);
   } catch (error) {
     console.error('POST /api/stories error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 
@@ -65,15 +66,15 @@ router.post('/', authOptional, (req: Request, res: Response) => {
 router.post('/:storyId/resonate', (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
-    if (isNaN(storyId)) return res.status(400).json({ code: 400, message: '无效的 storyId', data: null });
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
     const result = resonate(storyId);
-    if (!result) return res.status(404).json({ code: 404, message: '故事不存在', data: null });
+    if (!result) return notFound(res, '故事不存在');
 
-    res.json({ code: 200, message: '共鸣已点亮', data: result });
+    ok(res, '共鸣已点亮', result);
   } catch (error) {
     console.error('POST /api/stories/:storyId/resonate error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 
@@ -81,12 +82,12 @@ router.post('/:storyId/resonate', (req: Request, res: Response) => {
 router.post('/:storyId/view', (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
-    if (isNaN(storyId)) return res.status(400).json({ code: 400, message: '无效的 storyId', data: null });
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
     recordStoryView(storyId);
-    res.json({ code: 200, message: 'success', data: null });
+    ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stories/:storyId/view error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 
