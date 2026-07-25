@@ -1,15 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
+import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
-import { ok, badRequest, notFound, serverError } from '../utils/response';
+import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 
 const router = Router();
 
-// 获取所有星星
-router.get('/', (_req: Request, res: Response) => {
+// 获取所有星星（支持分页 ?page=&limit=，不传则返回全量）
+router.get('/', (req: Request, res: Response) => {
   try {
-    const stars = getAllStars();
-    ok(res, 'success', stars);
+    const page = parseInt(req.query.page as string, 10);
+    const limit = parseInt(req.query.limit as string, 10);
+    if (!isNaN(page) && !isNaN(limit)) {
+      const paged = getAllStarsPaged(page, limit);
+      ok(res, 'success', paged);
+    } else {
+      const stars = getAllStars();
+      ok(res, 'success', stars);
+    }
   } catch (error) {
     console.error('GET /api/stars error:', error);
     serverError(res);
@@ -168,6 +175,22 @@ router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Resp
     ok(res, '已取消收藏');
   } catch (error) {
     console.error('DELETE /api/stars/:catalogStarId/favorite error:', error);
+    serverError(res);
+  }
+});
+
+// 删除故事（旧路由兼容，需登录，只能删自己的）
+router.delete('/story/:storyId', authRequired, (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = deleteStory(storyId, user.id);
+    if (result.notFound) return notFound(res, '故事不存在');
+    if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    ok(res, '已删除');
+  } catch (error) {
+    console.error('DELETE /api/stars/story/:storyId error:', error);
     serverError(res);
   }
 });

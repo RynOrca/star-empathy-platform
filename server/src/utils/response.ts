@@ -29,5 +29,6 @@ export const ok = (res: any, message: string, data: any = null) => send(res, 200
 export const created = (res: any, message: string, data: any = null) => send(res, 201, message, data)
 export const badRequest = (res: any, message: string) => send(res, 400, message)
 export const unauthorized = (res: any, message: string) => send(res, 401, message)
+export const forbidden = (res: any, message: string) => send(res, 403, message)
 export const notFound = (res: any, message: string) => send(res, 404, message)
 export const serverError = (res: any, message: string = '服务器内部错误') => send(res, 500, message)

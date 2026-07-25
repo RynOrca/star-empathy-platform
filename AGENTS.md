@@ -34,11 +34,12 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 
 | 方法 | 路径 | 说明 | 鉴权 |
 |---|---|---|---|
-| GET | `/api/stories` | 获取所有故事 | 无 |
+| GET | `/api/stories` | 获取所有故事（支持 `?page=&limit=` 分页，不传返回全量） | 无 |
 | GET | `/api/stories/:storyId` | 单条故事详情 | 无 |
 | POST | `/api/stories` | 投递故事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`/`tag`） | 可选 |
 | POST | `/api/stories/:storyId/resonate` | 共鸣 +1 | 无 |
 | POST | `/api/stories/:storyId/view` | 记录故事浏览 | 无 |
+| DELETE | `/api/stories/:storyId` | 删除故事（只能删自己的） | 必须 |
 
 **恒星 catalog 相关 `/api/catalog/stars`**
 

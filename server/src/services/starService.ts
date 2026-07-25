@@ -28,6 +28,33 @@ export function getAllStars(): (Star & { username: string | null; tag: string | 
   `).all() as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
+// 分页获取所有星星
+export function getAllStarsPaged(page: number, limit: number): {
+  items: (Star & { username: string | null; tag: string | null })[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+} {
+  const p = Math.max(1, Math.floor(page));
+  const l = Math.max(1, Math.min(100, Math.floor(limit)));
+  const offset = (p - 1) * l;
+
+  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as { cnt: number };
+  const total = totalRow.cnt;
+  const totalPages = Math.ceil(total / l);
+
+  const items = db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
+
+  return { items, total, page: p, limit: l, totalPages };
+}
+
 // 创建星星
 export function createStar(
   content: string,
@@ -171,4 +198,17 @@ export function getUserFavorites(userId: number): number[] {
     'SELECT catalog_star_id FROM favorites WHERE user_id = ? ORDER BY created_at DESC'
   ).all(userId) as unknown as { catalog_star_id: number }[];
   return rows.map(r => r.catalog_star_id);
+}
+
+// 删除故事（只能删除自己的，userId 为 null 表示匿名不允许删）
+export function deleteStory(storyId: number, userId: number): {
+  success: boolean;
+  notFound?: boolean;
+  notOwner?: boolean;
+} {
+  const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
+  if (!existing) return { success: false, notFound: true };
+  if (existing.user_id !== userId) return { success: false, notOwner: true };
+  db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
+  return { success: true };
 }

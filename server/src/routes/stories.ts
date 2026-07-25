@@ -1,15 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, getStoryById, createStar, resonate, recordStoryView } from '../services/starService';
-import { authOptional } from '../middleware/auth';
-import { ok, badRequest, notFound, serverError } from '../utils/response';
+import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory } from '../services/starService';
+import { authOptional, authRequired } from '../middleware/auth';
+import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 
 const router = Router();
 
-// 获取所有故事
-router.get('/', (_req: Request, res: Response) => {
+// 获取所有故事（支持分页 ?page=&limit=，不传则返回全量）
+router.get('/', (req: Request, res: Response) => {
   try {
-    const stories = getAllStars();
-    ok(res, 'success', stories);
+    const page = parseInt(req.query.page as string, 10);
+    const limit = parseInt(req.query.limit as string, 10);
+    if (!isNaN(page) && !isNaN(limit)) {
+      const paged = getAllStarsPaged(page, limit);
+      ok(res, 'success', paged);
+    } else {
+      const stories = getAllStars();
+      ok(res, 'success', stories);
+    }
   } catch (error) {
     console.error('GET /api/stories error:', error);
     serverError(res);
@@ -101,6 +108,22 @@ router.post('/:storyId/view', (req: Request, res: Response) => {
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stories/:storyId/view error:', error);
+    serverError(res);
+  }
+});
+
+// 删除故事（需登录，只能删自己的）
+router.delete('/:storyId', authRequired, (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = deleteStory(storyId, user.id);
+    if (result.notFound) return notFound(res, '故事不存在');
+    if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    ok(res, '已删除');
+  } catch (error) {
+    console.error('DELETE /api/stories/:storyId error:', error);
     serverError(res);
   }
 });
