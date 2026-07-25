@@ -412,7 +412,7 @@ async function toggleFavorite() {
   if (prev) { emit('decrementFavorites') } else { emit('incrementFavorites') }
   try {
     const method = prev ? 'DELETE' : 'POST'
-    await fetch(`/api/stars/${props.catalogStarId}/favorite`, { method })
+    await fetch(`/api/catalog/stars/${props.catalogStarId}/favorite`, { method })
     fetchCatalogStatsFromFront()
   } catch {
     isFavorited.value = prev
@@ -422,7 +422,7 @@ async function toggleFavorite() {
 
 async function fetchCatalogStatsFromFront() {
   try {
-    const res = await fetch(`/api/stars/${props.catalogStarId}/stats`)
+    const res = await fetch(`/api/catalog/stars/${props.catalogStarId}/stats`)
     const json = await res.json()
     if (res.ok) {
       // 通知父组件更新
@@ -442,7 +442,7 @@ function openStoryDetail(story: { id: number }) {
   // 通知父组件更新统计行
   emit('incrementViews')
   // 后端记录 + 重新拉取
-  fetch(`/api/stars/story/${story.id}/view`, { method: 'POST' })
+  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
       // 失败回滚

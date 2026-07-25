@@ -48,7 +48,7 @@ export function useStars() {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch('/api/stars')
+      const res = await fetch('/api/stories')
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || '请求失败')
       stars.value = json.data as StarData[]
