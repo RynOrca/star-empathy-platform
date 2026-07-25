@@ -91,12 +91,14 @@
         :catalog-stats="catalogStats"
         :catalog-star-id="selectedCatalogStarId"
         :resonating="resonating"
+        :favorite-star-ids="favoriteStarIds"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
         @increment-views="onIncrementViews"
         @increment-favorites="onIncrementFavorites"
         @decrement-favorites="onDecrementFavorites"
+        @update-favorite-list="onUpdateFavoriteList"
         @update-stats="catalogStats = $event"
         @close="onCloseDetail"
         @write-story="onWriteStory"
@@ -124,6 +126,7 @@ import { constellationNames, starDistances } from '../data/starInfo'
 
 const router = useRouter()
 const username = ref('')
+const favoriteStarIds = ref<number[]>([])
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
@@ -176,9 +179,14 @@ onMounted(async () => {
   const token = localStorage.getItem('token')
   if (token) {
     try {
-      const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-      const json = await res.json()
-      if (res.ok) username.value = json.data.username
+      const [meRes, favRes] = await Promise.all([
+        fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      const meJson = await meRes.json()
+      if (meRes.ok) username.value = meJson.data.username
+      const favJson = await favRes.json()
+      if (favRes.ok) favoriteStarIds.value = favJson.data
     } catch {}
   }
 })
@@ -335,6 +343,14 @@ function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
 function onDecrementFavorites() { if (catalogStats.value && catalogStats.value.favoriteCount > 0) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount - 1 } }
+function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean }) {
+  if (data.favorited) {
+    if (!favoriteStarIds.value.includes(data.catalogStarId))
+      favoriteStarIds.value = [...favoriteStarIds.value, data.catalogStarId]
+  } else {
+    favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
+  }
+}
 async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stars/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
