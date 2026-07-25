@@ -50,7 +50,6 @@ db.exec(`
     UNIQUE(catalog_star_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS idx_favorites ON favorites(catalog_star_id);
-  CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 `);
 
 // 兼容旧数据库：添加新列
