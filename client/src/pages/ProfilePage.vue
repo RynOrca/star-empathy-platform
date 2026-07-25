@@ -80,11 +80,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
+
+const PAGE_SIZE = 20
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -101,6 +103,10 @@ const activeStory = ref<any>(null)
 const editingSig = ref(false)
 const sigDraft = ref('')
 const sigInputRef = ref<HTMLInputElement | null>(null)
+
+const currentPage = ref(0)
+const hasMore = ref(true)
+const loadingMore = ref(false)
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
@@ -135,10 +141,10 @@ async function removeFavorite(starId: number) {
   } catch {}
 }
 
-const precomputedPositions: { x: number; y: number; delay: number; size: number }[] = []
+const precomputedPositions = ref<{ x: number; y: number; delay: number; size: number }[]>([])
 function starStyle(i: number) {
-  if (i >= precomputedPositions.length) return {}
-  const p = precomputedPositions[i]
+  if (i >= precomputedPositions.value.length) return {}
+  const p = precomputedPositions.value[i]
   return {
     left: p.x + '%',
     top: p.y + '%',
@@ -148,7 +154,51 @@ function starStyle(i: number) {
   }
 }
 
+function appendPositions(count: number) {
+  for (let i = 0; i < count; i++) {
+    precomputedPositions.value.push({
+      x: 15 + Math.random() * 70,
+      y: 38 + Math.random() * 52,
+      delay: Math.random() * 2,
+      size: 4 + Math.random() * 8,
+    })
+  }
+}
+
 function getToken() { return localStorage.getItem('token') }
+
+async function loadNextPage() {
+  if (!hasMore.value || loadingMore.value) return
+  const token = getToken()
+  if (!token) return
+  loadingMore.value = true
+  try {
+    const nextPage = currentPage.value + 1
+    const res = await fetch(`/api/profile/stories?page=${nextPage}&limit=${PAGE_SIZE}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
+    if (res.ok && json.data) {
+      const items = json.data.items ?? json.data ?? []
+      stories.value = [...stories.value, ...items]
+      currentPage.value = json.data.page ?? nextPage
+      hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
+      appendPositions(items.length)
+      // 用 total 更新 storyCount（首次）
+      if (json.data.total != null && stats.value.storyCount === 0) {
+        stats.value.storyCount = json.data.total
+      }
+      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+    }
+  } catch (e) { console.error('加载故事页失败:', e) }
+  finally { loadingMore.value = false }
+}
+
+function onScroll() {
+  const scrollBottom = window.innerHeight + window.scrollY
+  const pageHeight = document.documentElement.scrollHeight
+  if (scrollBottom >= pageHeight - 200) loadNextPage()
+}
 
 async function startEditSig() {
   sigDraft.value = user.value?.signature || ''
@@ -181,37 +231,37 @@ onMounted(async () => {
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
-    const [meRes, storiesRes, favRes] = await Promise.all([
+    const [meRes, firstPageRes, favRes] = await Promise.all([
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/stories', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
-    const storiesJson = await storiesRes.json()
-    if (storiesRes.ok) {
-      stories.value = storiesJson.data
-      stats.value.storyCount = storiesJson.data.length
-      stats.value.totalResonance = storiesJson.data.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+    const firstJson = await firstPageRes.json()
+    if (firstJson.ok && firstJson.data) {
+      const items = firstJson.data.items ?? firstJson.data ?? []
+      stories.value = items
+      currentPage.value = firstJson.data.page ?? 1
+      hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
+      stats.value.storyCount = firstJson.data.total ?? items.length
+      stats.value.totalResonance = items.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      appendPositions(items.length)
     }
     const favJson = await favRes.json()
     if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
-
-    for (let i = 0; i < stories.value.length; i++) {
-      precomputedPositions.push({
-        x: 15 + Math.random() * 70,
-        y: 38 + Math.random() * 52,
-        delay: Math.random() * 2,
-        size: 4 + Math.random() * 8,
-      })
-    }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
 })
 </script>
 
 <style scoped>
-.profile-page { width: 100vw; min-height: 100vh; position: relative; overflow: hidden; font-family: var(--font,"Microsoft YaHei",sans-serif); color: #f6f1ff; }
+.profile-page { width: 100vw; min-height: 100vh; position: relative; overflow-x: hidden; font-family: var(--font,"Microsoft YaHei",sans-serif); color: #f6f1ff; padding-bottom: 120px; }
 .sky-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
 .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #7a759c; z-index: 10; }
 

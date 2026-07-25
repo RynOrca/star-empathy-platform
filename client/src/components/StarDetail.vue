@@ -455,7 +455,7 @@ function openStoryDetail(story: { id: number }) {
   // 通知父组件更新统计行
   emit('incrementViews')
   // 后端记录 + 重新拉取
-  fetch(`/api/stars/story/${story.id}/view`, { method: 'POST' })
+  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
       // 失败回滚

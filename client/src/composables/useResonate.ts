@@ -8,7 +8,7 @@ export function useResonate() {
     resonatingId.value = id
     lastError.value = null
     try {
-      const res = await fetch(`/api/stars/${id}/resonate`, {
+      const res = await fetch(`/api/stories/${id}/resonate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })

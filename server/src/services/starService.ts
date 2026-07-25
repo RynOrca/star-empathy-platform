@@ -192,6 +192,31 @@ export function getUserStories(userId: number): (Star & { username: string | nul
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
+export function getUserStoriesPaged(userId: number, page: number, limit: number): {
+  items: (Star & { username: string | null; tag: string | null })[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+} {
+  const p = Math.max(1, Math.floor(page));
+  const l = Math.max(1, Math.min(100, Math.floor(limit)));
+  const offset = (p - 1) * l;
+
+  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_id = ?').get(userId) as { cnt: number };
+  const total = totalRow.cnt;
+  const totalPages = Math.ceil(total / l);
+
+  const items = db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.user_id = ? ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(userId, l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
+
+  return { items, total, page: p, limit: l, totalPages };
+}
+
 // 我的收藏（返回该用户收藏的 catalog_star_id 列表）
 export function getUserFavorites(userId: number): number[] {
   const rows = db.prepare(
