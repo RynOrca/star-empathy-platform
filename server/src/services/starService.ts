@@ -107,14 +107,23 @@ export function getCatalogStats(catalogStarId: number): { storyCount: number; to
   };
 }
 
-// 收藏星星
-export function addFavorite(catalogStarId: number): void {
-  db.prepare('INSERT INTO favorites (catalog_star_id) VALUES (?)').run(catalogStarId);
+// 收藏星星（用户级，同一用户对同一星只能收藏一次）
+export function addFavorite(catalogStarId: number, userId: number): { already: boolean } {
+  const existing = db.prepare(
+    'SELECT id FROM favorites WHERE catalog_star_id = ? AND user_id = ?'
+  ).get(catalogStarId, userId) as unknown as { id: number } | undefined;
+  if (existing) return { already: true };
+  db.prepare(
+    'INSERT INTO favorites (catalog_star_id, user_id) VALUES (?, ?)'
+  ).run(catalogStarId, userId);
+  return { already: false };
 }
 
 // 取消收藏星星
-export function removeFavorite(catalogStarId: number): void {
-  db.prepare('DELETE FROM favorites WHERE catalog_star_id = ?').run(catalogStarId);
+export function removeFavorite(catalogStarId: number, userId: number): void {
+  db.prepare(
+    'DELETE FROM favorites WHERE catalog_star_id = ? AND user_id = ?'
+  ).run(catalogStarId, userId);
 }
 
 // 全局统计
@@ -134,10 +143,10 @@ export function getUserStories(userId: number): (Star & { username: string | nul
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
-// 我的收藏（返回收藏的星星 catalog_star_id 列表）
+// 我的收藏（返回该用户收藏的 catalog_star_id 列表）
 export function getUserFavorites(userId: number): number[] {
-  // favorites 表存的是 catalog_star_id，不需要关联用户
-  // 这里简化：返回所有收藏的星星ID（平台级收藏，非用户级）
-  const rows = db.prepare('SELECT DISTINCT catalog_star_id FROM favorites ORDER BY catalog_star_id').all() as unknown as { catalog_star_id: number }[];
+  const rows = db.prepare(
+    'SELECT catalog_star_id FROM favorites WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(userId) as unknown as { catalog_star_id: number }[];
   return rows.map(r => r.catalog_star_id);
 }

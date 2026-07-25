@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getAllStars, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
-import { authOptional } from '../middleware/auth';
+import { authOptional, authRequired } from '../middleware/auth';
 
 const router = Router();
 
@@ -62,82 +62,84 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
 });
 
 // 共鸣点亮
-router.post('/:id/resonate', (req: Request, res: Response) => {
+router.post('/:storyId/resonate', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return res.status(400).json({ code: 400, message: '无效的 storyId', data: null });
 
-    const result = resonate(id);
-    if (!result) return res.status(404).json({ code: 404, message: '星星不存在', data: null });
+    const result = resonate(storyId);
+    if (!result) return res.status(404).json({ code: 404, message: '故事不存在', data: null });
 
     res.json({ code: 200, message: '共鸣已点亮', data: result });
   } catch (error) {
-    console.error('POST /api/stars/:id/resonate error:', error);
+    console.error('POST /api/stars/:storyId/resonate error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });
 
-// 获取星星统计数据
-router.get('/:id/stats', (req: Request, res: Response) => {
+// 获取恒星统计数据（按 catalog_star_id）
+router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    const stats = getCatalogStats(id);
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return res.status(400).json({ code: 400, message: '无效的 catalogStarId', data: null });
+    const stats = getCatalogStats(catalogStarId);
     res.json({ code: 200, message: 'success', data: stats });
   } catch (error) {
-    console.error('GET /api/stars/:id/stats error:', error);
+    console.error('GET /api/stars/:catalogStarId/stats error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });
 
-// 记录星星级浏览（打开详情页一次）
-router.post('/:id/visit', (req: Request, res: Response) => {
+// 记录恒星浏览（打开详情页一次）
+router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    recordCatalogVisit(id);
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return res.status(400).json({ code: 400, message: '无效的 catalogStarId', data: null });
+    recordCatalogVisit(catalogStarId);
     res.json({ code: 200, message: 'success', data: null });
   } catch (error) {
-    console.error('POST /api/stars/:id/visit error:', error);
+    console.error('POST /api/stars/:catalogStarId/visit error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });
 
-// 记录故事级浏览（点击进入故事详情）
-router.post('/story/:id/view', (req: Request, res: Response) => {
+// 记录故事浏览（点击进入故事详情）
+router.post('/story/:storyId/view', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    recordStoryView(id);
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return res.status(400).json({ code: 400, message: '无效的 storyId', data: null });
+    recordStoryView(storyId);
     res.json({ code: 200, message: 'success', data: null });
   } catch (error) {
-    console.error('POST /api/stars/story/:id/view error:', error);
+    console.error('POST /api/stars/story/:storyId/view error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });
 
-// 收藏星星
-router.post('/:id/favorite', (req: Request, res: Response) => {
+// 收藏星星（需登录）
+router.post('/:catalogStarId/favorite', authRequired, (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    addFavorite(id);
-    res.json({ code: 200, message: '已收藏', data: null });
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return res.status(400).json({ code: 400, message: '无效的 catalogStarId', data: null });
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = addFavorite(catalogStarId, user.id);
+    res.json({ code: 200, message: result.already ? '已收藏' : '收藏成功', data: null });
   } catch (error) {
-    console.error('POST /api/stars/:id/favorite error:', error);
+    console.error('POST /api/stars/:catalogStarId/favorite error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });
 
-// 取消收藏星星
-router.delete('/:id/favorite', (req: Request, res: Response) => {
+// 取消收藏星星（需登录）
+router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    removeFavorite(id);
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return res.status(400).json({ code: 400, message: '无效的 catalogStarId', data: null });
+    const user = (req as Request & { user: { id: number } }).user;
+    removeFavorite(catalogStarId, user.id);
     res.json({ code: 200, message: '已取消收藏', data: null });
   } catch (error) {
-    console.error('DELETE /api/stars/:id/favorite error:', error);
+    console.error('DELETE /api/stars/:catalogStarId/favorite error:', error);
     res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
   }
 });

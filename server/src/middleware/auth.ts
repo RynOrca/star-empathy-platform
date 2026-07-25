@@ -1,7 +1,20 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'star-empathy-dev-secret';
+const envSecret = process.env.JWT_SECRET;
+const isDev = process.env.NODE_ENV !== 'production';
+let JWT_SECRET: string;
+
+if (!envSecret) {
+  if (isDev) {
+    console.warn('[auth] ⚠️  未设置 JWT_SECRET，开发环境使用默认值。生产环境必须设置！');
+    JWT_SECRET = 'star-empathy-dev-secret';
+  } else {
+    throw new Error('[auth] 生产环境必须设置 JWT_SECRET 环境变量');
+  }
+} else {
+  JWT_SECRET = envSecret;
+}
 
 export interface AuthUser {
   id: number;
