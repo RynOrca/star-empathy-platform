@@ -230,27 +230,75 @@ interface StoryData {
 }
 const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
 const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
+const fetchingStories = ref(false)
+let fetchAbort: AbortController | null = null
+
+const PAGE_SIZE = 50
+
+function mergeStoriesIntoMap(
+  items: any[],
+  map: Map<number, StoryData[]>,
+  statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+) {
+  for (const s of items) {
+    const cid = s.catalogStarId
+    if (cid == null) continue
+    if (!map.has(cid)) map.set(cid, [])
+    map.get(cid)!.push({
+      id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount,
+      catalogStarId: cid, createdAt: s.createdAt || '',
+      locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
+      type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
+      username: s.username ?? null, tag: s.tag ?? null,
+    })
+    const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
+    cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
+    statsMap.set(cid, cur)
+  }
+}
+
+function publishStories(
+  map: Map<number, StoryData[]>,
+  statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+) {
+  storiesByStarId.value = map
+  pendingStatsMap.value = statsMap
+  skyRef.value?.sky?.setStarStatsCache(statsMap)
+}
 
 async function fetchStories() {
+  if (fetchingStories.value) return
+  fetchingStories.value = true
+  fetchAbort?.abort()
+  fetchAbort = new AbortController()
+  const signal = fetchAbort.signal
+
   try {
-    const res = await fetch('/api/stars')
-    const json = await res.json()
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
-    for (const s of json.data ?? []) {
-      const cid = s.catalogStarId
-      if (cid != null) {
-        if (!map.has(cid)) map.set(cid, [])
-        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount, catalogStarId: cid, createdAt: s.createdAt || '', locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null, type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
-        const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
-        cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
-        statsMap.set(cid, cur)
-      }
+
+    // 加载第一页，立即显示
+    const first = await fetch(`/api/stories?page=1&limit=${PAGE_SIZE}`, { signal })
+    const firstJson = await first.json()
+    const firstData = firstJson.data?.items ?? firstJson.data ?? []
+    const totalPages = firstJson.data?.totalPages ?? 1
+    mergeStoriesIntoMap(firstData, map, statsMap)
+    publishStories(map, statsMap)
+
+    // 后台继续加载剩余页
+    for (let page = 2; page <= totalPages; page++) {
+      if (signal.aborted) break
+      const res = await fetch(`/api/stories?page=${page}&limit=${PAGE_SIZE}`, { signal })
+      const json = await res.json()
+      const items = json.data?.items ?? json.data ?? []
+      mergeStoriesIntoMap(items, map, statsMap)
+      publishStories(map, statsMap)
     }
-    storiesByStarId.value = map
-    pendingStatsMap.value = statsMap
-    skyRef.value?.sky?.setStarStatsCache(statsMap)
-  } catch (e) { console.error('获取故事失败:', e) }
+  } catch (e: any) {
+    if (e.name !== 'AbortError') console.error('获取故事失败:', e)
+  } finally {
+    fetchingStories.value = false
+  }
 }
 onMounted(() => { fetchStories() })
 
