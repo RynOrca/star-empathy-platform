@@ -43,11 +43,24 @@
 
       <!-- 收藏的星星 -->
       <div class="fav-section" v-if="favorites.length > 0">
-        <div class="fav-title">收藏的星星</div>
+        <div class="fav-title">收藏的星星 ({{ favorites.length }})</div>
         <div class="fav-list">
-          <span v-for="fid in favorites" :key="fid" class="fav-badge">{{ getStarName(fid) }}</span>
+          <div v-for="fid in favorites" :key="fid" class="fav-card">
+            <div class="fav-card-main" @click="goToStar(fid)">
+              <span class="fav-star" :style="{ color: getStarColor(fid) }">★</span>
+              <div class="fav-info">
+                <div class="fav-name">{{ getStarName(fid) }}</div>
+                <div class="fav-meta">
+                  <span v-if="getStarCon(fid)">{{ getStarCon(fid) }}</span>
+                  <span v-if="getStarMag(fid) != null">{{ getStarMag(fid)!.toFixed(1) }} mag</span>
+                </div>
+              </div>
+            </div>
+            <button class="fav-remove" title="取消收藏" @click="removeFavorite(fid)">×</button>
+          </div>
         </div>
       </div>
+      <div v-else class="empty-hint">还没有收藏的星星<br>去星空点亮一颗吧</div>
 
       <!-- 故事详情弹窗 -->
       <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
@@ -71,6 +84,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
+import { constellationNames } from '../data/starInfo'
 
 const PAGE_SIZE = 20
 
@@ -102,9 +116,30 @@ const daysAgo = computed(() => {
 
 function formatDate(d: string) { if (!d) return ''; return d.slice(0, 16).replace('T', ' ') }
 
-const starLookup = new Map<number, string>()
-for (const s of catalogData.stars) starLookup.set(s.id, s.name || `${s.con || ''} #${s.id}`)
-function getStarName(id: number) { return starLookup.get(id) || `星星 #${id}` }
+interface CatalogStarLite { name: string; con: string; mag: number; color: string }
+const starLookup = new Map<number, CatalogStarLite>()
+for (const s of catalogData.stars) starLookup.set(s.id, { name: s.name || `${s.con || ''} #${s.id}`, con: s.con || '', mag: s.mag, color: s.color || '#fff' })
+function getStarName(id: number) { return starLookup.get(id)?.name || `星星 #${id}` }
+function getStarCon(id: number) { const c = starLookup.get(id)?.con; return c ? (constellationNames[c] || c) : '' }
+function getStarMag(id: number) { return starLookup.get(id)?.mag ?? null }
+function getStarColor(id: number) { return starLookup.get(id)?.color || '#ffffff' }
+
+function goToStar(starId: number) { router.push({ path: '/sky', query: { star: String(starId) } }) }
+
+async function removeFavorite(starId: number) {
+  const token = getToken()
+  if (!token) return
+  try {
+    const res = await fetch(`/api/catalog/stars/${starId}/favorite`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      favorites.value = favorites.value.filter(fid => fid !== starId)
+      stats.value.favoriteCount = favorites.value.length
+    }
+  } catch {}
+}
 
 const precomputedPositions = ref<{ x: number; y: number; delay: number; size: number }[]>([])
 function starStyle(i: number) {
@@ -285,13 +320,24 @@ onUnmounted(() => {
 
 /* ═══ 收藏 ═══ */
 .fav-section { position: relative; z-index: 10; text-align: center; margin-top: 3rem; padding-bottom: 3rem; }
-.fav-title { font-size: 0.75rem; color: #5a5580; margin-bottom: 0.5rem; }
-.fav-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
-.fav-badge {
-  padding: 3px 10px; border-radius: 12px; font-size: 0.75rem;
-  background: rgba(255,217,138,0.06); border: 1px solid rgba(255,217,138,0.15);
-  color: #ffd98a; backdrop-filter: blur(4px);
+.fav-title { font-size: 0.75rem; color: #5a5580; margin-bottom: 0.75rem; }
+.fav-list { display: flex; flex-direction: column; gap: 0.5rem; max-width: 400px; margin: 0 auto; }
+.fav-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 10px;
+  background: rgba(255,217,138,0.04); border: 1px solid rgba(255,217,138,0.12);
+  backdrop-filter: blur(4px); text-align: left;
 }
+.fav-card-main { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
+.fav-star { font-size: 1.2rem; }
+.fav-info { flex: 1; }
+.fav-name { color: #f6f1ff; font-size: 0.9rem; }
+.fav-meta { color: #8a84a0; font-size: 0.7rem; display: flex; gap: 8px; margin-top: 2px; }
+.fav-remove {
+  background: none; border: none; color: #8a84a0; font-size: 1.2rem;
+  cursor: pointer; padding: 2px 8px; border-radius: 6px;
+}
+.fav-remove:hover { color: #ff6b8a; background: rgba(255,107,138,0.08); }
 
 /* ═══ 弹窗 ═══ */
 .modal-overlay {

@@ -260,6 +260,7 @@ const props = defineProps<{
   catalogStats: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null
   catalogStarId: number
   resonating: boolean
+  favoriteStarIds: number[]
 }>()
 
 const emit = defineEmits<{
@@ -269,6 +270,7 @@ const emit = defineEmits<{
   incrementViews: []
   incrementFavorites: []
   decrementFavorites: []
+  updateFavoriteList: [data: { catalogStarId: number; favorited: boolean }]
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
@@ -404,19 +406,30 @@ function onResonate(story: { id: number; resonanceCount: number }) {
 }
 
 // ─── 收藏 ───
-const isFavorited = ref(false)
+const isFavorited = computed(() => props.favoriteStarIds.includes(props.catalogStarId))
+
+function getToken() { return localStorage.getItem('token') }
 
 async function toggleFavorite() {
+  const token = getToken()
+  if (!token) {
+    alert('请先登录后再收藏')
+    return
+  }
   const prev = isFavorited.value
-  isFavorited.value = !prev
   if (prev) { emit('decrementFavorites') } else { emit('incrementFavorites') }
   try {
     const method = prev ? 'DELETE' : 'POST'
-    await fetch(`/api/catalog/stars/${props.catalogStarId}/favorite`, { method })
+    const res = await fetch(`/api/catalog/stars/${props.catalogStarId}/favorite`, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error('收藏失败')
+    emit('updateFavoriteList', { catalogStarId: props.catalogStarId, favorited: !prev })
     fetchCatalogStatsFromFront()
   } catch {
-    isFavorited.value = prev
     if (prev) { emit('incrementFavorites') } else { emit('decrementFavorites') }
+    alert('收藏失败，请重试')
   }
 }
 
