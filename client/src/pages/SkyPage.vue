@@ -199,7 +199,7 @@ async function onSearchInput() {
   if (!q) { searchResults.value = []; return }
   searching.value = true
   try {
-    const res = await fetch(`/api/stars/search?q=${encodeURIComponent(q)}`)
+    const res = await fetch(`/api/catalog/stars/search?q=${encodeURIComponent(q)}`)
     const json = await res.json()
     if (res.ok) searchResults.value = json.data
   } catch { searchResults.value = [] }
@@ -233,7 +233,7 @@ const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
 
 async function fetchStories() {
   try {
-    const res = await fetch('/api/stars')
+    const res = await fetch('/api/stories')
     const json = await res.json()
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
@@ -288,7 +288,7 @@ function onStarClick(starId: number) {
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
   fetchCatalogStats(starId)
-  fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
+  fetch(`/api/catalog/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
 }
 
 // 行星数据映射（用于故事详情展示）
@@ -326,7 +326,7 @@ function onPlanetClick(name: string, nameCN: string) {
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
 }
 async function fetchCatalogStats(starId: number) {
-  try { const res = await fetch(`/api/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
+  try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
 function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
@@ -335,7 +335,7 @@ function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
 function onDecrementFavorites() { if (catalogStats.value && catalogStats.value.favoriteCount > 0) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount - 1 } }
-async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stars/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
+async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>

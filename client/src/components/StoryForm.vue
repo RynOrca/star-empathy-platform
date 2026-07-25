@@ -106,7 +106,7 @@ async function onSubmit() {
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers['Authorization'] = `Bearer ${token}`
-    const res = await fetch('/api/stars/story', {
+    const res = await fetch('/api/stories', {
       method: 'POST',
       headers,
       body: JSON.stringify({
