@@ -28,6 +28,33 @@ export function getAllStars(): (Star & { username: string | null; tag: string | 
   `).all() as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
+// 分页获取所有星星
+export function getAllStarsPaged(page: number, limit: number): {
+  items: (Star & { username: string | null; tag: string | null })[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+} {
+  const p = Math.max(1, Math.floor(page));
+  const l = Math.max(1, Math.min(100, Math.floor(limit)));
+  const offset = (p - 1) * l;
+
+  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as { cnt: number };
+  const total = totalRow.cnt;
+  const totalPages = Math.ceil(total / l);
+
+  const items = db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
+
+  return { items, total, page: p, limit: l, totalPages };
+}
+
 // 创建星星
 export function createStar(
   content: string,
@@ -107,14 +134,23 @@ export function getCatalogStats(catalogStarId: number): { storyCount: number; to
   };
 }
 
-// 收藏星星
-export function addFavorite(catalogStarId: number): void {
-  db.prepare('INSERT INTO favorites (catalog_star_id) VALUES (?)').run(catalogStarId);
+// 收藏星星（用户级，同一用户对同一星只能收藏一次）
+export function addFavorite(catalogStarId: number, userId: number): { already: boolean } {
+  const existing = db.prepare(
+    'SELECT id FROM favorites WHERE catalog_star_id = ? AND user_id = ?'
+  ).get(catalogStarId, userId) as unknown as { id: number } | undefined;
+  if (existing) return { already: true };
+  db.prepare(
+    'INSERT INTO favorites (catalog_star_id, user_id) VALUES (?, ?)'
+  ).run(catalogStarId, userId);
+  return { already: false };
 }
 
 // 取消收藏星星
-export function removeFavorite(catalogStarId: number): void {
-  db.prepare('DELETE FROM favorites WHERE catalog_star_id = ?').run(catalogStarId);
+export function removeFavorite(catalogStarId: number, userId: number): void {
+  db.prepare(
+    'DELETE FROM favorites WHERE catalog_star_id = ? AND user_id = ?'
+  ).run(catalogStarId, userId);
 }
 
 // 全局统计
@@ -123,6 +159,28 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
   const userRow = db.prepare('SELECT COUNT(*) as cnt FROM users').get() as unknown as { cnt: number };
   const resRow = db.prepare('SELECT COALESCE(SUM(resonance_count), 0) as cnt FROM stars').get() as unknown as { cnt: number };
   return { starCount: starRow.cnt, userCount: userRow.cnt, totalResonance: resRow.cnt };
+}
+
+// 单条故事详情
+export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
+  const row = db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.id = ?
+  `).get(storyId) as unknown as (Star & { username: string | null; tag: string | null }) | undefined;
+  return row ?? null;
+}
+
+// 单星下的所有故事
+export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
+  return db.prepare(`
+    SELECT s.*, u.username, s.tag
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.catalog_star_id = ?
+    ORDER BY s.created_at DESC
+  `).all(catalogStarId) as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
 // 我的故事
@@ -134,10 +192,23 @@ export function getUserStories(userId: number): (Star & { username: string | nul
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
 }
 
-// 我的收藏（返回收藏的星星 catalog_star_id 列表）
+// 我的收藏（返回该用户收藏的 catalog_star_id 列表）
 export function getUserFavorites(userId: number): number[] {
-  // favorites 表存的是 catalog_star_id，不需要关联用户
-  // 这里简化：返回所有收藏的星星ID（平台级收藏，非用户级）
-  const rows = db.prepare('SELECT DISTINCT catalog_star_id FROM favorites ORDER BY catalog_star_id').all() as unknown as { catalog_star_id: number }[];
+  const rows = db.prepare(
+    'SELECT catalog_star_id FROM favorites WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(userId) as unknown as { catalog_star_id: number }[];
   return rows.map(r => r.catalog_star_id);
+}
+
+// 删除故事（只能删除自己的，userId 为 null 表示匿名不允许删）
+export function deleteStory(storyId: number, userId: number): {
+  success: boolean;
+  notFound?: boolean;
+  notOwner?: boolean;
+} {
+  const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
+  if (!existing) return { success: false, notFound: true };
+  if (existing.user_id !== userId) return { success: false, notOwner: true };
+  db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
+  return { success: true };
 }

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 interface User {
   id: number
   username: string
-  created_at: string
+  createdAt: string
 }
 
 const user = ref<User | null>(null)
@@ -17,7 +17,7 @@ async function fetchMe() {
   try {
     const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
     const json = await res.json()
-    if (json.code === 200) user.value = json.data
+    if (res.ok) user.value = json.data
   } catch { /* 静默 */ }
 }
 
@@ -28,7 +28,7 @@ async function login(username: string, password: string): Promise<string> {
     body: JSON.stringify({ username, password }),
   })
   const json = await res.json()
-  if (json.code !== 200) throw new Error(json.message)
+  if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
   user.value = json.data.user
   return json.data.token
@@ -41,7 +41,7 @@ async function register(username: string, password: string): Promise<string> {
     body: JSON.stringify({ username, password }),
   })
   const json = await res.json()
-  if (json.code !== 200) throw new Error(json.message)
+  if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
   user.value = json.data.user
   return json.data.token

@@ -1,17 +1,52 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite } from '../services/starService';
-import { authOptional } from '../middleware/auth';
+import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory } from '../services/starService';
+import { authOptional, authRequired } from '../middleware/auth';
+import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 
 const router = Router();
 
-// 获取所有星星
-router.get('/', (_req: Request, res: Response) => {
+// 获取所有星星（支持分页 ?page=&limit=，不传则返回全量）
+router.get('/', (req: Request, res: Response) => {
   try {
-    const stars = getAllStars();
-    res.json({ code: 200, message: 'success', data: stars });
+    const page = parseInt(req.query.page as string, 10);
+    const limit = parseInt(req.query.limit as string, 10);
+    if (!isNaN(page) && !isNaN(limit)) {
+      const paged = getAllStarsPaged(page, limit);
+      ok(res, 'success', paged);
+    } else {
+      const stars = getAllStars();
+      ok(res, 'success', stars);
+    }
   } catch (error) {
     console.error('GET /api/stars error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
+  }
+});
+
+// 单条故事详情（旧路由兼容）
+router.get('/story/:storyId', (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const story = getStoryById(storyId);
+    if (!story) return notFound(res, '故事不存在');
+    ok(res, 'success', story);
+  } catch (error) {
+    console.error('GET /api/stars/story/:storyId error:', error);
+    serverError(res);
+  }
+});
+
+// 单星下的所有故事（旧路由兼容）
+router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const stories = getStoriesByCatalogStarId(catalogStarId);
+    ok(res, 'success', stories);
+  } catch (error) {
+    console.error('GET /api/stars/:catalogStarId/stories error:', error);
+    serverError(res);
   }
 });
 
@@ -22,12 +57,12 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
     const user = (req as Request & { user?: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
-      return res.status(400).json({ code: 400, message: 'content 不能为空', data: null });
+      return badRequest(res, 'content 不能为空');
     }
 
     const trimmed = content.trim();
     if (trimmed.length === 0 || trimmed.length > 300) {
-      return res.status(400).json({ code: 400, message: 'content 长度需在 1~300 字之间', data: null });
+      return badRequest(res, 'content 长度需在 1~300 字之间');
     }
 
     const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
@@ -54,91 +89,109 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
 
     const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user?.id, safeTag);
-    res.status(200).json({ code: 200, message: '故事已化作星光', data: star });
+    ok(res, '故事已化作星光', star);
   } catch (error) {
     console.error('POST /api/stars/story error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 
 // 共鸣点亮
-router.post('/:id/resonate', (req: Request, res: Response) => {
+router.post('/:storyId/resonate', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
-    const result = resonate(id);
-    if (!result) return res.status(404).json({ code: 404, message: '星星不存在', data: null });
+    const result = resonate(storyId);
+    if (!result) return notFound(res, '故事不存在');
 
-    res.json({ code: 200, message: '共鸣已点亮', data: result });
+    ok(res, '共鸣已点亮', result);
   } catch (error) {
-    console.error('POST /api/stars/:id/resonate error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('POST /api/stars/:storyId/resonate error:', error);
+    serverError(res);
   }
 });
 
-// 获取星星统计数据
-router.get('/:id/stats', (req: Request, res: Response) => {
+// 获取恒星统计数据（按 catalog_star_id）
+router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    const stats = getCatalogStats(id);
-    res.json({ code: 200, message: 'success', data: stats });
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const stats = getCatalogStats(catalogStarId);
+    ok(res, 'success', stats);
   } catch (error) {
-    console.error('GET /api/stars/:id/stats error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('GET /api/stars/:catalogStarId/stats error:', error);
+    serverError(res);
   }
 });
 
-// 记录星星级浏览（打开详情页一次）
-router.post('/:id/visit', (req: Request, res: Response) => {
+// 记录恒星浏览（打开详情页一次）
+router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    recordCatalogVisit(id);
-    res.json({ code: 200, message: 'success', data: null });
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    recordCatalogVisit(catalogStarId);
+    ok(res, 'success');
   } catch (error) {
-    console.error('POST /api/stars/:id/visit error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('POST /api/stars/:catalogStarId/visit error:', error);
+    serverError(res);
   }
 });
 
-// 记录故事级浏览（点击进入故事详情）
-router.post('/story/:id/view', (req: Request, res: Response) => {
+// 记录故事浏览（点击进入故事详情）
+router.post('/story/:storyId/view', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    recordStoryView(id);
-    res.json({ code: 200, message: 'success', data: null });
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    recordStoryView(storyId);
+    ok(res, 'success');
   } catch (error) {
-    console.error('POST /api/stars/story/:id/view error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('POST /api/stars/story/:storyId/view error:', error);
+    serverError(res);
   }
 });
 
-// 收藏星星
-router.post('/:id/favorite', (req: Request, res: Response) => {
+// 收藏星星（需登录）
+router.post('/:catalogStarId/favorite', authRequired, (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    addFavorite(id);
-    res.json({ code: 200, message: '已收藏', data: null });
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = addFavorite(catalogStarId, user.id);
+    ok(res, result.already ? '已收藏' : '收藏成功');
   } catch (error) {
-    console.error('POST /api/stars/:id/favorite error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('POST /api/stars/:catalogStarId/favorite error:', error);
+    serverError(res);
   }
 });
 
-// 取消收藏星星
-router.delete('/:id/favorite', (req: Request, res: Response) => {
+// 取消收藏星星（需登录）
+router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return res.status(400).json({ code: 400, message: '无效的 id', data: null });
-    removeFavorite(id);
-    res.json({ code: 200, message: '已取消收藏', data: null });
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const user = (req as Request & { user: { id: number } }).user;
+    removeFavorite(catalogStarId, user.id);
+    ok(res, '已取消收藏');
   } catch (error) {
-    console.error('DELETE /api/stars/:id/favorite error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    console.error('DELETE /api/stars/:catalogStarId/favorite error:', error);
+    serverError(res);
+  }
+});
+
+// 删除故事（旧路由兼容，需登录，只能删自己的）
+router.delete('/story/:storyId', authRequired, (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = deleteStory(storyId, user.id);
+    if (result.notFound) return notFound(res, '故事不存在');
+    if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    ok(res, '已删除');
+  } catch (error) {
+    console.error('DELETE /api/stars/story/:storyId error:', error);
+    serverError(res);
   }
 });
 

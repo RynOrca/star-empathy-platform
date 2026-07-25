@@ -56,8 +56,8 @@
           <p class="modal-content">{{ activeStory.content }}</p>
           <div class="modal-meta">
             <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
-            <span>{{ formatDate(activeStory.created_at) }}</span>
-            <span>共鸣 {{ activeStory.resonance_count || 0 }}</span>
+            <span>{{ formatDate(activeStory.createdAt) }}</span>
+            <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
           </div>
           <button class="modal-close" @click="activeStory = null">关闭</button>
         </div>
@@ -77,7 +77,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 useParticleSky(canvasRef)
 
 const loaded = ref(false)
-const user = ref<{ id: number; username: string; signature: string; created_at: string } | null>(null)
+const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<number[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, favoriteCount: 0 })
@@ -91,7 +91,7 @@ const sigInputRef = ref<HTMLInputElement | null>(null)
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
   if (!user.value) return 0
-  return Math.max(0, Math.floor((Date.now() - new Date(user.value.created_at).getTime()) / 86400000))
+  return Math.max(0, Math.floor((Date.now() - new Date(user.value.createdAt).getTime()) / 86400000))
 })
 
 function formatDate(d: string) { if (!d) return ''; return d.slice(0, 16).replace('T', ' ') }
@@ -135,7 +135,7 @@ async function saveSig() {
       body: JSON.stringify({ signature: v }),
     })
     const j = await r.json()
-    if (j.code === 200 && user.value) user.value.signature = j.data.signature
+    if (r.ok && user.value) user.value.signature = j.data.signature
   } catch {}
 }
 
@@ -152,15 +152,15 @@ onMounted(async () => {
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
-    if (meJson.code === 200) user.value = meJson.data
+    if (meRes.ok) user.value = meJson.data
     const storiesJson = await storiesRes.json()
-    if (storiesJson.code === 200) {
+    if (storiesRes.ok) {
       stories.value = storiesJson.data
       stats.value.storyCount = storiesJson.data.length
-      stats.value.totalResonance = storiesJson.data.reduce((s: number, x: any) => s + (x.resonance_count || 0), 0)
+      stats.value.totalResonance = storiesJson.data.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
     }
     const favJson = await favRes.json()
-    if (favJson.code === 200) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
+    if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
 
     for (let i = 0; i < stories.value.length; i++) {
       precomputedPositions.push({

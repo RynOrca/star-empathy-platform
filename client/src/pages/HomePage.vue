@@ -167,7 +167,7 @@ async function handleGuestAccess() {
   try {
     const res = await fetch('/api/auth/guest', { method: 'POST' })
     const json = await res.json()
-    if (json.code !== 200) throw new Error(json.message)
+    if (!res.ok) throw new Error(json.message || '请求失败')
     localStorage.setItem('token', json.data.token)
     router.push('/sky')
   } catch (e: any) {
@@ -177,11 +177,12 @@ async function handleGuestAccess() {
   }
 }
 
-onMounted(() => {
-  fetch('/api/stats')
-    .then(r => r.json())
-    .then(j => { if (j.code === 200) stats.value = j.data })
-    .catch(() => {})
+onMounted(async () => {
+  try {
+    const r = await fetch('/api/stats')
+    const j = await r.json()
+    if (r.ok) stats.value = j.data
+  } catch {}
 })
 </script>
 

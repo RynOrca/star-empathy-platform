@@ -15,30 +15,78 @@
 
 ## 数据库架构
 
-SQLite（`server/data/stars.db`），三张表：
+SQLite（`server/data/stars.db`），四张表：
 
 | 表 | 用途 |
 |---|---|
-| `stars` | 核心表：历史星 + 用户星，含 `catalog_star_id`（星表恒星 ID）、`pos_x/y/z`（3D 坐标）、`resonance_count`、`view_count`、`origin` |
+| `users` | 用户表：用户名、密码哈希、签名 |
+| `stars` | 故事表（历史 + 用户），含 `catalog_star_id`（星表恒星 ID）、`pos_x/y/z`、`resonance_count`、`view_count`、`user_id`、`tag` |
 | `catalog_visits` | 星表恒星被浏览的记录 |
-| `favorites` | 用户收藏的恒星 |
+| `favorites` | 用户收藏的恒星（`user_id` + `catalog_star_id` 唯一约束） |
 
 ## 后端 API
 
 Base URL：`http://localhost:3000`（开发），部署后为 `https://your-domain.com`
 
+### 新规范路由（推荐使用）
+
+**故事相关 `/api/stories`**
+
+| 方法 | 路径 | 说明 | 鉴权 |
+|---|---|---|---|
+| GET | `/api/stories` | 获取所有故事（支持 `?page=&limit=` 分页，不传返回全量） | 无 |
+| GET | `/api/stories/:storyId` | 单条故事详情 | 无 |
+| POST | `/api/stories` | 投递故事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`/`tag`） | 可选 |
+| POST | `/api/stories/:storyId/resonate` | 共鸣 +1 | 无 |
+| POST | `/api/stories/:storyId/view` | 记录故事浏览 | 无 |
+| DELETE | `/api/stories/:storyId` | 删除故事（只能删自己的） | 必须 |
+
+**恒星 catalog 相关 `/api/catalog/stars`**
+
+| 方法 | 路径 | 说明 | 鉴权 |
+|---|---|---|---|
+| GET | `/api/catalog/stars/search?q=` | 搜索恒星 | 无 |
+| GET | `/api/catalog/stars/:catalogStarId/stats` | 获取某恒星的聚合统计 | 无 |
+| GET | `/api/catalog/stars/:catalogStarId/stories` | 获取某恒星下的所有故事 | 无 |
+| POST | `/api/catalog/stars/:catalogStarId/visit` | 记录恒星浏览 | 无 |
+| POST | `/api/catalog/stars/:catalogStarId/favorite` | 收藏恒星 | 必须 |
+| DELETE | `/api/catalog/stars/:catalogStarId/favorite` | 取消收藏 | 必须 |
+
+**认证 `/api/auth`**
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/stars` | 获取所有星星 |
-| POST | `/api/stars/story` | 投递心事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`） |
-| POST | `/api/stars/:id/resonate` | 共鸣 +1 |
-| GET | `/api/stars/:id/stats` | 获取某星表的聚合统计 |
-| POST | `/api/stars/:id/visit` | 记录恒星浏览 |
-| POST | `/api/stars/story/:id/view` | 记录故事浏览 |
-| POST | `/api/stars/:id/favorite` | 收藏 |
-| DELETE | `/api/stars/:id/favorite` | 取消收藏 |
+| POST | `/api/auth/register` | 注册 |
+| POST | `/api/auth/login` | 登录 |
+| POST | `/api/auth/guest` | 访客快捷登录 |
+| GET | `/api/auth/me` | 当前用户信息 |
+| PATCH | `/api/auth/signature` | 更新签名 |
 
-响应统一格式：`{ code: 200|400|404|500, message: "...", data: ... }`
+**个人主页 `/api/profile`**
+
+| 方法 | 路径 | 说明 | 鉴权 |
+|---|---|---|---|
+| GET | `/api/profile/stories` | 我的故事 | 必须 |
+| GET | `/api/profile/favorites` | 我的收藏 | 必须 |
+
+**其他**
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/stats` | 全局统计 |
+| GET | `/api/health` | 健康检查 |
+
+### 旧路由兼容（功能同上，不推荐用于新代码）
+
+`/api/stars`、`/api/stars/story`、`/api/stars/:id/resonate`、`/api/stars/:id/stats`、`/api/stars/:id/visit`、`/api/stars/story/:id/view`、`/api/stars/:id/favorite`、`/api/stars/search`
+
+响应统一格式：`{ message: "...", data: ... }`，通过 HTTP 状态码（200|400|401|404|429|500）表示结果。数据字段统一使用 camelCase（如 `resonanceCount`、`catalogStarId`、`viewCount`、`createdAt`）。
+
+### 限流策略
+
+- 全局 API：120 次/分钟/IP
+- 写操作（共鸣/浏览/收藏/投递）：30 次/分钟/IP
+- 认证接口（登录/注册/访客）：10 次/分钟/IP
 
 ## 前端关键模块
 
@@ -75,15 +123,16 @@ npm run preview    # 预览构建产物
 
 ## 前端代理配置
 
-`client/vite.config.ts` 中 `/api` 代理到 `http://localhost:31415`。确保后端端口与此一致，或在 Vite 配置中修改。
+`client/vite.config.ts` 中 `/api` 代理到 `http://localhost:3000`。确保后端端口与此一致，或在 Vite 配置中修改。
 
 ## 关键约束
 
 - **Node.js ≥22.5 必需** — 后端使用 `node:sqlite`（Node 内置实验模块），旧版本不可用
-- **不做权限系统** — 所有星星默认公开，这是产品核心设计
+- **鉴权说明**：有完整 JWT 鉴权系统。匿名可浏览/共鸣/投递心事，收藏和个人主页需要登录。所有内容默认公开
 - **冷启动数据真实** — seed 脚本中含古诗词、星座神话、社区语录，禁止用假数据
 - **数据迁移兼容** — `server/src/db.ts` 中有 `ALTER TABLE ... ADD COLUMN` 的 try-catch 兼容旧库，新环境不需要但保留无害
 - **星表坐标预计算** — 恒星坐标由 `generateStarCatalog.ts` 离线生成 JSON，后端不参与
+- **生产环境必须设置** `JWT_SECRET` 环境变量，否则启动失败
 
 ## 部署
 

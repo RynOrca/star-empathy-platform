@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { ok, serverError } from '../utils/response';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/', (req: Request, res: Response) => {
   try {
     const q = (req.query.q as string || '').trim().toLowerCase();
     if (!q || q.length < 1) {
-      return res.json({ code: 200, message: 'success', data: [] });
+      return ok(res, 'success', []);
     }
 
     const results = catalog.stars
@@ -61,10 +62,10 @@ router.get('/', (req: Request, res: Response) => {
         dec: s.dec,
       }));
 
-    res.json({ code: 200, message: 'success', data: results });
+    ok(res, 'success', results);
   } catch (error) {
     console.error('GET /api/stars/search error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 

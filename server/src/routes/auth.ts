@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { register, login, guestLogin, getUserById, updateSignature } from '../services/userService';
 import { authRequired } from '../middleware/auth';
+import { ok, badRequest, notFound, send } from '../utils/response';
 
 const router = Router();
 
@@ -9,15 +10,15 @@ router.post('/register', (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     if (!username || typeof username !== 'string' || username.length < 2 || username.length > 20) {
-      return res.status(400).json({ code: 400, message: '用户名需 2~20 个字符', data: null });
+      return badRequest(res, '用户名需 2~20 个字符');
     }
     if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
-      return res.status(400).json({ code: 400, message: '密码需 6~50 个字符', data: null });
+      return badRequest(res, '密码需 6~50 个字符');
     }
     const result = register(username.trim(), password);
-    res.json({ code: 200, message: '注册成功', data: result });
+    ok(res, '注册成功', result);
   } catch (error: any) {
-    res.status(400).json({ code: 400, message: error.message || '注册失败', data: null });
+    send(res, 400, error.message || '注册失败');
   }
 });
 
@@ -26,12 +27,12 @@ router.post('/login', (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ code: 400, message: '请填写用户名和密码', data: null });
+      return badRequest(res, '请填写用户名和密码');
     }
     const result = login(username, password);
-    res.json({ code: 200, message: '登录成功', data: result });
+    ok(res, '登录成功', result);
   } catch (error: any) {
-    res.status(400).json({ code: 400, message: error.message || '登录失败', data: null });
+    send(res, 400, error.message || '登录失败');
   }
 });
 
@@ -39,9 +40,9 @@ router.post('/login', (req: Request, res: Response) => {
 router.post('/guest', (_req: Request, res: Response) => {
   try {
     const result = guestLogin();
-    res.json({ code: 200, message: '访客登录成功', data: result });
+    ok(res, '访客登录成功', result);
   } catch (error: any) {
-    res.status(500).json({ code: 500, message: error.message || '访客登录失败', data: null });
+    send(res, 500, error.message || '访客登录失败');
   }
 });
 
@@ -49,8 +50,8 @@ router.post('/guest', (_req: Request, res: Response) => {
 router.get('/me', authRequired, (req: Request, res: Response) => {
   const user = (req as Request & { user: { id: number } }).user;
   const info = getUserById(user.id);
-  if (!info) return res.status(404).json({ code: 404, message: '用户不存在', data: null });
-  res.json({ code: 200, message: 'success', data: info });
+  if (!info) return notFound(res, '用户不存在');
+  ok(res, 'success', info);
 });
 
 // 更新签名
@@ -59,12 +60,12 @@ router.patch('/signature', authRequired, (req: Request, res: Response) => {
     const user = (req as Request & { user: { id: number } }).user;
     const { signature } = req.body;
     if (typeof signature !== 'string') {
-      return res.status(400).json({ code: 400, message: '签名需为字符串', data: null });
+      return badRequest(res, '签名需为字符串');
     }
     const updated = updateSignature(user.id, signature);
-    res.json({ code: 200, message: '签名已更新', data: updated });
+    ok(res, '签名已更新', updated);
   } catch (error: any) {
-    res.status(500).json({ code: 500, message: error.message || '更新失败', data: null });
+    send(res, 500, error.message || '更新失败');
   }
 });
 
