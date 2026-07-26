@@ -60,7 +60,7 @@
                 <div class="chat-bubble">
                   <template v-if="msg.role === 'assistant'">
                     <span class="chat-bubble-avatar">{{ selectedFigure?.avatar }}</span>
-                    <span class="chat-bubble-text">{{ msg.content }}</span>
+                    <span class="chat-bubble-text chat-bubble-markdown" v-html="renderMarkdown(msg.content)"></span>
                   </template>
                   <template v-else>
                     <span class="chat-bubble-text">{{ msg.content }}</span>
@@ -72,7 +72,7 @@
               <div v-if="streaming" class="chat-message assistant">
                 <div class="chat-bubble">
                   <span class="chat-bubble-avatar">{{ selectedFigure?.avatar }}</span>
-                  <span class="chat-bubble-text">{{ streamingContent }}</span>
+                  <span class="chat-bubble-text chat-bubble-markdown" v-html="renderMarkdown(streamingContent)"></span>
                   <span class="chat-cursor">|</span>
                 </div>
               </div>
@@ -118,6 +118,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
 import { X, Send } from 'lucide-vue-next'
+import { marked } from 'marked'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 interface Figure {
   id: string
@@ -339,6 +342,11 @@ function reset() {
   streaming.value = false
   streamingContent.value = ''
   errorMessage.value = ''
+}
+
+function renderMarkdown(text: string): string {
+  if (!text) return ''
+  return marked.parse(text) as string
 }
 </script>
 
@@ -564,6 +572,41 @@ function reset() {
   border: 1px solid var(--rule);
   border-bottom-left-radius: 4px;
 }
+
+/* ─── Markdown 渲染样式 ─── */
+.chat-bubble-markdown :deep(p) {
+  margin: 0 0 8px;
+  line-height: 1.7;
+}
+.chat-bubble-markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.chat-bubble-markdown :deep(em) {
+  color: var(--muted-light);
+  font-style: italic;
+}
+.chat-bubble-markdown :deep(strong) {
+  color: var(--ink);
+  font-weight: 600;
+}
+.chat-bubble-markdown :deep(blockquote) {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+  color: var(--accent);
+}
+.chat-bubble-markdown :deep(blockquote p) {
+  margin: 0;
+}
+.chat-bubble-markdown :deep(br) {
+  display: block;
+  content: '';
+  margin-bottom: 6px;
+}
+
 .chat-cursor {
   color: var(--accent);
   font-weight: 300;
