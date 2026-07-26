@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { recordCatalogVisit, getCatalogStats, getStoriesByCatalogStarId, addFavorite, removeFavorite } from '../services/starService';
 import { authRequired } from '../middleware/auth';
 import { ok, badRequest, serverError } from '../utils/response';
+import { getAggregatedTags } from '../services/kernel';
 
 const router = Router();
 
@@ -68,6 +69,19 @@ router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Resp
     ok(res, '已取消收藏');
   } catch (error) {
     console.error('DELETE /api/catalog/stars/:catalogStarId/favorite error:', error);
+    serverError(res);
+  }
+});
+
+// 获取恒星下聚合的 AI 内核标签
+router.get('/:catalogStarId/tags', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const tags = getAggregatedTags(catalogStarId);
+    ok(res, 'success', tags);
+  } catch (error) {
+    console.error('GET /api/catalog/stars/:catalogStarId/tags error:', error);
     serverError(res);
   }
 });
