@@ -614,7 +614,10 @@ export function useSky(
         }
       } else if (hoveredStarId !== -1) {
         if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-        options?.onStarHoverLong?.(null)
+        // 拖拽旋转时不触发离开逻辑，保持连线可见
+        if (!dragging) {
+          options?.onStarHoverLong?.(null)
+        }
         hoveredStarId = -1
         tooltipEl.style.opacity = '0'
         hoverGlowTargetOpacity = 0
@@ -930,7 +933,7 @@ export function useSky(
         const remaining = locateHighlightUntil - _now
         const fadeProgress = remaining / 2000 // 0→1
         const pulse = Math.sin(_now * 0.008) * 0.5 + 0.5
-        const scale = 6 + pulse * 8 // 6~14 呼吸
+        const scale = 10 + pulse * 15 // 10~25 呼吸
         locateHighlight.scale.set(scale, scale, 1)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
@@ -1070,7 +1073,7 @@ export function useSky(
       locateHighlight.position.copy(starWorld)
       locateHighlight.visible = true
       ;(locateHighlight.material as SpriteMaterial).opacity = 0.9
-      locateHighlight.scale.set(12, 12, 1)
+      locateHighlight.scale.set(25, 25, 1)
       locateHighlightUntil = performance.now() + 2000
     },
     dispose() {

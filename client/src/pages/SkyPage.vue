@@ -253,11 +253,17 @@ function locateStar(starId: number) {
 
 // ─── 长悬浮显示内核连线 ───
 let hoverLinesAbort: AbortController | null = null
+let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
 async function onStarHoverLong(starId: number | null) {
-  // 取消上一次请求
+  // 取消上一次请求和清除计时器
   if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
+  if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
+
   if (starId === null) {
-    skyRef.value?.sky?.setKernelLines([])
+    // 鼠标离开：2s 后再清除连线（给用户时间看清）
+    clearLinesTimer = setTimeout(() => {
+      skyRef.value?.sky?.setKernelLines([])
+    }, 2000)
     return
   }
   // 详情面板打开时不重复显示连线
