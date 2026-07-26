@@ -4,14 +4,35 @@
  * 默认模型：deepseek-v4-flash
  */
 
+import fs from 'node:fs'
+import path from 'node:path'
+
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
+
+// 运行时 API Key 持久化文件
+const KEY_FILE = path.resolve(__dirname, '../../.runtime-key')
 
 // 运行时 API Key（可通过 /api/settings 设置，优先级高于环境变量）
 let runtimeApiKey: string | null = null
 
+// 启动时从文件恢复
+try {
+  if (fs.existsSync(KEY_FILE)) {
+    runtimeApiKey = fs.readFileSync(KEY_FILE, 'utf-8').trim()
+  }
+} catch { /* ignore */ }
+
 export function setApiKey(key: string | null) {
   runtimeApiKey = key
+  // 持久化到文件
+  try {
+    if (key) {
+      fs.writeFileSync(KEY_FILE, key, 'utf-8')
+    } else if (fs.existsSync(KEY_FILE)) {
+      fs.unlinkSync(KEY_FILE)
+    }
+  } catch { /* ignore */ }
 }
 
 export function getApiKey(): string | null {

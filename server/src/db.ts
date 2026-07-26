@@ -73,6 +73,16 @@ db.exec(`
     generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at));
+
+  CREATE TABLE IF NOT EXISTS story_kernels (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id        INTEGER NOT NULL UNIQUE REFERENCES stars(id),
+    emotional_tags  TEXT NOT NULL DEFAULT '[]',
+    essence         TEXT NOT NULL DEFAULT '',
+    themes          TEXT NOT NULL DEFAULT '[]',
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_story_kernels_story ON story_kernels(story_id);
 `);
 
 // 兼容旧数据库：添加新列

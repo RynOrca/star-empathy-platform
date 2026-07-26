@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
+import { triggerKernelGeneration } from '../services/kernel';
 
 const router = Router();
 
@@ -89,6 +90,12 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
 
     const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user?.id, safeTag);
+
+    // 异步生成 AI 故事内核
+    if (star && (star as { id: number }).id) {
+      triggerKernelGeneration((star as { id: number }).id, safeContent, safeTitle);
+    }
+
     ok(res, '故事已化作星光', star);
   } catch (error) {
     console.error('POST /api/stars/story error:', error);

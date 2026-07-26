@@ -11,6 +11,9 @@
               <span class="sr-name">{{ r.name || r.conName }}</span>
               <span class="sr-con">{{ r.conName }}</span>
               <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+              <button class="sr-locate" title="定位到这颗星" @click.stop="locateStar(r.id); searchOpen = false; searchQuery = ''">
+                <Crosshair :size="14" />
+              </button>
             </div>
           </div>
           <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
@@ -26,7 +29,7 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -104,6 +107,7 @@
         @decrement-favorites="onDecrementFavorites"
         @update-favorite-list="onUpdateFavoriteList"
         @update-stats="catalogStats = $event"
+        @update-similar-stars="onUpdateSimilarStars"
         @close="onCloseDetail"
         @write-story="onWriteStory"
       />
@@ -126,7 +130,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Settings } from 'lucide-vue-next'
+import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
@@ -200,6 +204,10 @@ onMounted(async () => {
       if (favRes.ok) favoriteStarIds.value = favJson.data
     } catch {}
   }
+  // 监听相似星星点击事件
+  window.addEventListener('fly-to-star', ((e: CustomEvent) => {
+    onStarClick(e.detail.catalogStarId)
+  }) as EventListener)
 })
 
 function doLogout() {
@@ -230,6 +238,55 @@ async function flyToStar(starId: number) {
   if (!star) return
   // 模拟点击该星
   onStarClick(starId)
+}
+
+function locateStar(starId: number) {
+  const star = catalogStarLookup.get(starId)
+  if (!star || !skyRef.value?.sky) return
+  // 平滑转动相机，以该星为中心（不打开详情面板）
+  skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+  // 动画结束后高亮该星 2s
+  setTimeout(() => {
+    skyRef.value?.sky?.highlightStar(star.x, star.y, star.z)
+  }, 1200)
+}
+
+// ─── 长悬浮显示内核连线 ───
+let hoverLinesAbort: AbortController | null = null
+let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
+async function onStarHoverLong(starId: number | null) {
+  // 取消上一次请求和清除计时器
+  if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
+  if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
+
+  if (starId === null) {
+    // 鼠标离开：2s 后再清除连线（给用户时间看清）
+    clearLinesTimer = setTimeout(() => {
+      skyRef.value?.sky?.setKernelLines([])
+    }, 2000)
+    return
+  }
+  // 详情面板打开时不重复显示连线
+  if (selectedStarInfo.value) return
+  const controller = new AbortController()
+  hoverLinesAbort = controller
+  try {
+    const res = await fetch(`/api/catalog/stars/${starId}/similar`, { signal: controller.signal })
+    const json = await res.json()
+    if (!res.ok || !json.data?.length) {
+      skyRef.value?.sky?.setKernelLines([])
+      return
+    }
+    const sourceStar = catalogStarLookup.get(starId)
+    if (!sourceStar) return
+    const lines = (json.data as { catalogStarId: number }[]).map(s => {
+      const target = catalogStarLookup.get(s.catalogStarId)
+      return target ? { from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } } : null
+    }).filter(Boolean) as { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]
+    skyRef.value?.sky?.setKernelLines(lines)
+  } catch {
+    if (!controller.signal.aborted) skyRef.value?.sky?.setKernelLines([])
+  }
 }
 
 interface CatalogStar {
@@ -398,8 +455,21 @@ function onPlanetClick(name: string, nameCN: string) {
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]) }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
+function onUpdateSimilarStars(ids: number[]) {
+  // 查找源星和相似星的 3D 坐标
+  const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
+  if (!sourceStar) return
+  const lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[] = []
+  for (const id of ids) {
+    const target = catalogStarLookup.get(id)
+    if (target) {
+      lines.push({ from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } })
+    }
+  }
+  skyRef.value?.sky?.setKernelLines(lines)
+}
 function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
@@ -489,6 +559,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .sr-name { color: var(--accent); font-weight: 500; }
 .sr-con { color: var(--ink-secondary); }
 .sr-mag { color: var(--muted-light); font-size: 0.7rem; }
+.sr-locate {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--muted-light); cursor: pointer; padding: 3px 5px;
+  display: flex; align-items: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0; margin-left: 4px;
+}
+.sr-locate:hover {
+  color: var(--accent); border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.08);
+}
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;

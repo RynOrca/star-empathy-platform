@@ -241,10 +241,77 @@
 
         <!-- 标签 -->
         <div class="info-section">
-          <div class="info-label">标签</div>
-          <div class="info-tags">
-            <span class="tag" v-for="tag in generatedTags" :key="tag">{{ tag }}</span>
-            <span v-if="generatedTags.length === 0" class="tag is-empty">暂无标签</span>
+          <div class="info-label">
+            标签
+            <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+            <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+            <button
+              v-if="!editingTags"
+              class="tag-edit-btn"
+              title="编辑标签"
+              @click="startEditTags"
+            >
+              <PenSquare :size="11" />
+            </button>
+          </div>
+
+          <!-- 编辑模式 -->
+          <div v-if="editingTags" class="tag-editor">
+            <div class="tag-editor-tags">
+              <span
+                v-for="(t, i) in customTags"
+                :key="i"
+                class="tag tag-editable"
+                @click="removeCustomTag(i)"
+              >
+                {{ t }}
+                <X :size="10" class="tag-remove-x" />
+              </span>
+              <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+            </div>
+            <div class="tag-editor-input-row">
+              <input
+                v-model="newTagInput"
+                class="tag-editor-input"
+                placeholder="输入自定义标签..."
+                @keydown.enter="addCustomTag"
+              />
+              <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+            </div>
+            <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+              <span class="tag-editor-suggest-label">AI 建议：</span>
+              <span
+                v-for="t in displayTags"
+                :key="t.tag"
+                class="tag tag-suggestion"
+                :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                @click="addCustomTagFromSuggestion(t.tag)"
+              >
+                {{ t.tag }}
+              </span>
+            </div>
+            <div class="tag-editor-actions">
+              <button class="tag-editor-save" @click="saveTags">保存</button>
+              <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+            </div>
+          </div>
+
+          <!-- 展示模式 -->
+          <div v-else class="info-tags">
+            <span
+              v-for="t in mergedTags"
+              :key="t.tag"
+              class="tag"
+              :class="{
+                'tag-emotion': t.type === 'emotion',
+                'tag-theme': t.type === 'theme',
+                'tag-custom': t.custom,
+              }"
+            >
+              {{ t.tag }}
+              <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
+            </span>
+            <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
           </div>
         </div>
 
@@ -264,6 +331,61 @@
             <MessagesSquare :size="14" />
             <span>与古人共赏</span>
           </button>
+        </div>
+
+        <!-- 相似星星 -->
+        <div class="info-section" v-if="similarStars.similarStars.value.length > 0">
+          <div class="info-label">内核相似的星星</div>
+          <div class="similar-list">
+            <div
+              v-for="s in similarStars.similarStars.value.slice(0, 5)"
+              :key="s.catalogStarId"
+              class="similar-item"
+              @click="onSimilarStarClick(s.catalogStarId)"
+            >
+              <div class="similar-info">
+                <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
+                <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
+              </div>
+              <div class="similar-tags">
+                <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 天区故事精选 -->
+        <div class="info-section" v-if="areaHighlightsData.length > 0">
+          <div class="info-label">
+            天区故事精选
+            <span v-if="areaLoading" class="tag-loading">凝练中...</span>
+          </div>
+          <div class="highlight-list">
+            <div
+              v-for="(h, hi) in areaHighlightsData"
+              :key="h.catalogStarId"
+              class="highlight-card"
+              :class="{ 'is-target': hi === 0 && h.score === 0 }"
+              @click="h.catalogStarId !== catalogStarId && onSimilarStarClick(h.catalogStarId)"
+            >
+              <div class="highlight-head">
+                <span class="highlight-star-name">
+                  <span class="highlight-dot" :class="{ 'dot-target': hi === 0 && h.score === 0 }"></span>
+                  {{ getStarName(h.catalogStarId) }}
+                </span>
+                <span v-if="h.score > 0" class="highlight-score">{{ Math.round(h.score * 100) }}%</span>
+                <span v-else class="highlight-badge-target">当前</span>
+              </div>
+              <div class="highlight-emotions" v-if="h.sharedEmotions.length > 0">
+                <span v-for="tag in h.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+              </div>
+              <div class="highlight-essences">
+                <p v-for="(essence, ei) in h.essences" :key="ei" class="highlight-essence">
+                  "{{ essence }}"
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -285,6 +407,10 @@ import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermo
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
+import { useKernel } from '../composables/useKernel'
+import { useSimilarStars } from '../composables/useSimilarStars'
+import { useAreaHighlights } from '../composables/useAreaHighlights'
+import catalogData from '../data/stars.json'
 
 const props = defineProps<{
   stories: Array<{
@@ -320,6 +446,7 @@ const emit = defineEmits<{
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
+  updateSimilarStars: [ids: number[]]
 }>()
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
@@ -426,6 +553,42 @@ watch(() => props.catalogStarId, (id) => {
     narrative.fetchNarrative(id)
   }
 }, { immediate: true })
+
+// ─── AI 故事内核标签 ───
+const kernel = useKernel()
+watch(() => props.catalogStarId, (id) => {
+  if (id) {
+    kernel.reset()
+    kernel.fetchAggregatedTags(id)
+  }
+}, { immediate: true })
+
+// ─── 相似星星 ───
+const similarStars = useSimilarStars(() => props.catalogStarId)
+watch(() => similarStars.similarStars.value, (stars) => {
+  emit('updateSimilarStars', stars.map(s => s.catalogStarId))
+})
+
+// ─── 天区故事精选 ───
+const areaHighlights = useAreaHighlights(() => props.catalogStarId)
+const { highlights: areaHighlightsData, loading: areaLoading } = areaHighlights
+// 用 computed 别名保持模板简洁
+const areaHighlightsList = computed(() => areaHighlightsData.value)
+
+// 星表查找
+const catalogLookup = new Map<number, { name: string | null; con: string }>()
+for (const s of (catalogData as any).stars) {
+  catalogLookup.set(s.id, { name: s.name, con: s.con })
+}
+function getStarName(catalogStarId: number): string {
+  const s = catalogLookup.get(catalogStarId)
+  return s?.name || s?.con || `恒星 #${catalogStarId}`
+}
+function onSimilarStarClick(catalogStarId: number) {
+  emit('close')
+  // 模拟点击该星：通过全局事件通知 SkyPage
+  window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
+}
 
 // ─── 用户当前位置（用于计算距离） ───
 const userPosition = ref<{ lat: number; lng: number } | null>(null)
@@ -618,19 +781,107 @@ function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): D
   return { text: `${Math.round(km)}km`, near: false }
 }
 
-const generatedTags = computed<string[]>(() => {
+// ─── 标签：优先 AI 内核标签，回退到正则匹配 ───
+const displayTags = computed<{ tag: string; count: number; type: 'emotion' | 'theme' }[]>(() => {
+  const aiTags = kernel.aggregatedTags.value
+  if (aiTags && (aiTags.emotionalTags.length > 0 || aiTags.themes.length > 0)) {
+    return [
+      ...aiTags.emotionalTags.map(t => ({ tag: t.tag, count: t.count, type: 'emotion' as const })),
+      ...aiTags.themes.map(t => ({ tag: t.tag, count: t.count, type: 'theme' as const })),
+    ].slice(0, 8)
+  }
+
+  // 回退到旧的正则匹配
   if (!hasRealStory.value) return []
   const all = realStories.value.map(s => (s.title || '') + ' ' + s.content).join(' ')
-  const tags: string[] = []
-  if (/月|嫦娥|广寒/.test(all)) tags.push('月亮')
-  if (/星|天狼|织女|银河/.test(all)) tags.push('星辰')
-  if (/爱|恋|相思/.test(all)) tags.push('思念')
-  if (/独|孤|寂|一人/.test(all)) tags.push('孤独')
-  if (/梦|想/.test(all)) tags.push('梦想')
-  if (/家|乡|故/.test(all)) tags.push('思乡')
-  if (/毕业|青春/.test(all)) tags.push('青春')
-  if (tags.length === 0) tags.push('星空')
-  return [...new Set(tags)].slice(0, 5)
+  const tags: { tag: string; count: number; type: 'emotion' | 'theme' }[] = []
+  if (/月|嫦娥|广寒/.test(all)) tags.push({ tag: '月亮', count: 0, type: 'theme' })
+  if (/星|天狼|织女|银河/.test(all)) tags.push({ tag: '星辰', count: 0, type: 'theme' })
+  if (/爱|恋|相思/.test(all)) tags.push({ tag: '思念', count: 0, type: 'emotion' })
+  if (/独|孤|寂|一人/.test(all)) tags.push({ tag: '孤独', count: 0, type: 'emotion' })
+  if (/梦|想/.test(all)) tags.push({ tag: '梦想', count: 0, type: 'theme' })
+  if (/家|乡|故/.test(all)) tags.push({ tag: '思乡', count: 0, type: 'emotion' })
+  if (/毕业|青春/.test(all)) tags.push({ tag: '青春', count: 0, type: 'theme' })
+  if (tags.length === 0) tags.push({ tag: '星空', count: 0, type: 'theme' })
+  return tags
+})
+
+const hasAiTags = computed(() => {
+  const ai = kernel.aggregatedTags.value
+  return ai && (ai.emotionalTags.length > 0 || ai.themes.length > 0)
+})
+
+// ─── 标签编辑 ───
+const editingTags = ref(false)
+const customTags = ref<string[]>([])
+const newTagInput = ref('')
+const STORAGE_KEY_PREFIX = 'star-custom-tags-'
+
+function loadCustomTags(): void {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_PREFIX + props.catalogStarId)
+    customTags.value = stored ? JSON.parse(stored) : []
+  } catch {
+    customTags.value = []
+  }
+}
+
+function persistCustomTags(): void {
+  localStorage.setItem(STORAGE_KEY_PREFIX + props.catalogStarId, JSON.stringify(customTags.value))
+}
+
+function startEditTags(): void {
+  loadCustomTags()
+  editingTags.value = true
+}
+
+function addCustomTag(): void {
+  const tag = newTagInput.value.trim()
+  if (!tag || customTags.value.includes(tag)) {
+    newTagInput.value = ''
+    return
+  }
+  customTags.value.push(tag)
+  newTagInput.value = ''
+}
+
+function addCustomTagFromSuggestion(tag: string): void {
+  if (customTags.value.includes(tag)) return
+  customTags.value.push(tag)
+}
+
+function removeCustomTag(index: number): void {
+  customTags.value.splice(index, 1)
+}
+
+function saveTags(): void {
+  persistCustomTags()
+  editingTags.value = false
+}
+
+function cancelEditTags(): void {
+  customTags.value = []
+  editingTags.value = false
+}
+
+// 合并 AI 标签和用户自定义标签
+const mergedTags = computed<{ tag: string; count: number; type: 'emotion' | 'theme'; custom: boolean }[]>(() => {
+  const aiTags = displayTags.value.map(t => ({ ...t, custom: false }))
+  const custom = customTags.value.map(t => ({
+    tag: t,
+    count: 0,
+    type: 'theme' as const,
+    custom: true,
+  }))
+  // 自定义标签优先显示，去重
+  const customNames = new Set(custom.map(t => t.tag))
+  const filteredAi = aiTags.filter(t => !customNames.has(t.tag))
+  return [...custom, ...filteredAi]
+})
+
+// 当切换恒星时，重新加载自定义标签
+watch(() => props.catalogStarId, () => {
+  loadCustomTags()
 })
 </script>
 
@@ -639,8 +890,8 @@ const generatedTags = computed<string[]>(() => {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.45);
-  backdrop-filter: blur(4px);
+  background: rgba(7, 8, 22, 0.3);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1229,10 +1480,210 @@ const generatedTags = computed<string[]>(() => {
   background: rgba(255, 255, 255, 0.04);
   color: var(--ink-secondary);
   border: 1px solid var(--rule);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-emotion {
+  border-color: rgba(255, 139, 125, 0.25);
+  background: rgba(255, 139, 125, 0.06);
+  color: #ff8b7d;
+}
+.tag-theme {
+  border-color: rgba(134, 168, 255, 0.25);
+  background: rgba(134, 168, 255, 0.06);
+  color: #86a8ff;
+}
+.tag-count {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  font-weight: 500;
 }
 .tag.is-empty {
   opacity: 0.3;
   font-style: italic;
+}
+.tag-loading {
+  font-size: 0.7rem;
+  color: var(--accent);
+  opacity: 0.7;
+  font-style: italic;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.tag-badge-ai {
+  font-size: 0.6rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 217, 138, 0.15);
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+}
+
+/* ─── Tag Edit Button ─── */
+.tag-edit-btn {
+  background: none;
+  border: none;
+  color: var(--muted-light);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+.info-label:hover .tag-edit-btn,
+.tag-edit-btn:hover {
+  opacity: 1;
+}
+.tag-edit-btn:hover {
+  color: var(--accent);
+}
+
+/* ─── Tag Editor ─── */
+.tag-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+.tag-editor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+}
+.tag-editable {
+  cursor: pointer;
+  padding-right: 6px;
+  transition: background 0.15s;
+}
+.tag-editable:hover {
+  background: rgba(255, 100, 100, 0.1);
+  border-color: rgba(255, 100, 100, 0.3);
+}
+.tag-remove-x {
+  opacity: 0.5;
+}
+.tag-editable:hover .tag-remove-x {
+  opacity: 1;
+}
+.tag-editor-hint {
+  font-size: 0.72rem;
+  color: var(--muted-light);
+  font-style: italic;
+}
+.tag-editor-input-row {
+  display: flex;
+  gap: 6px;
+}
+.tag-editor-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.tag-editor-input:focus {
+  border-color: var(--accent-border);
+}
+.tag-editor-input::placeholder {
+  color: var(--muted-light);
+  opacity: 0.5;
+}
+.tag-editor-add {
+  padding: 6px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.tag-editor-add:hover:not(:disabled) {
+  background: rgba(255, 217, 138, 0.15);
+}
+.tag-editor-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tag-editor-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.tag-editor-suggest-label {
+  font-size: 0.7rem;
+  color: var(--muted-light);
+  margin-right: 2px;
+}
+.tag-suggestion {
+  cursor: pointer;
+  transition: opacity 0.15s;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+}
+.tag-suggestion:hover {
+  opacity: 0.7;
+}
+.tag-editor-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.tag-editor-save {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: rgba(0, 0, 0, 0.75);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tag-editor-save:hover {
+  background: var(--accent-hover);
+}
+.tag-editor-cancel {
+  padding: 5px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-secondary);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.tag-editor-cancel:hover {
+  border-color: var(--rule-hover);
+}
+
+/* ─── Custom Tag ─── */
+.tag-custom {
+  border-style: dashed;
+  border-color: rgba(255, 217, 138, 0.3);
+  color: var(--accent);
 }
 
 /* ─── Action Buttons ─── */
@@ -1370,5 +1821,138 @@ const generatedTags = computed<string[]>(() => {
 }
 .chat-btn:active {
   transform: scale(0.98);
+}
+
+/* ─── Similar Stars ─── */
+.similar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.similar-item {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.similar-item:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.04);
+}
+.similar-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.similar-name {
+  font-size: 0.8rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+.similar-score {
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.similar-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.similar-tag-emotion {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 139, 125, 0.1);
+  color: #ff8b7d;
+  border: 1px solid rgba(255, 139, 125, 0.15);
+}
+
+/* ─── 天区故事精选 ─── */
+.highlight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.highlight-card {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.015);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.highlight-card:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.03);
+}
+.highlight-card.is-target {
+  border-color: rgba(255, 217, 138, 0.2);
+  background: rgba(255, 217, 138, 0.04);
+}
+.highlight-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.highlight-star-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.highlight-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.highlight-dot.dot-target {
+  opacity: 1;
+  box-shadow: 0 0 4px var(--accent);
+}
+.highlight-score {
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.highlight-badge-target {
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 217, 138, 0.12);
+  color: var(--accent);
+  font-weight: 500;
+}
+.highlight-emotions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.highlight-essences {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.highlight-essence {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  font-style: italic;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>
