@@ -4,7 +4,7 @@
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Quaternion,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -184,6 +184,7 @@ export function useSky(
   options?: {
     onStarClick?: (starId: number) => void
     onStarHover?: (starId: number | null) => void
+    onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string) => void
     observerLat?: number
     observerLng?: number
@@ -270,6 +271,23 @@ export function useSky(
   hoverGlow.visible = false
   scene.add(hoverGlow)
 
+  // ═══ 定位高亮辉光（focusOnStar 后短暂高亮 2s） ═══
+  const locateHighlightTex = bloomTex('#ffe5a0', 128)
+  const locateHighlight = new Sprite(new SpriteMaterial({
+    map: locateHighlightTex,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+    opacity: 0,
+  }))
+  locateHighlight.scale.set(8, 8, 1)
+  locateHighlight.renderOrder = 101
+  locateHighlight.visible = false
+  scene.add(locateHighlight)
+  let locateHighlightUntil = 0
+  let locateHighlightPulsePhase = 0
+
   // ═══ 有故事的星星：呼吸辉光（同款 bloomTex，复用 hoverGlow 的方式） ═══
   const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
   function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
@@ -320,6 +338,11 @@ export function useSky(
       skyGroup.add(glow)
     }
   }
+
+  // ═══ 内核连线（相似星星） ═══
+  const kernelLinesGroup = new Group()
+  kernelLinesGroup.visible = false
+  skyGroup.add(kernelLinesGroup)
 
   // ═══ 天赤道 (Dec=0°) ═══
   {
@@ -517,6 +540,7 @@ export function useSky(
     let clickDrag = false
     let hoveredStarId = -1
     let hoverCheckTimer = 0
+    let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
 
     // 预计算所有星的归一化位置（用于屏幕投影）
     const allStarNorms: { id: number; nx: number; ny: number; nz: number }[] = []
@@ -609,13 +633,25 @@ export function useSky(
       // 阈值
       if (bestDist < 0.0015 && bestId !== -1) {
         if (bestId !== hoveredStarId) {
+          // 清除旧的长悬浮计时器
+          if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
           hoveredStarId = bestId
+          // 启动 1s 长悬浮计时器
+          const currentStarId = bestId
+          hoverLongTimer = setTimeout(() => {
+            options?.onStarHoverLong?.(currentStarId)
+          }, 1000)
           updateTooltipContent(bestId)
         } else {
           // 同一颗星：检查 stats 是否有更新
           refreshTooltipStats(bestId)
         }
       } else if (hoveredStarId !== -1) {
+        if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
+        // 拖拽旋转时不触发离开逻辑，保持连线可见
+        if (!dragging) {
+          options?.onStarHoverLong?.(null)
+        }
         hoveredStarId = -1
         tooltipEl.style.opacity = '0'
         hoverGlowTargetOpacity = 0
@@ -897,12 +933,37 @@ export function useSky(
       sm.opacity = 0
       hoverGlow.visible = false
     }
-    // 有故事的星：呼吸辉光动画
+    // 定位高亮呼吸动画（2s 后自动消失）
     const _now = performance.now()
+    if (locateHighlightUntil > 0) {
+      if (_now >= locateHighlightUntil) {
+        locateHighlight.visible = false
+        ;(locateHighlight.material as SpriteMaterial).opacity = 0
+        locateHighlightUntil = 0
+      } else {
+        const remaining = locateHighlightUntil - _now
+        const fadeProgress = remaining / 2000 // 0→1
+        const pulse = Math.sin(_now * 0.008) * 0.5 + 0.5
+        const scale = 10 + pulse * 15 // 10~25 呼吸
+        locateHighlight.scale.set(scale, scale, 1)
+        ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
+      }
+    }
+    // 有故事的星：呼吸辉光动画
     for (const sg of storyGlows) {
       const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
       const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
       ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+    }
+    // 内核连线呼吸动画
+    if (kernelLinesGroup.visible) {
+      const kernelBreath = (Math.sin(_now * 0.002) + 1) * 0.5
+      for (const child of kernelLinesGroup.children) {
+        if (child instanceof LineSegments) {
+          const mat = child.material as LineBasicMaterial
+          mat.opacity = 0.35 + kernelBreath * 0.45
+        }
+      }
     }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
@@ -981,6 +1042,92 @@ export function useSky(
       skyGroup.matrix.identity()
       skyGroup.matrix.multiply(new Matrix4().makeRotationY(Math.PI / 2 - lstRad))
       skyGroup.matrix.premultiply(new Matrix4().makeRotationX((90 - latDeg) * D2R))
+    },
+    setKernelLines(lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) {
+      // 清除旧连线
+      while (kernelLinesGroup.children.length > 0) {
+        kernelLinesGroup.remove(kernelLinesGroup.children[0])
+      }
+      if (lines.length === 0) {
+        kernelLinesGroup.visible = false
+        return
+      }
+      // 主连线（淡金虚线）
+      const v: number[] = []
+      for (const line of lines) {
+        v.push(line.from.x, line.from.y, line.from.z, line.to.x, line.to.y, line.to.z)
+      }
+      const geom = new BufferGeometry()
+      geom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      const mat = new LineDashedMaterial({
+        color: 0xffcc66,
+        dashSize: 2,
+        gapSize: 1.5,
+        transparent: true,
+        opacity: 0.55,
+        depthTest: true,
+        depthWrite: false,
+      })
+      const segs = new LineSegments(geom, mat)
+      segs.computeLineDistances()
+      kernelLinesGroup.add(segs)
+      // 发光层
+      const glowMat = new LineBasicMaterial({
+        color: 0xffd98a,
+        transparent: true,
+        opacity: 0.25,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      })
+      const glowGeom = new BufferGeometry()
+      glowGeom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      const glowSegs = new LineSegments(glowGeom, glowMat)
+      glowSegs.scale.setScalar(1.005)
+      kernelLinesGroup.add(glowSegs)
+      kernelLinesGroup.visible = true
+    },
+    focusOnStar(x: number, y: number, z: number) {
+      // 将恒星坐标从 skyGroup 局部空间转到世界空间
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+
+      // 计算目标朝向（相机在原点，看向恒星世界坐标）
+      const targetDir = starWorld.clone().normalize()
+      const dummyCam = camera.clone()
+      dummyCam.lookAt(starWorld)
+      const targetQuat = dummyCam.quaternion.clone()
+
+      const startQuat = camera.quaternion.clone()
+      const duration = 1200 // ms
+      const startTime = performance.now()
+
+      function animStep(now: number) {
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        // ease-in-out
+        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+
+        camera.quaternion.copy(startQuat).slerp(targetQuat, eased)
+
+        if (t < 1) {
+          requestAnimationFrame(animStep)
+        } else {
+          // 动画结束，更新拖拽偏移量以保持一致性
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+        }
+      }
+      requestAnimationFrame(animStep)
+    },
+    highlightStar(x: number, y: number, z: number) {
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+      locateHighlight.position.copy(starWorld)
+      locateHighlight.visible = true
+      ;(locateHighlight.material as SpriteMaterial).opacity = 0.9
+      locateHighlight.scale.set(25, 25, 1)
+      locateHighlightUntil = performance.now() + 2000
     },
     dispose() {
       cancelAnimationFrame(af)

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { recordCatalogVisit, getCatalogStats, getStoriesByCatalogStarId, addFavorite, removeFavorite } from '../services/starService';
 import { authRequired } from '../middleware/auth';
 import { ok, badRequest, serverError } from '../utils/response';
+import { getAggregatedTags, getSimilarStars, getAreaHighlights } from '../services/kernel';
 
 const router = Router();
 
@@ -68,6 +69,45 @@ router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Resp
     ok(res, '已取消收藏');
   } catch (error) {
     console.error('DELETE /api/catalog/stars/:catalogStarId/favorite error:', error);
+    serverError(res);
+  }
+});
+
+// 获取恒星下聚合的 AI 内核标签
+router.get('/:catalogStarId/tags', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const tags = getAggregatedTags(catalogStarId);
+    ok(res, 'success', tags);
+  } catch (error) {
+    console.error('GET /api/catalog/stars/:catalogStarId/tags error:', error);
+    serverError(res);
+  }
+});
+
+// 获取内核相似的恒星
+router.get('/:catalogStarId/similar', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const similar = getSimilarStars(catalogStarId);
+    ok(res, 'success', similar);
+  } catch (error) {
+    console.error('GET /api/catalog/stars/:catalogStarId/similar error:', error);
+    serverError(res);
+  }
+});
+
+// 获取天区故事精选（目标恒星 + 相似恒星的故事内核凝练）
+router.get('/:catalogStarId/area-highlights', (req: Request, res: Response) => {
+  try {
+    const catalogStarId = parseInt(req.params.catalogStarId, 10);
+    if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    const highlights = getAreaHighlights(catalogStarId);
+    ok(res, 'success', highlights);
+  } catch (error) {
+    console.error('GET /api/catalog/stars/:catalogStarId/area-highlights error:', error);
     serverError(res);
   }
 });

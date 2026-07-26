@@ -1,4 +1,5 @@
-﻿import db from '../src/db';
+import db from '../src/db';
+import { generatePosition } from '../src/utils/position';
 
 interface SeedStory {
   title: string;
@@ -637,7 +638,8 @@ function seed() {
     const content = item.content.length > 300
       ? item.content.substring(0, 297) + '...'
       : item.content;
-    insert.run(item.title, content, resonance, 0, 0, 0, item.catalog_star_id, item.origin);
+    const pos = generatePosition();
+    insert.run(item.title, content, resonance, pos.x, pos.y, pos.z, item.catalog_star_id, item.origin);
   }
 
   const count = db.prepare("SELECT COUNT(*) as count FROM stars WHERE type = 'history'").get() as { count: number };
