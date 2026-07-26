@@ -10,9 +10,10 @@ function resolveDbPath(): string {
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
-  const dataDir = path.join(__dirname, '../data');
+  const finalPath = candidates[candidates.length - 1];
+  const dataDir = path.dirname(finalPath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  return candidates[0];
+  return finalPath;
 }
 
 const DB_PATH = resolveDbPath();
