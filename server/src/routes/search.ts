@@ -1,12 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { ok, serverError } from '../utils/response';
 
 const router = Router();
 
-// 加载星表数据
-const catalogPath = resolve(__dirname, '../../../client/src/data/stars.json');
+function resolveCatalogPath(): string {
+  const candidates = [
+    resolve(__dirname, '../../../client/src/data/stars.json'),
+    resolve(__dirname, '../../../../client/src/data/stars.json'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return candidates[0];
+}
+
+const catalogPath = resolveCatalogPath();
 let catalog: { stars: { id: number; name: string | null; con: string; mag: number; ra: number; dec: number; x: number; y: number; z: number; color: string }[] } = { stars: [] };
 try {
   catalog = JSON.parse(readFileSync(catalogPath, 'utf-8'));
