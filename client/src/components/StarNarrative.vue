@@ -2,7 +2,8 @@
   <div class="narrative-section">
     <!-- 加载中：骨架 -->
     <div v-if="loading" class="narrative-loading">
-      <div class="shimmer-line shimmer-long"></div>
+      <div class="shimmer-line shimmer-title"></div>
+      <div class="shimmer-line"></div>
       <div class="shimmer-line"></div>
       <div class="shimmer-line shimmer-short"></div>
     </div>
@@ -13,10 +14,9 @@
       <button class="retry-btn" @click="$emit('retry')">重试</button>
     </div>
 
-    <!-- 加载完成：展示叙事 -->
+    <!-- 加载完成：展示 Markdown 渲染叙事 -->
     <div v-else-if="content" class="narrative-content">
-      <p class="narrative-text">{{ content }}</p>
-      <span v-if="cached" class="cache-badge">已缓存</span>
+      <div class="narrative-body" v-html="renderedContent"></div>
     </div>
 
     <!-- 静默：未开始 -->
@@ -27,7 +27,10 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import { marked } from 'marked'
+
+const props = defineProps<{
   content: string | null
   loading: boolean
   error: string | null
@@ -37,14 +40,23 @@ defineProps<{
 defineEmits<{
   retry: []
 }>()
+
+// 配置 marked 渲染选项
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
+
+const renderedContent = computed(() => {
+  if (!props.content) return ''
+  return marked.parse(props.content) as string
+})
 </script>
 
 <style scoped>
 .narrative-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  min-height: 60px;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--rule);
 }
 
 /* ── 加载骨架 ── */
@@ -64,9 +76,9 @@ defineEmits<{
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
-  width: 80%;
+  width: 85%;
 }
-.shimmer-long { width: 95%; }
+.shimmer-title { width: 60%; height: 18px; }
 .shimmer-short { width: 50%; }
 
 @keyframes shimmer {
@@ -99,24 +111,51 @@ defineEmits<{
   background: var(--accent-subtle);
 }
 
-/* ── 叙事内容 ── */
+/* ── 叙事内容（Markdown 渲染） ── */
 .narrative-content {
   position: relative;
 }
-.narrative-text {
-  margin: 0;
-  font-size: 0.82rem;
+
+/* ── Markdown 样式 ── */
+.narrative-body :deep(h1) {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 16px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.narrative-body :deep(p) {
+  font-size: 0.84rem;
   line-height: 1.85;
   color: var(--ink-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin: 0 0 12px;
 }
-.cache-badge {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 0.68rem;
-  color: var(--muted-light);
-  opacity: 0.5;
+
+.narrative-body :deep(blockquote) {
+  margin: 14px 0;
+  padding: 10px 16px;
+  border-left: 3px solid var(--accent);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 6px 6px 0;
+}
+
+.narrative-body :deep(blockquote p) {
+  font-size: 0.88rem;
+  color: var(--accent);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.7;
+}
+
+.narrative-body :deep(strong) {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.narrative-body :deep(em) {
+  color: var(--star-purple);
 }
 
 /* ── 闲置 ── */

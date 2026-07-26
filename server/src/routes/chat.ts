@@ -1,11 +1,12 @@
 /**
  * 聊天路由 — Feature 2「古人陪看」
- * GET  /api/catalog/stars/:catalogStarId/chat/figures — 获取古人列表
- * POST /api/catalog/stars/:catalogStarId/chat         — SSE 流式聊天
+ * GET  /api/catalog/stars/:catalogStarId/chat/figures — 获取与该星关联的古人列表
+ * POST /api/catalog/stars/:catalogStarId/chat/opening  — 获取诗人主动开场白
+ * POST /api/catalog/stars/:catalogStarId/chat          — SSE 流式聊天
  */
 
 import { Router, Request, Response } from 'express'
-import { getPublicFigures } from '../data/ancientFigures'
+import { getPublicFigures, getFiguresForStar, getFigureById, generateOpening, getStarAssociation } from '../data/ancientFigures'
 import { streamChat } from '../services/chat'
 import { ok, badRequest, notFound } from '../utils/response'
 import fs from 'fs'
@@ -65,7 +66,7 @@ function findStar(catalogStarId: number): CatalogStar | undefined {
 
 /**
  * GET /api/catalog/stars/:catalogStarId/chat/figures
- * 获取可选古人列表
+ * 获取与该星关联的古人列表（按星星-诗人关联过滤）
  */
 router.get('/:catalogStarId/chat/figures', (req: Request, res: Response) => {
   const catalogStarId = parseInt(req.params.catalogStarId, 10)
@@ -75,7 +76,12 @@ router.get('/:catalogStarId/chat/figures', (req: Request, res: Response) => {
   }
 
   const star = findStar(catalogStarId)
-  const figures = getPublicFigures()
+  const starName = star?.name || null
+  const constellation = star?.con || ''
+
+  // 按星星关联过滤古人
+  const matchedFigures = getFiguresForStar(starName, constellation)
+  const figures = matchedFigures.map(({ systemPrompt, ...rest }) => rest)
 
   ok(res, '获取古人列表成功', {
     figures,
@@ -86,6 +92,47 @@ router.get('/:catalogStarId/chat/figures', (req: Request, res: Response) => {
           magnitude: star.mag,
         }
       : null,
+  })
+})
+
+/**
+ * POST /api/catalog/stars/:catalogStarId/chat/opening
+ * 获取诗人主动开场白（选择古人后调用）
+ */
+router.post('/:catalogStarId/chat/opening', (req: Request, res: Response) => {
+  const catalogStarId = parseInt(req.params.catalogStarId, 10)
+  if (isNaN(catalogStarId)) {
+    badRequest(res, '无效的恒星 ID')
+    return
+  }
+
+  const { figureId } = req.body
+  if (!figureId) {
+    badRequest(res, '缺少必填参数：figureId')
+    return
+  }
+
+  const figure = getFigureById(figureId)
+  if (!figure) {
+    notFound(res, '古人角色不存在')
+    return
+  }
+
+  const star = findStar(catalogStarId)
+  const starName = star?.name || null
+  const constellation = star?.con || ''
+
+  // 生成主动开场白
+  const opening = generateOpening(figure, starName, constellation)
+
+  // 获取星星关联的诗词背景
+  const association = getStarAssociation(figureId, starName, constellation)
+
+  ok(res, '开场白生成成功', {
+    opening,
+    starName: starName || `恒星 #${catalogStarId}`,
+    constellation: CON_NAMES[constellation] || constellation,
+    association,
   })
 })
 
@@ -118,14 +165,18 @@ router.post('/:catalogStarId/chat', async (req: Request, res: Response) => {
 
   // 构建星星上下文
   const star = findStar(catalogStarId)
-  const starContext = star
-    ? {
-        starName: star.name || `恒星 #${catalogStarId}`,
-        constellation: CON_NAMES[star.con] || star.con,
-        magnitude: star.mag,
-        distance: star.dist,
-      }
-    : { starName: `恒星 #${catalogStarId}`, constellation: '' }
+  const starName = star?.name || null
+  const constellation = star?.con || ''
+  const association = getStarAssociation(figureId, starName, constellation)
+
+  const starContext = {
+    starName: starName || `恒星 #${catalogStarId}`,
+    constellation: CON_NAMES[constellation] || constellation,
+    magnitude: star?.mag,
+    distance: star?.dist,
+    relatedPoems: association?.poems?.join('\n'),
+    historicalContext: association?.context,
+  }
 
   await streamChat(res, figureId, message.trim(), history || [], starContext)
 })

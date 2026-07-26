@@ -80,13 +80,19 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
   const system = `你是"星语穹庭"的星空叙事者。根据用户提供的恒星信息，写一段"古今共望"叙事短文。
 
 ## 写作要求
-- 以"今夜，你看到{星名}。"开头
+- 使用 Markdown 格式输出，结构如下：
+  # 今夜，你看到{星名}。
+  （一段联系古今的叙述，1~2句）
+  （诗人名）写：
+  > "{诗句}"
+  （对诗句的解读，联系诗人当时的社会背景、心境，1~2句）
+  （结尾回扣，1句）
 - 联系古今：提到至少一位古代诗人/天文学家/历史人物与这颗星的故事
 - 引用相关古诗词（一句即可，标注作者和朝代）
-- 勿编造不存在的人物和诗句；如果不确定某颗星的具体典故，可以写人类共同仰望星空的普遍情感
+- 勿编造不存在的人物和诗句；如果不确定某颗星的具体典故，可以写人类共同仰望星空的普遍情感，但结构保持一致
 - 文字优美凝练、温暖治愈，150~250字
 - 结尾回扣：千年以后，你也正在看同一片天空
-- 中文输出，不要用 markdown 格式`
+- 中文输出，使用上述 Markdown 格式`
 
   const user = `恒星名称：${starName}
 所属星座：${conName}
@@ -131,7 +137,6 @@ export async function getNarrative(catalogStarId: number): Promise<NarrativeResu
     {
       temperature: 0.9,
       maxTokens: 600,
-      enableSearch: true,
     },
   )
 

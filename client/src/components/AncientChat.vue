@@ -13,7 +13,14 @@
 
           <!-- 角色选择 -->
           <div v-if="stage === 'figureSelect'" class="chat-figure-select">
-            <p class="chat-select-hint">选择一位古人，一起仰望这颗星</p>
+            <p class="chat-select-hint">
+              <template v-if="figures.length > 0">
+                选择一位古人，一起仰望这颗星
+              </template>
+              <template v-else>
+                这颗星暂无古人记载，但你可以和张衡一起探索它
+              </template>
+            </p>
             <div class="chat-figure-grid">
               <button
                 v-for="f in figures"
@@ -176,11 +183,56 @@ async function fetchFigures() {
   }
 }
 
-function selectFigure(f: Figure) {
+async function selectFigure(f: Figure) {
   selectedFigureId.value = f.id
   stage.value = 'chatting'
-  // 自动发送开场白
-  nextTick(() => scrollToBottom())
+
+  // 获取诗人主动开场白
+  await fetchOpening(f.id)
+}
+
+async function fetchOpening(figureId: string) {
+  streaming.value = true
+  streamingContent.value = ''
+
+  try {
+    const res = await fetch(`/api/catalog/stars/${props.catalogStarId}/chat/opening`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ figureId }),
+    })
+
+    const json = await res.json()
+    if (res.ok && json.data?.opening) {
+      // 逐字显示开场白
+      const opening = json.data.opening
+      for (let i = 0; i < opening.length; i++) {
+        streamingContent.value = opening.slice(0, i + 1)
+        await nextTick()
+        scrollToBottom()
+        await new Promise(r => setTimeout(r, 20))
+      }
+
+      // 开场白完成，加入消息列表
+      messages.value.push({ role: 'assistant', content: opening })
+    } else {
+      // 没有开场白，静默
+      messages.value.push({
+        role: 'assistant',
+        content: `（${selectedFigure.value?.name || '古人'}望向星空，与你一同仰望）`,
+      })
+    }
+  } catch {
+    messages.value.push({
+      role: 'assistant',
+      content: `（${selectedFigure.value?.name || '古人'}望向星空，与你一同仰望）`,
+    })
+  } finally {
+    streaming.value = false
+    streamingContent.value = ''
+    await nextTick()
+    scrollToBottom()
+  }
 }
 
 async function sendMessage() {

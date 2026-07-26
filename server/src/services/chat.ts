@@ -24,6 +24,7 @@ export interface StarContext {
   magnitude?: number
   distance?: number
   relatedPoems?: string
+  historicalContext?: string
 }
 
 /**
@@ -42,9 +43,13 @@ function buildStarContext(ctx: StarContext): string {
     parts.push(`距离地球约 ${ctx.distance} 光年`)
   }
   if (ctx.relatedPoems) {
-    parts.push(`\n与此星相关的诗词典故：${ctx.relatedPoems}`)
+    parts.push(`\n你与此星相关的诗句：${ctx.relatedPoems}`)
   }
-  return parts.join('，')
+  if (ctx.historicalContext) {
+    parts.push(`\n你当时写这些诗句的历史背景：${ctx.historicalContext}`)
+  }
+  parts.push(`\n请基于你的真实历史背景和诗词，自然地与这位现代人对话。`)
+  return parts.join('\n')
 }
 
 /**
@@ -80,7 +85,7 @@ export async function streamChat(
   // 构建 messages
   let systemContent = figure.systemPrompt
   if (starContext) {
-    systemContent += `\n\n${buildStarContext(starContext)}`
+    systemContent += `\n\n## 当前观测的星星\n${buildStarContext(starContext)}`
   }
 
   const messages: ChatMessage[] = [
