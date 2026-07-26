@@ -29,7 +29,7 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -245,6 +245,42 @@ function locateStar(starId: number) {
   if (!star || !skyRef.value?.sky) return
   // 平滑转动相机，以该星为中心（不打开详情面板）
   skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+  // 动画结束后高亮该星 2s
+  setTimeout(() => {
+    skyRef.value?.sky?.highlightStar(star.x, star.y, star.z)
+  }, 1200)
+}
+
+// ─── 长悬浮显示内核连线 ───
+let hoverLinesAbort: AbortController | null = null
+async function onStarHoverLong(starId: number | null) {
+  // 取消上一次请求
+  if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
+  if (starId === null) {
+    skyRef.value?.sky?.setKernelLines([])
+    return
+  }
+  // 详情面板打开时不重复显示连线
+  if (selectedStarInfo.value) return
+  const controller = new AbortController()
+  hoverLinesAbort = controller
+  try {
+    const res = await fetch(`/api/catalog/stars/${starId}/similar`, { signal: controller.signal })
+    const json = await res.json()
+    if (!res.ok || !json.data?.length) {
+      skyRef.value?.sky?.setKernelLines([])
+      return
+    }
+    const sourceStar = catalogStarLookup.get(starId)
+    if (!sourceStar) return
+    const lines = (json.data as { catalogStarId: number }[]).map(s => {
+      const target = catalogStarLookup.get(s.catalogStarId)
+      return target ? { from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } } : null
+    }).filter(Boolean) as { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]
+    skyRef.value?.sky?.setKernelLines(lines)
+  } catch {
+    if (!controller.signal.aborted) skyRef.value?.sky?.setKernelLines([])
+  }
 }
 
 interface CatalogStar {

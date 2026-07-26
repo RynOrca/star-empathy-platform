@@ -142,6 +142,7 @@ export interface SkyAPI {
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
   setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
   focusOnStar: (x: number, y: number, z: number) => void
+  highlightStar: (x: number, y: number, z: number) => void
 }
 
 export function useSky(
@@ -149,6 +150,7 @@ export function useSky(
   options?: {
     onStarClick?: (starId: number) => void
     onStarHover?: (starId: number | null) => void
+    onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string) => void
     observerLat?: number
     observerLng?: number
@@ -234,6 +236,23 @@ export function useSky(
   hoverGlow.renderOrder = 100
   hoverGlow.visible = false
   scene.add(hoverGlow)
+
+  // ═══ 定位高亮辉光（focusOnStar 后短暂高亮 2s） ═══
+  const locateHighlightTex = bloomTex('#ffe5a0', 128)
+  const locateHighlight = new Sprite(new SpriteMaterial({
+    map: locateHighlightTex,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+    opacity: 0,
+  }))
+  locateHighlight.scale.set(8, 8, 1)
+  locateHighlight.renderOrder = 101
+  locateHighlight.visible = false
+  scene.add(locateHighlight)
+  let locateHighlightUntil = 0
+  let locateHighlightPulsePhase = 0
 
   // ═══ 有故事的星星：呼吸辉光（同款 bloomTex，复用 hoverGlow 的方式） ═══
   const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
@@ -487,6 +506,7 @@ export function useSky(
     let clickDrag = false
     let hoveredStarId = -1
     let hoverCheckTimer = 0
+    let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
 
     // 预计算所有星的归一化位置（用于屏幕投影）
     const allStarNorms: { id: number; nx: number; ny: number; nz: number }[] = []
@@ -579,13 +599,22 @@ export function useSky(
       // 阈值
       if (bestDist < 0.0015 && bestId !== -1) {
         if (bestId !== hoveredStarId) {
+          // 清除旧的长悬浮计时器
+          if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
           hoveredStarId = bestId
+          // 启动 1s 长悬浮计时器
+          const currentStarId = bestId
+          hoverLongTimer = setTimeout(() => {
+            options?.onStarHoverLong?.(currentStarId)
+          }, 1000)
           updateTooltipContent(bestId)
         } else {
           // 同一颗星：检查 stats 是否有更新
           refreshTooltipStats(bestId)
         }
       } else if (hoveredStarId !== -1) {
+        if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
+        options?.onStarHoverLong?.(null)
         hoveredStarId = -1
         tooltipEl.style.opacity = '0'
         hoverGlowTargetOpacity = 0
@@ -890,8 +919,23 @@ export function useSky(
       sm.opacity = 0
       hoverGlow.visible = false
     }
-    // 有故事的星：呼吸辉光动画
+    // 定位高亮呼吸动画（2s 后自动消失）
     const _now = performance.now()
+    if (locateHighlightUntil > 0) {
+      if (_now >= locateHighlightUntil) {
+        locateHighlight.visible = false
+        ;(locateHighlight.material as SpriteMaterial).opacity = 0
+        locateHighlightUntil = 0
+      } else {
+        const remaining = locateHighlightUntil - _now
+        const fadeProgress = remaining / 2000 // 0→1
+        const pulse = Math.sin(_now * 0.008) * 0.5 + 0.5
+        const scale = 6 + pulse * 8 // 6~14 呼吸
+        locateHighlight.scale.set(scale, scale, 1)
+        ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
+      }
+    }
+    // 有故事的星：呼吸辉光动画
     for (const sg of storyGlows) {
       const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
       const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
@@ -1019,6 +1063,15 @@ export function useSky(
         }
       }
       requestAnimationFrame(animStep)
+    },
+    highlightStar(x: number, y: number, z: number) {
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+      locateHighlight.position.copy(starWorld)
+      locateHighlight.visible = true
+      ;(locateHighlight.material as SpriteMaterial).opacity = 0.9
+      locateHighlight.scale.set(12, 12, 1)
+      locateHighlightUntil = performance.now() + 2000
     },
     dispose() {
       cancelAnimationFrame(af)

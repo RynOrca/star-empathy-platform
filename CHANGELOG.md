@@ -4,6 +4,13 @@
 
 ### 2026-07-26
 
+- **feat**: 悬浮连线 + 定位高亮
+  - 鼠标悬浮星星 1s 后自动显示内核连线（无需点击），移开即消失
+  - `useSky.ts` 新增 `onStarHoverLong` 回调和 1s 计时器
+  - 搜索定位后目标星高亮 2s（呼吸脉冲 + 渐隐动画）
+  - `useSky.ts` 新增 `highlightStar()` 和 `locateHighlight` sprite
+  - 详情面板打开时悬浮连线不触发，避免冲突
+
 - **feat**: 搜索定位星星 + 连线可见性优化
   - 搜索下拉结果新增定位按钮（Crosshair 图标），点击后相机平滑动画转动到该星为中心
   - `useSky.ts` 新增 `focusOnStar(x, y, z)` 函数：quaternion slerp 平滑转动，1.2s ease-in-out 动画
