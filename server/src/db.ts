@@ -50,6 +50,14 @@ db.exec(`
     UNIQUE(catalog_star_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS idx_favorites ON favorites(catalog_star_id);
+
+  CREATE TABLE IF NOT EXISTS narratives (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    catalog_star_id INTEGER NOT NULL,
+    content         TEXT NOT NULL,
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at));
 `);
 
 // 兼容旧数据库：添加新列
@@ -64,6 +72,9 @@ try { db.exec('ALTER TABLE stars ADD COLUMN tag TEXT'); } catch {}
 try { db.exec('ALTER TABLE favorites ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorites(catalog_star_id, user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)'); } catch {}
+// 兼容旧数据库：narratives 表
+try { db.exec('CREATE TABLE IF NOT EXISTS narratives (id INTEGER PRIMARY KEY AUTOINCREMENT, catalog_star_id INTEGER NOT NULL, content TEXT NOT NULL, generated_at TEXT NOT NULL DEFAULT (datetime(\'now\')))'); } catch {}
+try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at))'); } catch {}
 // 兼容旧数据库：添加新索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)'); } catch {}

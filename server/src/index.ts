@@ -10,6 +10,7 @@ import authRouter from './routes/auth';
 import statsRouter from './routes/stats';
 import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
+import narrativeRouter from './routes/narrative';
 import { ok, serverError } from './utils/response';
 
 const app = express();
@@ -96,6 +97,7 @@ app.use('/api/stories', storiesRouter);
 app.post('/api/catalog/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/catalog/stars', narrativeRouter); // 叙事路由（/narrative）
 app.use('/api/catalog/stars', catalogRouter);
 
 // ═══ 旧路由兼容（/api/stars/*，功能同上，不删除） ═══
