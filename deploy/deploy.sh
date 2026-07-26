@@ -92,8 +92,9 @@ echo "
 🏗️  [4/8] 构建后端..."
 
 cd "${APP_DIR}/server"
-npm install --production
+npm install
 npm run build
+npm prune --production
 echo "   ✅ 后端构建完成"
 
 # ---------- 5. 前端构建 ----------
