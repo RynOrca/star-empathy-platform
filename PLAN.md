@@ -320,11 +320,11 @@ figureSelect（选角色）
 1. [x] 提交当前修改到 `Orca` 分支 → 已推送
 2. [x] Pull 最新 `main` → 架构已更新
 3. [x] Feature 1「古今共望」→ 已实现（deepseek + narrative + StarNarrative）
-4. [ ] 建分支 `feat/ancient-chat`
-5. [ ] 后端：`ancientFigures.ts` 数据 + `chat.ts` 服务 + `chat.ts` 路由
-6. [ ] 前端：`AncientChat.vue` 侧边抽屉 + `StarDetail.vue` 集成
-7. [ ] 测试 + commit
-8. [ ] 更新 CHANGELOG.md
+4. [x] 建分支 `feat/ancient-chat` → `6e417c4`
+5. [x] 后端：`ancientFigures.ts` 数据 + `chat.ts` 服务 + `chat.ts` 路由
+6. [x] 前端：`AncientChat.vue` 侧边抽屉 + `StarDetail.vue` 集成
+7. [x] 测试 + commit → `6e417c4`
+8. [x] 更新 CHANGELOG.md
 
 ---
 

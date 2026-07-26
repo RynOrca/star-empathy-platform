@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### 2026-07-26
+
+- **feat(chat)**: 古人陪看 AI 角色扮演聊天功能 (`6e417c4`)
+  - 4 位古人预设（李白/杜牧/苏轼/张衡），含 systemPrompt 角色扮演
+  - SSE 流式聊天，星星上下文自动注入
+  - API：`GET /api/catalog/stars/:id/chat/figures` + `POST /api/catalog/stars/:id/chat`
+  - 前端：AncientChat.vue 侧边抽屉（选角色→聊天状态机）
+  - StarDetail 右面板底部「与古人共赏」紫色按钮
+
 ### 2026-07-15
 
 - **feat**: 个人资料页星光节点重设计 — 全屏星空背景 + 故事星节点 + 星云签名编辑
