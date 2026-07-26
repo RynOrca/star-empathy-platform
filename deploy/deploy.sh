@@ -59,6 +59,7 @@ if [ -d "${APP_DIR}/.git" ]; then
     cd "${APP_DIR}"
     git fetch origin
     git checkout main
+    git checkout -- .
     git pull origin main
     echo "   ✅ 已更新到最新"
 else
