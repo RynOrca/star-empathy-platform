@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,7 +11,10 @@ import authRouter from './routes/auth';
 import statsRouter from './routes/stats';
 import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
-import { ok, serverError } from './utils/response';
+import narrativeRouter from './routes/narrative';
+import chatRouter from './routes/chat';
+import { ok, badRequest, serverError } from './utils/response';
+import { setApiKey, getApiKey } from './services/deepseek';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -98,6 +101,8 @@ app.use('/api/stories', storiesRouter);
 app.post('/api/catalog/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/catalog/stars', narrativeRouter); // 叙事路由（/narrative）
+app.use('/api/catalog/stars', chatRouter);      // 聊天路由（/chat/figures, /chat）
 app.use('/api/catalog/stars', catalogRouter);
 
 // ═══ 旧路由兼容（/api/stars/*，功能同上，不删除） ═══
@@ -112,6 +117,51 @@ app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// 设置 API Key（运行时覆盖）
+app.get('/api/settings/api-key', (_req: Request, res: Response) => {
+  ok(res, 'ok', { hasKey: !!getApiKey() });
+});
+app.post('/api/settings/api-key', (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+    setApiKey(null);
+    ok(res, '已清除 API Key');
+    return;
+  }
+  setApiKey(apiKey.trim());
+  ok(res, 'API Key 已保存');
+});
+
+// 测试 API Key 连通性
+app.post('/api/settings/test-key', async (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getApiKey();
+  if (!key) {
+    return badRequest(res, '请先设置 API Key');
+  }
+  try {
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 5,
+      }),
+    });
+    if (resp.ok) {
+      ok(res, '星河已连通');
+    } else {
+      badRequest(res, '未能连通');
+    }
+  } catch (e: any) {
+    serverError(res, `网络错误: ${e.message}`);
+  }
+});
 
 // SPA 回退：非 API 路径返回 index.html
 app.get('*', (_req: Request, res: Response) => {

@@ -1,1 +1,0 @@
-{'visible': False, 'name': '3h47m -10°31′', 'stats': ''}

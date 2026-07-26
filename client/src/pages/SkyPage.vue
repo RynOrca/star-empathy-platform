@@ -78,6 +78,10 @@
     <div v-if="userLat != null" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
+      <div class="zoom-divider"></div>
+      <button class="zoom-btn settings-entry" @click="showSettings = true" title="设置">
+        <Settings :size="16" />
+      </button>
     </div>
     <div v-if="userLat != null" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
@@ -111,16 +115,23 @@
         @submitted="onStorySubmitted"
         @close="showForm = false"
       />
+
+      <SettingsModal
+        :visible="showSettings"
+        @close="showSettings = false"
+      />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Settings } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
 import StoryForm from '../components/StoryForm.vue'
+import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 
@@ -336,6 +347,7 @@ const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
+const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
@@ -490,6 +502,14 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   align-items: center; justify-content: center;
 }
 .zoom-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.zoom-divider {
+  width: 22px; height: 1px;
+  background: var(--rule);
+  margin: 2px auto;
+}
+.settings-entry {
+  font-size: 0.85rem;
+}
 .hint {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
   color: var(--muted-light); font-size: 0.78rem; z-index: 5;

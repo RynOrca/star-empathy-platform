@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### 2026-07-26
+
+- **fix**: 强制 AI 输出格式 — Chat 分行 + Narrative Markdown (`f334687`)
+  - Chat: 系统 Prompt 增加格式要求（动作括号标注→空行→对话分段），`max_tokens` 300→500
+  - Narrative: 强化 Prompt 逐条列出格式规则（`#` 标题、`>` 引用、双引号、朝代标注），用户消息追加格式提醒
+  - 清除旧叙事缓存，确保新 Prompt 立即生效
+- **fix**: 修复三个问题 — 聊天 Markdown + 叙事渲染 + 故事入口重构 (`8bbcc73`)
+  - AncientChat 对话增加 Markdown 渲染（`marked`），括号动作/空行/对话分层展示
+  - 删除右栏冗余叙事组件（`StarNarrative` 只保留在左栏）
+  - 加强叙事 Prompt 强制 Markdown 格式输出（标题 `#`、引用 `>`、空行分隔）
+  - 故事按钮改为视图切换入口（叙事 → 故事列表），非折叠展开
+  - 故事列表增加「返回叙事」导航
+- **refactor**: 重构古人共赏 + 叙事 Markdown 渲染 + 布局调整 (`c740de4`)
+  - 扩展诗人列表至 11 位（新增屈原/陶渊明/李清照/辛弃疾/王维/白居易/李商隐）
+  - 新增星星-诗人关联映射（`starAssociations`），按星名/星座精确匹配
+  - 新增诗人主动开场白功能（`POST /api/catalog/stars/:id/chat/opening`）
+  - 新增 `GET /api/catalog/stars/:id/chat/figures` 按关联过滤古人
+  - 叙事支持 Markdown 渲染（`marked` 库），结构化输出（标题/引用/段落）
+  - 布局重构：叙事移至左栏顶部，故事列表改为可折叠区域
+  - 修复叙事生成失败（去掉 `enableSearch: true`）
+  - 修复 `starName` 可能为 null 的类型错误
+- **fix**: 修复三个 Bug (`fc95d3d`)
+  - chat.ts 中 stars.json 解析错误（对象而非数组），修复「与古人共赏」500 错误
+  - deepseek.ts 空内容返回增加详细日志
+  - StarDetail 右面板布局溢出：加 height/max-height/overflow-y
+- **feat(chat)**: 古人陪看 AI 角色扮演聊天功能 (`6e417c4`)
+  - 4 位古人预设（李白/杜牧/苏轼/张衡），含 systemPrompt 角色扮演
+  - SSE 流式聊天，星星上下文自动注入
+  - API：`GET /api/catalog/stars/:id/chat/figures` + `POST /api/catalog/stars/:id/chat`
+  - 前端：AncientChat.vue 侧边抽屉（选角色→聊天状态机）
+  - StarDetail 右面板底部「与古人共赏」紫色按钮
+
 ### 2026-07-15
 
 - **feat**: 个人资料页星光节点重设计 — 全屏星空背景 + 故事星节点 + 星云签名编辑
