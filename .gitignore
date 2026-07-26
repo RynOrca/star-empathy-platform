@@ -6,6 +6,8 @@
 # ─── 数据库 ───
 *.db
 server/data/
+.runtime-key
+server/.runtime-key
 
 # ─── 构建产物 ───
 *.bat
