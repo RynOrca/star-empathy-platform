@@ -4,7 +4,7 @@
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshPhongMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Quaternion,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
   TextureLoader, PointLight, ShaderMaterial, LoadingManager,
   ACESFilmicToneMapping,
   InstancedMesh, Object3D,
@@ -19,12 +19,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
-import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync, trueObliquityRad } from '../utils/astro'
+import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync } from '../utils/astro'
 // 阶段 3 P2：小行星 + 流星雨 + GPU 检测
 import { ASTEROIDS } from '../data/asteroids'
 import { getActiveShowers, type MeteorShower } from '../data/meteorShowers'
 import { detectGPU, getRenderParams } from '../utils/gpuDetect'
-import { getBrowserLocation, getCurrentTime, getCurrentDate } from '../utils/geoTime'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
