@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2026-07-25T16:16:50.245Z",
+  "license": "CC-BY-4.0",
+  "credits": [
+    "Planet textures: Solar System Scope (https://www.solarsystemscope.com/textures/)",
+    "Milky Way panorama: ESO/S. Brunier (https://www.eso.org/public/images/eso0932a/)"
+  ],
+  "totalBytes": 10272299,
+  "resources": [
+    {
+      "path": "textures/planets/2k_sun.jpg",
+      "label": "太阳",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_sun.jpg",
+      "ok": true,
+      "size": 822427
+    },
+    {
+      "path": "textures/planets/2k_mercury.jpg",
+      "label": "水星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_mercury.jpg",
+      "ok": true,
+      "size": 872555
+    },
+    {
+      "path": "textures/planets/2k_venus_surface.jpg",
+      "label": "金星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_venus_surface.jpg",
+      "ok": true,
+      "size": 885075
+    },
+    {
+      "path": "textures/planets/2k_moon.jpg",
+      "label": "月球",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_moon.jpg",
+      "ok": true,
+      "size": 1053869
+    },
+    {
+      "path": "textures/planets/2k_mars.jpg",
+      "label": "火星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_mars.jpg",
+      "ok": true,
+      "size": 750547
+    },
+    {
+      "path": "textures/planets/2k_jupiter.jpg",
+      "label": "木星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_jupiter.jpg",
+      "ok": true,
+      "size": 498976
+    },
+    {
+      "path": "textures/planets/2k_saturn.jpg",
+      "label": "土星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_saturn.jpg",
+      "ok": true,
+      "size": 199916
+    },
+    {
+      "path": "textures/planets/2k_saturn_ring_alpha.png",
+      "label": "土星环（带 alpha）",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_saturn_ring_alpha.png",
+      "ok": true,
+      "size": 12119
+    },
+    {
+      "path": "textures/planets/2k_uranus.jpg",
+      "label": "天王星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_uranus.jpg",
+      "ok": true,
+      "size": 77751
+    },
+    {
+      "path": "textures/planets/2k_neptune.jpg",
+      "label": "海王星",
+      "url": "https://www.solarsystemscope.com/textures/download/2k_neptune.jpg",
+      "ok": true,
+      "size": 241580
+    },
+    {
+      "path": "textures/skybox/milky_way.jpg",
+      "label": "银河全景（ESO）",
+      "url": "https://cdn.eso.org/images/publicationjpg/eso0932a.jpg",
+      "ok": true,
+      "size": 4857484
+    }
+  ]
+}

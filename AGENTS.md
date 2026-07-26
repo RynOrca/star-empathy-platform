@@ -75,7 +75,7 @@ npm run preview    # 预览构建产物
 
 ## 前端代理配置
 
-`client/vite.config.ts` 中 `/api` 代理到 `http://localhost:31415`。确保后端端口与此一致，或在 Vite 配置中修改。
+`client/vite.config.ts` 中 `/api` 代理到 `http://localhost:3000`。后端 `server/src/index.ts` 默认端口也是 3000（可通过 `PORT` 环境变量覆盖）。
 
 ## 关键约束
 

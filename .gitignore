@@ -5,6 +5,10 @@
 *.log
 /tmp/
 
+# 例外：前端静态纹理资源需要提交到版本控制
+!client/public/textures/**/*.jpg
+!client/public/textures/**/*.png
+
 node_modules/
 dist/
 .design/
@@ -12,3 +16,4 @@ dist/
 
 .playwright-mcp/
 .omo/run-continuation/
+research/
