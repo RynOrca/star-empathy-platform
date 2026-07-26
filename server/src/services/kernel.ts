@@ -209,6 +209,121 @@ export function getAggregatedTags(catalogStarId: number): {
   }
 }
 
+/** 获取所有有内核的恒星及其标签集合 */
+function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: Set<string> }> {
+  const rows = db.prepare(`
+    SELECT DISTINCT s.catalog_star_id, sk.emotional_tags, sk.themes
+    FROM story_kernels sk
+    JOIN stars s ON sk.story_id = s.id
+    WHERE s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
+  `).all() as { catalog_star_id: number; emotional_tags: string; themes: string }[]
+
+  const map = new Map<number, { emotionalTags: Set<string>; themes: Set<string> }>()
+  for (const row of rows) {
+    if (!map.has(row.catalog_star_id)) {
+      map.set(row.catalog_star_id, { emotionalTags: new Set(), themes: new Set() })
+    }
+    const entry = map.get(row.catalog_star_id)!
+    try { JSON.parse(row.emotional_tags).forEach((t: string) => entry.emotionalTags.add(t)) } catch { /* skip */ }
+    try { JSON.parse(row.themes).forEach((t: string) => entry.themes.add(t)) } catch { /* skip */ }
+  }
+  return map
+}
+
+/** 计算 Jaccard 相似度 */
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 0
+  let intersection = 0
+  for (const item of a) {
+    if (b.has(item)) intersection++
+  }
+  const union = a.size + b.size - intersection
+  return union === 0 ? 0 : intersection / union
+}
+
+export interface SimilarStar {
+  catalogStarId: number
+  score: number
+  sharedEmotions: string[]
+  sharedThemes: string[]
+  storyCount: number
+}
+
+/** 查找与指定恒星内核相似的恒星 */
+export function getSimilarStars(catalogStarId: number, limit = 8): SimilarStar[] {
+  const allKernels = getAllStarKernels()
+  const target = allKernels.get(catalogStarId)
+  if (!target) return []
+
+  const results: SimilarStar[] = []
+  for (const [cid, tags] of allKernels) {
+    if (cid === catalogStarId) continue
+    const emotionSim = jaccardSimilarity(target.emotionalTags, tags.emotionalTags)
+    const themeSim = jaccardSimilarity(target.themes, tags.themes)
+    // 情绪权重 0.6，主题权重 0.4
+    const score = emotionSim * 0.6 + themeSim * 0.4
+    if (score <= 0) continue
+
+    const sharedEmotions = [...target.emotionalTags].filter(t => tags.emotionalTags.has(t))
+    const sharedThemes = [...target.themes].filter(t => tags.themes.has(t))
+
+    const storyCount = (db.prepare(
+      'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+    ).get(cid) as { cnt: number }).cnt
+
+    results.push({ catalogStarId: cid, score: Math.round(score * 100) / 100, sharedEmotions, sharedThemes, storyCount })
+  }
+
+  // 按相似度降序，取前 limit
+  return results.sort((a, b) => b.score - a.score).slice(0, limit)
+}
+
+export interface AreaHighlight {
+  catalogStarId: number
+  essences: string[]
+  sharedEmotions: string[]
+  score: number
+  storyCount: number
+}
+
+/** 获取天区故事精选：目标恒星 + 相似恒星的故事内核凝练 */
+export function getAreaHighlights(catalogStarId: number, limit = 6): AreaHighlight[] {
+  const similar = getSimilarStars(catalogStarId, limit)
+
+  // 目标恒星自己的内核
+  const targetEssences = getAggregatedTags(catalogStarId).essences
+  const targetStoryCount = (db.prepare(
+    'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+  ).get(catalogStarId) as { cnt: number }).cnt
+
+  const result: AreaHighlight[] = []
+
+  if (targetEssences.length > 0) {
+    result.push({
+      catalogStarId,
+      essences: targetEssences.slice(0, 3),
+      sharedEmotions: [],
+      score: 0,
+      storyCount: targetStoryCount,
+    })
+  }
+
+  // 相似恒星的内核
+  for (const s of similar) {
+    const tags = getAggregatedTags(s.catalogStarId)
+    if (tags.essences.length === 0) continue
+    result.push({
+      catalogStarId: s.catalogStarId,
+      essences: tags.essences.slice(0, 2),
+      sharedEmotions: s.sharedEmotions,
+      score: s.score,
+      storyCount: s.storyCount,
+    })
+  }
+
+  return result
+}
+
 /** 异步触发内核生成（不阻塞，失败静默） */
 export function triggerKernelGeneration(storyId: number, content: string, title?: string | null): void {
   setImmediate(async () => {

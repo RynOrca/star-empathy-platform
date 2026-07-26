@@ -41,7 +41,7 @@ router.get('/:storyId', (req: Request, res: Response) => {
 // 投递故事（可选登录）
 router.post('/', authOptional, (req: Request, res: Response) => {
   try {
-    const { title, content, catalog_star_id, location, tag } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, location, tag } = req.body;
     const user = (req as Request & { user?: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {

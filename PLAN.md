@@ -2,7 +2,7 @@
 
 ## 当前任务：Issue #9 — 引入 Agents：星星故事凝练
 
-**状态：** 阶段一已完成
+**状态：** 阶段一、阶段二已完成
 
 ### 阶段一：AI 故事内核提取 + 替换标签系统
 
@@ -43,3 +43,26 @@
 - 保留 `stars.tag` 字段不动（旧数据兼容）
 - 旧故事无内核时，显示"AI 分析中..."或回退到旧标签
 - 为 seed 数据也可异步生成内核
+
+---
+
+### 阶段二：星座连线 + 天区故事精选
+
+**目标：** 相似故事内核的星星浪漫化连接，天区故事精选面板展示内核凝练。
+
+#### 1. 相似星星匹配 `kernel.ts`
+- `getAllStarKernels()` → 聚合所有恒星的内核标签集合
+- `jaccardSimilarity(a, b)` → Jaccard 相似度计算
+- `getSimilarStars(catalogStarId, limit)` → 按情绪(60%)+主题(40%)权重匹配相似恒星
+- `getAreaHighlights(catalogStarId, limit)` → 目标恒星+相似恒星的故事内核凝练
+
+#### 2. 后端路由 `catalog.ts`
+- `GET /api/catalog/stars/:catalogStarId/similar` → 内核相似的恒星
+- `GET /api/catalog/stars/:catalogStarId/area-highlights` → 天区故事精选
+
+#### 3. 前端变更
+- 新建 `client/src/composables/useSimilarStars.ts` → 获取相似星星
+- 新建 `client/src/composables/useAreaHighlights.ts` → 获取天区故事精选
+- `StarDetail.vue` → 内核相似星星列表 + 天区故事精选面板
+- `useSky.ts` → `setKernelLines()` 3D 虚线连接相似星星（发光层 + 动画）
+- `SkyPage.vue` → `onUpdateSimilarStars()` 处理连线渲染

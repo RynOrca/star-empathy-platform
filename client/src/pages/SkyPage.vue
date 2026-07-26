@@ -104,6 +104,7 @@
         @decrement-favorites="onDecrementFavorites"
         @update-favorite-list="onUpdateFavoriteList"
         @update-stats="catalogStats = $event"
+        @update-similar-stars="onUpdateSimilarStars"
         @close="onCloseDetail"
         @write-story="onWriteStory"
       />
@@ -200,6 +201,10 @@ onMounted(async () => {
       if (favRes.ok) favoriteStarIds.value = favJson.data
     } catch {}
   }
+  // 监听相似星星点击事件
+  window.addEventListener('fly-to-star', ((e: CustomEvent) => {
+    onStarClick(e.detail.catalogStarId)
+  }) as EventListener)
 })
 
 function doLogout() {
@@ -398,8 +403,21 @@ function onPlanetClick(name: string, nameCN: string) {
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]) }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
+function onUpdateSimilarStars(ids: number[]) {
+  // 查找源星和相似星的 3D 坐标
+  const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
+  if (!sourceStar) return
+  const lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[] = []
+  for (const id of ids) {
+    const target = catalogStarLookup.get(id)
+    if (target) {
+      lines.push({ from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } })
+    }
+  }
+  skyRef.value?.sky?.setKernelLines(lines)
+}
 function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }

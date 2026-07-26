@@ -332,6 +332,61 @@
             <span>与古人共赏</span>
           </button>
         </div>
+
+        <!-- 相似星星 -->
+        <div class="info-section" v-if="similarStars.similarStars.value.length > 0">
+          <div class="info-label">内核相似的星星</div>
+          <div class="similar-list">
+            <div
+              v-for="s in similarStars.similarStars.value.slice(0, 5)"
+              :key="s.catalogStarId"
+              class="similar-item"
+              @click="onSimilarStarClick(s.catalogStarId)"
+            >
+              <div class="similar-info">
+                <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
+                <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
+              </div>
+              <div class="similar-tags">
+                <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 天区故事精选 -->
+        <div class="info-section" v-if="areaHighlightsData.length > 0">
+          <div class="info-label">
+            天区故事精选
+            <span v-if="areaLoading" class="tag-loading">凝练中...</span>
+          </div>
+          <div class="highlight-list">
+            <div
+              v-for="(h, hi) in areaHighlightsData"
+              :key="h.catalogStarId"
+              class="highlight-card"
+              :class="{ 'is-target': hi === 0 && h.score === 0 }"
+              @click="h.catalogStarId !== catalogStarId && onSimilarStarClick(h.catalogStarId)"
+            >
+              <div class="highlight-head">
+                <span class="highlight-star-name">
+                  <span class="highlight-dot" :class="{ 'dot-target': hi === 0 && h.score === 0 }"></span>
+                  {{ getStarName(h.catalogStarId) }}
+                </span>
+                <span v-if="h.score > 0" class="highlight-score">{{ Math.round(h.score * 100) }}%</span>
+                <span v-else class="highlight-badge-target">当前</span>
+              </div>
+              <div class="highlight-emotions" v-if="h.sharedEmotions.length > 0">
+                <span v-for="tag in h.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+              </div>
+              <div class="highlight-essences">
+                <p v-for="(essence, ei) in h.essences" :key="ei" class="highlight-essence">
+                  "{{ essence }}"
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -353,6 +408,9 @@ import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
 import { useKernel } from '../composables/useKernel'
+import { useSimilarStars } from '../composables/useSimilarStars'
+import { useAreaHighlights } from '../composables/useAreaHighlights'
+import catalogData from '../data/stars.json'
 
 const props = defineProps<{
   stories: Array<{
@@ -388,6 +446,7 @@ const emit = defineEmits<{
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
+  updateSimilarStars: [ids: number[]]
 }>()
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
@@ -503,6 +562,33 @@ watch(() => props.catalogStarId, (id) => {
     kernel.fetchAggregatedTags(id)
   }
 }, { immediate: true })
+
+// ─── 相似星星 ───
+const similarStars = useSimilarStars(() => props.catalogStarId)
+watch(() => similarStars.similarStars.value, (stars) => {
+  emit('updateSimilarStars', stars.map(s => s.catalogStarId))
+})
+
+// ─── 天区故事精选 ───
+const areaHighlights = useAreaHighlights(() => props.catalogStarId)
+const { highlights: areaHighlightsData, loading: areaLoading } = areaHighlights
+// 用 computed 别名保持模板简洁
+const areaHighlightsList = computed(() => areaHighlightsData.value)
+
+// 星表查找
+const catalogLookup = new Map<number, { name: string | null; con: string }>()
+for (const s of (catalogData as any).stars) {
+  catalogLookup.set(s.id, { name: s.name, con: s.con })
+}
+function getStarName(catalogStarId: number): string {
+  const s = catalogLookup.get(catalogStarId)
+  return s?.name || s?.con || `恒星 #${catalogStarId}`
+}
+function onSimilarStarClick(catalogStarId: number) {
+  emit('close')
+  // 模拟点击该星：通过全局事件通知 SkyPage
+  window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
+}
 
 // ─── 用户当前位置（用于计算距离） ───
 const userPosition = ref<{ lat: number; lng: number } | null>(null)
@@ -1447,12 +1533,13 @@ watch(() => props.catalogStarId, () => {
   padding: 2px;
   display: inline-flex;
   align-items: center;
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity 0.15s, color 0.15s;
   vertical-align: middle;
   margin-left: 2px;
 }
-.info-label:hover .tag-edit-btn {
+.info-label:hover .tag-edit-btn,
+.tag-edit-btn:hover {
   opacity: 1;
 }
 .tag-edit-btn:hover {
@@ -1734,5 +1821,138 @@ watch(() => props.catalogStarId, () => {
 }
 .chat-btn:active {
   transform: scale(0.98);
+}
+
+/* ─── Similar Stars ─── */
+.similar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.similar-item {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.similar-item:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.04);
+}
+.similar-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.similar-name {
+  font-size: 0.8rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+.similar-score {
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.similar-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.similar-tag-emotion {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 139, 125, 0.1);
+  color: #ff8b7d;
+  border: 1px solid rgba(255, 139, 125, 0.15);
+}
+
+/* ─── 天区故事精选 ─── */
+.highlight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.highlight-card {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.015);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.highlight-card:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.03);
+}
+.highlight-card.is-target {
+  border-color: rgba(255, 217, 138, 0.2);
+  background: rgba(255, 217, 138, 0.04);
+}
+.highlight-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.highlight-star-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.highlight-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.highlight-dot.dot-target {
+  opacity: 1;
+  box-shadow: 0 0 4px var(--accent);
+}
+.highlight-score {
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.highlight-badge-target {
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 217, 138, 0.12);
+  color: var(--accent);
+  font-weight: 500;
+}
+.highlight-emotions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.highlight-essences {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.highlight-essence {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  font-style: italic;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

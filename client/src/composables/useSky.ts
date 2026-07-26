@@ -140,6 +140,7 @@ export interface SkyAPI {
   setObserver: (obs: ObserverLoc | null) => void
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
+  setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
 }
 
 export function useSky(
@@ -283,6 +284,11 @@ export function useSky(
       skyGroup.add(glow)
     }
   }
+
+  // ═══ 内核连线（相似星星） ═══
+  const kernelLinesGroup = new Group()
+  kernelLinesGroup.visible = false
+  skyGroup.add(kernelLinesGroup)
 
   // ═══ 天赤道 (Dec=0°) ═══
   {
@@ -890,6 +896,16 @@ export function useSky(
       const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
       ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
     }
+    // 内核连线呼吸动画
+    if (kernelLinesGroup.visible) {
+      const kernelBreath = (Math.sin(_now * 0.002) + 1) * 0.5
+      for (const child of kernelLinesGroup.children) {
+        if (child instanceof LineSegments) {
+          const mat = child.material as LineBasicMaterial
+          mat.opacity = 0.25 + kernelBreath * 0.35
+        }
+      }
+    }
     labelRenderer.render(scene, camera)
     renderer.render(scene, camera)
   }
@@ -925,6 +941,50 @@ export function useSky(
         0,        0,        0,     1,
       )
       skyGroup.matrix.copy(m)
+    },
+    setKernelLines(lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) {
+      // 清除旧连线
+      while (kernelLinesGroup.children.length > 0) {
+        kernelLinesGroup.remove(kernelLinesGroup.children[0])
+      }
+      if (lines.length === 0) {
+        kernelLinesGroup.visible = false
+        return
+      }
+      // 主连线（淡金虚线）
+      const v: number[] = []
+      for (const line of lines) {
+        v.push(line.from.x, line.from.y, line.from.z, line.to.x, line.to.y, line.to.z)
+      }
+      const geom = new BufferGeometry()
+      geom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      const mat = new LineDashedMaterial({
+        color: 0xffcc66,
+        dashSize: 2,
+        gapSize: 1.5,
+        transparent: true,
+        opacity: 0.4,
+        depthTest: true,
+        depthWrite: false,
+      })
+      const segs = new LineSegments(geom, mat)
+      segs.computeLineDistances()
+      kernelLinesGroup.add(segs)
+      // 发光层
+      const glowMat = new LineBasicMaterial({
+        color: 0xffd98a,
+        transparent: true,
+        opacity: 0.15,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      })
+      const glowGeom = new BufferGeometry()
+      glowGeom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
+      const glowSegs = new LineSegments(glowGeom, glowMat)
+      glowSegs.scale.setScalar(1.005)
+      kernelLinesGroup.add(glowSegs)
+      kernelLinesGroup.visible = true
     },
     dispose() {
       cancelAnimationFrame(af)

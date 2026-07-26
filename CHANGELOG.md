@@ -4,6 +4,17 @@
 
 ### 2026-07-26
 
+- **feat**: Issue #9 阶段二 — 星座连线 + 天区故事精选
+  - 后端 `kernel.ts`：新增 `getAllStarKernels()`、`jaccardSimilarity()`、`getSimilarStars()`、`getAreaHighlights()` 函数
+  - 新增 `GET /api/catalog/stars/:catalogStarId/similar` 端点（Jaccard 相似度匹配，情绪 60% + 主题 40% 权重）
+  - 新增 `GET /api/catalog/stars/:catalogStarId/area-highlights` 端点（天区故事内核凝练）
+  - 新建 `useSimilarStars.ts` composable（获取相似星星）
+  - 新建 `useAreaHighlights.ts` composable（获取天区故事精选）
+  - `StarDetail.vue`：新增「内核相似的星星」列表 +「天区故事精选」面板（故事内核卡片展示）
+  - `useSky.ts`：新增 `setKernelLines()` 3D 虚线连接相似星星（发光层 + additive blending）
+  - `SkyPage.vue`：新增 `onUpdateSimilarStars()` 处理连线渲染
+  - 修复 `StarDetail.vue` 模板中 `similarStars` composable 对象引用错误
+
 - **feat**: AI 故事内核提取系统 — Issue #9 阶段一 (`1105d44`)
   - 新增 `story_kernels` 表，存储 AI 生成的故事情绪标签、内核、主题词
   - 新增 `server/src/services/kernel.ts`：DeepSeek 驱动的内核提取服务
