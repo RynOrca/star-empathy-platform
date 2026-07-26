@@ -1,4 +1,4 @@
-import {
+﻿﻿import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
@@ -9,6 +9,7 @@ import {
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
 import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, trueObliquityRad } from '../utils/astro'
+import { getBrowserLocation, getCurrentTime, getCurrentDate } from '../utils/geoTime'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
@@ -140,6 +141,29 @@ export interface SkyAPI {
   setObserver: (obs: ObserverLoc | null) => void
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
+  /** 绕世界 X 轴旋转天球（弧度），正角 = 右手定则 */
+  rotateX: (rad: number) => void
+  /** 绕世界 Y 轴旋转天球（弧度），正角 = 右手定则（向东转） */
+  rotateY: (rad: number) => void
+  /** 绕世界 Z 轴旋转天球（弧度），正角 = 右手定则 */
+  rotateZ: (rad: number) => void
+  /** 天球回到默认朝向（北极星正上方，春分点正右） */
+  resetRotation: () => void
+  /**
+   * 统一旋转入口 — 一次性绕 X/Y/Z 三轴旋转天球（含黄道、银河、行星等全部子元素）
+   * 顺序：先绕 X，再绕 Y，最后绕 Z（本地坐标系累积）
+   * @param radX 绕 X 轴弧度（东西轴，正角=北极星向南倒，对应纬度）
+   * @param radY 绕 Y 轴弧度（天极轴，正角=星星东升西落，对应地方恒星时）
+   * @param radZ 绕 Z 轴弧度（前后轴，正角=北极星向右倒，较少使用）
+   */
+  rotate: (radX: number, radY: number, radZ: number) => void
+  /**
+   * 设置天球绝对旋转（覆盖当前旋转，不是叠加）
+   * @param radX 绕 X 轴弧度
+   * @param radY 绕 Y 轴弧度
+   * @param radZ 绕 Z 轴弧度
+   */
+  setRotation: (radX: number, radY: number, radZ: number) => void
 }
 
 export function useSky(
@@ -610,60 +634,36 @@ export function useSky(
     })
   }
 
-  // ═══ 地平旋转（赤道坐标 → 地平坐标） ═══
-  // 根据 LST 和纬度旋转 skyGroup 使天球正确对齐地平
-  // 旋转顺序：先绕 Y 轴（将 RA=LST 子午线转到 -Z/南方），再绕 X 轴（使 NCP 高度 = 纬度）
-  // 必须手动构建旋转矩阵 M = Rx(rotX) * Ry(rotY)（先 Y 后 X）
-  {
-    const lat = options?.observerLat
-    const lng = options?.observerLng
-    if (lat == null || lng == null) {
-      // 没有经纬度时不做地平旋转，保持赤道坐标
-      skyGroup.matrixAutoUpdate = false
-      skyGroup.matrix.identity()
-    } else {
-      const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
-      const lstRad = lstHours / 24 * Math.PI * 2
-      const latRad = lat * D2R
-      const ry = lstRad - Math.PI / 2  // 绕 Y 的旋转角
-      const rx = Math.PI / 2 - latRad  // 绕 X 的旋转角
-      const cy = Math.cos(ry), sy = Math.sin(ry)
-      const cx = Math.cos(rx), sx = Math.sin(rx)
-      // M = Rx * Ry (column-major for THREE.js Matrix4)
-      const m = new Matrix4()
-      m.set(
-        cy,      -sx*sy,  cx*sy,  0,
-        0,        cx,      sx,     0,
-        -sy,     -sx*cy,  cx*cy,  0,
-        0,        0,        0,     1,
-      )
-      skyGroup.matrixAutoUpdate = false
-      skyGroup.matrix.copy(m)
-    }
-  }
+  // ═══ 地平旋转（已禁用：天球保持原始赤道坐标系） ═══
+  // 不根据 GPS/时间做任何旋转，天球保持默认朝向：
+  //   Y+ = 北天极（北极星）  X+ = 春分点（赤经 0h）  Z- = 前方
+  skyGroup.matrixAutoUpdate = false
+  skyGroup.matrix.identity()
 
   // ═══ 相机 ═══
-  let baseRotX = 0.3, baseRotY = 0                 // 由 observer/lst 算出的「基础朝向」
-  let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0.3
+  let baseRotX = 0, baseRotY = 0                 // 由 observer/lst 算出的「基础朝向」
+  let dragging = false, px = 0, py = 0, rotY = 0, rotX = 0
   let userFov = DEFAULT_FOV
   let observer: ObserverLoc | null = null
   let lstRefDeg = 0                                 // 设定 observer 时的 LST，用于实时自转
 
   /** 根据当前地点+真实时刻刷新基础朝向 */
   function applyObserverRotation(now = new Date()) {
-    if (!observer) return
-    const jd = dateToJD(now)
-    const lst = lstDeg(jd, observer.lon)
-    const euler = orientationEuler(observer.lat, lst)
-    baseRotX = euler.rotX
-    baseRotY = euler.rotY
-    lstRefDeg = lst
-    camera.rotation.set(baseRotX + rotX - 0.3, baseRotY + rotY, 0, 'YXZ')
+    // 已禁用：天球回归默认不旋转
+    // if (!observer) return
+    // const jd = dateToJD(now)
+    // const lst = lstDeg(jd, observer.lon)
+    // const euler = orientationEuler(observer.lat, lst)
+    // baseRotX = euler.rotX
+    // baseRotY = euler.rotY
+    // lstRefDeg = lst
+    // camera.rotation.set(baseRotX + rotX - 0.3, baseRotY + rotY, 0, 'YXZ')
   }
 
   function setObserver(obs: ObserverLoc | null) {
-    observer = obs
-    if (obs) applyObserverRotation()
+    // 已禁用：天球回归默认不旋转
+    // observer = obs
+    // if (obs) applyObserverRotation()
   }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -839,43 +839,44 @@ export function useSky(
     camera.updateProjectionMatrix()
 
     // 实时恒星漂移：按真实恒星时与基础 LST 的差修正 rotY
-    if (observer) {
-      lstSyncAccum += 16
-      if (lstSyncAccum >= 5000) {
-        lstSyncAccum = 0
-        const jd = dateToJD(new Date())
-        const cur = lstDeg(jd, observer.lon)
-        let d = cur - lstRefDeg
-        if (d > 180) d -= 360
-        if (d < -180) d += 360
-        baseRotY = -(cur / 15) * D2R
-        lstRefDeg = cur
-      }
-      // 基础朝向 + 用户拖动偏移
-      camera.rotation.set(
-        baseRotX + (rotX - 0.3),
-        baseRotY + rotY,
-        0,
-        'YXZ',
-      )
-      // 每日同步一次黄道顶点（岁差 + 真黄赤交角年变化，约 0.003°/年）
-      eclipticRefreshAccum += 16
-      if (eclipticRefreshAccum > 1000 * 60 * 60 * 24 && eclipticLine) {
-        eclipticRefreshAccum = 0
-        const now = new Date()
-        const v: number[] = []
-        for (let i = 0; i <= 360; i++) {
-          const { ra, dec } = eclipticToRaDecJD(i, now)
-          const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
-          v.push(p.x, p.y, p.z)
-        }
-        const next = new Float32Array(v)
-        ;(eclipticLine.userData as { basePos: Float32Array }).basePos = next
-        eclipticLine.geometry.setAttribute('position', new BufferAttribute(next, 3))
-        eclipticLine.geometry.computeBoundingSphere()
-        eclipticLine.computeLineDistances()
-      }
-    }
+    // 已禁用：天球回归默认不旋转
+    // if (observer) {
+    //   lstSyncAccum += 16
+    //   if (lstSyncAccum >= 5000) {
+    //     lstSyncAccum = 0
+    //     const jd = dateToJD(new Date())
+    //     const cur = lstDeg(jd, observer.lon)
+    //     let d = cur - lstRefDeg
+    //     if (d > 180) d -= 360
+    //     if (d < -180) d += 360
+    //     baseRotY = -(cur / 15) * D2R
+    //     lstRefDeg = cur
+    //   }
+    //   // 基础朝向 + 用户拖动偏移
+    //   camera.rotation.set(
+    //     baseRotX + (rotX - 0.3),
+    //     baseRotY + rotY,
+    //     0,
+    //     'YXZ',
+    //   )
+    // }
+    // 每日同步一次黄道顶点（已禁用：天球回归静态坐标系）
+    // eclipticRefreshAccum += 16
+    // if (eclipticRefreshAccum > 1000 * 60 * 60 * 24 && eclipticLine) {
+    //   eclipticRefreshAccum = 0
+    //   const now = new Date()
+    //   const v: number[] = []
+    //   for (let i = 0; i <= 360; i++) {
+    //     const { ra, dec } = eclipticToRaDecJD(i, now)
+    //     const p = raDecXYZ(ra, dec, SPHERE_RADIUS)
+    //     v.push(p.x, p.y, p.z)
+    //   }
+    //   const next = new Float32Array(v)
+    //   ;(eclipticLine.userData as { basePos: Float32Array }).basePos = next
+    //   eclipticLine.geometry.setAttribute('position', new BufferAttribute(next, 3))
+    //   eclipticLine.geometry.computeBoundingSphere()
+    //   eclipticLine.computeLineDistances()
+    // }
     // hover glow opacity lerp
     const sm = hoverGlow.material as SpriteMaterial
     sm.opacity += (hoverGlowTargetOpacity - sm.opacity) * 0.2
@@ -906,25 +907,54 @@ export function useSky(
       updateStoryGlows(cache)
     },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
-      if (lat == null || lng == null) {
-        skyGroup.matrix.identity()
-        return
-      }
-      const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
-      const lstRad = lstHours / 24 * Math.PI * 2
-      const latRad = lat * D2R
-      const ry = lstRad - Math.PI / 2
-      const rx = Math.PI / 2 - latRad
-      const cy = Math.cos(ry), sy = Math.sin(ry)
-      const cx = Math.cos(rx), sx = Math.sin(rx)
-      const m = new Matrix4()
-      m.set(
-        cy,      -sx*sy,  cx*sy,  0,
-        0,        cx,      sx,     0,
-        -sy,     -sx*cy,  cx*cy,  0,
-        0,        0,        0,     1,
-      )
-      skyGroup.matrix.copy(m)
+      // 已禁用：天球回归默认不旋转
+      // if (lat == null || lng == null) {
+      //   skyGroup.matrix.identity()
+      //   return
+      // }
+      // const lstHours = ((gmstHours(new Date()) + lng / 15) % 24 + 24) % 24
+      // const lstRad = lstHours / 24 * Math.PI * 2
+      // const latRad = lat * D2R
+      // const ry = lstRad - Math.PI / 2
+      // const rx = Math.PI / 2 - latRad
+      // const cy = Math.cos(ry), sy = Math.sin(ry)
+      // const cx = Math.cos(rx), sx = Math.sin(rx)
+      // const m = new Matrix4()
+      // m.set(
+      //   cy,      -sx*sy,  cx*sy,  0,
+      //   0,        cx,      sx,     0,
+      //   -sy,     -sx*cy,  cx*cy,  0,
+      //   0,        0,        0,     1,
+      // )
+      // skyGroup.matrix.copy(m)
+    },
+    rotateX(rad: number) {
+      // 绕世界 X 轴（东西方向线）旋转天球，正角 = 北极星向南倒
+      skyGroup.matrix.multiply(new Matrix4().makeRotationX(rad))
+    },
+    rotateY(rad: number) {
+      // 绕世界 Y 轴（天极方向）旋转天球，正角 = 星星东升西落
+      skyGroup.matrix.multiply(new Matrix4().makeRotationY(rad))
+    },
+    rotateZ(rad: number) {
+      // 绕世界 Z 轴（前后方向）旋转天球，正角 = 北极星向右倒
+      skyGroup.matrix.multiply(new Matrix4().makeRotationZ(rad))
+    },
+    resetRotation() {
+      skyGroup.matrix.identity()
+    },
+    rotate(radX: number, radY: number, radZ: number) {
+      // 顺序：先 X（纬度），再 Y（恒星时），最后 Z（几乎不用）
+      // 每个轴都是本地坐标系累积（post-multiply）
+      if (radX !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationX(radX))
+      if (radY !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationY(radY))
+      if (radZ !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationZ(radZ))
+    },
+    setRotation(radX: number, radY: number, radZ: number) {
+      skyGroup.matrix.identity()
+      if (radX !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationX(radX))
+      if (radY !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationY(radY))
+      if (radZ !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationZ(radZ))
     },
     dispose() {
       cancelAnimationFrame(af)
