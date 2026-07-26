@@ -164,6 +164,19 @@ export interface SkyAPI {
    * @param radZ 绕 Z 轴弧度
    */
   setRotation: (radX: number, radY: number, radZ: number) => void
+  /**
+   * 根据观测者经纬度+UTC时间，自动旋转天球到正确天文位置
+   *
+   * 公式: M = Rx(90°−lat) · Ry(π/2 + LST)
+   *   - NCP/北极星: 高度角=lat, 方位角=北
+   *   - 春分点: LST=90°时在东点, LST=0°时在子午线
+   *   - 恒星: 东升西落
+   *
+   * @param latDeg 观测者纬度（度）
+   * @param lonDeg 观测者经度（度）
+   * @param date UTC 日期时间（默认当前时刻）
+   */
+  applyAstroRotation: (latDeg: number, lonDeg: number, date?: Date) => void
 }
 
 export function useSky(
@@ -955,6 +968,20 @@ export function useSky(
       if (radX !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationX(radX))
       if (radY !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationY(radY))
       if (radZ !== 0) skyGroup.matrix.multiply(new Matrix4().makeRotationZ(radZ))
+    },
+    applyAstroRotation(latDeg: number, lonDeg: number, date: Date = new Date()) {
+      const jd = dateToJD(date)
+      const lstDegVal = lstDeg(jd, lonDeg)
+      const D2R = Math.PI / 180
+      const latRad = latDeg * D2R
+      const lstRad = lstDegVal * D2R
+
+      // M = Rx(90°−lat) · Ry(π/2 + LST)
+      // Step 1: 绕世界Y(天极)旋转 π/2+LST → 春分点归位
+      // Step 2: 绕世界X 旋转 90°−lat → 北极星抬高到纬度高度
+      skyGroup.matrix.identity()
+      skyGroup.matrix.multiply(new Matrix4().makeRotationY(Math.PI / 2 + lstRad))
+      skyGroup.matrix.premultiply(new Matrix4().makeRotationX((90 - latDeg) * D2R))
     },
     dispose() {
       cancelAnimationFrame(af)

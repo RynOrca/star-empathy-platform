@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -123,6 +123,7 @@ import StarDetail from '../components/StarDetail.vue'
 import StoryForm from '../components/StoryForm.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
+import { dateToJD, lstDeg } from '../utils/astro'
 
 const router = useRouter()
 const username = ref('')
@@ -328,6 +329,98 @@ watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
   if (sRef?.sky && statsMap) {
     sRef.sky.setStarStatsCache(statsMap)
   }
+})
+
+// ═══════════════════════════════════════════
+// 天球旋转 + 实时调试日志
+// ═══════════════════════════════════════════
+let debugTimer: ReturnType<typeof setInterval> | null = null
+
+function applySkyRotation() {
+  const sky = skyRef.value?.sky
+  if (!sky) return false
+
+  const lat = userLat.value
+  const lng = userLng.value
+  if (lat == null || lng == null) return false
+
+  // M = Rx(90°−lat) · Ry(π/2 + LST)
+  // 北极星: 高度角=lat, 方位角=北
+  // 春分点: LST=90°时在东点(左), 恒星东升西落
+  sky.applyAstroRotation(lat, lng, new Date())
+
+  // 手动验算
+  const jd = dateToJD(new Date())
+  const lstDegVal = lstDeg(jd, lng)
+  const lstHours = lstDegVal / 15
+
+  console.log(
+    '%c✅ 天球旋转已应用 %c| 公式: M = Rx(90°−lat)·Ry(π/2+LST)',
+    'color:#66bb6a;font-weight:bold;font-size:14px',
+    'color:#aaa',
+  )
+  console.log(`  纬度 φ: ${lat.toFixed(4)}°  |  经度 λ: ${lng.toFixed(4)}°`)
+  console.log(`  LST: ${lstDegVal.toFixed(2)}° (${lstHours.toFixed(2)}h)`)
+  console.log('  北极星: 高度角=' + lat.toFixed(1) + '°(≈纬度), 方位角=北')
+
+  // 验算: 北极星高度角 = 纬度
+  const phiRad = lat * Math.PI / 180
+  const ncpY = Math.sin(phiRad)
+  const ncpZ = Math.cos(phiRad)
+  console.log(`  验算: NCP=(0, ${ncpY.toFixed(3)}R, ${ncpZ.toFixed(3)}R) → 高度角=${(Math.atan2(ncpY, ncpZ) * 180 / Math.PI).toFixed(1)}°`)
+
+  return true
+}
+
+// 立即尝试(可能 skyRef 已就绪) + watch 兜底
+const rotationApplied = ref(false)
+watch(skyRef, () => {
+  if (!rotationApplied.value) {
+    rotationApplied.value = applySkyRotation()
+  }
+}, { immediate: true })
+
+// 兜底: 用轮询确保 sky 就绪后一定会应用
+let retryCount = 0
+const retryInterval = setInterval(() => {
+  if (rotationApplied.value) {
+    clearInterval(retryInterval)
+    return
+  }
+  if (applySkyRotation()) {
+    clearInterval(retryInterval)
+  } else if (++retryCount > 30) {
+    console.warn('⚠️ 天球旋转未能在3秒内应用，skyRef可能未就绪')
+    clearInterval(retryInterval)
+  }
+}, 100)
+
+// ── 实时控制台日志 + 天球自转更新 ──
+debugTimer = setInterval(() => {
+  const now = new Date()
+  const lat = userLat.value ?? 0
+  const lng = userLng.value ?? 0
+  const jd = dateToJD(now)
+  const lstDegVal = lstDeg(jd, lng)
+  const lstHours = lstDegVal / 15
+
+  console.log(
+    `%c⏱ ${now.toISOString()}`,
+    'color:#888',
+    `| LST: ${lstDegVal.toFixed(2)}° (${lstHours.toFixed(2)}h)`,
+    `| 经度: ${lng.toFixed(4)}°`,
+    `| 纬度: ${lat.toFixed(4)}°`,
+  )
+
+  // 实时更新天球旋转（LST随时间变化，天球自转）
+  if (skyRef.value?.sky && userLat.value != null && userLng.value != null) {
+    skyRef.value.sky.applyAstroRotation(userLat.value, userLng.value, now)
+  }
+}, 1000)
+
+onBeforeUnmount(() => {
+  if (debugTimer) clearInterval(debugTimer)
+  clearInterval(retryInterval)
 })
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
