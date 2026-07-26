@@ -24,8 +24,9 @@ jobs:
 
             echo "=== 2/5 构建后端 ==="
             cd server
-            npm install --production --silent
+            npm install --silent
             npm run build
+            npm prune --production --silent
 
             if [ ! -f .env ]; then
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
