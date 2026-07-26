@@ -27,7 +27,7 @@ interface CatalogData {
 let _catalog: CatalogData | null = null
 function getCatalog(): CatalogData {
   if (!_catalog) {
-    const jsonPath = path.resolve(__dirname, '../../../../client/src/data/stars.json')
+    const jsonPath = path.resolve(__dirname, '../../../client/src/data/stars.json')
     const raw = fs.readFileSync(jsonPath, 'utf-8')
     _catalog = JSON.parse(raw) as CatalogData
   }
