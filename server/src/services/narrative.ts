@@ -26,13 +26,16 @@ interface CatalogData {
 
 /** 获取项目根目录（兼容 ts-node 开发 和 tsc 编译后生产环境） */
 function getProjectRoot(): string {
-  // process.cwd() 在 PM2 中 = server/，在 npm run dev 中也 = server/
-  const cwd = process.cwd()
-  // 如果 cwd 以 server 结尾，则项目根是其父目录
-  if (cwd.endsWith('server') || cwd.endsWith('server/') || cwd.endsWith('server\\')) {
-    return path.resolve(cwd, '..')
+  // __dirname: 开发时 = server/src/services/，生产时 = server/dist/src/services/
+  // 无论哪种情况，上溯 3 级到 server/ 目录，再上 1 级到项目根
+  // server/src/services/ → ../../../ = 项目根
+  // server/dist/src/services/ → ../../../ = server/ → 再 ../  = 项目根
+  const dir = __dirname
+  // 尝试从 __dirname 推断：如果路径中包含 /dist/，需要多上一级
+  if (dir.includes('/dist/') || dir.includes('\\dist\\')) {
+    return path.resolve(dir, '..', '..', '..', '..')
   }
-  return cwd
+  return path.resolve(dir, '..', '..', '..')
 }
 
 // 懒加载星表数据
