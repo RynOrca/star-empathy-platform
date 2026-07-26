@@ -8,7 +8,7 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }

@@ -240,15 +240,31 @@
             <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
           </button>
         </div>
+        <div class="action-buttons-secondary">
+          <button class="chat-btn" @click="openChat">
+            <MessagesSquare :size="14" />
+            <span>与古人共赏</span>
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- 古人陪看聊天抽屉 -->
+    <AncientChat
+      :visible="showChat"
+      :catalogStarId="catalogStarId"
+      :starName="starInfo?.displayName || ''"
+      :constellation="starInfo?.conName || ''"
+      @close="showChat = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
+import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
 
 const props = defineProps<{
@@ -465,6 +481,10 @@ async function fetchCatalogStatsFromFront() {
 }
 
 function onWriteStory() { emit('writeStory') }
+
+// ─── 古人陪看聊天 ───
+const showChat = ref(false)
+function openChat() { showChat.value = true }
 
 // 打开故事详情 + 记录浏览（乐观更新）
 function openStoryDetail(story: { id: number }) {
@@ -1252,5 +1272,33 @@ const generatedTags = computed<string[]>(() => {
 .close-btn:hover {
   color: var(--ink);
   border-color: var(--rule-hover);
+}
+
+/* ─── Chat Button ─── */
+.action-buttons-secondary {
+  margin-top: 10px;
+}
+.chat-btn {
+  width: 100%;
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--star-purple);
+  color: var(--star-purple);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.chat-btn:hover {
+  background: rgba(202, 167, 255, 0.1);
+}
+.chat-btn:active {
+  transform: scale(0.98);
 }
 </style>
