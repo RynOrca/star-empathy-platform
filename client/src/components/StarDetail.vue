@@ -211,6 +211,15 @@
           </div>
         </div>
 
+        <!-- 古今共望叙事 -->
+        <StarNarrative
+          :content="narrative.content.value"
+          :loading="narrative.loading.value"
+          :error="narrative.error.value"
+          :cached="narrative.cached.value"
+          @retry="narrative.fetchNarrative(catalogStarId)"
+        />
+
         <!-- 标签 -->
         <div class="info-section">
           <div class="info-label">标签</div>
@@ -237,8 +246,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown } from 'lucide-vue-next'
+import StarNarrative from './StarNarrative.vue'
+import { useNarrative } from '../composables/useNarrative'
 
 const props = defineProps<{
   stories: Array<{
@@ -370,6 +381,15 @@ const detailStory = computed(() => {
   return realStories.value.find(s => s.id === detailStoryId.value) ?? null
 })
 const justResonatedId = ref<number | null>(null)
+
+// ─── 古今共望叙事 ───
+const narrative = useNarrative()
+watch(() => props.catalogStarId, (id) => {
+  if (id) {
+    narrative.reset()
+    narrative.fetchNarrative(id)
+  }
+}, { immediate: true })
 
 // ─── 用户当前位置（用于计算距离） ───
 const userPosition = ref<{ lat: number; lng: number } | null>(null)
