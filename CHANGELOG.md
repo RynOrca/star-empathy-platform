@@ -4,6 +4,10 @@
 
 ### 2026-07-26
 
+- **fix**: 修复三个 Bug (`fc95d3d`)
+  - chat.ts 中 stars.json 解析错误（对象而非数组），修复「与古人共赏」500 错误
+  - deepseek.ts 空内容返回增加详细日志
+  - StarDetail 右面板布局溢出：加 height/max-height/overflow-y
 - **feat(chat)**: 古人陪看 AI 角色扮演聊天功能 (`6e417c4`)
   - 4 位古人预设（李白/杜牧/苏轼/张衡），含 systemPrompt 角色扮演
   - SSE 流式聊天，星星上下文自动注入
