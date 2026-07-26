@@ -28,9 +28,18 @@ interface CatalogData {
   lines: number[][]
 }
 
+/** 获取项目根目录（兼容 ts-node 开发 和 tsc 编译后生产环境） */
+function getProjectRoot(): string {
+  const cwd = process.cwd()
+  if (cwd.endsWith('server') || cwd.endsWith('server/') || cwd.endsWith('server\\')) {
+    return path.resolve(cwd, '..')
+  }
+  return cwd
+}
+
 let starsData: CatalogStar[] = []
 try {
-  const starsPath = path.resolve(__dirname, '../../../client/src/data/stars.json')
+  const starsPath = path.resolve(getProjectRoot(), 'client/src/data/stars.json')
   const raw = fs.readFileSync(starsPath, 'utf-8')
   const catalog = JSON.parse(raw) as CatalogData
   starsData = catalog.stars || []

@@ -24,13 +24,31 @@ interface CatalogData {
   stars: CatalogStar[]
 }
 
+/** 获取项目根目录（兼容 ts-node 开发 和 tsc 编译后生产环境） */
+function getProjectRoot(): string {
+  // process.cwd() 在 PM2 中 = server/，在 npm run dev 中也 = server/
+  const cwd = process.cwd()
+  // 如果 cwd 以 server 结尾，则项目根是其父目录
+  if (cwd.endsWith('server') || cwd.endsWith('server/') || cwd.endsWith('server\\')) {
+    return path.resolve(cwd, '..')
+  }
+  return cwd
+}
+
 // 懒加载星表数据
 let _catalog: CatalogData | null = null
 function getCatalog(): CatalogData {
   if (!_catalog) {
-    const jsonPath = path.resolve(__dirname, '../../../client/src/data/stars.json')
-    const raw = fs.readFileSync(jsonPath, 'utf-8')
-    _catalog = JSON.parse(raw) as CatalogData
+    const jsonPath = path.resolve(getProjectRoot(), 'client/src/data/stars.json')
+    try {
+      const raw = fs.readFileSync(jsonPath, 'utf-8')
+      _catalog = JSON.parse(raw) as CatalogData
+      console.log(`📖 星表已加载 (${jsonPath}): ${_catalog.stars.length} 颗恒星`)
+    } catch (err) {
+      console.error(`❌ 无法加载星表文件: ${jsonPath}`, err)
+      // 返回空星表，避免崩溃
+      _catalog = { stars: [] }
+    }
   }
   return _catalog
 }

@@ -10,8 +10,20 @@ import path from 'node:path'
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
 
-// 运行时 API Key 持久化文件
-const KEY_FILE = path.resolve(__dirname, '../../.runtime-key')
+// 运行时 API Key 持久化文件（兼容 ts-node 开发 和 tsc 编译后生产环境）
+function resolveKeyFilePath(): string {
+  const candidates = [
+    path.resolve(process.cwd(), '.runtime-key'),
+    path.resolve(__dirname, '../../.runtime-key'),
+  ]
+  // 优先返回已存在的文件路径；都不存在则用第一个（cwd 优先）
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p
+  }
+  return candidates[0]
+}
+
+const KEY_FILE = resolveKeyFilePath()
 
 // 运行时 API Key（可通过 /api/settings 设置，优先级高于环境变量）
 let runtimeApiKey: string | null = null
@@ -20,8 +32,15 @@ let runtimeApiKey: string | null = null
 try {
   if (fs.existsSync(KEY_FILE)) {
     runtimeApiKey = fs.readFileSync(KEY_FILE, 'utf-8').trim()
+    console.log(`🔑 已从文件加载 API Key (${KEY_FILE})`)
+  } else {
+    console.log(`ℹ️  未找到运行时 Key 文件 (${KEY_FILE})，将使用环境变量 DEEPSEEK_API_KEY`)
   }
 } catch { /* ignore */ }
+
+if (process.env.DEEPSEEK_API_KEY) {
+  console.log('🔑 检测到环境变量 DEEPSEEK_API_KEY')
+}
 
 export function setApiKey(key: string | null) {
   runtimeApiKey = key
@@ -77,6 +96,8 @@ export async function deepseekChat(
     body.enable_search = true
   }
 
+  console.log(`🤖 DeepSeek 请求: ${model}, ${messages.length} 条消息`)
+
   const res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
@@ -88,6 +109,7 @@ export async function deepseekChat(
 
   if (!res.ok) {
     const errText = await res.text()
+    console.error(`DeepSeek API 错误 (${res.status}):`, errText.slice(0, 300))
     throw new Error(`DeepSeek API 请求失败 (${res.status}): ${errText}`)
   }
 

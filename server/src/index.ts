@@ -72,7 +72,15 @@ const authLimiter = rateLimit({
 });
 
 // 生产环境：托管前端静态文件
-const clientDist = path.resolve(__dirname, '../../../client/dist')
+// 使用 process.cwd() 而非 __dirname，兼容 tsc 编译后 dist/ 多一层目录的问题
+const projectRoot = (() => {
+  const cwd = process.cwd()
+  if (cwd.endsWith('server') || cwd.endsWith('server/') || cwd.endsWith('server\\')) {
+    return path.resolve(cwd, '..')
+  }
+  return cwd
+})()
+const clientDist = path.resolve(projectRoot, 'client/dist')
 app.use(express.static(clientDist))
 
 // 健康检查
