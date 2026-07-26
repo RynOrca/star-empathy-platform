@@ -84,7 +84,7 @@ Write-Host "`n📥 [2/6] 获取代码..." -ForegroundColor Yellow
 $appDir = "/var/www/star-empathy-platform"
 $exists = Invoke-Ssh "test -d $appDir/.git && echo yes || echo no"
 if ($exists -match 'yes') {
-    Invoke-Ssh "cd $appDir && git fetch origin && git checkout main && git pull origin main 2>&1"
+    Invoke-Ssh "cd $appDir && git fetch origin && git checkout main && git checkout -- . && git pull origin main 2>&1"
 } else {
     Invoke-Ssh "mkdir -p /var/www && cd /var/www && git clone https://github.com/RynOrca/star-empathy-platform.git 2>&1"
 }
