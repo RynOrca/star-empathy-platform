@@ -4,7 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshLambertMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Quaternion,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX } from '../utils/constants'
@@ -141,6 +141,7 @@ export interface SkyAPI {
   setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
   setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
+  focusOnStar: (x: number, y: number, z: number) => void
 }
 
 export function useSky(
@@ -902,7 +903,7 @@ export function useSky(
       for (const child of kernelLinesGroup.children) {
         if (child instanceof LineSegments) {
           const mat = child.material as LineBasicMaterial
-          mat.opacity = 0.25 + kernelBreath * 0.35
+          mat.opacity = 0.35 + kernelBreath * 0.45
         }
       }
     }
@@ -963,7 +964,7 @@ export function useSky(
         dashSize: 2,
         gapSize: 1.5,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.55,
         depthTest: true,
         depthWrite: false,
       })
@@ -974,7 +975,7 @@ export function useSky(
       const glowMat = new LineBasicMaterial({
         color: 0xffd98a,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.25,
         blending: AdditiveBlending,
         depthWrite: false,
         depthTest: false,
@@ -985,6 +986,39 @@ export function useSky(
       glowSegs.scale.setScalar(1.005)
       kernelLinesGroup.add(glowSegs)
       kernelLinesGroup.visible = true
+    },
+    focusOnStar(x: number, y: number, z: number) {
+      // 将恒星坐标从 skyGroup 局部空间转到世界空间
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+
+      // 计算目标朝向（相机在原点，看向恒星世界坐标）
+      const targetDir = starWorld.clone().normalize()
+      const dummyCam = camera.clone()
+      dummyCam.lookAt(starWorld)
+      const targetQuat = dummyCam.quaternion.clone()
+
+      const startQuat = camera.quaternion.clone()
+      const duration = 1200 // ms
+      const startTime = performance.now()
+
+      function animStep(now: number) {
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        // ease-in-out
+        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+
+        camera.quaternion.copy(startQuat).slerp(targetQuat, eased)
+
+        if (t < 1) {
+          requestAnimationFrame(animStep)
+        } else {
+          // 动画结束，更新拖拽偏移量以保持一致性
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+        }
+      }
+      requestAnimationFrame(animStep)
     },
     dispose() {
       cancelAnimationFrame(af)

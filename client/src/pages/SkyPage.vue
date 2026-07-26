@@ -11,6 +11,9 @@
               <span class="sr-name">{{ r.name || r.conName }}</span>
               <span class="sr-con">{{ r.conName }}</span>
               <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+              <button class="sr-locate" title="定位到这颗星" @click.stop="locateStar(r.id); searchOpen = false; searchQuery = ''">
+                <Crosshair :size="14" />
+              </button>
             </div>
           </div>
           <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
@@ -127,7 +130,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Settings } from 'lucide-vue-next'
+import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
@@ -235,6 +238,13 @@ async function flyToStar(starId: number) {
   if (!star) return
   // 模拟点击该星
   onStarClick(starId)
+}
+
+function locateStar(starId: number) {
+  const star = catalogStarLookup.get(starId)
+  if (!star || !skyRef.value?.sky) return
+  // 平滑转动相机，以该星为中心（不打开详情面板）
+  skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
 }
 
 interface CatalogStar {
@@ -507,6 +517,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .sr-name { color: var(--accent); font-weight: 500; }
 .sr-con { color: var(--ink-secondary); }
 .sr-mag { color: var(--muted-light); font-size: 0.7rem; }
+.sr-locate {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--muted-light); cursor: pointer; padding: 3px 5px;
+  display: flex; align-items: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0; margin-left: 4px;
+}
+.sr-locate:hover {
+  color: var(--accent); border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.08);
+}
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;

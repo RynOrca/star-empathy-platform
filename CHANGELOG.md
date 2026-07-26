@@ -4,6 +4,12 @@
 
 ### 2026-07-26
 
+- **feat**: 搜索定位星星 + 连线可见性优化
+  - 搜索下拉结果新增定位按钮（Crosshair 图标），点击后相机平滑动画转动到该星为中心
+  - `useSky.ts` 新增 `focusOnStar(x, y, z)` 函数：quaternion slerp 平滑转动，1.2s ease-in-out 动画
+  - 优化详情面板 overlay 透明度（0.45→0.3）和模糊（4px→2px），让内核连线可见
+  - 提高内核连线基础透明度（0.4→0.55）和发光层（0.15→0.25），呼吸动画范围加大
+
 - **feat**: Issue #9 阶段二 — 星座连线 + 天区故事精选
   - 后端 `kernel.ts`：新增 `getAllStarKernels()`、`jaccardSimilarity()`、`getSimilarStars()`、`getAreaHighlights()` 函数
   - 新增 `GET /api/catalog/stars/:catalogStarId/similar` 端点（Jaccard 相似度匹配，情绪 60% + 主题 40% 权重）

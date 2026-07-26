@@ -890,8 +890,8 @@ watch(() => props.catalogStarId, () => {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.45);
-  backdrop-filter: blur(4px);
+  background: rgba(7, 8, 22, 0.3);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
