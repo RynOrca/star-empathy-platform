@@ -18,7 +18,7 @@ import { setApiKey, getApiKey } from './services/deepseek';
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.API_PORT || '3000', 10);
 const isDev = process.env.NODE_ENV !== 'production';
 
 const allowedOrigins = isDev
