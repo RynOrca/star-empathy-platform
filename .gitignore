@@ -40,3 +40,13 @@ coverage/
 
 # ─── 调试截图 ───
 screenshots/
+
+# ─── 项目文档（不上传） ───
+CHANGELOG.md
+AGENTS.md
+PLAN.md
+CODE_WIKI.md
+toA.md
+方案.md
+登录页模板.html
+star-empathy-platform.html
