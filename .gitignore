@@ -1,16 +1,42 @@
+# ─── 敏感信息 ───
+.env
+.env.*
+!.env.example
+
+# ─── 数据库 ───
+*.db
+server/data/
+
+# ─── 构建产物 ───
 *.bat
 *.js
 !ecosystem.config.js
 *.jpg
 *.png
+*.zip
+*.tsbuildinfo
+
+# ─── 日志 ───
 *.log
+
+# ─── 临时文件 ───
 /tmp/
 nul
+.DS_Store
+Thumbs.db
 
+# ─── 依赖与构建 ───
 node_modules/
 dist/
+coverage/
+
+# ─── 工具配置 ───
 .design/
 .uploads/
-
+.vscode/
+.codegraph/
 .playwright-mcp/
-.omo/run-continuation/
+.omo/
+
+# ─── 调试截图 ───
+screenshots/

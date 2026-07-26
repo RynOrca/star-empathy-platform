@@ -4,9 +4,19 @@
  * 默认模型：deepseek-v4-flash
  */
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
+
+// 运行时 API Key（可通过 /api/settings 设置，优先级高于环境变量）
+let runtimeApiKey: string | null = null
+
+export function setApiKey(key: string | null) {
+  runtimeApiKey = key
+}
+
+export function getApiKey(): string | null {
+  return runtimeApiKey || process.env.DEEPSEEK_API_KEY || null
+}
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -28,8 +38,9 @@ export async function deepseekChat(
   messages: ChatMessage[],
   options: ChatOptions = {},
 ): Promise<string> {
-  if (!DEEPSEEK_API_KEY) {
-    throw new Error('DEEPSEEK_API_KEY 未设置，请在环境变量中配置')
+  const apiKey = getApiKey()
+  if (!apiKey) {
+    throw new Error('DEEPSEEK_API_KEY 未设置，请在设置中配置或在环境变量中设置')
   }
 
   const model = options.model || DEFAULT_MODEL
@@ -49,7 +60,7 @@ export async function deepseekChat(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   })

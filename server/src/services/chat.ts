@@ -6,9 +6,9 @@
 import type { Response } from 'express'
 import { getFigureById } from '../data/ancientFigures'
 import type { ChatMessage } from './deepseek'
+import { getApiKey } from './deepseek'
 
-// 复用 deepseek 的配置
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
+// DeepSeek 配置
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
 
@@ -70,8 +70,8 @@ export async function streamChat(
     return
   }
 
-  if (!DEEPSEEK_API_KEY) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI 服务未配置' })}\n\n`)
+  if (!getApiKey()) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI 服务未配置，请在设置中填写 API Key' })}\n\n`)
     res.end()
     return
   }
@@ -115,7 +115,7 @@ export async function streamChat(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        'Authorization': `Bearer ${getApiKey()}`,
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
