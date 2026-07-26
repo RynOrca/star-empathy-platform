@@ -4,7 +4,7 @@
 
 ### 2026-07-26
 
-- **feat**: AI 故事内核提取系统 — Issue #9 阶段一
+- **feat**: AI 故事内核提取系统 — Issue #9 阶段一 (`1105d44`)
   - 新增 `story_kernels` 表，存储 AI 生成的故事情绪标签、内核、主题词
   - 新增 `server/src/services/kernel.ts`：DeepSeek 驱动的内核提取服务
   - 投递故事后异步触发内核生成（不阻塞响应），永久缓存
