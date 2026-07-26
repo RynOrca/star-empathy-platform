@@ -56,7 +56,6 @@ const renderedContent = computed(() => {
 <style scoped>
 .narrative-section {
   padding: 24px 28px;
-  border-bottom: 1px solid var(--rule);
 }
 
 /* ── 加载骨架 ── */

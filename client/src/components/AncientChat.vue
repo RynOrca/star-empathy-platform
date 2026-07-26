@@ -15,10 +15,10 @@
           <div v-if="stage === 'figureSelect'" class="chat-figure-select">
             <p class="chat-select-hint">
               <template v-if="figures.length > 0">
-                选择一位古人，一起仰望这颗星
+                选择一位古人，共赴星河旧梦
               </template>
               <template v-else>
-                这颗星暂无古人记载，但你可以和张衡一起探索它
+                此星尚无古人留墨，静待来者与之对望
               </template>
             </p>
             <div class="chat-figure-grid">

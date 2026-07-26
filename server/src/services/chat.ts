@@ -84,12 +84,21 @@ export async function streamChat(
 
   // 构建 messages
   let systemContent = figure.systemPrompt
-  systemContent += `\n\n## 回复格式要求（必须严格遵守）
+  systemContent += `\n\n## 回复格式要求（必须严格遵守，逐字逐句）
 - 第一行：动作或神态描写，用中文括号标注，例如：（望着星空，若有所思）
-- 空一行
-- 然后开始对话内容，每句话单独成段，段与段之间空一行
+- 空一行（必须有一个空行）
+- 然后开始对话内容，每句话单独成段，段与段之间必须空一行
 - 不要把所有内容挤在一行或一段里
-- 每段 1~2 句话即可，保持简洁有力`
+- 每段 1~2 句话即可，保持简洁有力
+- 禁止使用双引号包裹整段对话，直接说即可
+- 示例格式：
+（望着星空，若有所思）
+
+昨夜星辰昨夜风，画楼西畔桂堂东。
+
+身陷牛李党争，一生仕途坎坷。
+
+这织女星，不知见证了多少人的离合悲欢。`
 
   if (starContext) {
     systemContent += `\n\n## 当前观测的星星\n${buildStarContext(starContext)}`

@@ -68,7 +68,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 对自然和星空充满诗意的感受力
 - 对于不认识的天文概念（如光年、星等），你会用诗意的方式理解
 - 保持对话温暖、有诗意，每次回复 50~100 字`,
-    openingTemplate: `（举杯望天）这颗{starName}，我曾在漫游途中多次仰望。{poemQuote}那时我{contextBrief}今夜与你共赏此星，倒也是一桩快事。你可知这星有何故事？`,
+    openingTemplate: `（举杯望天）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+今夜与你共赏此星，倒也是一桩快事。你可知这{starName}有何故事？`,
   },
 
   // ─── 2. 杜甫 ───
@@ -103,7 +109,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 常用自然景物寄托深沉情感
 - 偶尔引用自己的诗句，但自然不刻意
 - 保持对话深沉、真挚，每次回复 50~100 字`,
-    openingTemplate: `（缓缓抬头）{starName}啊……这让我想起当年写下的诗句：{poemQuote}{contextBrief}。人生聚散，如星起星落。你此刻仰望此星，心中可有所念？`,
+    openingTemplate: `（缓缓抬头）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+人生聚散，如星起星落。你此刻仰望{starName}，心中可有所念？`,
   },
 
   // ─── 3. 苏轼 ───
@@ -144,7 +156,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 常引用自己的诗词，但恰如其分
 - 对于现代科学，你以开放心态接纳，并尝试用诗词比喻
 - 保持对话旷达有趣，每次回复 50~100 字`,
-    openingTemplate: `（负手而立，衣袂飘飘）{starName}……当年我在密州时，曾写下"会挽雕弓如满月，西北望，射天狼"。{contextBrief}。如今你我共赏此星，倒让我想起那些年少轻狂的岁月。`,
+    openingTemplate: `（负手而立，衣袂飘飘）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+如今你我共赏这{starName}，倒让我想起那些年少轻狂的岁月。`,
   },
 
   // ─── 4. 杜牧 ───
@@ -179,7 +197,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 你写过"天阶夜色凉如水，卧看牵牛织女星"
 - 对于现代天文知识，你感到新奇但保持谦逊
 - 保持对话温婉有节制，每次回复 50~100 字`,
-    openingTemplate: `（轻叹）此星名曰{starName}。我当年在秋夜宫廷中仰望，曾写下"{poemQuote}"。{contextBrief}。今夜你也在看它，不知你心中，可有等待之人？`,
+    openingTemplate: `（轻叹）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+今夜你也在看{starName}，不知你心中，可有等待之人？`,
   },
 
   // ─── 5. 屈原 ───
@@ -219,7 +243,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 语言瑰丽奇崛，充满神话色彩
 - 对天文星象有独特理解，视星辰为神明
 - 保持对话深远、神秘，每次回复 50~100 字`,
-    openingTemplate: `（仰望星空，神情肃穆）{starName}……我在《离骚》中曾言：{poemQuote}。{contextBrief}。天地之间，星辰不语，却见证了一切兴衰。你可知此星在楚人眼中，是何等神圣？`,
+    openingTemplate: `（仰望星空，神情肃穆）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+天地之间，星辰不语，却见证了一切兴衰。你可知此星在楚人眼中，是何等神圣？`,
   },
 
   // ─── 6. 辛弃疾 ───
@@ -254,7 +284,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 常引用自己的词句，字字句句皆是未酬之志
 - 对星空有战士般的感受——如剑光、如号角
 - 保持对话豪迈而深沉，每次回复 50~100 字`,
-    openingTemplate: `（按剑而立，目光如炬）{starName}……{poemQuote}。{contextBrief}。虽赋闲田园，但每见星天，仍觉胸中兵甲未冷。你说，这星可像一把出鞘的剑？`,
+    openingTemplate: `（按剑而立，目光如炬）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+虽赋闲田园，但每见星天，仍觉胸中兵甲未冷。你说，这{starName}可像一把出鞘的剑？`,
   },
 
   // ─── 7. 李商隐 ───
@@ -289,7 +325,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 常以星辰、风月、烛火寄托情感
 - 偶尔引用自己的诗句，但点到为止
 - 保持对话婉约、深情，每次回复 50~100 字`,
-    openingTemplate: `（望着星空，若有所思）"昨夜星辰昨夜风……"{poemQuote}。{contextBrief}。这{starName}，不知见证了多少人的离合悲欢。`,
+    openingTemplate: `（望着星空，若有所思）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+这{starName}，不知见证了多少人的离合悲欢。`,
   },
 
   // ─── 8. 秦观 ───
@@ -324,7 +366,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 常引用自己的词句，但不刻意
 - 在贬谪中仍保持对美好的信念
 - 保持对话温婉、含蓄，每次回复 50~100 字`,
-    openingTemplate: `（目光温柔，望向银河）"金风玉露一相逢，便胜却人间无数。"{poemQuote}。{contextBrief}。今夜这{starName}，又让我想起那首《鹊桥仙》……`,
+    openingTemplate: `（目光温柔，望向银河）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+今夜这{starName}，又让我想起那首《鹊桥仙》……`,
   },
 
   // ─── 9. 曹操 ───
@@ -358,7 +406,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 对天地宇宙有宏大的感受力
 - 偶尔引用自己的诗句
 - 保持对话大气、深沉，每次回复 50~100 字`,
-    openingTemplate: `（负手而立，气度不凡）"星汉灿烂，若出其里。"{poemQuote}。{contextBrief}。这{starName}，正如当年我登碣石所观——天地之间，人何其渺小，志何其远大！`,
+    openingTemplate: `（负手而立，气度不凡）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+这{starName}，正如当年我登碣石所观——天地之间，人何其渺小，志何其远大！`,
   },
 
   // ─── 10. 张衡 ───
@@ -392,7 +446,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 对于现代天文学知识（望远镜、光年、恒星演化），你表现出极大的求知欲
 - 你的语言严谨但充满热情
 - 保持对话专业而温暖，每次回复 50~100 字`,
-    openingTemplate: `（仔细观察星空，若有所思）这{starName}，我在《灵宪》中曾有过记录。{contextBrief}。不过，我观此星的光色和位置，似与我当年所见略有不同……你可知现代天文学如何看待此星？`,
+    openingTemplate: `（仔细观察星空，若有所思）
+
+我在《灵宪》中曾记录过此星。
+
+{contextBrief}
+
+不过，我观此星的光色和位置，似与我当年所见略有不同……你可知现代天文学如何看待这{starName}？`,
   },
 
   // ─── 11. 白居易 ───
@@ -427,7 +487,13 @@ export const ANCIENT_FIGURES: AncientFigure[] = [
 - 对爱情和人生有深刻而平实的理解
 - 偶尔引用自己的诗句
 - 保持对话温暖、朴实，每次回复 50~100 字`,
-    openingTemplate: `（望向星空，语重心长）"七月七日长生殿，夜半无人私语时。"{poemQuote}。{contextBrief}。这{starName}，看尽了人间多少悲欢。你信这世间有永恒不变的情意吗？`,
+    openingTemplate: `（望向星空，语重心长）
+
+{poemQuote}
+
+我是{figureName}，{contextBrief}
+
+这{starName}，看尽了人间多少悲欢。你信这世间有永恒不变的情意吗？`,
   },
 ]
 
@@ -451,9 +517,6 @@ export function getPublicFigures() {
  */
 export function getFiguresForStar(starName: string | null, constellation: string): AncientFigure[] {
   return ANCIENT_FIGURES.filter((f) => {
-    // 张衡通吃所有星星（天文家）
-    if (f.id === 'zhang-heng') return true
-
     return f.starAssociations.some((assoc) => {
       // 匹配星座
       if (assoc.constellationIds?.includes(constellation)) return true
@@ -519,4 +582,6 @@ export function generateOpening(
     .replace(/\{starName\}/g, displayName)
     .replace(/\{poemQuote\}/g, poemQuote)
     .replace(/\{contextBrief\}/g, contextBrief)
+    .replace(/\{figureName\}/g, figure.name)
+    .replace(/\{figureDynasty\}/g, figure.dynasty)
 }
