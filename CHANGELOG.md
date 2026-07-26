@@ -4,6 +4,10 @@
 
 ### 2026-07-26
 
+- **fix**: 强制 AI 输出格式 — Chat 分行 + Narrative Markdown (`f334687`)
+  - Chat: 系统 Prompt 增加格式要求（动作括号标注→空行→对话分段），`max_tokens` 300→500
+  - Narrative: 强化 Prompt 逐条列出格式规则（`#` 标题、`>` 引用、双引号、朝代标注），用户消息追加格式提醒
+  - 清除旧叙事缓存，确保新 Prompt 立即生效
 - **fix**: 修复三个问题 — 聊天 Markdown + 叙事渲染 + 故事入口重构 (`8bbcc73`)
   - AncientChat 对话增加 Markdown 渲染（`marked`），括号动作/空行/对话分层展示
   - 删除右栏冗余叙事组件（`StarNarrative` 只保留在左栏）
