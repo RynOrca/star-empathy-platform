@@ -30,7 +30,7 @@ jobs:
 
             if [ ! -f .env ]; then
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
-              echo "PORT=3000" >> .env
+              echo "API_PORT=3000" >> .env
               echo "NODE_ENV=production" >> .env
               echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" >> .env
             fi
