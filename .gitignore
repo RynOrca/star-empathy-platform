@@ -1,5 +1,6 @@
 *.bat
 *.js
+!ecosystem.config.js
 *.jpg
 *.png
 *.log
