@@ -1035,6 +1035,17 @@ const generatedTags = computed<string[]>(() => {
   flex-shrink: 0;
   padding: 24px;
   position: relative;
+  height: 70vh;
+  max-height: 600px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.panel-info::-webkit-scrollbar { width: 5px; }
+.panel-info::-webkit-scrollbar-track { background: transparent; }
+.panel-info::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }
 
 /* ─── Star Header ─── */

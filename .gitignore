@@ -4,6 +4,7 @@
 *.png
 *.log
 /tmp/
+nul
 
 node_modules/
 dist/

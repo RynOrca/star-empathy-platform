@@ -16,17 +16,23 @@ const router = Router()
 // 加载星表数据（用于查找星星信息）
 interface CatalogStar {
   id: number
-  name: string
+  name: string | null
   con: string
   mag: number
   dist?: number
+}
+
+interface CatalogData {
+  stars: CatalogStar[]
+  lines: number[][]
 }
 
 let starsData: CatalogStar[] = []
 try {
   const starsPath = path.resolve(__dirname, '../../../client/src/data/stars.json')
   const raw = fs.readFileSync(starsPath, 'utf-8')
-  starsData = JSON.parse(raw) as CatalogStar[]
+  const catalog = JSON.parse(raw) as CatalogData
+  starsData = catalog.stars || []
 } catch {
   console.warn('无法加载星表数据，星星上下文将不完整')
 }
@@ -114,7 +120,7 @@ router.post('/:catalogStarId/chat', async (req: Request, res: Response) => {
   const star = findStar(catalogStarId)
   const starContext = star
     ? {
-        starName: star.name,
+        starName: star.name || `恒星 #${catalogStarId}`,
         constellation: CON_NAMES[star.con] || star.con,
         magnitude: star.mag,
         distance: star.dist,

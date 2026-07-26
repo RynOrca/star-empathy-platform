@@ -65,6 +65,7 @@ export async function deepseekChat(
 
   const content = json.choices?.[0]?.message?.content
   if (!content) {
+    console.error('DeepSeek API 返回内容为空，完整响应:', JSON.stringify(json).slice(0, 500))
     throw new Error('DeepSeek API 返回内容为空')
   }
 
