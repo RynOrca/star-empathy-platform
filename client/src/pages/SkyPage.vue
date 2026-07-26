@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -344,9 +344,10 @@ function applySkyRotation() {
   const lng = userLng.value
   if (lat == null || lng == null) return false
 
-  // M = Rx(90°−lat) · Ry(π/2 + LST)
+  // M = Rx(90°−lat) · Ry(π/2 − LST)
   // 北极星: 高度角=lat, 方位角=北
-  // 春分点: LST=90°时在东点(左), 恒星东升西落
+  // 春分点: LST=0°时在子午线, LST=90°时在西点(右), LST=270°时在东点(左)
+  // 恒星: 东升西落（LST 增加 → 恒星向西移动）
   sky.applyAstroRotation(lat, lng, new Date())
 
   // 手动验算
