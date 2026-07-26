@@ -13,6 +13,9 @@
           <div class="modal-body">
             <div class="form-group">
               <label class="form-label">DeepSeek API Key</label>
+              <p v-if="hasExistingKey && !apiKey" class="form-existing-hint">
+                ✅ API Key 已配置。如需更换，请在上方输入新 Key。
+              </p>
               <div class="input-wrap">
                 <input
                   ref="inputRef"
@@ -46,7 +49,7 @@
                 </div>
               </div>
               <p class="form-hint">
-                用于生成"古今共望"叙事和"与古人共赏"对话。Key 仅保存在当前会话中，不会上传到服务器存储。
+                用于生成"古今共望"叙事和"与古人共赏"对话。Key 会安全保存在服务端，刷新不丢失。
               </p>
             </div>
           </div>
@@ -86,6 +89,7 @@ const saving = ref(false)
 const testing = ref(false)
 const statusText = ref('')
 const statusType = ref<'success' | 'error'>('success')
+const hasExistingKey = ref(false)
 const inputRef = ref<HTMLInputElement | null>(null)
 
 // 打开时读取已有 key 状态
@@ -93,6 +97,7 @@ watch(() => props.visible, async (v) => {
   if (v) {
     statusText.value = ''
     apiKey.value = ''
+    hasExistingKey.value = false
     await nextTick()
     inputRef.value?.focus()
     // 检查后端是否有 key
@@ -100,7 +105,7 @@ watch(() => props.visible, async (v) => {
       const res = await fetch('/api/settings/api-key')
       const json = await res.json()
       if (res.ok && json.data?.hasKey) {
-        apiKey.value = '(已设置，输入新值覆盖)'
+        hasExistingKey.value = true
       }
     } catch {}
   }
@@ -114,11 +119,6 @@ function showStatus(text: string, type: 'success' | 'error') {
 
 async function save() {
   const key = apiKey.value.trim()
-  // 如果是占位文本，不操作
-  if (key === '(已设置，输入新值覆盖)') {
-    emit('close')
-    return
-  }
 
   if (!key) {
     showStatus('请输入 API Key', 'error')
@@ -133,6 +133,7 @@ async function save() {
       body: JSON.stringify({ apiKey: key }),
     })
     if (res.ok) {
+      hasExistingKey.value = true
       showStatus('API Key 已保存', 'success')
       setTimeout(() => emit('close'), 800)
     } else {
@@ -148,9 +149,9 @@ async function save() {
 
 async function testKey() {
   const key = apiKey.value.trim()
-  if (key === '(已设置，输入新值覆盖)') {
+  if (!key && hasExistingKey.value) {
+    // 测试已保存的 key
     showStatus('正在测试已保存的 Key...', 'success')
-    // 测试已保存的 key 不需要传新值
   } else if (!key) {
     showStatus('请先输入 API Key', 'error')
     return
@@ -158,7 +159,7 @@ async function testKey() {
 
   testing.value = true
   try {
-    const body = (key && key !== '(已设置，输入新值覆盖)') ? { apiKey: key } : {}
+    const body = key ? { apiKey: key } : {}
     const res = await fetch('/api/settings/test-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -187,6 +188,7 @@ async function clear() {
     })
     if (res.ok) {
       apiKey.value = ''
+      hasExistingKey.value = false
       showStatus('已清除', 'success')
     }
   } catch {
@@ -332,6 +334,13 @@ async function clear() {
   line-height: 1.5;
   margin: 0;
   opacity: 0.7;
+}
+.form-existing-hint {
+  font-size: 0.78rem;
+  color: var(--star-green);
+  line-height: 1.5;
+  margin: 0 0 8px;
+  opacity: 0.85;
 }
 
 /* ─── Footer ─── */
