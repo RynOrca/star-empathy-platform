@@ -1,4 +1,4 @@
-<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -11,6 +11,9 @@
               <span class="sr-name">{{ r.name || r.conName }}</span>
               <span class="sr-con">{{ r.conName }}</span>
               <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+              <button class="sr-locate" title="定位到这颗星" @click.stop="locateStar(r.id); searchOpen = false; searchQuery = ''">
+                <Crosshair :size="14" />
+              </button>
             </div>
           </div>
           <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
@@ -34,7 +37,7 @@
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -86,6 +89,10 @@
     <div v-if="userLat != null" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
+      <div class="zoom-divider"></div>
+      <button class="zoom-btn settings-entry" @click="showSettings = true" title="设置">
+        <Settings :size="16" />
+      </button>
     </div>
     <div v-if="userLat != null" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
@@ -99,13 +106,16 @@
         :catalog-stats="catalogStats"
         :catalog-star-id="selectedCatalogStarId"
         :resonating="resonating"
+        :favorite-star-ids="favoriteStarIds"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
         @increment-views="onIncrementViews"
         @increment-favorites="onIncrementFavorites"
         @decrement-favorites="onDecrementFavorites"
+        @update-favorite-list="onUpdateFavoriteList"
         @update-stats="catalogStats = $event"
+        @update-similar-stars="onUpdateSimilarStars"
         @close="onCloseDetail"
         @write-story="onWriteStory"
       />
@@ -117,22 +127,31 @@
         @submitted="onStorySubmitted"
         @close="showForm = false"
       />
+
+      <SettingsModal
+        :visible="showSettings"
+        @close="showSettings = false"
+      />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
 import StoryForm from '../components/StoryForm.vue'
+import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm } from '../data/planets'
 
+
 const router = useRouter()
 const username = ref('')
+const favoriteStarIds = ref<number[]>([])
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
@@ -229,11 +248,20 @@ onMounted(async () => {
   const token = localStorage.getItem('token')
   if (token) {
     try {
-      const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-      const json = await res.json()
-      if (json.code === 200) username.value = json.data.username
+      const [meRes, favRes] = await Promise.all([
+        fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      const meJson = await meRes.json()
+      if (meRes.ok) username.value = meJson.data.username
+      const favJson = await favRes.json()
+      if (favRes.ok) favoriteStarIds.value = favJson.data
     } catch {}
   }
+  // 监听相似星星点击事件
+  window.addEventListener('fly-to-star', ((e: CustomEvent) => {
+    onStarClick(e.detail.catalogStarId)
+  }) as EventListener)
 })
 
 function doLogout() {
@@ -252,9 +280,9 @@ async function onSearchInput() {
   if (!q) { searchResults.value = []; return }
   searching.value = true
   try {
-    const res = await fetch(`/api/stars/search?q=${encodeURIComponent(q)}`)
+    const res = await fetch(`/api/catalog/stars/search?q=${encodeURIComponent(q)}`)
     const json = await res.json()
-    if (json.code === 200) searchResults.value = json.data
+    if (res.ok) searchResults.value = json.data
   } catch { searchResults.value = [] }
   finally { searching.value = false }
 }
@@ -264,6 +292,55 @@ async function flyToStar(starId: number) {
   if (!star) return
   // 模拟点击该星
   onStarClick(starId)
+}
+
+function locateStar(starId: number) {
+  const star = catalogStarLookup.get(starId)
+  if (!star || !skyRef.value?.sky) return
+  // 平滑转动相机，以该星为中心（不打开详情面板）
+  skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+  // 动画结束后高亮该星 2s
+  setTimeout(() => {
+    skyRef.value?.sky?.highlightStar(star.x, star.y, star.z)
+  }, 1200)
+}
+
+// ─── 长悬浮显示内核连线 ───
+let hoverLinesAbort: AbortController | null = null
+let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
+async function onStarHoverLong(starId: number | null) {
+  // 取消上一次请求和清除计时器
+  if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
+  if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
+
+  if (starId === null) {
+    // 鼠标离开：2s 后再清除连线（给用户时间看清）
+    clearLinesTimer = setTimeout(() => {
+      skyRef.value?.sky?.setKernelLines([])
+    }, 2000)
+    return
+  }
+  // 详情面板打开时不重复显示连线
+  if (selectedStarInfo.value) return
+  const controller = new AbortController()
+  hoverLinesAbort = controller
+  try {
+    const res = await fetch(`/api/catalog/stars/${starId}/similar`, { signal: controller.signal })
+    const json = await res.json()
+    if (!res.ok || !json.data?.length) {
+      skyRef.value?.sky?.setKernelLines([])
+      return
+    }
+    const sourceStar = catalogStarLookup.get(starId)
+    if (!sourceStar) return
+    const lines = (json.data as { catalogStarId: number }[]).map(s => {
+      const target = catalogStarLookup.get(s.catalogStarId)
+      return target ? { from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } } : null
+    }).filter(Boolean) as { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]
+    skyRef.value?.sky?.setKernelLines(lines)
+  } catch {
+    if (!controller.signal.aborted) skyRef.value?.sky?.setKernelLines([])
+  }
 }
 
 interface CatalogStar {
@@ -277,33 +354,83 @@ for (const s of catalogData.stars) {
 
 interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
-  catalog_star_id: number; created_at: string; location_lat: number | null
-  location_lng: number | null; type: string; view_count: number; origin: string | null
+  catalogStarId: number; createdAt: string; locationLat: number | null
+  locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalog_star_id: -1, created_at: '', location_lat: null, location_lng: null, type: '', view_count: 0, origin: null, username: null, tag: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
 const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
+const fetchingStories = ref(false)
+let fetchAbort: AbortController | null = null
+
+const PAGE_SIZE = 50
+
+function mergeStoriesIntoMap(
+  items: any[],
+  map: Map<number, StoryData[]>,
+  statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+) {
+  for (const s of items) {
+    const cid = s.catalogStarId
+    if (cid == null) continue
+    if (!map.has(cid)) map.set(cid, [])
+    map.get(cid)!.push({
+      id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount,
+      catalogStarId: cid, createdAt: s.createdAt || '',
+      locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
+      type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
+      username: s.username ?? null, tag: s.tag ?? null,
+    })
+    const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
+    cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
+    statsMap.set(cid, cur)
+  }
+}
+
+function publishStories(
+  map: Map<number, StoryData[]>,
+  statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+) {
+  storiesByStarId.value = map
+  pendingStatsMap.value = statsMap
+  skyRef.value?.sky?.setStarStatsCache(statsMap)
+}
 
 async function fetchStories() {
+  if (fetchingStories.value) return
+  fetchingStories.value = true
+  fetchAbort?.abort()
+  fetchAbort = new AbortController()
+  const signal = fetchAbort.signal
+
   try {
-    const res = await fetch('/api/stars')
+    const res = await fetch('/api/stories')
     const json = await res.json()
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
-    for (const s of json.data ?? []) {
-      const cid = s.catalog_star_id
-      if (cid != null) {
-        if (!map.has(cid)) map.set(cid, [])
-        map.get(cid)!.push({ id: s.id, title: s.title, content: s.content, resonanceCount: s.resonance_count, catalog_star_id: cid, created_at: s.created_at || '', location_lat: s.location_lat ?? null, location_lng: s.location_lng ?? null, type: s.type || 'user', view_count: s.view_count ?? 0, origin: s.origin ?? null, username: s.username ?? null, tag: s.tag ?? null })
-        const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
-        cur.stories++; cur.resonance += s.resonance_count || 0; cur.views += s.view_count || 0
-        statsMap.set(cid, cur)
-      }
+
+    // 加载第一页，立即显示
+    const first = await fetch(`/api/stories?page=1&limit=${PAGE_SIZE}`, { signal })
+    const firstJson = await first.json()
+    const firstData = firstJson.data?.items ?? firstJson.data ?? []
+    const totalPages = firstJson.data?.totalPages ?? 1
+    mergeStoriesIntoMap(firstData, map, statsMap)
+    publishStories(map, statsMap)
+
+    // 后台继续加载剩余页
+    for (let page = 2; page <= totalPages; page++) {
+      if (signal.aborted) break
+      const res = await fetch(`/api/stories?page=${page}&limit=${PAGE_SIZE}`, { signal })
+      const json = await res.json()
+      const items = json.data?.items ?? json.data ?? []
+      mergeStoriesIntoMap(items, map, statsMap)
+      publishStories(map, statsMap)
     }
-    storiesByStarId.value = map
-    pendingStatsMap.value = statsMap
-    skyRef.value?.sky?.setStarStatsCache(statsMap)
-  } catch (e) { console.error('获取故事失败:', e) }
+  } catch (e: any) {
+    if (e.name !== 'AbortError') console.error('获取故事失败:', e)
+  } finally {
+    fetchingStories.value = false
+  }
 }
 onMounted(() => { fetchStories() })
 
@@ -324,6 +451,58 @@ watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
     sRef.sky.setStarStatsCache(statsMap)
   }
 })
+
+// ═══════════════════════════════════════════
+// 天球旋转 + 实时自转
+// ═══════════════════════════════════════════
+let debugTimer: ReturnType<typeof setInterval> | null = null
+
+function applySkyRotation() {
+  const sky = skyRef.value?.sky
+  if (!sky) return false
+
+  const lat = userLat.value
+  const lng = userLng.value
+  if (lat == null || lng == null) return false
+
+  sky.applyAstroRotation(lat, lng, new Date())
+  return true
+}
+
+// 立即尝试(可能 skyRef 已就绪) + watch 兜底
+const rotationApplied = ref(false)
+watch(skyRef, () => {
+  if (!rotationApplied.value) {
+    rotationApplied.value = applySkyRotation()
+  }
+}, { immediate: true })
+
+// 兜底: 用轮询确保 sky 就绪后一定会应用
+let retryCount = 0
+const retryInterval = setInterval(() => {
+  if (rotationApplied.value) {
+    clearInterval(retryInterval)
+    return
+  }
+  if (applySkyRotation()) {
+    clearInterval(retryInterval)
+  } else if (++retryCount > 30) {
+    clearInterval(retryInterval)
+  }
+}, 100)
+
+// 实时天球自转更新（每秒刷新 LST）
+debugTimer = setInterval(() => {
+  const now = new Date()
+  if (skyRef.value?.sky && userLat.value != null && userLng.value != null) {
+    skyRef.value.sky.applyAstroRotation(userLat.value, userLng.value, now)
+  }
+}, 1000)
+
+onBeforeUnmount(() => {
+  if (debugTimer) clearInterval(debugTimer)
+  clearInterval(retryInterval)
+})
 const selectedStories = shallowRef<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
@@ -331,6 +510,7 @@ const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
+const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
@@ -341,7 +521,7 @@ function onStarClick(starId: number) {
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
   fetchCatalogStats(starId)
-  fetch(`/api/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
+  fetch(`/api/catalog/stars/${starId}/visit`, { method: 'POST' }).catch(() => {})
 }
 
 // 行星数据映射（用于故事详情展示）
@@ -379,16 +559,37 @@ function onPlanetClick(name: string, nameCN: string) {
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
 }
 async function fetchCatalogStats(starId: number) {
-  try { const res = await fetch(`/api/stars/${starId}/stats`); const json = await res.json(); if (json.code === 200) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
+  try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]) }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
-function onStorySubmitted(story: StoryData) { const cid = story.catalog_star_id; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
+function onUpdateSimilarStars(ids: number[]) {
+  // 查找源星和相似星的 3D 坐标
+  const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
+  if (!sourceStar) return
+  const lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[] = []
+  for (const id of ids) {
+    const target = catalogStarLookup.get(id)
+    if (target) {
+      lines.push({ from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } })
+    }
+  }
+  skyRef.value?.sky?.setKernelLines(lines)
+}
+function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
 function onDecrementFavorites() { if (catalogStats.value && catalogStats.value.favoriteCount > 0) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount - 1 } }
-async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stars/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (json.code === 200) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonance_count; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
+function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean }) {
+  if (data.favorited) {
+    if (!favoriteStarIds.value.includes(data.catalogStarId))
+      favoriteStarIds.value = [...favoriteStarIds.value, data.catalogStarId]
+  } else {
+    favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
+  }
+}
+async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>
@@ -503,6 +704,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .sr-name { color: var(--accent); font-weight: 500; }
 .sr-con { color: var(--ink-secondary); }
 .sr-mag { color: var(--muted-light); font-size: 0.7rem; }
+.sr-locate {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--muted-light); cursor: pointer; padding: 3px 5px;
+  display: flex; align-items: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0; margin-left: 4px;
+}
+.sr-locate:hover {
+  color: var(--accent); border-color: var(--accent-border);
+  background: rgba(255, 217, 138, 0.08);
+}
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;
@@ -516,6 +727,14 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   align-items: center; justify-content: center;
 }
 .zoom-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.zoom-divider {
+  width: 22px; height: 1px;
+  background: var(--rule);
+  margin: 2px auto;
+}
+.settings-entry {
+  font-size: 0.85rem;
+}
 .hint {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
   color: var(--muted-light); font-size: 0.78rem; z-index: 5;

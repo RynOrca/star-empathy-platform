@@ -1,11 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { ok, serverError } from '../utils/response';
 
 const router = Router();
 
-// 加载星表数据
-const catalogPath = resolve(__dirname, '../../../client/src/data/stars.json');
+function resolveCatalogPath(): string {
+  const candidates = [
+    resolve(__dirname, '../../../client/src/data/stars.json'),
+    resolve(__dirname, '../../../../client/src/data/stars.json'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return candidates[0];
+}
+
+const catalogPath = resolveCatalogPath();
 let catalog: { stars: { id: number; name: string | null; con: string; mag: number; ra: number; dec: number; x: number; y: number; z: number; color: string }[] } = { stars: [] };
 try {
   catalog = JSON.parse(readFileSync(catalogPath, 'utf-8'));
@@ -40,7 +51,7 @@ router.get('/', (req: Request, res: Response) => {
   try {
     const q = (req.query.q as string || '').trim().toLowerCase();
     if (!q || q.length < 1) {
-      return res.json({ code: 200, message: 'success', data: [] });
+      return ok(res, 'success', []);
     }
 
     const results = catalog.stars
@@ -61,10 +72,10 @@ router.get('/', (req: Request, res: Response) => {
         dec: s.dec,
       }));
 
-    res.json({ code: 200, message: 'success', data: results });
+    ok(res, 'success', results);
   } catch (error) {
     console.error('GET /api/stars/search error:', error);
-    res.status(500).json({ code: 500, message: '服务器内部错误', data: null });
+    serverError(res);
   }
 });
 

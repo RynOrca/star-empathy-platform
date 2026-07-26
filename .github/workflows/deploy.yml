@@ -1,0 +1,52 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /var/www/star-empathy-platform
+            echo "=== 1/5 拉取代码 ==="
+            git checkout -- .
+            git pull origin main
+
+            echo "=== 2/5 构建后端 ==="
+            cd server
+            npm install --silent
+            npm run build
+            npm prune --production --silent
+
+            if [ ! -f .env ]; then
+              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
+              echo "API_PORT=3000" >> .env
+              echo "NODE_ENV=production" >> .env
+              echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" >> .env
+            fi
+
+            echo "=== 3/5 启动后端 ==="
+            pm2 restart star-api 2>/dev/null || pm2 start dist/src/index.js --name star-api
+            pm2 save
+
+            echo "=== 4/5 构建前端 ==="
+            cd ../client
+            npm install --silent
+            npm run build
+
+            echo "=== 5/5 重载 Nginx ==="
+            nginx -t && nginx -s reload
+
+            echo "=== 部署完成 ==="
+            pm2 status

@@ -1,7 +1,22 @@
 import { DatabaseSync } from 'node:sqlite';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DB_PATH = path.join(__dirname, '../data/stars.db');
+function resolveDbPath(): string {
+  const candidates = [
+    path.join(__dirname, '../data/stars.db'),
+    path.join(__dirname, '../../data/stars.db'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  const finalPath = candidates[candidates.length - 1];
+  const dataDir = path.dirname(finalPath);
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  return finalPath;
+}
+
+const DB_PATH = resolveDbPath();
 const db = new DatabaseSync(DB_PATH);
 
 // 建表
@@ -45,9 +60,29 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS favorites (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     catalog_star_id INTEGER NOT NULL,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    user_id         INTEGER NOT NULL REFERENCES users(id),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(catalog_star_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS idx_favorites ON favorites(catalog_star_id);
+
+  CREATE TABLE IF NOT EXISTS narratives (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    catalog_star_id INTEGER NOT NULL,
+    content         TEXT NOT NULL,
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at));
+
+  CREATE TABLE IF NOT EXISTS story_kernels (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id        INTEGER NOT NULL UNIQUE REFERENCES stars(id),
+    emotional_tags  TEXT NOT NULL DEFAULT '[]',
+    essence         TEXT NOT NULL DEFAULT '',
+    themes          TEXT NOT NULL DEFAULT '[]',
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_story_kernels_story ON story_kernels(story_id);
 `);
 
 // 兼容旧数据库：添加新列
@@ -58,7 +93,15 @@ try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 
 try { db.exec('ALTER TABLE stars ADD COLUMN origin TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN tag TEXT'); } catch {}
+// 兼容旧数据库：favorites 表加 user_id 列
+try { db.exec('ALTER TABLE favorites ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorites(catalog_star_id, user_id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)'); } catch {}
+// 兼容旧数据库：narratives 表
+try { db.exec('CREATE TABLE IF NOT EXISTS narratives (id INTEGER PRIMARY KEY AUTOINCREMENT, catalog_star_id INTEGER NOT NULL, content TEXT NOT NULL, generated_at TEXT NOT NULL DEFAULT (datetime(\'now\')))'); } catch {}
+try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at))'); } catch {}
 // 兼容旧数据库：添加新索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)'); } catch {}
 
 export default db;

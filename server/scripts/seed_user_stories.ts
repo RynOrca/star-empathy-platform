@@ -1,4 +1,5 @@
 import db from '../src/db';
+import { generatePosition } from '../src/utils/position';
 
 /**
  * seed_user_stories.ts
@@ -18,7 +19,7 @@ console.log('清除完成。');
 // ─── 插入模板 ─────────────────────────────────────────────
 const insert = db.prepare(
   `INSERT INTO stars (type, title, content, resonance_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
-   VALUES ('user', ?, ?, ?, 0, 0, 0, ?, null)`
+   VALUES ('user', ?, ?, ?, ?, ?, ?, ?, null)`
 );
 
 interface UserStory {
@@ -454,7 +455,8 @@ const stories: UserStory[] = [
 // ─── 执行插入 ───────────────────────────────
 console.log(`正在插入 ${stories.length} 条用户故事...`);
 for (const row of stories) {
-  insert.run(row.title, row.content, row.resonance_count, row.catalog_star_id);
+  const pos = generatePosition();
+  insert.run(row.title, row.content, row.resonance_count, pos.x, pos.y, pos.z, row.catalog_star_id);
 }
 console.log('插入完成。');
 

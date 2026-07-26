@@ -8,13 +8,12 @@ export function useResonate() {
     resonatingId.value = id
     lastError.value = null
     try {
-      const res = await fetch(`/api/stars/${id}/resonate`, {
+      const res = await fetch(`/api/stories/${id}/resonate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
-      if (json.code !== 200) throw new Error(json.message || '共鸣失败')
+      if (!res.ok) throw new Error(json.message || '共鸣失败')
       return true
     } catch (e: any) {
       lastError.value = e.message || '网络错误'

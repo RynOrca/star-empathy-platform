@@ -88,7 +88,7 @@ export function eclipticToRaDecJD(lonDeg: number, date: Date): { ra: number; dec
   const λ = lonDeg * D2R
   const ra = Math.atan2(Math.sin(λ) * Math.cos(ε), Math.cos(λ))
   const dec = Math.asin(Math.sin(λ) * Math.sin(ε))
-  return { ra: (ra + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2) * 24, dec: dec / R2D }
+  return { ra: (ra + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2) * 24, dec: dec * R2D }
 }
 
 /** 某黄道经纬度（当日）相对观测者的 alt/az — 供可见弧段筛选 */

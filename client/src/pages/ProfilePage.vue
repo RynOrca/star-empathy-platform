@@ -43,11 +43,24 @@
 
       <!-- 收藏的星星 -->
       <div class="fav-section" v-if="favorites.length > 0">
-        <div class="fav-title">收藏的星星</div>
+        <div class="fav-title">收藏的星星 ({{ favorites.length }})</div>
         <div class="fav-list">
-          <span v-for="fid in favorites" :key="fid" class="fav-badge">{{ getStarName(fid) }}</span>
+          <div v-for="fid in favorites" :key="fid" class="fav-card">
+            <div class="fav-card-main" @click="goToStar(fid)">
+              <span class="fav-star" :style="{ color: getStarColor(fid) }">★</span>
+              <div class="fav-info">
+                <div class="fav-name">{{ getStarName(fid) }}</div>
+                <div class="fav-meta">
+                  <span v-if="getStarCon(fid)">{{ getStarCon(fid) }}</span>
+                  <span v-if="getStarMag(fid) != null">{{ getStarMag(fid)!.toFixed(1) }} mag</span>
+                </div>
+              </div>
+            </div>
+            <button class="fav-remove" title="取消收藏" @click="removeFavorite(fid)">×</button>
+          </div>
         </div>
       </div>
+      <div v-else class="empty-hint">还没有收藏的星星<br>去星空点亮一颗吧</div>
 
       <!-- 故事详情弹窗 -->
       <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
@@ -56,8 +69,8 @@
           <p class="modal-content">{{ activeStory.content }}</p>
           <div class="modal-meta">
             <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
-            <span>{{ formatDate(activeStory.created_at) }}</span>
-            <span>共鸣 {{ activeStory.resonance_count || 0 }}</span>
+            <span>{{ formatDate(activeStory.createdAt) }}</span>
+            <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
           </div>
           <button class="modal-close" @click="activeStory = null">关闭</button>
         </div>
@@ -67,17 +80,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
+import { constellationNames } from '../data/starInfo'
+
+const PAGE_SIZE = 20
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 useParticleSky(canvasRef)
 
 const loaded = ref(false)
-const user = ref<{ id: number; username: string; signature: string; created_at: string } | null>(null)
+const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<number[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, favoriteCount: 0 })
@@ -88,22 +104,47 @@ const editingSig = ref(false)
 const sigDraft = ref('')
 const sigInputRef = ref<HTMLInputElement | null>(null)
 
+const currentPage = ref(0)
+const hasMore = ref(true)
+const loadingMore = ref(false)
+
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
   if (!user.value) return 0
-  return Math.max(0, Math.floor((Date.now() - new Date(user.value.created_at).getTime()) / 86400000))
+  return Math.max(0, Math.floor((Date.now() - new Date(user.value.createdAt).getTime()) / 86400000))
 })
 
 function formatDate(d: string) { if (!d) return ''; return d.slice(0, 16).replace('T', ' ') }
 
-const starLookup = new Map<number, string>()
-for (const s of catalogData.stars) starLookup.set(s.id, s.name || `${s.con || ''} #${s.id}`)
-function getStarName(id: number) { return starLookup.get(id) || `星星 #${id}` }
+interface CatalogStarLite { name: string; con: string; mag: number; color: string }
+const starLookup = new Map<number, CatalogStarLite>()
+for (const s of catalogData.stars) starLookup.set(s.id, { name: s.name || `${s.con || ''} #${s.id}`, con: s.con || '', mag: s.mag, color: s.color || '#fff' })
+function getStarName(id: number) { return starLookup.get(id)?.name || `星星 #${id}` }
+function getStarCon(id: number) { const c = starLookup.get(id)?.con; return c ? (constellationNames[c] || c) : '' }
+function getStarMag(id: number) { return starLookup.get(id)?.mag ?? null }
+function getStarColor(id: number) { return starLookup.get(id)?.color || '#ffffff' }
 
-const precomputedPositions: { x: number; y: number; delay: number; size: number }[] = []
+function goToStar(starId: number) { router.push({ path: '/sky', query: { star: String(starId) } }) }
+
+async function removeFavorite(starId: number) {
+  const token = getToken()
+  if (!token) return
+  try {
+    const res = await fetch(`/api/catalog/stars/${starId}/favorite`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      favorites.value = favorites.value.filter(fid => fid !== starId)
+      stats.value.favoriteCount = favorites.value.length
+    }
+  } catch {}
+}
+
+const precomputedPositions = ref<{ x: number; y: number; delay: number; size: number }[]>([])
 function starStyle(i: number) {
-  if (i >= precomputedPositions.length) return {}
-  const p = precomputedPositions[i]
+  if (i >= precomputedPositions.value.length) return {}
+  const p = precomputedPositions.value[i]
   return {
     left: p.x + '%',
     top: p.y + '%',
@@ -113,7 +154,51 @@ function starStyle(i: number) {
   }
 }
 
+function appendPositions(count: number) {
+  for (let i = 0; i < count; i++) {
+    precomputedPositions.value.push({
+      x: 15 + Math.random() * 70,
+      y: 38 + Math.random() * 52,
+      delay: Math.random() * 2,
+      size: 4 + Math.random() * 8,
+    })
+  }
+}
+
 function getToken() { return localStorage.getItem('token') }
+
+async function loadNextPage() {
+  if (!hasMore.value || loadingMore.value) return
+  const token = getToken()
+  if (!token) return
+  loadingMore.value = true
+  try {
+    const nextPage = currentPage.value + 1
+    const res = await fetch(`/api/profile/stories?page=${nextPage}&limit=${PAGE_SIZE}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
+    if (res.ok && json.data) {
+      const items = json.data.items ?? json.data ?? []
+      stories.value = [...stories.value, ...items]
+      currentPage.value = json.data.page ?? nextPage
+      hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
+      appendPositions(items.length)
+      // 用 total 更新 storyCount（首次）
+      if (json.data.total != null && stats.value.storyCount === 0) {
+        stats.value.storyCount = json.data.total
+      }
+      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+    }
+  } catch (e) { console.error('加载故事页失败:', e) }
+  finally { loadingMore.value = false }
+}
+
+function onScroll() {
+  const scrollBottom = window.innerHeight + window.scrollY
+  const pageHeight = document.documentElement.scrollHeight
+  if (scrollBottom >= pageHeight - 200) loadNextPage()
+}
 
 async function startEditSig() {
   sigDraft.value = user.value?.signature || ''
@@ -135,7 +220,7 @@ async function saveSig() {
       body: JSON.stringify({ signature: v }),
     })
     const j = await r.json()
-    if (j.code === 200 && user.value) user.value.signature = j.data.signature
+    if (r.ok && user.value) user.value.signature = j.data.signature
   } catch {}
 }
 
@@ -146,37 +231,37 @@ onMounted(async () => {
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
-    const [meRes, storiesRes, favRes] = await Promise.all([
+    const [meRes, firstPageRes, favRes] = await Promise.all([
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/stories', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
-    if (meJson.code === 200) user.value = meJson.data
-    const storiesJson = await storiesRes.json()
-    if (storiesJson.code === 200) {
-      stories.value = storiesJson.data
-      stats.value.storyCount = storiesJson.data.length
-      stats.value.totalResonance = storiesJson.data.reduce((s: number, x: any) => s + (x.resonance_count || 0), 0)
+    if (meRes.ok) user.value = meJson.data
+    const firstJson = await firstPageRes.json()
+    if (firstJson.ok && firstJson.data) {
+      const items = firstJson.data.items ?? firstJson.data ?? []
+      stories.value = items
+      currentPage.value = firstJson.data.page ?? 1
+      hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
+      stats.value.storyCount = firstJson.data.total ?? items.length
+      stats.value.totalResonance = items.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      appendPositions(items.length)
     }
     const favJson = await favRes.json()
-    if (favJson.code === 200) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
-
-    for (let i = 0; i < stories.value.length; i++) {
-      precomputedPositions.push({
-        x: 15 + Math.random() * 70,
-        y: 38 + Math.random() * 52,
-        delay: Math.random() * 2,
-        size: 4 + Math.random() * 8,
-      })
-    }
+    if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
 })
 </script>
 
 <style scoped>
-.profile-page { width: 100vw; min-height: 100vh; position: relative; overflow: hidden; font-family: var(--font,"Microsoft YaHei",sans-serif); color: #f6f1ff; }
+.profile-page { width: 100vw; min-height: 100vh; position: relative; overflow-x: hidden; font-family: var(--font,"Microsoft YaHei",sans-serif); color: #f6f1ff; padding-bottom: 120px; }
 .sky-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
 .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #7a759c; z-index: 10; }
 
@@ -235,13 +320,24 @@ onMounted(async () => {
 
 /* ═══ 收藏 ═══ */
 .fav-section { position: relative; z-index: 10; text-align: center; margin-top: 3rem; padding-bottom: 3rem; }
-.fav-title { font-size: 0.75rem; color: #5a5580; margin-bottom: 0.5rem; }
-.fav-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
-.fav-badge {
-  padding: 3px 10px; border-radius: 12px; font-size: 0.75rem;
-  background: rgba(255,217,138,0.06); border: 1px solid rgba(255,217,138,0.15);
-  color: #ffd98a; backdrop-filter: blur(4px);
+.fav-title { font-size: 0.75rem; color: #5a5580; margin-bottom: 0.75rem; }
+.fav-list { display: flex; flex-direction: column; gap: 0.5rem; max-width: 400px; margin: 0 auto; }
+.fav-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 10px;
+  background: rgba(255,217,138,0.04); border: 1px solid rgba(255,217,138,0.12);
+  backdrop-filter: blur(4px); text-align: left;
 }
+.fav-card-main { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
+.fav-star { font-size: 1.2rem; }
+.fav-info { flex: 1; }
+.fav-name { color: #f6f1ff; font-size: 0.9rem; }
+.fav-meta { color: #8a84a0; font-size: 0.7rem; display: flex; gap: 8px; margin-top: 2px; }
+.fav-remove {
+  background: none; border: none; color: #8a84a0; font-size: 1.2rem;
+  cursor: pointer; padding: 2px 8px; border-radius: 6px;
+}
+.fav-remove:hover { color: #ff6b8a; background: rgba(255,107,138,0.08); }
 
 /* ═══ 弹窗 ═══ */
 .modal-overlay {

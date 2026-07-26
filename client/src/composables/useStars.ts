@@ -10,32 +10,13 @@ interface StarData {
   posY: number
   posZ: number
   createdAt: string
-}
-
-interface RawStar {
-  id: number
-  type: string
-  title: string | null
-  content: string
-  resonance_count: number
-  pos_x: number
-  pos_y: number
-  pos_z: number
-  created_at: string
-}
-
-function normalize(star: RawStar): StarData {
-  return {
-    id: star.id,
-    type: star.type as 'history' | 'user',
-    title: star.title,
-    content: star.content,
-    resonanceCount: star.resonance_count,
-    posX: star.pos_x,
-    posY: star.pos_y,
-    posZ: star.pos_z,
-    createdAt: star.created_at,
-  }
+  catalogStarId: number | null
+  viewCount: number
+  origin: string | null
+  username: string | null
+  tag: string | null
+  locationLat: number | null
+  locationLng: number | null
 }
 
 export interface StarFilters {
@@ -67,11 +48,10 @@ export function useStars() {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch('/api/stars')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const res = await fetch('/api/stories')
       const json = await res.json()
-      if (json.code !== 200) throw new Error(json.message || 'API error')
-      stars.value = (json.data as RawStar[]).map(normalize)
+      if (!res.ok) throw new Error(json.message || '请求失败')
+      stars.value = json.data as StarData[]
     } catch (e: any) {
       error.value = e.message || '加载星空数据失败'
       console.error('useStars: fetch failed', e)
