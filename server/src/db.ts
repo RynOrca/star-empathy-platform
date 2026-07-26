@@ -1,7 +1,22 @@
 import { DatabaseSync } from 'node:sqlite';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DB_PATH = path.join(__dirname, '../data/stars.db');
+function resolveDbPath(): string {
+  const candidates = [
+    path.join(__dirname, '../data/stars.db'),
+    path.join(__dirname, '../../data/stars.db'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  const finalPath = candidates[candidates.length - 1];
+  const dataDir = path.dirname(finalPath);
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  return finalPath;
+}
+
+const DB_PATH = resolveDbPath();
 const db = new DatabaseSync(DB_PATH);
 
 // 建表
