@@ -84,6 +84,13 @@ export async function streamChat(
 
   // 构建 messages
   let systemContent = figure.systemPrompt
+  systemContent += `\n\n## 回复格式要求（必须严格遵守）
+- 第一行：动作或神态描写，用中文括号标注，例如：（望着星空，若有所思）
+- 空一行
+- 然后开始对话内容，每句话单独成段，段与段之间空一行
+- 不要把所有内容挤在一行或一段里
+- 每段 1~2 句话即可，保持简洁有力`
+
   if (starContext) {
     systemContent += `\n\n## 当前观测的星星\n${buildStarContext(starContext)}`
   }
@@ -105,7 +112,7 @@ export async function streamChat(
         model: DEFAULT_MODEL,
         messages,
         temperature: 0.9,
-        max_tokens: 300,
+        max_tokens: 500,
         stream: true,
       }),
     })
