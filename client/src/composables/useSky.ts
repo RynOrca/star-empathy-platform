@@ -177,6 +177,12 @@ export interface SkyAPI {
    * @param date UTC 日期时间（默认当前时刻）
    */
   applyAstroRotation: (latDeg: number, lonDeg: number, date?: Date) => void
+  /** 设置内核连线（搜索结果星之间的连线） */
+  setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
+  /** 平滑将相机焦点移动到指定恒星（带动画） */
+  focusOnStar: (x: number, y: number, z: number) => void
+  /** 高亮指定恒星位置（短暂 2s） */
+  highlightStar: (x: number, y: number, z: number) => void
 }
 
 export function useSky(
