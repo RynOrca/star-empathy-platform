@@ -4,6 +4,15 @@
 
 ### 2026-07-26
 
+- **refactor**: 重构古人共赏 + 叙事 Markdown 渲染 + 布局调整 (`c740de4`)
+  - 扩展诗人列表至 11 位（新增屈原/陶渊明/李清照/辛弃疾/王维/白居易/李商隐）
+  - 新增星星-诗人关联映射（`starAssociations`），按星名/星座精确匹配
+  - 新增诗人主动开场白功能（`POST /api/catalog/stars/:id/chat/opening`）
+  - 新增 `GET /api/catalog/stars/:id/chat/figures` 按关联过滤古人
+  - 叙事支持 Markdown 渲染（`marked` 库），结构化输出（标题/引用/段落）
+  - 布局重构：叙事移至左栏顶部，故事列表改为可折叠区域
+  - 修复叙事生成失败（去掉 `enableSearch: true`）
+  - 修复 `starName` 可能为 null 的类型错误
 - **fix**: 修复三个 Bug (`fc95d3d`)
   - chat.ts 中 stars.json 解析错误（对象而非数组），修复「与古人共赏」500 错误
   - deepseek.ts 空内容返回增加详细日志
