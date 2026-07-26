@@ -315,6 +315,21 @@
           </div>
         </div>
 
+        <!-- ─── P1-2：北极星岁差变迁科普（14-B §2 岁差） ─── -->
+        <div v-if="catalogStarId === 4" class="info-section precession-lore">
+          <div class="info-label">北极星不是永恒的</div>
+          <p class="lore-text">
+            地球自转轴像一只倾斜的陀螺，在太空中缓慢画圆，周期约 <strong>25772 年</strong>。
+            因此"北极星"这个位置在不同年代由不同的恒星担任：
+          </p>
+          <ul class="lore-list">
+            <li><span class="lore-year">公元前 3000 年</span><span class="lore-star">天龙座 右枢（Thuban）</span></li>
+            <li><span class="lore-year">今天</span><span class="lore-star">小熊座 勾陈一（Polaris）</span></li>
+            <li><span class="lore-year">公元 13700 年</span><span class="lore-star">天琴座 织女星（Vega）</span></li>
+          </ul>
+          <p class="lore-footnote">—— 这就是岁差，星空在千年的尺度上悄悄改写人间的方向。</p>
+        </div>
+
         <div class="action-buttons">
           <button class="write-btn" @click="onWriteStory"><PenSquare :size="14" /> 写我的故事</button>
           <button
@@ -1684,6 +1699,58 @@ watch(() => props.catalogStarId, () => {
   border-style: dashed;
   border-color: rgba(255, 217, 138, 0.3);
   color: var(--accent);
+}
+
+/* ─── P1-2：北极星岁差科普区块 ─── */
+.precession-lore .info-label {
+  color: #c8b6ff;
+  letter-spacing: 0.04em;
+}
+.precession-lore .lore-text {
+  margin: 0 0 10px 0;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--ink-secondary);
+}
+.precession-lore .lore-text strong {
+  color: #e8dfff;
+  font-weight: 600;
+}
+.precession-lore .lore-list {
+  list-style: none;
+  margin: 0 0 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.precession-lore .lore-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(200, 182, 255, 0.05);
+  border-left: 2px solid rgba(200, 182, 255, 0.35);
+}
+.precession-lore .lore-year {
+  flex: 0 0 auto;
+  min-width: 110px;
+  font-size: 0.74rem;
+  color: #8a7fb8;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.precession-lore .lore-star {
+  font-size: 0.82rem;
+  color: #e8dfff;
+}
+.precession-lore .lore-footnote {
+  margin: 0;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 /* ─── Action Buttons ─── */

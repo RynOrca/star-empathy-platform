@@ -81,7 +81,20 @@ const projectRoot = (() => {
   return cwd
 })()
 const clientDist = path.resolve(projectRoot, 'client/dist')
-app.use(express.static(clientDist))
+app.use(express.static(clientDist, {
+  maxAge: '1y',
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    // 纹理资源：1 年 immutable 缓存
+    if (filePath.includes('/textures/') || filePath.match(/\.(jpg|jpeg|png|webp)$/i)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    }
+    // HTML 入口：不缓存，确保用户拿到最新版本
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache')
+    }
+  },
+}))
 
 // 健康检查
 app.get('/api/health', (_req: Request, res: Response) => {

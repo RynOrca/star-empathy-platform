@@ -12,4 +12,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-three': ['three'],
+          'vendor-vue': ['vue', 'vue-router'],
+          'vendor-primevue': ['primevue', '@primevue/themes'],
+          'vendor-astro': ['astronomy-engine'],
+        },
+      },
+    },
+  },
 })

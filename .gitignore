@@ -18,6 +18,10 @@ server/.runtime-key
 *.zip
 *.tsbuildinfo
 
+# 例外：前端静态纹理资源需要提交到版本控制
+!client/public/textures/**/*.jpg
+!client/public/textures/**/*.png
+
 # ─── 日志 ───
 *.log
 
@@ -39,12 +43,13 @@ coverage/
 .codegraph/
 .playwright-mcp/
 .omo/
+.omo/run-continuation/
+research/
 
 # ─── 调试截图 ───
 screenshots/
 
 # ─── 项目文档（不上传） ───
-AGENTS.md
 CHANGELOG.md
 PLAN.md
 CODE_WIKI.md

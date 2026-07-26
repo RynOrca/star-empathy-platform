@@ -22,6 +22,14 @@
         </div>
       </div>
       <div class="nav-right">
+        <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
+          <span class="term-text">{{ solarTerm.termName }}</span>
+          <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
+        </span>
+        <span v-if="moonPhase" class="moon-phase" :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）`">
+          <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
+          <span class="moon-text">{{ moonPhase.phaseName }}</span>
+        </span>
         <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
           👤 {{ username }}
         </span>
@@ -128,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
@@ -138,6 +146,7 @@ import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
+import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 
 const router = useRouter()
@@ -147,6 +156,50 @@ const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
 const locationFailed = ref(false)
+
+// ─── 阶段 3 P0-1：月相显示（14-C §1 地月系） ───
+const moonPhase = ref<{ phaseFraction: number; phaseName: string; illumination: number } | null>(null)
+// CSS 绘制月相图标：用 radial-gradient 模拟月相阴影
+// 上半月（phase<0.5）：右边亮；下半月（phase>0.5）：左边亮
+const moonIconStyle = computed(() => {
+  if (!moonPhase.value) return ''
+  const f = moonPhase.value.phaseFraction
+  // 0=新月（全黑），0.5=满月（全亮），0.25=上弦（右半亮），0.75=下弦（左半亮）
+  // 用 conic-gradient 或 linear-gradient 简化：左右半圆 + 中间过渡
+  if (f < 0.5) {
+    // 上半月：从全黑到全亮，亮的部分在右
+    const lit = f * 2 * 100 // 0~100%
+    return `linear-gradient(90deg, #1a1a2e ${100 - lit}%, #f0e6c8 ${100 - lit}%)`
+  } else {
+    // 下半月：从全亮到全黑，亮的部分在左
+    const lit = (1 - f) * 2 * 100 // 100~0%
+    return `linear-gradient(90deg, #f0e6c8 ${100 - lit}%, #1a1a2e ${100 - lit}%)`
+  }
+})
+
+async function refreshMoonPhase() {
+  moonPhase.value = await getMoonPhase()
+}
+
+// ─── 阶段 3 P1-1：节气显示（14-B §3 黄道与节气） ───
+const solarTerm = ref<{ termName: string; nextTermName: string; daysToNext: number } | null>(null)
+async function refreshSolarTerm() {
+  solarTerm.value = await getSolarTerm()
+}
+
+// 月相 + 节气 定时刷新
+let astroTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  refreshMoonPhase()
+  refreshSolarTerm()
+  astroTimer = setInterval(() => {
+    refreshMoonPhase()
+    refreshSolarTerm()
+  }, 30 * 60 * 1000)
+})
+onBeforeUnmount(() => {
+  if (astroTimer) { clearInterval(astroTimer); astroTimer = null }
+})
 
 const cities = [
   { name: '北京', lat: 39.9, lng: 116.4 },
@@ -556,6 +609,45 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
 .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+.solar-term {
+  display: inline-flex; align-items: baseline; gap: 0.4rem;
+  padding: 0.3rem 0.7rem; border-radius: 14px;
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  background: rgba(40, 35, 18, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: default;
+  transition: border-color 0.2s;
+}
+.solar-term:hover { border-color: rgba(255, 217, 138, 0.35); }
+.term-text {
+  font-size: 0.82rem; color: #ffd98a;
+  font-weight: 500; letter-spacing: 0.04em;
+}
+.term-next {
+  font-size: 0.68rem; color: #8a849e;
+  letter-spacing: 0.02em;
+}
+.moon-phase {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.7rem; border-radius: 14px;
+  border: 1px solid rgba(240, 230, 200, 0.18);
+  background: rgba(16, 20, 43, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: default;
+  transition: border-color 0.2s;
+}
+.moon-phase:hover { border-color: rgba(240, 230, 200, 0.35); }
+.moon-icon {
+  width: 14px; height: 14px; border-radius: 50%;
+  box-shadow: 0 0 6px rgba(240, 230, 200, 0.3);
+  display: inline-block;
+}
+.moon-text {
+  font-size: 0.78rem; color: #c8c2d8;
+  letter-spacing: 0.04em;
+}
 .nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; }
 .nav-user:hover { color: #f6f1ff; }
 .nav-btn {
