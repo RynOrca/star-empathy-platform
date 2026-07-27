@@ -565,7 +565,7 @@ const narrative = useNarrative()
 watch(() => props.catalogStarId, (id) => {
   if (id) {
     narrative.reset()
-    narrative.fetchNarrative(id)
+    narrative.fetchNarrative(id, userPosition.value?.lat, userPosition.value?.lng)
   }
 }, { immediate: true })
 
