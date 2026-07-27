@@ -49,6 +49,11 @@
       <div v-if="myToggleFeedback" class="toggle-toast">{{ myToggleFeedback }}</div>
     </Transition>
 
+    <!-- 定位城市提示 -->
+    <Transition name="toast-fade">
+      <div v-if="locationCityToast" class="location-toast">📍 {{ locationCityToast }}</div>
+    </Transition>
+
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
     <!-- 定位加载/失败 -->
@@ -151,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
@@ -169,6 +174,7 @@ const route = useRoute()
 const username = ref('')
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
+const locationCityToast = ref('')
 
 function toggleMyStories() {
   showMyStoriesOnly.value = !showMyStoriesOnly.value
@@ -240,11 +246,12 @@ const cities = [
   { name: '哈尔滨', lat: 45.8, lng: 126.7 },
 ]
 
-function selectCity(c: { lat: number; lng: number }) {
+function selectCity(c: { name: string; lat: number; lng: number }) {
   userLat.value = c.lat
   userLng.value = c.lng
   locationFailed.value = false
   locationReady.value = true
+  showLocationToast(c.name)
 }
 
 // 获取用户地理位置（带 2 小时缓存）
@@ -265,6 +272,28 @@ function setCachedLocation(lat: number, lng: number) {
   localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
 }
 
+// 反向地理编码：获取城市名称
+async function fetchCityName(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
+    const data = await res.json()
+    const addr = data.address || {}
+    const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
+    console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
+    return city
+  } catch (e) {
+    console.error('[SkyPage] fetchCityName failed:', e)
+    return ''
+  }
+}
+
+function showLocationToast(city: string) {
+  const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
+  console.log('[SkyPage] showLocationToast:', text)
+  locationCityToast.value = text
+  setTimeout(() => { locationCityToast.value = '' }, 10000)
+}
+
 function fetchLocation() {
   if (!navigator.geolocation) {
     locationReady.value = true
@@ -272,12 +301,15 @@ function fetchLocation() {
     return
   }
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    async (pos) => {
       userLat.value = pos.coords.latitude
       userLng.value = pos.coords.longitude
       setCachedLocation(pos.coords.latitude, pos.coords.longitude)
       locationReady.value = true
       locationFailed.value = false
+      // 获取城市名并显示 2 秒
+      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
+      showLocationToast(city)
     },
     (err) => {
       console.warn('Geolocation failed:', err.message)
@@ -288,11 +320,26 @@ function fetchLocation() {
   )
 }
 
-// 手动刷新定位（供设置面板调用）
+// 手动刷新定位（不隐藏天空，静默更新）
 function refreshLocation() {
-  locationReady.value = false
-  locationFailed.value = false
-  fetchLocation()
+  if (!navigator.geolocation) {
+    showLocationToast('')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      userLat.value = pos.coords.latitude
+      userLng.value = pos.coords.longitude
+      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
+      locationFailed.value = false
+      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
+      showLocationToast(city)
+    },
+    () => {
+      showLocationToast('')
+    },
+    { timeout: 5000, enableHighAccuracy: false },
+  )
 }
 
 // 优先使用缓存定位
@@ -302,6 +349,8 @@ if (cached) {
   userLng.value = cached.lng
   locationReady.value = true
   locationFailed.value = false
+  // 异步获取城市名并显示 toast
+  fetchCityName(cached.lat, cached.lng).then(city => showLocationToast(city))
 } else {
   fetchLocation()
 }
@@ -453,7 +502,7 @@ interface StoryData {
   username: string | null; tag: string | null
 }
 const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
-const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
+const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
 
@@ -682,7 +731,7 @@ onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
 })
-const selectedStories = shallowRef<StoryData[]>([])
+const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
 const selectedCatalogStarId = ref(0)
@@ -756,16 +805,18 @@ function onUpdateSimilarStars(ids: number[]) {
   skyRef.value?.sky?.setKernelLines(lines)
 }
 function onStorySubmitted(story: StoryData) {
+  console.log('[SkyPage] onStorySubmitted:', story)
   const cid = story.catalogStarId
-  const map = storiesByStarId.value
-  const existing = map.get(cid) ?? []
-  existing.push(story)
+  const map = new Map(storiesByStarId.value)
+  const existing = [...(map.get(cid) ?? []), story]
   map.set(cid, existing)
-  storiesByStarId.value = new Map(map)
+  storiesByStarId.value = map
   // 更新天空统计（无论是否"只看我的"模式）
   recalcFilteredStats()
   if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
-    selectedStories.value = [...existing]
+    selectedStories.value = existing
+    // 从后端拉取权威统计数据，确保数据准确
+    fetchCatalogStats(cid)
   }
   showForm.value = false
 }
@@ -787,26 +838,30 @@ async function onResonate(storyId: number) {
     const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' })
     const json = await res.json()
     if (res.ok) {
+      // 更新当前选中故事列表
       const stories = selectedStories.value
       const idx = stories.findIndex(s => s.id === storyId)
       if (idx >= 0) {
-        stories[idx].resonanceCount = json.data.resonanceCount
-        selectedStories.value = [...stories]
+        selectedStories.value = stories.map((s, i) =>
+          i === idx ? { ...s, resonanceCount: json.data.resonanceCount } : s,
+        )
       }
-      if (catalogStats.value) {
-        catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 }
-      }
-      const map = storiesByStarId.value
+      // 更新主数据源 storiesByStarId
+      const map = new Map(storiesByStarId.value)
       for (const [cid, starStories] of map) {
         const sIdx = starStories.findIndex(s => s.id === storyId)
         if (sIdx >= 0) {
-          starStories[sIdx] = { ...starStories[sIdx], resonanceCount: json.data.resonanceCount }
-          map.set(cid, [...starStories])
-          storiesByStarId.value = new Map(map)
+          map.set(cid, starStories.map((s, i) =>
+            i === sIdx ? { ...s, resonanceCount: json.data.resonanceCount } : s,
+          ))
+          storiesByStarId.value = map
           break
         }
       }
-      if (showMyStoriesOnly.value) recalcFilteredStats()
+      // 从后端拉取权威 stats，确保数据准确
+      fetchCatalogStats(selectedCatalogStarId.value)
+      // 刷新天空统计
+      recalcFilteredStats()
     }
   } catch (e) {
     console.error('共鸣失败:', e)
@@ -1144,6 +1199,17 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
 .toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
 .toast-fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+
+/* ─── 定位城市 Toast ─── */
+.location-toast {
+  position: fixed; top: 6rem; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 0.6rem 1.5rem; border-radius: 20px;
+  background: rgba(20, 30, 50, 0.9); border: 1px solid rgba(100, 200, 150, 0.4);
+  color: #95f0c0; font-size: 0.85rem; font-weight: 500;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
 
 /* ─── 定位刷新按钮 ─── */
 .nav-loc-btn {

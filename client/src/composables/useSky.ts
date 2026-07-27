@@ -338,6 +338,8 @@ export function useSky(
   canvas.parentElement?.appendChild(lrEl)
 
   const stars = CAT.stars; const n = stars.length
+const starById = new Map<number, CatStar>()
+for (const s of stars) starById.set(s.id, s)
 
   // ═══ 星星分层 ═══
   const tiers = [
@@ -439,7 +441,7 @@ export function useSky(
     for (const [starId, stats] of cache) {
       if (stats.stories === 0) continue
       if (existing.has(starId)) continue
-      const star = stars[starId]
+      const star = starById.get(starId)
       if (!star) continue
       const sp = new Sprite(new SpriteMaterial({
         map: bloomTex('#ffe5a0', 128),
@@ -825,7 +827,7 @@ export function useSky(
     // tooltip 内容更新函数
     let _lastStatsKey = ''
     function updateTooltipContent(starId: number) {
-      const star = stars[starId]
+      const star = starById.get(starId)
       if (!star) return
       const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
       const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
