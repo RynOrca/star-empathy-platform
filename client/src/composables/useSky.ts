@@ -1,4 +1,4 @@
-import {
+﻿import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
@@ -1186,7 +1186,6 @@ for (const s of stars) starById.set(s.id, s)
         hoverCheckTimer = 0 // 重置节流，强制下一帧立即检测
         return
       }
->>>>>>> d745839 (fix(issue-34): 优化星空视图显示（关闭闪烁/连线交互/名称显示）)
       if (hoveredStarId !== -1) {
         options?.onStarClick?.(hoveredStarId)
         return
