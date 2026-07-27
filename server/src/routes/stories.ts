@@ -38,11 +38,11 @@ router.get('/:storyId', (req: Request, res: Response) => {
   }
 });
 
-// 投递故事（可选登录）
-router.post('/', authOptional, (req: Request, res: Response) => {
+// 投递故事（需登录）
+router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, location, tag } = req.body;
-    const user = (req as Request & { user?: { id: number } }).user;
+    const { title, content, catalogStarId: catalog_star_id, location, tag, isAnonymous } = req.body;
+    const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
       return badRequest(res, 'content 不能为空');
@@ -75,8 +75,9 @@ router.post('/', authOptional, (req: Request, res: Response) => {
     const safeContent = esc(trimmed);
     const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
     const safeTag = typeof tag === 'string' ? tag : undefined;
+    const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user?.id, safeTag);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {
@@ -90,14 +91,16 @@ router.post('/', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 共鸣故事
-router.post('/:storyId/resonate', (req: Request, res: Response) => {
+// 共鸣故事（需登录，去重）
+router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
-    const result = resonate(storyId);
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = resonate(storyId, user.id);
     if (!result) return notFound(res, '故事不存在');
+    if (result.already) return ok(res, '已共鸣', result);
 
     ok(res, '共鸣已点亮', result);
   } catch (error) {
@@ -106,7 +109,7 @@ router.post('/:storyId/resonate', (req: Request, res: Response) => {
   }
 });
 
-// 故事级浏览 +1
+// 故事级浏览 +1（纯计数）
 router.post('/:storyId/view', (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);

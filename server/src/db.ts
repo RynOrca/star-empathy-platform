@@ -25,6 +25,7 @@ db.exec(`
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    email         TEXT,
     signature     TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -83,10 +84,46 @@ db.exec(`
     generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_story_kernels_story ON story_kernels(story_id);
+
+  CREATE TABLE IF NOT EXISTS token_blacklist (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+
+  CREATE TABLE IF NOT EXISTS resonance_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id   INTEGER NOT NULL REFERENCES stars(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(story_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_resonance_log_story ON resonance_log(story_id);
+
+  CREATE TABLE IF NOT EXISTS story_views (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id  INTEGER NOT NULL REFERENCES stars(id),
+    user_id   INTEGER NOT NULL REFERENCES users(id),
+    viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_story_views_dedup ON story_views(story_id, user_id);
+
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    email      TEXT NOT NULL,
+    code       TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_tokens(email, expires_at);
 `);
 
 // 兼容旧数据库：添加新列
 try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lat REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lng REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0'); } catch {}
@@ -105,5 +142,10 @@ try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narrative
 // 兼容旧数据库：添加新索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)'); } catch {}
+// 兼容旧数据库：catalog_visits 加 user_id 列
+try { db.exec('ALTER TABLE catalog_visits ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_visits(user_id)'); } catch {}
+// 兼容旧数据库：stars 加 is_anonymous 列
+try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 
 export default db;

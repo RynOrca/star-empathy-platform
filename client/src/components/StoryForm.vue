@@ -46,6 +46,14 @@
           </div>
         </div>
 
+        <!-- 匿名投递 -->
+        <div class="field">
+          <label class="field-checkbox">
+            <input type="checkbox" v-model="isAnonymous" />
+            <span>匿名投递（故事属于你，但不显示你的名字）</span>
+          </label>
+        </div>
+
         <p v-if="error" class="form-error">{{ error }}</p>
 
         <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
@@ -68,7 +76,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null }]
 }>()
 
 const title = ref('')
@@ -78,6 +86,7 @@ const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const userLocation = ref<{ lat: number; lng: number } | null>(null)
 const selectedTag = ref<string | null>(null)
+const isAnonymous = ref(false)
 const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
 
 onMounted(() => {
@@ -115,6 +124,7 @@ async function onSubmit() {
         content: trimmed,
         location: userLocation.value,
         tag: selectedTag.value,
+        isAnonymous: isAnonymous.value,
       }),
     })
     const json = await res.json()
@@ -133,6 +143,7 @@ async function onSubmit() {
         origin: null,
         username: json.data.username ?? null,
         tag: json.data.tag ?? selectedTag.value,
+        userId: json.data.userId ?? null,
       })
     } else {
       error.value = json.message || '提交失败，再试一次吧'
@@ -333,6 +344,8 @@ async function onSubmit() {
 .tag-btn.tag-愿望.active { background: rgba(255,217,138,0.2); color: #ffd98a; }
 .tag-btn.tag-孤独.active { background: rgba(149,240,192,0.2); color: #95f0c0; }
 .optional { color: #5a5580; font-size: 0.75rem; font-weight: 400; }
+.field-checkbox { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.8rem; color: #7a759c; }
+.field-checkbox input[type="checkbox"] { accent-color: #ffd98a; width: 15px; height: 15px; cursor: pointer; }
 .submit-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -127,6 +127,7 @@
         :catalog-star-id="selectedCatalogStarId"
         :resonating="resonating"
         :favorite-star-ids="favoriteStarIds"
+        :current-user-id="currentUserId"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -138,6 +139,7 @@
         @update-similar-stars="onUpdateSimilarStars"
         @close="onCloseDetail"
         @write-story="onWriteStory"
+        @delete-story="onDeleteStory"
       />
 
       <StoryForm
@@ -159,6 +161,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
+import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
@@ -171,7 +174,9 @@ import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 const router = useRouter()
 const route = useRoute()
+const { startRefreshTimer, stopRefreshTimer } = useAuth()
 const username = ref('')
+const currentUserId = ref<number | null>(null)
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
 const locationCityToast = ref('')
@@ -403,13 +408,18 @@ onMounted(async () => {
   fetchStories()
   const token = localStorage.getItem('token')
   if (token) {
+    startRefreshTimer()
     try {
       const [meRes, favRes] = await Promise.all([
         fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
       ])
       const meJson = await meRes.json()
-      if (meRes.ok) username.value = meJson.data.username
+      if (meRes.ok) {
+        const meData = meJson.data
+        username.value = meData.username
+        currentUserId.value = meData.id ?? null
+      }
       const favJson = await favRes.json()
       if (favRes.ok) favoriteStarIds.value = favJson.data
     } catch {}
@@ -446,12 +456,23 @@ watch(() => route.query.star, () => {
   focusOnQueryStar()
 })
 
-function doLogout() {
+async function doLogout() {
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch { /* 即使 API 失败也清除本地状态 */ }
+  }
+  stopRefreshTimer()
   localStorage.removeItem('token')
   router.push('/')
 }
 
 function goLogin() {
+  stopRefreshTimer()
   localStorage.removeItem('token')
   router.push('/')
 }
@@ -543,9 +564,9 @@ interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
   catalogStarId: number; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
-  username: string | null; tag: string | null
+  username: string | null; tag: string | null; userId: number | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null }
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -566,7 +587,7 @@ function mergeStoriesIntoMap(
       catalogStarId: cid, createdAt: s.createdAt || '',
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
-      username: s.username ?? null, tag: s.tag ?? null,
+      username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
     })
     const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
     cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
@@ -630,7 +651,7 @@ function recalcFilteredStats() {
   const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
   for (const [cid, stories] of fullMap) {
     const filtered = showMyStoriesOnly.value
-      ? stories.filter(s => s.username === username.value)
+      ? stories.filter(s => s.userId === currentUserId.value)
       : stories
     if (filtered.length === 0) continue
     statsMap.set(cid, {
@@ -677,7 +698,7 @@ function getFilteredStories(starId: number): StoryData[] {
   const stories = storiesByStarId.value.get(starId)
   if (!stories) return []
   if (!showMyStoriesOnly.value) return stories
-  return stories.filter(s => s.username === username.value)
+  return stories.filter(s => s.userId === currentUserId.value)
 }
 
 // 获取用户私有内核连线
@@ -849,7 +870,6 @@ function onUpdateSimilarStars(ids: number[]) {
   skyRef.value?.sky?.setKernelLines(lines)
 }
 function onStorySubmitted(story: StoryData) {
-  console.log('[SkyPage] onStorySubmitted:', story)
   const cid = story.catalogStarId
   const map = new Map(storiesByStarId.value)
   const existing = [...(map.get(cid) ?? []), story]
@@ -876,12 +896,39 @@ function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean 
     favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
   }
 }
+function onDeleteStory(storyId: number) {
+  // 从 selectedStories 中移除
+  selectedStories.value = selectedStories.value.filter(s => s.id !== storyId)
+  // 从 storiesByStarId 中移除
+  const map = new Map(storiesByStarId.value)
+  const cid = selectedCatalogStarId.value
+  const existing = map.get(cid)
+  if (existing) {
+    map.set(cid, existing.filter(s => s.id !== storyId))
+    storiesByStarId.value = map
+  }
+  // 更新统计
+  recalcFilteredStats()
+  fetchCatalogStats(cid)
+  // 如果当前星没有故事了，关闭面板
+  if (selectedStories.value.length === 0) {
+    onCloseDetail()
+  }
+}
 async function onResonate(storyId: number) {
   resonating.value = true
   try {
-    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' })
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST', headers })
     const json = await res.json()
     if (res.ok) {
+      // 如果已共鸣，不更新计数
+      if (json.data?.already) {
+        resonating.value = false
+        return
+      }
       // 更新当前选中故事列表
       const stories = selectedStories.value
       const idx = stories.findIndex(s => s.id === storyId)

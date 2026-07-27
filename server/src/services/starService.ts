@@ -18,19 +18,21 @@ export interface Star {
   origin: string | null;
 }
 
-// 获取所有星星（含用户名和标签）
-export function getAllStars(): (Star & { username: string | null; tag: string | null })[] {
+// 获取所有星星（含用户名、用户 ID 和标签）
+export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null })[] {
   return db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, s.user_id as userId,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      s.tag
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
-  `).all() as unknown as (Star & { username: string | null; tag: string | null })[];
+  `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 }
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null })[];
   total: number;
   page: number;
   limit: number;
@@ -45,12 +47,14 @@ export function getAllStarsPaged(page: number, limit: number): {
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, s.user_id as userId,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      s.tag
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
+  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 
   return { items, total, page: p, limit: l, totalPages };
 }
@@ -63,13 +67,14 @@ export function createStar(
   location?: { lat: number; lng: number },
   userId?: number,
   tag?: string,
-): Star {
+  isAnonymous?: boolean,
+): Star & { username: string | null; userId: number | null } {
   const pos = generatePosition();
   const validTags = ['思念', '等待', '离别', '愿望', '孤独'];
   const safeTag = tag && validTags.includes(tag) ? tag : null;
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -80,19 +85,36 @@ export function createStar(
     location?.lng ?? null,
     userId ?? null,
     safeTag,
+    isAnonymous ? 1 : 0,
   );
   return db.prepare(`
-    SELECT s.*, u.username
+    SELECT s.*, s.user_id as userId,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
-  `).get(result.lastInsertRowid) as unknown as Star;
+  `).get(result.lastInsertRowid) as unknown as Star & { username: string | null; userId: number | null };
 }
 
-// 共鸣 +1
-export function resonate(id: number): { id: number; resonance_count: number } | null {
+// 共鸣 +1（支持去重）
+export function resonate(id: number, userId?: number): { id: number; resonance_count: number; already?: boolean } | null {
   const star = db.prepare('SELECT * FROM stars WHERE id = ?').get(id) as unknown as Star | undefined;
   if (!star) return null;
+
+  // 登录用户去重：同一用户对同一故事只能共鸣一次
+  if (userId) {
+    const existing = db.prepare(
+      'SELECT id FROM resonance_log WHERE story_id = ? AND user_id = ?'
+    ).get(id, userId) as unknown as { id: number } | undefined;
+    if (existing) {
+      const current = db.prepare('SELECT id, resonance_count FROM stars WHERE id = ?').get(id) as unknown as {
+        id: number; resonance_count: number;
+      };
+      return { ...current, already: true };
+    }
+    db.prepare('INSERT INTO resonance_log (story_id, user_id) VALUES (?, ?)').run(id, userId);
+  }
+
   db.prepare('UPDATE stars SET resonance_count = resonance_count + 1 WHERE id = ?').run(id);
   const updated = db.prepare('SELECT id, resonance_count FROM stars WHERE id = ?').get(id) as unknown as {
     id: number;
@@ -106,12 +128,12 @@ export function incrementView(catalogStarId: number): void {
   db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE catalog_star_id = ?').run(catalogStarId);
 }
 
-// 星星级浏览记录（打开详情页一次 = +1）
+// 星星级浏览记录（打开详情页一次 = +1，纯计数不去重）
 export function recordCatalogVisit(catalogStarId: number): void {
   db.prepare('INSERT INTO catalog_visits (catalog_star_id) VALUES (?)').run(catalogStarId);
 }
 
-// 故事级浏览 +1（点击进入故事详情 = +1）
+// 故事级浏览 +1（点击进入故事详情 = +1，纯计数不去重）
 export function recordStoryView(storyId: number): void {
   db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE id = ?').run(storyId);
 }

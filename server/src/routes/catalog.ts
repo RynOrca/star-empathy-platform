@@ -32,7 +32,7 @@ router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   }
 });
 
-// 记录恒星浏览（打开详情页一次）
+// 记录恒星浏览（打开详情页一次，纯计数）
 router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
