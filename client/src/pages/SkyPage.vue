@@ -57,6 +57,7 @@
             {{ c.name }}
           </button>
         </div>
+        <button class="refresh-loc-btn" @click="refreshLocation">🔄 重新获取定位</button>
       </div>
     </div>
 
@@ -143,7 +144,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -156,6 +157,7 @@ import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 
 const router = useRouter()
+const route = useRoute()
 const username = ref('')
 const showMyStoriesOnly = ref(false)
 const favoriteStarIds = ref<number[]>([])
@@ -230,13 +232,37 @@ function selectCity(c: { lat: number; lng: number }) {
   locationReady.value = true
 }
 
-// 获取用户地理位置
-if (navigator.geolocation) {
+// 获取用户地理位置（带 2 小时缓存）
+const LOCATION_CACHE_KEY = 'star_location_cache'
+const LOCATION_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 小时
+
+function getCachedLocation(): { lat: number; lng: number } | null {
+  try {
+    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!raw) return null
+    const { lat, lng, ts } = JSON.parse(raw)
+    if (Date.now() - ts > LOCATION_CACHE_TTL) return null
+    return { lat, lng }
+  } catch { return null }
+}
+
+function setCachedLocation(lat: number, lng: number) {
+  localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
+}
+
+function fetchLocation() {
+  if (!navigator.geolocation) {
+    locationReady.value = true
+    locationFailed.value = true
+    return
+  }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       userLat.value = pos.coords.latitude
       userLng.value = pos.coords.longitude
+      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
       locationReady.value = true
+      locationFailed.value = false
     },
     (err) => {
       console.warn('Geolocation failed:', err.message)
@@ -245,9 +271,24 @@ if (navigator.geolocation) {
     },
     { timeout: 5000, enableHighAccuracy: false },
   )
-} else {
+}
+
+// 手动刷新定位（供设置面板调用）
+function refreshLocation() {
+  locationReady.value = false
+  locationFailed.value = false
+  fetchLocation()
+}
+
+// 优先使用缓存定位
+const cached = getCachedLocation()
+if (cached) {
+  userLat.value = cached.lat
+  userLng.value = cached.lng
   locationReady.value = true
-  locationFailed.value = true
+  locationFailed.value = false
+} else {
+  fetchLocation()
 }
 
 onMounted(async () => {
@@ -269,6 +310,25 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
+
+  // 从个人主页收藏点击跳转过来：定位到指定星星
+  const targetStarId = route.query.star
+  if (targetStarId) {
+    const starId = parseInt(targetStarId as string, 10)
+    if (!isNaN(starId)) {
+      // 等 sky 就绪后定位
+      const tryFocus = () => {
+        const star = catalogStarLookup.get(starId)
+        if (star && skyRef.value?.sky) {
+          skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+          setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
+        } else {
+          setTimeout(tryFocus, 300)
+        }
+      }
+      setTimeout(tryFocus, 500)
+    }
+  }
 })
 
 function doLogout() {
@@ -673,7 +733,19 @@ function onUpdateSimilarStars(ids: number[]) {
   }
   skyRef.value?.sky?.setKernelLines(lines)
 }
-function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
+function onStorySubmitted(story: StoryData) {
+  const cid = story.catalogStarId
+  const map = storiesByStarId.value
+  const existing = map.get(cid) ?? []
+  existing.push(story)
+  map.set(cid, existing)
+  storiesByStarId.value = new Map(map)
+  if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
+    selectedStories.value = [...existing]
+  }
+  showForm.value = false
+  if (showMyStoriesOnly.value) recalcFilteredStats()
+}
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
@@ -686,7 +758,39 @@ function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean 
     favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
   }
 }
-async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
+async function onResonate(storyId: number) {
+  resonating.value = true
+  try {
+    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' })
+    const json = await res.json()
+    if (res.ok) {
+      const stories = selectedStories.value
+      const idx = stories.findIndex(s => s.id === storyId)
+      if (idx >= 0) {
+        stories[idx].resonanceCount = json.data.resonanceCount
+        selectedStories.value = [...stories]
+      }
+      if (catalogStats.value) {
+        catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 }
+      }
+      const map = storiesByStarId.value
+      for (const [cid, starStories] of map) {
+        const sIdx = starStories.findIndex(s => s.id === storyId)
+        if (sIdx >= 0) {
+          starStories[sIdx] = { ...starStories[sIdx], resonanceCount: json.data.resonanceCount }
+          map.set(cid, [...starStories])
+          storiesByStarId.value = new Map(map)
+          break
+        }
+      }
+      if (showMyStoriesOnly.value) recalcFilteredStats()
+    }
+  } catch (e) {
+    console.error('共鸣失败:', e)
+  } finally {
+    resonating.value = false
+  }
+}
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>
@@ -942,6 +1046,21 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .city-btn:hover {
   border-color: rgba(255, 217, 138, 0.4);
   background: rgba(40, 35, 18, 0.5);
+}
+.refresh-loc-btn {
+  margin-top: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 217, 138, 0.3);
+  background: rgba(40, 35, 18, 0.4);
+  color: #ffd98a;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.refresh-loc-btn:hover {
+  border-color: rgba(255, 217, 138, 0.5);
+  background: rgba(40, 35, 18, 0.6);
 }
 
 /* ─── 叙事引导牌（大号黄色悬浮卡片） ─── */
