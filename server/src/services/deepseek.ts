@@ -119,7 +119,7 @@ export async function deepseekChat(
 
   // DeepSeek v4 推理模型有时把回复放在 reasoning_content 而不是 content
   const message = json.choices?.[0]?.message
-  const content = message?.content || message?.reasoning_content || ''
+  const content = message?.content || ''
   if (!content) {
     console.error('DeepSeek API 返回内容为空，完整响应:', JSON.stringify(json).slice(0, 500))
     throw new Error('DeepSeek API 返回内容为空')
