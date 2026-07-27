@@ -25,6 +25,7 @@ db.exec(`
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    email         TEXT,
     signature     TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -108,10 +109,21 @@ db.exec(`
     viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_story_views_dedup ON story_views(story_id, user_id);
+
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    email      TEXT NOT NULL,
+    code       TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_tokens(email, expires_at);
 `);
 
 // 兼容旧数据库：添加新列
 try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lat REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lng REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0'); } catch {}

@@ -18,7 +18,7 @@
           </div>
 
           <!-- 标签页切换 -->
-          <div class="tab-menu">
+          <div class="tab-menu" v-if="mode !== 'forgot'">
             <div
               class="tab-item"
               :class="{ active: mode === 'login' }"
@@ -31,7 +31,68 @@
             >注册</div>
           </div>
 
-          <!-- 表单 -->
+          <!-- 找回密码模式 -->
+          <template v-if="mode === 'forgot'">
+            <div class="form-header">
+              <h2 class="form-title">找回引力密钥</h2>
+            </div>
+            <form class="auth-form" @submit.prevent="handleForgotSubmit" autocomplete="off">
+              <div class="form-group">
+                <label for="forgotEmail">注册邮箱</label>
+                <input
+                  id="forgotEmail"
+                  v-model="forgotEmail"
+                  type="email"
+                  class="form-input"
+                  required
+                  placeholder="输入注册时使用的邮箱"
+                  autocomplete="email"
+                />
+              </div>
+
+              <template v-if="forgotStep === 'code'">
+                <div class="form-group">
+                  <label for="resetCode">验证码</label>
+                  <input
+                    id="resetCode"
+                    v-model="resetCode"
+                    type="text"
+                    class="form-input"
+                    required
+                    placeholder="输入 6 位验证码"
+                    maxlength="6"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="newPassword">新引力密钥</label>
+                  <input
+                    id="newPassword"
+                    v-model="newPassword"
+                    type="password"
+                    class="form-input"
+                    required
+                    placeholder="设置新密码（6~50 字符）"
+                    maxlength="50"
+                    autocomplete="new-password"
+                  />
+                </div>
+              </template>
+
+              <p v-if="forgotMsg" class="msg" :class="{ error: forgotError, success: !forgotError }">{{ forgotMsg }}</p>
+
+              <button type="submit" class="submit-btn" :disabled="forgotLoading">
+                <span v-if="forgotLoading">请稍候...</span>
+                <span v-else>{{ forgotStep === 'send' ? '发送验证码' : '重置密码' }}</span>
+              </button>
+
+              <button type="button" class="back-link" @click="switchMode('login')">← 返回登录</button>
+            </form>
+          </template>
+
+          <!-- 登录/注册表单 -->
+          <template v-else>
           <form class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
             <div class="form-group">
               <label for="username">观测者账号</label>
@@ -44,6 +105,18 @@
                 :placeholder="mode === 'register' ? '设置观测者账号' : '请输入账号或邮箱'"
                 maxlength="20"
                 autocomplete="username"
+              />
+            </div>
+
+            <div class="form-group" v-if="mode === 'register'">
+              <label for="email">联络邮箱 <span class="field-optional">选填（用于找回密码）</span></label>
+              <input
+                id="email"
+                v-model="email"
+                type="email"
+                class="form-input"
+                placeholder="your@email.com"
+                autocomplete="email"
               />
             </div>
 
@@ -77,11 +150,19 @@
 
             <p v-if="error" class="error">{{ error }}</p>
 
+            <label v-if="mode === 'login'" class="remember-me">
+              <input type="checkbox" v-model="rememberMe" />
+              <span>记住我，永不坠落</span>
+            </label>
+
             <button type="submit" class="submit-btn" :disabled="loading">
               <span v-if="loading">请稍候...</span>
               <span v-else>{{ mode === 'login' ? '校准并进入星系' : '铸造星籍并启航' }}</span>
             </button>
           </form>
+
+          <!-- 忘记密码 -->
+          <p v-if="mode === 'login'" class="forgot-link" @click="switchMode('forgot')">忘记引力密钥？</p>
 
           <!-- 分割线 -->
           <div class="divider">或</div>
@@ -91,6 +172,7 @@
             <span v-if="guestLoading">正在校准...</span>
             <span v-else>匿名快捷体验</span>
           </button>
+          </template>
 
           <!-- 底部统计 -->
           <p v-if="stats" class="stats">{{ stats.starCount }} 颗星 · {{ stats.totalResonance }} 次共鸣</p>
@@ -111,18 +193,105 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 useParticleSky(canvasRef as { value: HTMLCanvasElement | null })
 const { login, register } = useAuth()
 
-const mode = ref<'login' | 'register'>('login')
+const mode = ref<'login' | 'register' | 'forgot'>('login')
 const username = ref('')
+const email = ref('')
 const password = ref('')
 const password2 = ref('')
+const rememberMe = ref(false)
 const loading = ref(false)
 const guestLoading = ref(false)
 const error = ref('')
 const stats = ref<{ starCount: number; totalResonance: number } | null>(null)
 
-function switchMode(m: 'login' | 'register') {
+// ─── 找回密码 ───
+const forgotStep = ref<'send' | 'code'>('send')
+const forgotEmail = ref('')
+const resetCode = ref('')
+const newPassword = ref('')
+const forgotLoading = ref(false)
+const forgotMsg = ref('')
+const forgotError = ref(false)
+
+function switchMode(m: 'login' | 'register' | 'forgot') {
   mode.value = m
   error.value = ''
+  forgotMsg.value = ''
+  forgotError.value = false
+  forgotStep.value = 'send'
+  forgotEmail.value = ''
+  resetCode.value = ''
+  newPassword.value = ''
+}
+
+async function handleForgotSubmit() {
+  forgotMsg.value = ''
+  forgotError.value = false
+  if (!forgotEmail.value.trim()) return
+
+  if (forgotStep.value === 'send') {
+    // 发送验证码
+    forgotLoading.value = true
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.value.trim() }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        forgotMsg.value = json.message || '验证码已发送'
+        forgotError.value = false
+        forgotStep.value = 'code'
+      } else {
+        forgotMsg.value = json.message || '发送失败'
+        forgotError.value = true
+      }
+    } catch {
+      forgotMsg.value = '网络错误，请重试'
+      forgotError.value = true
+    } finally {
+      forgotLoading.value = false
+    }
+  } else {
+    // 重置密码
+    if (!resetCode.value.trim() || resetCode.value.trim().length !== 6) {
+      forgotMsg.value = '请输入 6 位验证码'
+      forgotError.value = true
+      return
+    }
+    if (!newPassword.value || newPassword.value.length < 6) {
+      forgotMsg.value = '新密码需 6~50 个字符'
+      forgotError.value = true
+      return
+    }
+    forgotLoading.value = true
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.value.trim(),
+          code: resetCode.value.trim(),
+          newPassword: newPassword.value,
+        }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        forgotMsg.value = '密码重置成功，请登录'
+        forgotError.value = false
+        setTimeout(() => switchMode('login'), 2000)
+      } else {
+        forgotMsg.value = json.message || '重置失败'
+        forgotError.value = true
+      }
+    } catch {
+      forgotMsg.value = '网络错误，请重试'
+      forgotError.value = true
+    } finally {
+      forgotLoading.value = false
+    }
+  }
 }
 
 async function handleSubmit() {
@@ -135,7 +304,7 @@ async function handleLogin() {
   if (!username.value.trim() || !password.value) return
   loading.value = true
   try {
-    await login(username.value.trim(), password.value)
+    await login(username.value.trim(), password.value, rememberMe.value)
     router.push('/sky')
   } catch (e: any) {
     error.value = e.message || '登录失败'
@@ -152,7 +321,7 @@ async function handleRegister() {
   if (password.value !== password2.value) { error.value = '两次引力密钥不一致'; return }
   loading.value = true
   try {
-    await register(u, password.value)
+    await register(u, password.value, email.value.trim() || undefined)
     router.push('/sky')
   } catch (e: any) {
     error.value = e.message || '注册失败'
@@ -396,6 +565,68 @@ onMounted(async () => {
   margin: -0.5rem 0 0;
   text-align: center;
 }
+
+/* 消息提示 */
+.msg {
+  font-size: 0.8rem;
+  margin: -0.5rem 0 0;
+  text-align: center;
+}
+.msg.error { color: #ff8b7d; }
+.msg.success { color: #95f0c0; }
+
+/* 忘记密码 */
+.forgot-link {
+  font-size: 0.8rem;
+  color: #64748b;
+  text-align: center;
+  cursor: pointer;
+  margin-top: 0.8rem;
+  transition: color 0.2s;
+  user-select: none;
+}
+.forgot-link:hover { color: #818cf8; }
+
+/* 返回链接 */
+.back-link {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 0.5rem;
+  transition: color 0.2s;
+  text-align: center;
+  width: 100%;
+}
+.back-link:hover { color: #818cf8; }
+
+/* 选填标签 */
+.field-optional {
+  font-size: 0.7rem;
+  color: #5a5580;
+  font-weight: 300;
+}
+
+/* 记住我 */
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+  margin-top: -0.5rem;
+}
+.remember-me input[type="checkbox"] {
+  accent-color: #4f46e5;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.remember-me:hover { color: #818cf8; }
 
 /* 分割线 */
 .divider {
