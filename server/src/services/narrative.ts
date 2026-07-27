@@ -62,22 +62,22 @@ function getStarInfo(catalogStarId: number): CatalogStar | null {
   return cat.stars.find(s => s.id === catalogStarId) ?? null
 }
 
-/** 查找今日是否有缓存的叙事 */
-function getCachedNarrative(catalogStarId: number): string | null {
+/** 查找今日是否有缓存的叙事（区分地平线上下） */
+function getCachedNarrative(catalogStarId: number, isVisible: boolean): string | null {
   const row = db.prepare(`
     SELECT content FROM narratives
-    WHERE catalog_star_id = ? AND date(generated_at) = date('now')
+    WHERE catalog_star_id = ? AND date(generated_at) = date('now') AND is_visible = ?
     ORDER BY generated_at DESC LIMIT 1
-  `).get(catalogStarId) as { content: string } | undefined
+  `).get(catalogStarId, isVisible ? 1 : 0) as { content: string } | undefined
   return row?.content ?? null
 }
 
 /** 保存叙事到缓存 */
-function cacheNarrative(catalogStarId: number, content: string): void {
+function cacheNarrative(catalogStarId: number, content: string, isVisible: boolean): void {
   db.prepare(`
-    INSERT OR REPLACE INTO narratives (catalog_star_id, content, generated_at)
-    VALUES (?, ?, datetime('now'))
-  `).run(catalogStarId, content)
+    INSERT OR REPLACE INTO narratives (catalog_star_id, content, generated_at, is_visible)
+    VALUES (?, ?, datetime('now'), ?)
+  `).run(catalogStarId, content, isVisible ? 1 : 0)
 }
 
 /** 将 hex 颜色值转为人类可读描述，避免 AI 直接输出 hex 颜色 */
@@ -108,22 +108,40 @@ function colorToDescription(hex: string): string {
   return map[hex.toLowerCase()] || '肉眼可见的星光'
 }
 
-/** 计算恒星是否在地平线以上（简化算法：基于赤纬和观测者纬度） */
+/** 计算儒略日（Julian Date） */
+function getJulianDate(date: Date): number {
+  const y = date.getUTCFullYear()
+  const m = date.getUTCMonth() + 1
+  const d = date.getUTCDate()
+  const h = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600
+
+  let a = Math.floor((14 - m) / 12)
+  let year = y + 4800 - a
+  let month = m + 12 * a - 3
+
+  let jd = d + Math.floor((153 * month + 2) / 5) + 365 * year
+    + Math.floor(year / 4) - Math.floor(year / 100) + Math.floor(year / 400) - 32045
+  jd += (h - 12) / 24
+
+  return jd
+}
+
+/** 计算恒星是否在地平线以上 */
 function isAboveHorizon(star: CatalogStar, lat: number, lng: number): boolean {
-  // 恒星时简化计算（以 UTC 为基准）
   const now = new Date()
-  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600
-  // 格林尼治恒星时（简化）
-  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
-  const gmst = (18.697374558 + 24.06570982441908 * (dayOfYear + utcHours / 24)) % 24
+  // 儒略日 → 距 J2000.0 纪元的天数
+  const jd = getJulianDate(now)
+  const d = jd - 2451545.0
+  // 格林尼治恒星时（小时）
+  const gmst = (18.697374558 + 24.06570982441908 * d) % 24
   // 本地恒星时
-  const lst = (gmst + lng / 15 + 24) % 24
-  // 时角
-  const ha = ((lst - star.ra) * 15 + 360) % 360
+  const lst = ((gmst + lng / 15) % 24 + 24) % 24
+  // 时角（度）
+  const ha = ((lst - star.ra) * 15 % 360 + 360) % 360
   const haRad = ha * Math.PI / 180
   const decRad = star.dec * Math.PI / 180
   const latRad = lat * Math.PI / 180
-  // 高度角
+  // 高度角的正弦
   const sinAlt = Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad)
   return sinAlt > -0.05 // 考虑大气折射，略低于地平线也算可见
 }
@@ -335,14 +353,17 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
     throw Object.assign(new Error('恒星不存在'), { statusCode: 404 })
   }
 
-  // 2. 查缓存
-  const cached = getCachedNarrative(catalogStarId)
+  // 2. 计算地平线可见性
+  const hasPosition = lat !== undefined && lng !== undefined
+  const visible = hasPosition ? isAboveHorizon(star, lat, lng) : true
+
+  // 3. 查缓存（区分地平线上下）
+  const cached = getCachedNarrative(catalogStarId, visible)
   if (cached) {
     return { content: cached, cached: true }
   }
 
-  // 3. 生成叙事
-  const visible = (lat !== undefined && lng !== undefined) ? isAboveHorizon(star, lat, lng) : true
+  // 4. 生成叙事
   const { system, user } = buildNarrativePrompt(star, visible)
   const content = await deepseekChat(
     [
@@ -355,8 +376,10 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
     },
   )
 
-  // 4. 缓存
-  cacheNarrative(catalogStarId, content)
+  // 5. 缓存（仅在有位置信息时缓存，确保地平线判断正确）
+  if (hasPosition) {
+    cacheNarrative(catalogStarId, content, visible)
+  }
 
   return { content, cached: false }
 }

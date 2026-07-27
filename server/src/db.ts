@@ -99,7 +99,9 @@ try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorit
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)'); } catch {}
 // 兼容旧数据库：narratives 表
 try { db.exec('CREATE TABLE IF NOT EXISTS narratives (id INTEGER PRIMARY KEY AUTOINCREMENT, catalog_star_id INTEGER NOT NULL, content TEXT NOT NULL, generated_at TEXT NOT NULL DEFAULT (datetime(\'now\')))'); } catch {}
-try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at))'); } catch {}
+try { db.exec('ALTER TABLE narratives ADD COLUMN is_visible INTEGER NOT NULL DEFAULT 1'); } catch {}
+try { db.exec('DROP INDEX IF EXISTS idx_narratives_day'); } catch {}
+try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at), is_visible)'); } catch {}
 // 兼容旧数据库：添加新索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)'); } catch {}
