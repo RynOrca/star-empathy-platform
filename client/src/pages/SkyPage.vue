@@ -30,6 +30,12 @@
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
+        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
+          {{ showMyStoriesOnly ? '🌐 全部' : '⭐ 我的' }}
+        </button>
+        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" title="更改定位">
+          📍 定位
+        </button>
         <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
           👤 {{ username }}
         </span>
@@ -37,6 +43,16 @@
         <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
       </div>
     </nav>
+
+    <!-- 切换反馈提示 -->
+    <Transition name="toast-fade">
+      <div v-if="myToggleFeedback" class="toggle-toast">{{ myToggleFeedback }}</div>
+    </Transition>
+
+    <!-- 定位城市提示 -->
+    <Transition name="toast-fade">
+      <div v-if="locationCityToast" class="location-toast">📍 {{ locationCityToast }}</div>
+    </Transition>
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
@@ -54,6 +70,7 @@
             {{ c.name }}
           </button>
         </div>
+        <button class="refresh-loc-btn" @click="refreshLocation">🔄 重新获取定位</button>
       </div>
     </div>
 
@@ -139,8 +156,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -153,7 +170,17 @@ import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 
 const router = useRouter()
+const route = useRoute()
 const username = ref('')
+const showMyStoriesOnly = ref(false)
+const myToggleFeedback = ref('')
+const locationCityToast = ref('')
+
+function toggleMyStories() {
+  showMyStoriesOnly.value = !showMyStoriesOnly.value
+  myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
+  setTimeout(() => { myToggleFeedback.value = '' }, 2000)
+}
 const favoriteStarIds = ref<number[]>([])
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
@@ -219,20 +246,70 @@ const cities = [
   { name: '哈尔滨', lat: 45.8, lng: 126.7 },
 ]
 
-function selectCity(c: { lat: number; lng: number }) {
+function selectCity(c: { name: string; lat: number; lng: number }) {
   userLat.value = c.lat
   userLng.value = c.lng
   locationFailed.value = false
   locationReady.value = true
+  showLocationToast(c.name)
 }
 
-// 获取用户地理位置
-if (navigator.geolocation) {
+// 获取用户地理位置（带 2 小时缓存）
+const LOCATION_CACHE_KEY = 'star_location_cache'
+const LOCATION_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 小时
+
+function getCachedLocation(): { lat: number; lng: number } | null {
+  try {
+    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!raw) return null
+    const { lat, lng, ts } = JSON.parse(raw)
+    if (Date.now() - ts > LOCATION_CACHE_TTL) return null
+    return { lat, lng }
+  } catch { return null }
+}
+
+function setCachedLocation(lat: number, lng: number) {
+  localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
+}
+
+// 反向地理编码：获取城市名称
+async function fetchCityName(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
+    const data = await res.json()
+    const addr = data.address || {}
+    const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
+    console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
+    return city
+  } catch (e) {
+    console.error('[SkyPage] fetchCityName failed:', e)
+    return ''
+  }
+}
+
+function showLocationToast(city: string) {
+  const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
+  console.log('[SkyPage] showLocationToast:', text)
+  locationCityToast.value = text
+  setTimeout(() => { locationCityToast.value = '' }, 10000)
+}
+
+function fetchLocation() {
+  if (!navigator.geolocation) {
+    locationReady.value = true
+    locationFailed.value = true
+    return
+  }
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    async (pos) => {
       userLat.value = pos.coords.latitude
       userLng.value = pos.coords.longitude
+      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
       locationReady.value = true
+      locationFailed.value = false
+      // 获取城市名并显示 2 秒
+      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
+      showLocationToast(city)
     },
     (err) => {
       console.warn('Geolocation failed:', err.message)
@@ -241,9 +318,41 @@ if (navigator.geolocation) {
     },
     { timeout: 5000, enableHighAccuracy: false },
   )
-} else {
+}
+
+// 手动刷新定位（不隐藏天空，静默更新）
+function refreshLocation() {
+  if (!navigator.geolocation) {
+    showLocationToast('')
+    return
+  }
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      userLat.value = pos.coords.latitude
+      userLng.value = pos.coords.longitude
+      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
+      locationFailed.value = false
+      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
+      showLocationToast(city)
+    },
+    () => {
+      showLocationToast('')
+    },
+    { timeout: 5000, enableHighAccuracy: false },
+  )
+}
+
+// 优先使用缓存定位
+const cached = getCachedLocation()
+if (cached) {
+  userLat.value = cached.lat
+  userLng.value = cached.lng
   locationReady.value = true
-  locationFailed.value = true
+  locationFailed.value = false
+  // 异步获取城市名并显示 toast
+  fetchCityName(cached.lat, cached.lng).then(city => showLocationToast(city))
+} else {
+  fetchLocation()
 }
 
 onMounted(async () => {
@@ -265,6 +374,32 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
+
+  // 从个人主页收藏点击跳转过来：定位到指定星星
+  focusOnQueryStar()
+})
+
+// 提取定位逻辑为独立函数，供 onMounted 和 watch 共用
+function focusOnQueryStar() {
+  const targetStarId = route.query.star
+  if (!targetStarId) return
+  const starId = parseInt(targetStarId as string, 10)
+  if (isNaN(starId)) return
+  const tryFocus = () => {
+    const star = catalogStarLookup.get(starId)
+    if (star && skyRef.value?.sky) {
+      skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+      setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
+    } else {
+      setTimeout(tryFocus, 300)
+    }
+  }
+  setTimeout(tryFocus, 500)
+}
+
+// 监听路由 query 变化（从个人主页多次点击收藏时触发）
+watch(() => route.query.star, () => {
+  focusOnQueryStar()
 })
 
 function doLogout() {
@@ -367,7 +502,7 @@ interface StoryData {
   username: string | null; tag: string | null
 }
 const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null }
-const storiesByStarId = shallowRef(new Map<number, StoryData[]>())
+const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
 
@@ -439,8 +574,93 @@ async function fetchStories() {
   } finally {
     fetchingStories.value = false
   }
+  // 如果"只看我的"已开启，重新计算过滤后的天空统计
+  if (showMyStoriesOnly.value) recalcFilteredStats()
 }
 onMounted(() => { fetchStories() })
+
+// 根据"只看我的"切换，重新计算天空中的星星统计数据
+function recalcFilteredStats() {
+  const fullMap = storiesByStarId.value
+  if (!fullMap) return
+  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  for (const [cid, stories] of fullMap) {
+    const filtered = showMyStoriesOnly.value
+      ? stories.filter(s => s.username === username.value)
+      : stories
+    if (filtered.length === 0) continue
+    statsMap.set(cid, {
+      stories: filtered.length,
+      resonance: filtered.reduce((sum, s) => sum + s.resonanceCount, 0),
+      views: filtered.reduce((sum, s) => sum + s.viewCount, 0),
+      favorites: 0,
+    })
+  }
+  pendingStatsMap.value = statsMap
+  skyRef.value?.sky?.setStarStatsCache(statsMap)
+}
+
+// 监听"只看我的"切换，更新天空统计和私有连线
+watch(showMyStoriesOnly, async () => {
+  recalcFilteredStats()
+  if (showMyStoriesOnly.value) {
+    // 开启"只看我的"：加载私有连线
+    await fetchMyKernelLines()
+  } else {
+    // 关闭"只看我的"：清除连线
+    skyRef.value?.sky?.setKernelLines([])
+  }
+  // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
+  if (selectedStarInfo.value && selectedCatalogStarId.value) {
+    const filtered = getFilteredStories(selectedCatalogStarId.value)
+    if (filtered.length === 0) {
+      selectedStories.value = []
+      selectedStarInfo.value = null
+      catalogStats.value = null
+    } else {
+      selectedStories.value = filtered
+      catalogStats.value = {
+        storyCount: filtered.length,
+        totalResonance: filtered.reduce((s, x) => s + x.resonanceCount, 0),
+        totalViews: 0, starViews: 0, favoriteCount: 0,
+      }
+    }
+  }
+})
+
+// 获取过滤后的故事（考虑"只看我的"开关）
+function getFilteredStories(starId: number): StoryData[] {
+  const stories = storiesByStarId.value.get(starId)
+  if (!stories) return []
+  if (!showMyStoriesOnly.value) return stories
+  return stories.filter(s => s.username === username.value)
+}
+
+// 获取用户私有内核连线
+async function fetchMyKernelLines() {
+  const token = localStorage.getItem('token')
+  if (!token) return
+  try {
+    const res = await fetch('/api/profile/kernel-lines', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
+    if (!res.ok || !json.data?.length) {
+      skyRef.value?.sky?.setKernelLines([])
+      return
+    }
+    const lines = (json.data as {
+      from: { catalogStarId: number; x: number; y: number; z: number }
+      to: { catalogStarId: number; x: number; y: number; z: number }
+    }[]).map(l => ({
+      from: { x: l.from.x, y: l.from.y, z: l.from.z },
+      to: { x: l.to.x, y: l.to.y, z: l.to.z },
+    }))
+    skyRef.value?.sky?.setKernelLines(lines)
+  } catch {
+    skyRef.value?.sky?.setKernelLines([])
+  }
+}
 
 function formatStarName(s: CatalogStar): string {
   if (s.name) return s.name
@@ -511,7 +731,7 @@ onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
 })
-const selectedStories = shallowRef<StoryData[]>([])
+const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
 const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
 const selectedCatalogStarId = ref(0)
@@ -522,7 +742,7 @@ const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
-  const stories = storiesByStarId.value.get(starId)
+  const stories = getFilteredStories(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
@@ -549,7 +769,7 @@ function onPlanetClick(name: string, nameCN: string) {
   const planetId = PLANET_ID_MAP[name]
   if (planetId == null) return
   const info = PLANET_INFO[name]
-  const stories = storiesByStarId.value.get(planetId)
+  const stories = getFilteredStories(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
   selectedStarInfo.value = {
@@ -584,7 +804,22 @@ function onUpdateSimilarStars(ids: number[]) {
   }
   skyRef.value?.sky?.setKernelLines(lines)
 }
-function onStorySubmitted(story: StoryData) { const cid = story.catalogStarId; const map = storiesByStarId.value; const existing = map.get(cid) ?? []; existing.push(story); map.set(cid, existing); storiesByStarId.value = new Map(map); if (cid === selectedCatalogStarId.value && selectedStarInfo.value) selectedStories.value = [...existing]; showForm.value = false }
+function onStorySubmitted(story: StoryData) {
+  console.log('[SkyPage] onStorySubmitted:', story)
+  const cid = story.catalogStarId
+  const map = new Map(storiesByStarId.value)
+  const existing = [...(map.get(cid) ?? []), story]
+  map.set(cid, existing)
+  storiesByStarId.value = map
+  // 更新天空统计（无论是否"只看我的"模式）
+  recalcFilteredStats()
+  if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
+    selectedStories.value = existing
+    // 从后端拉取权威统计数据，确保数据准确
+    fetchCatalogStats(cid)
+  }
+  showForm.value = false
+}
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
 function onIncrementFavorites() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, favoriteCount: catalogStats.value.favoriteCount + 1 } }
@@ -597,7 +832,43 @@ function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean 
     favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
   }
 }
-async function onResonate(storyId: number) { resonating.value = true; try { const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' }); const json = await res.json(); if (res.ok) { const stories = selectedStories.value; const idx = stories.findIndex(s => s.id === storyId); if (idx >= 0) { stories[idx].resonanceCount = json.data.resonanceCount; selectedStories.value = [...stories] } if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalResonance: catalogStats.value.totalResonance + 1 } } } catch (e) { console.error('共鸣失败:', e) } finally { resonating.value = false } }
+async function onResonate(storyId: number) {
+  resonating.value = true
+  try {
+    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' })
+    const json = await res.json()
+    if (res.ok) {
+      // 更新当前选中故事列表
+      const stories = selectedStories.value
+      const idx = stories.findIndex(s => s.id === storyId)
+      if (idx >= 0) {
+        selectedStories.value = stories.map((s, i) =>
+          i === idx ? { ...s, resonanceCount: json.data.resonanceCount } : s,
+        )
+      }
+      // 更新主数据源 storiesByStarId
+      const map = new Map(storiesByStarId.value)
+      for (const [cid, starStories] of map) {
+        const sIdx = starStories.findIndex(s => s.id === storyId)
+        if (sIdx >= 0) {
+          map.set(cid, starStories.map((s, i) =>
+            i === sIdx ? { ...s, resonanceCount: json.data.resonanceCount } : s,
+          ))
+          storiesByStarId.value = map
+          break
+        }
+      }
+      // 从后端拉取权威 stats，确保数据准确
+      fetchCatalogStats(selectedCatalogStarId.value)
+      // 刷新天空统计
+      recalcFilteredStats()
+    }
+  } catch (e) {
+    console.error('共鸣失败:', e)
+  } finally {
+    resonating.value = false
+  }
+}
 function zoomIn()  { skyRef.value?.sky?.zoomIn() }
 function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>
@@ -669,6 +940,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(40, 35, 18, 0.35);
 }
 .nav-login-btn:hover { color: #ffe6b0; border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
+.nav-my-toggle {
+  color: #ffd98a; border-color: rgba(255, 217, 138, 0.25);
+  background: rgba(40, 35, 18, 0.3); transition: all 0.25s;
+}
+.nav-my-toggle:hover { border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
+.nav-my-toggle.active {
+  color: #7a759c; border-color: rgba(48, 55, 87, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+.nav-my-toggle.active:hover { color: #b9b4d6; }
 .nav-center { flex: 1; display: flex; justify-content: center; }
 .search-box { position: relative; width: 260px; }
 .search-icon {
@@ -844,6 +1125,21 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border-color: rgba(255, 217, 138, 0.4);
   background: rgba(40, 35, 18, 0.5);
 }
+.refresh-loc-btn {
+  margin-top: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 217, 138, 0.3);
+  background: rgba(40, 35, 18, 0.4);
+  color: #ffd98a;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.refresh-loc-btn:hover {
+  border-color: rgba(255, 217, 138, 0.5);
+  background: rgba(40, 35, 18, 0.6);
+}
 
 /* ─── 叙事引导牌（大号黄色悬浮卡片） ─── */
 .guide-cards {
@@ -890,6 +1186,37 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border-color: rgba(255, 217, 138, 0.35);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
+
+/* ─── 切换反馈 Toast ─── */
+.toggle-toast {
+  position: fixed; top: 3.5rem; left: 50%; transform: translateX(-50%);
+  z-index: 25; padding: 0.5rem 1.2rem; border-radius: 20px;
+  background: rgba(255, 217, 138, 0.15); border: 1px solid rgba(255, 217, 138, 0.3);
+  color: #ffd98a; font-size: 0.82rem; backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
+.toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
+.toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+.toast-fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+
+/* ─── 定位城市 Toast ─── */
+.location-toast {
+  position: fixed; top: 6rem; left: 50%; transform: translateX(-50%);
+  z-index: 100; padding: 0.6rem 1.5rem; border-radius: 20px;
+  background: rgba(20, 30, 50, 0.9); border: 1px solid rgba(100, 200, 150, 0.4);
+  color: #95f0c0; font-size: 0.85rem; font-weight: 500;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── 定位刷新按钮 ─── */
+.nav-loc-btn {
+  color: #8a84a0; border-color: rgba(48, 55, 87, 0.5);
+  font-size: 0.75rem;
+}
+.nav-loc-btn:hover { color: #ffd98a; border-color: rgba(255, 217, 138, 0.3); }
 
 @media (max-width: 640px) {
   .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }

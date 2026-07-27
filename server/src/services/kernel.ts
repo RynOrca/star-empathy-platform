@@ -334,3 +334,82 @@ export function triggerKernelGeneration(storyId: number, content: string, title?
     }
   })
 }
+
+export interface KernelLine {
+  from: { catalogStarId: number; x: number; y: number; z: number }
+  to: { catalogStarId: number; x: number; y: number; z: number }
+  score: number
+  sharedEmotions: string[]
+  sharedThemes: string[]
+}
+
+/** 获取用户自己的故事之间的内核连线（跨星） */
+export function getUserKernelLines(userId: number, limit = 20): KernelLine[] {
+  // 获取用户所有有内核的故事
+  const rows = db.prepare(`
+    SELECT s.id as story_id, s.catalog_star_id, s.pos_x, s.pos_y, s.pos_z,
+           sk.emotional_tags, sk.themes
+    FROM stars s
+    JOIN story_kernels sk ON s.id = sk.story_id
+    WHERE s.user_id = ? AND s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
+  `).all(userId) as {
+    story_id: number
+    catalog_star_id: number
+    pos_x: number; pos_y: number; pos_z: number
+    emotional_tags: string; themes: string
+  }[]
+
+  if (rows.length < 2) return []
+
+  // 为每个故事构建标签集合
+  interface StoryEntry {
+    storyId: number
+    catalogStarId: number
+    x: number; y: number; z: number
+    emotionalTags: Set<string>
+    themes: Set<string>
+  }
+  const entries: StoryEntry[] = rows.map(r => {
+    let emotionalTags: string[] = []
+    let themes: string[] = []
+    try { emotionalTags = JSON.parse(r.emotional_tags) } catch {}
+    try { themes = JSON.parse(r.themes) } catch {}
+    return {
+      storyId: r.story_id,
+      catalogStarId: r.catalog_star_id,
+      x: r.pos_x, y: r.pos_y, z: r.pos_z,
+      emotionalTags: new Set(emotionalTags),
+      themes: new Set(themes),
+    }
+  })
+
+  // 计算两两之间的相似度
+  const lines: KernelLine[] = []
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i]
+      const b = entries[j]
+      // 同一颗星下的不连（同一颗星的故事已经聚合在一起了）
+      if (a.catalogStarId === b.catalogStarId) continue
+
+      const emotionSim = jaccardSimilarity(a.emotionalTags, b.emotionalTags)
+      const themeSim = jaccardSimilarity(a.themes, b.themes)
+      const score = emotionSim * 0.6 + themeSim * 0.4
+      if (score <= 0.15) continue // 相似度太低的不连
+
+      const sharedEmotions = [...a.emotionalTags].filter(t => b.emotionalTags.has(t))
+      const sharedThemes = [...a.themes].filter(t => b.themes.has(t))
+
+      lines.push({
+        from: { catalogStarId: a.catalogStarId, x: a.x, y: a.y, z: a.z },
+        to: { catalogStarId: b.catalogStarId, x: b.x, y: b.y, z: b.z },
+        score: Math.round(score * 100) / 100,
+        sharedEmotions,
+        sharedThemes,
+      })
+    }
+  }
+
+  // 按相似度降序，取前 limit
+  return lines.sort((a, b) => b.score - a.score).slice(0, limit)
+}

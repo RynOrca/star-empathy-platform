@@ -31,6 +31,11 @@
 
       <!-- 故事星节点 -->
       <div class="story-field" v-if="stories.length > 0">
+        <svg class="kernel-lines-svg" v-if="kernelLines.length > 0">
+          <line v-for="(l, i) in kernelLines" :key="i"
+            :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+            class="kernel-line" />
+        </svg>
         <div v-for="(s, i) in stories" :key="s.id"
           class="story-star" :style="starStyle(i)"
           @click="openStory(s)"
@@ -80,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
@@ -107,6 +112,7 @@ const sigInputRef = ref<HTMLInputElement | null>(null)
 const currentPage = ref(0)
 const hasMore = ref(true)
 const loadingMore = ref(false)
+const kernelLines = ref<{ x1: string; y1: string; x2: string; y2: string }[]>([])
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
@@ -163,6 +169,45 @@ function appendPositions(count: number) {
       size: 4 + Math.random() * 8,
     })
   }
+}
+
+// 根据内核连线 API 结果计算 SVG 坐标
+async function computeKernelLines(linesRes: Response, stories: any[]) {
+  try {
+    const linesJson = await linesRes.json()
+    if (!linesJson.ok || !linesJson.data?.length) return
+    const apiLines = linesJson.data as {
+      from: { catalogStarId: number }
+      to: { catalogStarId: number }
+    }[]
+
+    // 构建 catalog_star_id → 第一个故事节点索引的映射
+    const starToIndex = new Map<number, number>()
+    for (let i = 0; i < stories.length; i++) {
+      const cid = stories[i].catalogStarId
+      if (cid != null && !starToIndex.has(cid)) {
+        starToIndex.set(cid, i)
+      }
+    }
+
+    // 计算连线坐标
+    const lines: { x1: string; y1: string; x2: string; y2: string }[] = []
+    for (const l of apiLines) {
+      const fromIdx = starToIndex.get(l.from.catalogStarId)
+      const toIdx = starToIndex.get(l.to.catalogStarId)
+      if (fromIdx == null || toIdx == null) continue
+      const fromPos = precomputedPositions.value[fromIdx]
+      const toPos = precomputedPositions.value[toIdx]
+      if (!fromPos || !toPos) continue
+      lines.push({
+        x1: fromPos.x + '%',
+        y1: fromPos.y + '%',
+        x2: toPos.x + '%',
+        y2: toPos.y + '%',
+      })
+    }
+    kernelLines.value = lines
+  } catch { /* 静默失败 */ }
 }
 
 function getToken() { return localStorage.getItem('token') }
@@ -227,14 +272,29 @@ async function saveSig() {
 function openStory(s: any) { activeStory.value = s }
 function goBack() { router.push('/sky') }
 
-onMounted(async () => {
+// 每次进入页面时重新加载所有数据
+async function loadProfileData() {
+  // 重置所有状态，确保数据是全新的
+  loaded.value = false
+  user.value = null
+  stories.value = []
+  favorites.value = []
+  stats.value = { storyCount: 0, totalResonance: 0, favoriteCount: 0 }
+  currentPage.value = 0
+  hasMore.value = true
+  loadingMore.value = false
+  precomputedPositions.value = []
+  activeStory.value = null
+  kernelLines.value = []
+
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
-    const [meRes, firstPageRes, favRes] = await Promise.all([
+    const [meRes, firstPageRes, favRes, linesRes] = await Promise.all([
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
@@ -247,12 +307,23 @@ onMounted(async () => {
       stats.value.storyCount = firstJson.data.total ?? items.length
       stats.value.totalResonance = items.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
       appendPositions(items.length)
+      // 计算内核连线坐标
+      computeKernelLines(linesRes, items)
     }
     const favJson = await favRes.json()
     if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
+}
+
+onMounted(() => {
+  loadProfileData()
   window.addEventListener('scroll', onScroll, { passive: true })
+})
+
+// 兼容 keep-alive 场景：组件被缓存后再次激活时重新加载
+onActivated(() => {
+  loadProfileData()
 })
 
 onUnmounted(() => {
@@ -297,6 +368,20 @@ onUnmounted(() => {
 
 /* ═══ 故事星节点 ═══ */
 .story-field { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+.kernel-lines-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 4;
+}
+.kernel-line {
+  stroke: rgba(255, 217, 138, 0.15);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+  animation: lineGlow 4s ease-in-out infinite;
+}
+@keyframes lineGlow {
+  0%, 100% { stroke: rgba(255, 217, 138, 0.1); }
+  50% { stroke: rgba(255, 217, 138, 0.3); }
+}
 .story-star {
   position: absolute; border-radius: 50%; cursor: pointer; pointer-events: auto;
   background: radial-gradient(circle, rgba(255,217,138,0.9) 0%, rgba(255,217,138,0) 70%);

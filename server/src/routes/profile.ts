@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getUserStories, getUserStoriesPaged, getUserFavorites } from '../services/starService';
+import { getUserKernelLines } from '../services/kernel';
 import { authRequired } from '../middleware/auth';
 import { ok, serverError } from '../utils/response';
 
@@ -32,6 +33,18 @@ router.get('/favorites', authRequired, (req: Request, res: Response) => {
     ok(res, 'success', favIds);
   } catch (error) {
     console.error('GET /api/profile/favorites error:', error);
+    serverError(res);
+  }
+});
+
+// 我的故事内核连线（跨星私有连线）
+router.get('/kernel-lines', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const lines = getUserKernelLines(user.id);
+    ok(res, 'success', lines);
+  } catch (error) {
+    console.error('GET /api/profile/kernel-lines error:', error);
     serverError(res);
   }
 });

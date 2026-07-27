@@ -81,7 +81,12 @@ export function createStar(
     userId ?? null,
     safeTag,
   );
-  return db.prepare('SELECT * FROM stars WHERE id = ?').get(result.lastInsertRowid) as unknown as Star;
+  return db.prepare(`
+    SELECT s.*, u.username
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.id = ?
+  `).get(result.lastInsertRowid) as unknown as Star;
 }
 
 // 共鸣 +1
