@@ -241,7 +241,7 @@ export async function getNarrative(catalogStarId: number): Promise<NarrativeResu
     ],
     {
       temperature: 0.9,
-      maxTokens: 600,
+      maxTokens: 3000,
     },
   )
 
