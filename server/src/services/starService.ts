@@ -128,30 +128,13 @@ export function incrementView(catalogStarId: number): void {
   db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE catalog_star_id = ?').run(catalogStarId);
 }
 
-// 星星级浏览记录（打开详情页一次 = +1，支持 24h 去重）
-export function recordCatalogVisit(catalogStarId: number, userId?: number): void {
-  if (userId) {
-    const recent = db.prepare(`
-      SELECT id FROM catalog_visits
-      WHERE catalog_star_id = ? AND user_id = ? AND visited_at > datetime('now', '-24 hours')
-    `).get(catalogStarId, userId) as unknown as { id: number } | undefined;
-    if (recent) return; // 24h 内不重复记录
-    db.prepare('INSERT INTO catalog_visits (catalog_star_id, user_id) VALUES (?, ?)').run(catalogStarId, userId);
-  } else {
-    db.prepare('INSERT INTO catalog_visits (catalog_star_id) VALUES (?)').run(catalogStarId);
-  }
+// 星星级浏览记录（打开详情页一次 = +1，纯计数不去重）
+export function recordCatalogVisit(catalogStarId: number): void {
+  db.prepare('INSERT INTO catalog_visits (catalog_star_id) VALUES (?)').run(catalogStarId);
 }
 
-// 故事级浏览 +1（点击进入故事详情 = +1，支持 24h 去重）
-export function recordStoryView(storyId: number, userId?: number): void {
-  if (userId) {
-    const recent = db.prepare(`
-      SELECT id FROM story_views
-      WHERE story_id = ? AND user_id = ? AND viewed_at > datetime('now', '-24 hours')
-    `).get(storyId, userId) as unknown as { id: number } | undefined;
-    if (recent) return; // 24h 内不重复计数
-    db.prepare('INSERT INTO story_views (story_id, user_id) VALUES (?, ?)').run(storyId, userId);
-  }
+// 故事级浏览 +1（点击进入故事详情 = +1，纯计数不去重）
+export function recordStoryView(storyId: number): void {
   db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE id = ?').run(storyId);
 }
 

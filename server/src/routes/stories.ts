@@ -109,13 +109,12 @@ router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) =>
   }
 });
 
-// 故事级浏览 +1（可选登录，用于去重）
-router.post('/:storyId/view', authOptional, (req: Request, res: Response) => {
+// 故事级浏览 +1（纯计数）
+router.post('/:storyId/view', (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
-    const user = (req as Request & { user?: { id: number } }).user;
-    recordStoryView(storyId, user?.id);
+    recordStoryView(storyId);
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stories/:storyId/view error:', error);

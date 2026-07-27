@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -127,6 +127,7 @@
         :catalog-star-id="selectedCatalogStarId"
         :resonating="resonating"
         :favorite-star-ids="favoriteStarIds"
+        :current-user-id="currentUserId"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -138,6 +139,7 @@
         @update-similar-stars="onUpdateSimilarStars"
         @close="onCloseDetail"
         @write-story="onWriteStory"
+        @delete-story="onDeleteStory"
       />
 
       <StoryForm
@@ -159,6 +161,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair } from 'lucide-vue-next'
+import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
@@ -171,6 +174,7 @@ import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 const router = useRouter()
 const route = useRoute()
+const { startRefreshTimer, stopRefreshTimer } = useAuth()
 const username = ref('')
 const currentUserId = ref<number | null>(null)
 const showMyStoriesOnly = ref(false)
@@ -360,6 +364,7 @@ onMounted(async () => {
   fetchStories()
   const token = localStorage.getItem('token')
   if (token) {
+    startRefreshTimer()
     try {
       const [meRes, favRes] = await Promise.all([
         fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
@@ -417,11 +422,13 @@ async function doLogout() {
       })
     } catch { /* 即使 API 失败也清除本地状态 */ }
   }
+  stopRefreshTimer()
   localStorage.removeItem('token')
   router.push('/')
 }
 
 function goLogin() {
+  stopRefreshTimer()
   localStorage.removeItem('token')
   router.push('/')
 }
@@ -843,6 +850,25 @@ function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean 
       favoriteStarIds.value = [...favoriteStarIds.value, data.catalogStarId]
   } else {
     favoriteStarIds.value = favoriteStarIds.value.filter(id => id !== data.catalogStarId)
+  }
+}
+function onDeleteStory(storyId: number) {
+  // 从 selectedStories 中移除
+  selectedStories.value = selectedStories.value.filter(s => s.id !== storyId)
+  // 从 storiesByStarId 中移除
+  const map = new Map(storiesByStarId.value)
+  const cid = selectedCatalogStarId.value
+  const existing = map.get(cid)
+  if (existing) {
+    map.set(cid, existing.filter(s => s.id !== storyId))
+    storiesByStarId.value = map
+  }
+  // 更新统计
+  recalcFilteredStats()
+  fetchCatalogStats(cid)
+  // 如果当前星没有故事了，关闭面板
+  if (selectedStories.value.length === 0) {
+    onCloseDetail()
   }
 }
 async function onResonate(storyId: number) {

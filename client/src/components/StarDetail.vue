@@ -63,6 +63,15 @@
                     <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
                     <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
                   </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
                 </div>
               </div>
             </Transition>
@@ -413,12 +422,26 @@
       :constellation="starInfo?.conName || ''"
       @close="showChat = false"
     />
+
+    <!-- 删除确认弹窗 -->
+    <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click.self="cancelDelete">
+      <div class="delete-confirm-card">
+        <h3>确认删除</h3>
+        <p>删除后不可恢复，确定要删除这个故事吗？</p>
+        <div class="delete-confirm-actions">
+          <button class="delete-cancel-btn" @click="cancelDelete" :disabled="deleting">取消</button>
+          <button class="delete-confirm-btn" @click="doDeleteStory" :disabled="deleting">
+            {{ deleting ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2 } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
@@ -441,6 +464,7 @@ const props = defineProps<{
     origin: string | null
     username: string | null
     tag: string | null
+    userId: number | null
   }>
   activeIndex: number
   starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -448,6 +472,7 @@ const props = defineProps<{
   catalogStarId: number
   resonating: boolean
   favoriteStarIds: number[]
+  currentUserId: number | null
 }>()
 
 const emit = defineEmits<{
@@ -462,6 +487,7 @@ const emit = defineEmits<{
   close: []
   writeStory: []
   updateSimilarStars: [ids: number[]]
+  deleteStory: [storyId: number]
 }>()
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
@@ -673,6 +699,47 @@ function onResonate(story: { id: number; resonanceCount: number }) {
   setTimeout(() => { justResonatedId.value = null }, 2000)
 }
 
+// ─── 删除故事 ───
+const showDeleteConfirm = ref(false)
+const deletingStoryId = ref<number | null>(null)
+const deleting = ref(false)
+
+function confirmDelete(storyId: number) {
+  deletingStoryId.value = storyId
+  showDeleteConfirm.value = true
+}
+
+async function doDeleteStory() {
+  if (!deletingStoryId.value) return
+  const token = getToken()
+  if (!token) return
+  deleting.value = true
+  try {
+    const res = await fetch(`/api/stories/${deletingStoryId.value}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      emit('deleteStory', deletingStoryId.value)
+      showDeleteConfirm.value = false
+      deletingStoryId.value = null
+      detailStoryId.value = null
+    } else {
+      const json = await res.json()
+      alert(json.message || '删除失败')
+    }
+  } catch {
+    alert('网络错误，请重试')
+  } finally {
+    deleting.value = false
+  }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false
+  deletingStoryId.value = null
+}
+
 // ─── 收藏 ───
 const isFavorited = computed(() => props.favoriteStarIds.includes(props.catalogStarId))
 
@@ -727,10 +794,7 @@ function openStoryDetail(story: { id: number }) {
   // 通知父组件更新统计行
   emit('incrementViews')
   // 后端记录 + 重新拉取
-  const token = localStorage.getItem('token')
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  fetch(`/api/stories/${story.id}/view`, { method: 'POST', headers })
+  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
       // 失败回滚
@@ -2058,5 +2122,105 @@ watch(() => props.catalogStarId, () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ─── Delete Story Button ─── */
+.delete-story-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(255, 107, 138, 0.25);
+  color: #ff6b8a;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.delete-story-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 138, 0.08);
+  border-color: rgba(255, 107, 138, 0.4);
+}
+.delete-story-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* ─── Delete Confirm Modal ─── */
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(4, 4, 18, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.delete-confirm-card {
+  background: rgba(16, 20, 43, 0.95);
+  border: 1px solid rgba(48, 55, 87, 0.5);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  animation: slideUp 0.2s ease-out;
+}
+.delete-confirm-card h3 {
+  color: #ff6b8a;
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.delete-confirm-card p {
+  color: #b9b4d6;
+  font-size: 0.85rem;
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.delete-cancel-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(48, 55, 87, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  color: #7a759c;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.delete-cancel-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f6f1ff;
+}
+.delete-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.delete-confirm-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: none;
+  background: #ff6b8a;
+  color: #1a1438;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.delete-confirm-btn:hover:not(:disabled) {
+  background: #ff8a9e;
+}
+.delete-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 </style>

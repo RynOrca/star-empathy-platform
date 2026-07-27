@@ -111,7 +111,24 @@
             <span>{{ formatDate(activeStory.createdAt) }}</span>
             <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
           </div>
-          <button class="modal-close" @click="activeStory = null">关闭</button>
+          <div class="modal-actions">
+            <button class="modal-close" @click="activeStory = null">关闭</button>
+            <button class="modal-delete" @click="confirmDeleteStory(activeStory)">删除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 删除确认弹窗 -->
+      <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
+        <div class="modal-card delete-modal">
+          <h3>确认删除</h3>
+          <p>删除后不可恢复，确定要删除这个故事吗？</p>
+          <div class="modal-actions">
+            <button class="modal-close" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
+            <button class="modal-delete confirm" @click="doDeleteStory" :disabled="deletingStory">
+              {{ deletingStory ? '删除中...' : '确认删除' }}
+            </button>
+          </div>
         </div>
       </div>
     </template>
@@ -350,6 +367,45 @@ async function saveSig() {
 function openStory(s: any) { activeStory.value = s }
 function goBack() { router.push('/sky') }
 
+// ─── 删除故事 ───
+const showDeleteConfirm = ref(false)
+const pendingDeleteStory = ref<any>(null)
+const deletingStory = ref(false)
+
+function confirmDeleteStory(story: any) {
+  pendingDeleteStory.value = story
+  showDeleteConfirm.value = true
+}
+
+async function doDeleteStory() {
+  if (!pendingDeleteStory.value) return
+  const token = getToken()
+  if (!token) return
+  deletingStory.value = true
+  try {
+    const res = await fetch(`/api/stories/${pendingDeleteStory.value.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      // 从本地列表中移除
+      stories.value = stories.value.filter(s => s.id !== pendingDeleteStory.value.id)
+      stats.value.storyCount = Math.max(0, stats.value.storyCount - 1)
+      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      showDeleteConfirm.value = false
+      activeStory.value = null
+      pendingDeleteStory.value = null
+    } else {
+      const json = await res.json()
+      alert(json.message || '删除失败')
+    }
+  } catch {
+    alert('网络错误，请重试')
+  } finally {
+    deletingStory.value = false
+  }
+}
+
 // 每次进入页面时重新加载所有数据
 async function loadProfileData() {
   // 重置所有状态，确保数据是全新的
@@ -519,6 +575,24 @@ onUnmounted(() => {
 .tag-思念 { color: #ff8b7d; } .tag-等待 { color: #86a8ff; } .tag-离别 { color: #caa7ff; } .tag-愿望 { color: #ffd98a; } .tag-孤独 { color: #95f0c0; }
 .modal-close { margin-top: 1rem; padding: 0.4rem 1.2rem; border-radius: 10px; border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05); color: #7a759c; cursor: pointer; font-size: 0.8rem; }
 .modal-close:hover { color: #ffd98a; border-color: rgba(255,217,138,0.3); }
+.modal-close:disabled { opacity: 0.5; cursor: wait; }
+
+.modal-actions { display: flex; gap: 0.8rem; margin-top: 1rem; justify-content: flex-end; }
+.modal-delete {
+  padding: 0.4rem 1.2rem; border-radius: 10px;
+  border: 1px solid rgba(255,107,138,0.25); background: transparent;
+  color: #ff6b8a; font-family: var(--font,"Microsoft YaHei",sans-serif); font-size: 0.8rem;
+  cursor: pointer; transition: all 0.15s;
+}
+.modal-delete:hover { background: rgba(255,107,138,0.08); border-color: rgba(255,107,138,0.4); }
+.modal-delete:disabled { opacity: 0.5; cursor: wait; }
+.modal-delete.confirm {
+  border: none; background: #ff6b8a; color: #1a1438; font-weight: 600;
+}
+.modal-delete.confirm:hover:not(:disabled) { background: #ff8a9e; }
+
+.delete-modal h3 { color: #ff6b8a; }
+.delete-modal p { color: #b9b4d6; font-size: 0.85rem; margin: 0 0 0.5rem; line-height: 1.6; }
 
 /* ═══ 修改密码 ═══ */
 .account-actions { position: relative; z-index: 10; text-align: center; margin-top: 1.5rem; }
