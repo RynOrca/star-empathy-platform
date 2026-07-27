@@ -108,8 +108,28 @@ function colorToDescription(hex: string): string {
   return map[hex.toLowerCase()] || '肉眼可见的星光'
 }
 
+/** 计算恒星是否在地平线以上（简化算法：基于赤纬和观测者纬度） */
+function isAboveHorizon(star: CatalogStar, lat: number, lng: number): boolean {
+  // 恒星时简化计算（以 UTC 为基准）
+  const now = new Date()
+  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600
+  // 格林尼治恒星时（简化）
+  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
+  const gmst = (18.697374558 + 24.06570982441908 * (dayOfYear + utcHours / 24)) % 24
+  // 本地恒星时
+  const lst = (gmst + lng / 15 + 24) % 24
+  // 时角
+  const ha = ((lst - star.ra) * 15 + 360) % 360
+  const haRad = ha * Math.PI / 180
+  const decRad = star.dec * Math.PI / 180
+  const latRad = lat * Math.PI / 180
+  // 高度角
+  const sinAlt = Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad)
+  return sinAlt > -0.05 // 考虑大气折射，略低于地平线也算可见
+}
+
 /** 生成恒星的叙事 Prompt */
-function buildNarrativePrompt(star: CatalogStar): { system: string; user: string } {
+function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { system: string; user: string } {
   const starName = star.name || `RA ${star.ra.toFixed(1)}h Dec ${star.dec.toFixed(1)}°`
   const conMap: Record<string, string> = {
     And: '仙女座', Aqr: '宝瓶座', Ari: '白羊座', Aur: '御夫座',
@@ -129,6 +149,95 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
 
   // 检查该星是否有古人关联
   const hasFigures = getFiguresForStar(star.name, star.con).length > 0
+
+  // 星星不可见时的特殊处理
+  if (!isVisible) {
+    if (!hasFigures) {
+      // 不可见 + 无古诗记录
+      const system = `你是"星语穹庭"的星空叙事者。根据用户提供的恒星信息，写一段"古今共望"叙事短文。
+
+**注意：这颗星目前在地平线以下，无法直接用肉眼看到。请你如实而优美地表达这一点。**
+
+**你必须严格按照以下格式输出：**
+
+# 此刻，{星名}正在地平线之下
+
+它并未消失，只是暂时隐于大地的另一侧。
+
+（一段描写这颗星本身的文字：它的亮度、颜色、星座位置，1~2句）
+
+（坦诚地说明：这颗星尚无古人留下诗篇，但它的光芒穿越千年，等待属于它的故事——用优美、文艺的语言，1~2句）
+
+（结尾：愿未来的某一天，当它升起时，有人为它写下第一行诗，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 此刻，"开头，后跟星名和"正在地平线之下"
+2. 每个段落之间必须空一行
+3. 不要编造不存在的古诗或人物
+4. 不要使用 # 和 > 之外的任何 markdown 符号
+5. 文字优美凝练、温暖治愈，120~180字
+6. 中文输出`
+
+      const user = `恒星名称：${starName}
+所属星座：${conName}
+视星等：${star.mag.toFixed(1)} 等（${brightness}）
+颜色/光谱：${colorToDescription(star.color)}
+赤经：${star.ra.toFixed(2)}h
+赤纬：${star.dec.toFixed(2)}°
+
+这颗星目前在地平线以下，无法看到。它没有已知的古人诗词记录。请为它写一段叙事，坦诚而优美地表达：它虽在地平线下，但仍在等待属于它的诗篇。第一行必须是 "# 此刻，${starName}正在地平线之下"。`
+
+      return { system, user }
+    }
+
+    // 不可见 + 有古诗记录
+    const system = `你是"星语穹庭"的星空叙事者。根据用户提供的恒星信息，写一段"古今共望"叙事短文。
+
+**注意：这颗星目前在地平线以下，无法直接用肉眼看到。请你如实而优美地表达这一点。**
+
+**你必须严格按照以下格式输出，逐字逐句，包括 # 和 > 符号：**
+
+# 此刻，{星名}正在地平线之下
+
+它并未消失，只是暂时隐于大地的另一侧。
+
+（一段联系古今的叙述，1~2句）
+
+（诗人名）写：
+
+> "{诗句}"（朝代·《出处》）
+
+（对诗句的解读，联系诗人当时的社会背景、心境，1~2句）
+
+（结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 此刻，"开头，后跟星名和"正在地平线之下"
+2. 每个段落之间必须空一行
+3. 诗句引用必须以"> "（大于号+空格）开头，诗句用双引号包裹
+4. 诗句后面用括号标注朝代和出处
+5. 不要把所有内容写成一段，必须分段
+6. 不要省略 # 和 > 符号
+
+**内容要求：**
+- 联系古今：提到至少一位古代诗人/天文学家/历史人物
+- 引用相关古诗词（一句即可，标注作者和朝代）
+- 勿编造不存在的人物和诗句
+- 文字优美凝练、温暖治愈，150~250字
+- 结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星
+- 中文输出`
+
+    const user = `恒星名称：${starName}
+所属星座：${conName}
+视星等：${star.mag.toFixed(1)} 等（${brightness}）
+颜色/光谱：${colorToDescription(star.color)}
+赤经：${star.ra.toFixed(2)}h
+赤纬：${star.dec.toFixed(2)}°
+
+这颗星目前在地平线以下，无法看到。请为它写一段"古今共望"叙事。记住：第一行必须是 "# 此刻，${starName}正在地平线之下"，诗句引用必须以 "> " 开头。`
+
+    return { system, user }
+  }
 
   if (!hasFigures) {
     // 无古诗记录的星星：文艺提示
@@ -219,7 +328,7 @@ export interface NarrativeResult {
 /**
  * 获取恒星叙事（优先缓存，无缓存则生成并缓存）
  */
-export async function getNarrative(catalogStarId: number): Promise<NarrativeResult> {
+export async function getNarrative(catalogStarId: number, lat?: number, lng?: number): Promise<NarrativeResult> {
   // 1. 查找恒星信息
   const star = getStarInfo(catalogStarId)
   if (!star) {
@@ -233,7 +342,8 @@ export async function getNarrative(catalogStarId: number): Promise<NarrativeResu
   }
 
   // 3. 生成叙事
-  const { system, user } = buildNarrativePrompt(star)
+  const visible = (lat !== undefined && lng !== undefined) ? isAboveHorizon(star, lat, lng) : true
+  const { system, user } = buildNarrativePrompt(star, visible)
   const content = await deepseekChat(
     [
       { role: 'system', content: system },
