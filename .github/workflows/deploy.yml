@@ -79,7 +79,7 @@ jobs:
             npm install --production --silent
 
             # 重启后端
-            pm2 restart star-api 2>/dev/null || pm2 start dist/index.js --name star-api
+            pm2 restart star-api 2>/dev/null || pm2 start dist/src/index.js --name star-api
             pm2 save
 
             # 重载 Nginx
