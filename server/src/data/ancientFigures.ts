@@ -518,15 +518,11 @@ export function getPublicFigures() {
 export function getFiguresForStar(starName: string | null, constellation: string): AncientFigure[] {
   return ANCIENT_FIGURES.filter((f) => {
     return f.starAssociations.some((assoc) => {
-      // 匹配星座
-      if (assoc.constellationIds?.includes(constellation)) return true
-      // 匹配星名关键词
-      if (starName) {
-        return assoc.starKeywords.some((kw) =>
-          starName.toLowerCase().includes(kw.toLowerCase()),
-        )
-      }
-      return false
+      // 只匹配星名关键词，不按星座匹配（避免不相关古人被关联）
+      if (!starName) return false
+      return assoc.starKeywords.some((kw) =>
+        starName.toLowerCase().includes(kw.toLowerCase()),
+      )
     })
   })
 }
@@ -542,12 +538,11 @@ export function getStarAssociation(figureId: string, starName: string | null, co
   if (!figure) return null
 
   for (const assoc of figure.starAssociations) {
-    const matchConstellation = assoc.constellationIds?.includes(constellation)
     const matchName = starName
       ? assoc.starKeywords.some((kw) => starName.toLowerCase().includes(kw.toLowerCase()))
       : false
 
-    if (matchConstellation || matchName) {
+    if (matchName) {
       return { poems: assoc.poems, context: assoc.context }
     }
   }
