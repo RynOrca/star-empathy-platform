@@ -273,48 +273,90 @@ function setCachedLocation(lat: number, lng: number) {
 }
 
 // 反向地理编码：获取城市名称
+// 优先通过后端代理（服务端网络更可靠），再回退到直接调 Nominatim
 async function fetchCityName(lat: number, lng: number): Promise<string> {
+  // 1. 通过后端代理
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
+    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`)
+    const json = await res.json()
+    if (res.ok && json.data?.city) {
+      console.log('[SkyPage] fetchCityName via backend:', json.data.city)
+      return json.data.city
+    }
+  } catch (e) {
+    console.warn('[SkyPage] fetchCityName via backend failed:', e)
+  }
+  // 2. 回退到直接调 Nominatim（带 User-Agent）
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`,
+      { headers: { 'User-Agent': 'StarLanguageDome/1.0' } },
+    )
     const data = await res.json()
     const addr = data.address || {}
     const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
-    console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
+    console.log('[SkyPage] fetchCityName direct:', city)
     return city
   } catch (e) {
-    console.error('[SkyPage] fetchCityName failed:', e)
+    console.error('[SkyPage] fetchCityName all failed:', e)
     return ''
   }
 }
 
 function showLocationToast(city: string) {
-  const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
+  const text = city ? `当前定位：${city}` : '📍 定位成功'
   console.log('[SkyPage] showLocationToast:', text)
   locationCityToast.value = text
   setTimeout(() => { locationCityToast.value = '' }, 10000)
 }
 
+// IP 坐标兜底：浏览器定位失败时用（大致位置，总比没有好）
+// 返回 true=成功设置坐标, false=完全失败
+async function fallbackToIP(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/location/ip')
+    const json = await res.json()
+    if (res.ok && json.data?.lat != null && json.data?.lng != null) {
+      userLat.value = json.data.lat
+      userLng.value = json.data.lng
+      setCachedLocation(json.data.lat, json.data.lng)
+      console.log('[SkyPage] IP fallback coords:', json.data.lat, json.data.lng)
+      return true
+    }
+  } catch (e) {
+    console.error('[SkyPage] IP fallback failed:', e)
+  }
+  return false
+}
+
 function fetchLocation() {
   if (!navigator.geolocation) {
-    locationReady.value = true
-    locationFailed.value = true
+    // 浏览器不支持 → IP 坐标兜底 + 显示城市选择面板让用户纠正
+    fallbackToIP().then(ok => {
+      locationReady.value = true
+      locationFailed.value = true  // 显示城市面板
+      if (!ok) showLocationToast('')
+    })
     return
   }
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
+      // ✅ 浏览器定位坐标（精确）设置天球
       userLat.value = pos.coords.latitude
       userLng.value = pos.coords.longitude
       setCachedLocation(pos.coords.latitude, pos.coords.longitude)
       locationReady.value = true
       locationFailed.value = false
-      // 获取城市名并显示 2 秒
+      // 用反向地理编码获取真实城市名（仅供参考）
       const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
       showLocationToast(city)
     },
-    (err) => {
+    async (err) => {
       console.warn('Geolocation failed:', err.message)
+      // 浏览器定位失败 → IP 坐标兜底（大致位置）
+      await fallbackToIP()
       locationReady.value = true
-      locationFailed.value = true
+      locationFailed.value = true  // 显示城市选择面板，让用户手动校正
     },
     { timeout: 5000, enableHighAccuracy: false },
   )
@@ -323,7 +365,9 @@ function fetchLocation() {
 // 手动刷新定位（不隐藏天空，静默更新）
 function refreshLocation() {
   if (!navigator.geolocation) {
-    showLocationToast('')
+    fallbackToIP().then(ok => {
+      if (!ok) showLocationToast('')
+    })
     return
   }
   navigator.geolocation.getCurrentPosition(
@@ -335,8 +379,8 @@ function refreshLocation() {
       const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
       showLocationToast(city)
     },
-    () => {
-      showLocationToast('')
+    async () => {
+      await fallbackToIP()
     },
     { timeout: 5000, enableHighAccuracy: false },
   )

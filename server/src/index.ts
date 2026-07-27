@@ -13,6 +13,7 @@ import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
 import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
+import locationRouter from './routes/location';
 import { ok, badRequest, serverError } from './utils/response';
 import { setApiKey, getApiKey } from './services/deepseek';
 
@@ -100,6 +101,10 @@ app.use(express.static(clientDist, {
 app.get('/api/health', (_req: Request, res: Response) => {
   ok(res, 'ok');
 });
+
+// 认证路由
+// 定位服务（IP 定位 + 反向地理编码代理）
+app.use('/api/location', locationRouter);
 
 // 认证路由
 app.use('/api/auth', authLimiter, authRouter);
