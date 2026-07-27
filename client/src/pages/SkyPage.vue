@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -31,13 +31,16 @@
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
         <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
-          {{ showMyStoriesOnly ? '🌐 全部' : '⭐ 我的' }}
+          <component :is="showMyStoriesOnly ? Globe : Star" :size="14" />
+          <span>{{ showMyStoriesOnly ? '全部' : '我的' }}</span>
         </button>
         <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" title="更改定位">
-          📍 定位
+          <MapPin :size="14" />
+          <span>定位</span>
         </button>
         <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
-          👤 {{ username }}
+          <User :size="14" />
+          <span>{{ username }}</span>
         </span>
         <button v-if="username" class="nav-btn" @click="doLogout">退出</button>
         <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
@@ -51,7 +54,7 @@
 
     <!-- 定位城市提示 -->
     <Transition name="toast-fade">
-      <div v-if="locationCityToast" class="location-toast">📍 {{ locationCityToast }}</div>
+      <div v-if="locationCityToast" class="location-toast"><MapPin :size="13" /> {{ locationCityToast }}</div>
     </Transition>
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
@@ -70,7 +73,7 @@
             {{ c.name }}
           </button>
         </div>
-        <button class="refresh-loc-btn" @click="refreshLocation">🔄 重新获取定位</button>
+        <button class="refresh-loc-btn" @click="refreshLocation"><RefreshCw :size="14" /> 重新获取定位</button>
       </div>
     </div>
 
@@ -160,7 +163,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -278,90 +281,48 @@ function setCachedLocation(lat: number, lng: number) {
 }
 
 // 反向地理编码：获取城市名称
-// 优先通过后端代理（服务端网络更可靠），再回退到直接调 Nominatim
 async function fetchCityName(lat: number, lng: number): Promise<string> {
-  // 1. 通过后端代理
   try {
-    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`)
-    const json = await res.json()
-    if (res.ok && json.data?.city) {
-      console.log('[SkyPage] fetchCityName via backend:', json.data.city)
-      return json.data.city
-    }
-  } catch (e) {
-    console.warn('[SkyPage] fetchCityName via backend failed:', e)
-  }
-  // 2. 回退到直接调 Nominatim（带 User-Agent）
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`,
-      { headers: { 'User-Agent': 'StarLanguageDome/1.0' } },
-    )
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
     const data = await res.json()
     const addr = data.address || {}
     const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
-    console.log('[SkyPage] fetchCityName direct:', city)
+    console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
     return city
   } catch (e) {
-    console.error('[SkyPage] fetchCityName all failed:', e)
+    console.error('[SkyPage] fetchCityName failed:', e)
     return ''
   }
 }
 
 function showLocationToast(city: string) {
-  const text = city ? `当前定位：${city}` : '📍 定位成功'
+  const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
   console.log('[SkyPage] showLocationToast:', text)
   locationCityToast.value = text
   setTimeout(() => { locationCityToast.value = '' }, 10000)
 }
 
-// IP 坐标兜底：浏览器定位失败时用（大致位置，总比没有好）
-// 返回 true=成功设置坐标, false=完全失败
-async function fallbackToIP(): Promise<boolean> {
-  try {
-    const res = await fetch('/api/location/ip')
-    const json = await res.json()
-    if (res.ok && json.data?.lat != null && json.data?.lng != null) {
-      userLat.value = json.data.lat
-      userLng.value = json.data.lng
-      setCachedLocation(json.data.lat, json.data.lng)
-      console.log('[SkyPage] IP fallback coords:', json.data.lat, json.data.lng)
-      return true
-    }
-  } catch (e) {
-    console.error('[SkyPage] IP fallback failed:', e)
-  }
-  return false
-}
-
 function fetchLocation() {
   if (!navigator.geolocation) {
-    // 浏览器不支持 → IP 坐标兜底 + 显示城市选择面板让用户纠正
-    fallbackToIP().then(ok => {
-      locationReady.value = true
-      locationFailed.value = true  // 显示城市面板
-      if (!ok) showLocationToast('')
-    })
+    locationReady.value = true
+    locationFailed.value = true
     return
   }
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
-      // ✅ 浏览器定位坐标（精确）设置天球
       userLat.value = pos.coords.latitude
       userLng.value = pos.coords.longitude
       setCachedLocation(pos.coords.latitude, pos.coords.longitude)
       locationReady.value = true
       locationFailed.value = false
-      // 用反向地理编码获取真实城市名（仅供参考）
+      // 获取城市名并显示 2 秒
       const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
       showLocationToast(city)
     },
-    async (err) => {
+    (err) => {
       console.warn('Geolocation failed:', err.message)
-      // 浏览器定位失败 → IP 坐标兜底（大致位置）
-      await fallbackToIP()
       locationReady.value = true
-      locationFailed.value = true  // 显示城市选择面板，让用户手动校正
+      locationFailed.value = true
     },
     { timeout: 5000, enableHighAccuracy: false },
   )
@@ -370,9 +331,7 @@ function fetchLocation() {
 // 手动刷新定位（不隐藏天空，静默更新）
 function refreshLocation() {
   if (!navigator.geolocation) {
-    fallbackToIP().then(ok => {
-      if (!ok) showLocationToast('')
-    })
+    showLocationToast('')
     return
   }
   navigator.geolocation.getCurrentPosition(
@@ -384,8 +343,8 @@ function refreshLocation() {
       const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
       showLocationToast(city)
     },
-    async () => {
-      await fallbackToIP()
+    () => {
+      showLocationToast('')
     },
     { timeout: 5000, enableHighAccuracy: false },
   )
@@ -1018,12 +977,13 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   font-size: 0.78rem; color: #c8c2d8;
   letter-spacing: 0.04em;
 }
-.nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; }
+.nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .nav-user:hover { color: #f6f1ff; }
 .nav-btn {
   padding: 0.3rem 0.8rem; border-radius: 8px;
   border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05);
   color: #7a759c; font-size: 0.8rem; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
 }
 .nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
 .nav-login-btn {
@@ -1225,6 +1185,7 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   color: #ffd98a;
   font-size: 0.8rem;
   cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
   transition: border-color 0.2s, background 0.2s;
 }
 .refresh-loc-btn:hover {
@@ -1295,6 +1256,7 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .location-toast {
   position: fixed; top: 6rem; left: 50%; transform: translateX(-50%);
   z-index: 100; padding: 0.6rem 1.5rem; border-radius: 20px;
+  display: flex; align-items: center; gap: 5px;
   background: rgba(20, 30, 50, 0.9); border: 1px solid rgba(100, 200, 150, 0.4);
   color: #95f0c0; font-size: 0.85rem; font-weight: 500;
   backdrop-filter: blur(12px);

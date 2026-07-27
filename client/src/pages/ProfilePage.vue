@@ -86,7 +86,7 @@
         <div class="fav-list">
           <div v-for="fid in favorites" :key="fid" class="fav-card">
             <div class="fav-card-main" @click="goToStar(fid)">
-              <span class="fav-star" :style="{ color: getStarColor(fid) }">★</span>
+              <span class="fav-star" :style="{ color: getStarColor(fid) }"><Star :size="16" :fill="getStarColor(fid)" /></span>
               <div class="fav-info">
                 <div class="fav-name">{{ getStarName(fid) }}</div>
                 <div class="fav-meta">
@@ -138,6 +138,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, onActivated, computed, nextTick, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
