@@ -1,4 +1,5 @@
 export interface PlanetInfo {
+  planetId?: number       // 行星编号（0=太阳, 1=水星, ..., 8=海王星, 9=月球）
   name: string
   nameCN: string
   color: number          // 保留，用于 fallback
@@ -14,9 +15,12 @@ export interface PlanetInfo {
   period: number // 年
   rotationPeriod?: number // 自转周期（小时），14-A §4；负值表示逆向自转
   axialTilt?: number      // 轴倾角（度），14-A §4
-  atmosphere?: {          // 大气层光晕（菲涅尔 shader）
+  atmosphere?: {          // 大气层光晕（Physical-Lite shader, OPT-9）
     color: number         // 大气颜色（如地球蓝、金星黄）
     intensity: number     // 强度 0~1
+    rayleigh?: [number, number, number]  // Rayleigh 散射系数 RGB（物理大气散射）
+    mie?: number          // Mie 散射系数
+    mieG?: number         // Mie 不对称因子（-1~1，正值=前向散射）
   }
 }
 

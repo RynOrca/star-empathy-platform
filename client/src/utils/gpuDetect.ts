@@ -78,11 +78,15 @@ export function getRenderParams(tier: RenderTier): {
   bloom: boolean
   vignette: boolean
   meteorParticles: number
+  maxDpr: number
+  antialias: boolean
+  labelMode: 'all' | 'major-only' | 'none'
+  labelLODDistance: number
 } {
   switch (tier) {
-    case 'high':   return { sphereSegments: [64, 32], starCount: 2000, instancedMesh: true,  bloom: true,  vignette: true,  meteorParticles: 60 }
-    case 'medium': return { sphereSegments: [32, 16], starCount: 1000, instancedMesh: true,  bloom: true,  vignette: false, meteorParticles: 40 }
-    case 'low':    return { sphereSegments: [16, 12], starCount: 512,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 20 }
-    case 'fallback': return { sphereSegments: [8, 6], starCount: 256,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 0 }
+    case 'high':   return { sphereSegments: [64, 32], starCount: 2000, instancedMesh: true,  bloom: true,  vignette: true,  meteorParticles: 60, maxDpr: 3, antialias: true,  labelMode: 'all',         labelLODDistance: 280 }
+    case 'medium': return { sphereSegments: [32, 16], starCount: 1000, instancedMesh: true,  bloom: true,  vignette: false, meteorParticles: 40, maxDpr: 2, antialias: false, labelMode: 'major-only',  labelLODDistance: 200 }
+    case 'low':    return { sphereSegments: [16, 12], starCount: 512,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 20, maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
+    case 'fallback': return { sphereSegments: [8, 6], starCount: 256,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 0,  maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
   }
 }

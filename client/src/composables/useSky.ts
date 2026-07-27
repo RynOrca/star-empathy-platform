@@ -2331,7 +2331,7 @@ for (const s of stars) starById.set(s.id, s)
   const COMET_TAIL_PARTICLES = gpuCap.tier === 'high' ? 80
     : gpuCap.tier === 'medium' ? 50 : 0
   if (COMET_TAIL_PARTICLES > 0) {
-    COMETS.forEach(comet => {
+    COMETS.forEach((comet: CometElement) => {
       // ── 彗核 ──
       const nucGeo = new IcosahedronGeometry(comet.nucleusSize * 0.8, 1)
       const [r, g, b] = hexRGB(comet.color)
@@ -2413,7 +2413,7 @@ for (const s of stars) starById.set(s.id, s)
     })
   } else {
     // Low/Fallback tier：仅渲染彗核（无拖尾，省 GPU）
-    COMETS.forEach(comet => {
+    COMETS.forEach((comet: CometElement) => {
       const nucGeo = new IcosahedronGeometry(comet.nucleusSize * 0.8, 0)
       const [r, g, b] = hexRGB(comet.color)
       const nucMat = new MeshBasicMaterial({
