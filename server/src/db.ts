@@ -133,5 +133,7 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)
 // 兼容旧数据库：catalog_visits 加 user_id 列
 try { db.exec('ALTER TABLE catalog_visits ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_visits(user_id)'); } catch {}
+// 兼容旧数据库：stars 加 is_anonymous 列
+try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 
 export default db;

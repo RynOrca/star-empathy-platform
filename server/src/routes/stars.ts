@@ -51,11 +51,11 @@ router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
   }
 });
 
-// 投递心事/创建星星（可选登录）
-router.post('/story', authOptional, (req: Request, res: Response) => {
+// 投递心事/创建星星（需登录）
+router.post('/story', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalog_star_id, location, tag } = req.body;
-    const user = (req as Request & { user?: { id: number } }).user;
+    const { title, content, catalog_star_id, location, tag, isAnonymous } = req.body;
+    const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
       return badRequest(res, 'content 不能为空');
@@ -88,8 +88,9 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
     const safeContent = esc(trimmed);
     const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
     const safeTag = typeof tag === 'string' ? tag : undefined;
+    const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user?.id, safeTag);
+    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous);
 
     // 异步生成 AI 故事内核
     if (star && (star as { id: number }).id) {
@@ -103,14 +104,14 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 共鸣点亮（可选登录，用于去重）
-router.post('/:storyId/resonate', authOptional, (req: Request, res: Response) => {
+// 共鸣点亮（需登录，去重）
+router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
-    const user = (req as Request & { user?: { id: number } }).user;
-    const result = resonate(storyId, user?.id);
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = resonate(storyId, user.id);
     if (!result) return notFound(res, '故事不存在');
     if (result.already) return ok(res, '已共鸣', result);
 
