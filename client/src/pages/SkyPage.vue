@@ -469,9 +469,16 @@ function recalcFilteredStats() {
   skyRef.value?.sky?.setStarStatsCache(statsMap)
 }
 
-// 监听"只看我的"切换，更新天空统计
-watch(showMyStoriesOnly, () => {
+// 监听"只看我的"切换，更新天空统计和私有连线
+watch(showMyStoriesOnly, async () => {
   recalcFilteredStats()
+  if (showMyStoriesOnly.value) {
+    // 开启"只看我的"：加载私有连线
+    await fetchMyKernelLines()
+  } else {
+    // 关闭"只看我的"：清除连线
+    skyRef.value?.sky?.setKernelLines([])
+  }
   // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
   if (selectedStarInfo.value && selectedCatalogStarId.value) {
     const filtered = getFilteredStories(selectedCatalogStarId.value)
@@ -496,6 +503,32 @@ function getFilteredStories(starId: number): StoryData[] {
   if (!stories) return []
   if (!showMyStoriesOnly.value) return stories
   return stories.filter(s => s.username === username.value)
+}
+
+// 获取用户私有内核连线
+async function fetchMyKernelLines() {
+  const token = localStorage.getItem('token')
+  if (!token) return
+  try {
+    const res = await fetch('/api/profile/kernel-lines', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
+    if (!res.ok || !json.data?.length) {
+      skyRef.value?.sky?.setKernelLines([])
+      return
+    }
+    const lines = (json.data as {
+      from: { catalogStarId: number; x: number; y: number; z: number }
+      to: { catalogStarId: number; x: number; y: number; z: number }
+    }[]).map(l => ({
+      from: { x: l.from.x, y: l.from.y, z: l.from.z },
+      to: { x: l.to.x, y: l.to.y, z: l.to.z },
+    }))
+    skyRef.value?.sky?.setKernelLines(lines)
+  } catch {
+    skyRef.value?.sky?.setKernelLines([])
+  }
 }
 
 function formatStarName(s: CatalogStar): string {
