@@ -80,8 +80,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, onActivated, computed, nextTick } from 'vue'
+import { useRouter, onBeforeRouteEnter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
@@ -227,7 +227,20 @@ async function saveSig() {
 function openStory(s: any) { activeStory.value = s }
 function goBack() { router.push('/sky') }
 
-onMounted(async () => {
+// 每次进入页面时重新加载所有数据
+async function loadProfileData() {
+  // 重置所有状态，确保数据是全新的
+  loaded.value = false
+  user.value = null
+  stories.value = []
+  favorites.value = []
+  stats.value = { storyCount: 0, totalResonance: 0, favoriteCount: 0 }
+  currentPage.value = 0
+  hasMore.value = true
+  loadingMore.value = false
+  precomputedPositions.value = []
+  activeStory.value = null
+
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
@@ -252,7 +265,16 @@ onMounted(async () => {
     if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
+}
+
+onMounted(() => {
+  loadProfileData()
   window.addEventListener('scroll', onScroll, { passive: true })
+})
+
+// 兼容 keep-alive 场景：组件被缓存后再次激活时重新加载
+onActivated(() => {
+  loadProfileData()
 })
 
 onUnmounted(() => {
