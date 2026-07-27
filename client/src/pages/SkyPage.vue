@@ -30,6 +30,9 @@
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
+        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="showMyStoriesOnly = !showMyStoriesOnly" title="只看我的故事">
+          {{ showMyStoriesOnly ? '🌐 全部' : '⭐ 我的' }}
+        </button>
         <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
           👤 {{ username }}
         </span>
@@ -154,6 +157,7 @@ import { getMoonPhase, getSolarTerm } from '../data/planets'
 
 const router = useRouter()
 const username = ref('')
+const showMyStoriesOnly = ref(false)
 const favoriteStarIds = ref<number[]>([])
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
@@ -439,8 +443,60 @@ async function fetchStories() {
   } finally {
     fetchingStories.value = false
   }
+  // 如果"只看我的"已开启，重新计算过滤后的天空统计
+  if (showMyStoriesOnly.value) recalcFilteredStats()
 }
 onMounted(() => { fetchStories() })
+
+// 根据"只看我的"切换，重新计算天空中的星星统计数据
+function recalcFilteredStats() {
+  const fullMap = storiesByStarId.value
+  if (!fullMap) return
+  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  for (const [cid, stories] of fullMap) {
+    const filtered = showMyStoriesOnly.value
+      ? stories.filter(s => s.username === username.value)
+      : stories
+    if (filtered.length === 0) continue
+    statsMap.set(cid, {
+      stories: filtered.length,
+      resonance: filtered.reduce((sum, s) => sum + s.resonanceCount, 0),
+      views: filtered.reduce((sum, s) => sum + s.viewCount, 0),
+      favorites: 0,
+    })
+  }
+  pendingStatsMap.value = statsMap
+  skyRef.value?.sky?.setStarStatsCache(statsMap)
+}
+
+// 监听"只看我的"切换，更新天空统计
+watch(showMyStoriesOnly, () => {
+  recalcFilteredStats()
+  // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
+  if (selectedStarInfo.value && selectedCatalogStarId.value) {
+    const filtered = getFilteredStories(selectedCatalogStarId.value)
+    if (filtered.length === 0) {
+      selectedStories.value = []
+      selectedStarInfo.value = null
+      catalogStats.value = null
+    } else {
+      selectedStories.value = filtered
+      catalogStats.value = {
+        storyCount: filtered.length,
+        totalResonance: filtered.reduce((s, x) => s + x.resonanceCount, 0),
+        totalViews: 0, starViews: 0, favoriteCount: 0,
+      }
+    }
+  }
+})
+
+// 获取过滤后的故事（考虑"只看我的"开关）
+function getFilteredStories(starId: number): StoryData[] {
+  const stories = storiesByStarId.value.get(starId)
+  if (!stories) return []
+  if (!showMyStoriesOnly.value) return stories
+  return stories.filter(s => s.username === username.value)
+}
 
 function formatStarName(s: CatalogStar): string {
   if (s.name) return s.name
@@ -522,7 +578,7 @@ const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
-  const stories = storiesByStarId.value.get(starId)
+  const stories = getFilteredStories(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
@@ -549,7 +605,7 @@ function onPlanetClick(name: string, nameCN: string) {
   const planetId = PLANET_ID_MAP[name]
   if (planetId == null) return
   const info = PLANET_INFO[name]
-  const stories = storiesByStarId.value.get(planetId)
+  const stories = getFilteredStories(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
   selectedStarInfo.value = {
@@ -669,6 +725,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(40, 35, 18, 0.35);
 }
 .nav-login-btn:hover { color: #ffe6b0; border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
+.nav-my-toggle {
+  color: #ffd98a; border-color: rgba(255, 217, 138, 0.25);
+  background: rgba(40, 35, 18, 0.3); transition: all 0.25s;
+}
+.nav-my-toggle:hover { border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
+.nav-my-toggle.active {
+  color: #7a759c; border-color: rgba(48, 55, 87, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+.nav-my-toggle.active:hover { color: #b9b4d6; }
 .nav-center { flex: 1; display: flex; justify-content: center; }
 .search-box { position: relative; width: 260px; }
 .search-icon {

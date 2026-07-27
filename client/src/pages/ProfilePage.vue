@@ -81,7 +81,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, onActivated, computed, nextTick } from 'vue'
-import { useRouter, onBeforeRouteEnter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useParticleSky } from '../composables/useParticleSky'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
