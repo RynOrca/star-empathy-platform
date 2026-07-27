@@ -20,48 +20,55 @@ jobs:
             set -e
             cd /var/www/star-empathy-platform
 
-            echo "=== 1/6 备份敏感文件 ==="
+            echo "=== 1/7 停服务释放内存 ==="
+            pm2 stop star-api 2>/dev/null || true
+
+            echo "=== 2/7 备份敏感文件 ==="
             cp server/.env /tmp/star-env 2>/dev/null || true
             cp server/data/stars.db /tmp/star-db 2>/dev/null || true
 
-            echo "=== 2/6 拉取代码 ==="
+            echo "=== 3/7 拉取代码 ==="
             git fetch origin main
             git reset --hard origin/main
 
-            echo "=== 2.5/6 检查合并冲突 ==="
+            echo "=== 3.5/7 检查合并冲突 ==="
             if grep -rn "^<<<<<<< \|^=======\|^>>>>>>> " client/src/ server/src/ 2>/dev/null; then
               echo "❌ 检测到未解决的合并冲突标记，终止部署！"
+              pm2 start star-api 2>/dev/null || true
               exit 1
             fi
             echo "✅ 无合并冲突标记"
 
-            echo "=== 3/6 恢复敏感文件 ==="
+            echo "=== 4/7 恢复敏感文件 ==="
             cp /tmp/star-env server/.env 2>/dev/null || true
             cp /tmp/star-db server/data/stars.db 2>/dev/null || true
 
-            echo "=== 4/6 构建后端 ==="
+            echo "=== 5/7 安装依赖 ==="
+            cd server && npm install --silent && cd ..
+            cd client && npm install --silent && cd ..
+
+            echo "=== 6/7 构建后端 ==="
             cd server
-            npm install --silent
             npx tsc
             npm prune --production --silent
-
             if [ ! -f .env ]; then
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
               echo "API_PORT=3000" >> .env
               echo "NODE_ENV=production" >> .env
               echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" >> .env
             fi
+            cd ..
 
-            echo "=== 5/6 构建前端 + 重启 ==="
-            cd ../client
-            npm install --silent
-            NODE_OPTIONS="--max-old-space-size=4096" npx vite build
+            echo "=== 7/7 构建前端 + 重启 ==="
+            cd client
+            NODE_OPTIONS="--max-old-space-size=1536" npx vite build
             cd ../server
             pm2 restart star-api 2>/dev/null || pm2 start dist/src/index.js --name star-api
             pm2 save
 
-            echo "=== 6/6 重载 Nginx ==="
+            echo "=== 重载 Nginx ==="
             nginx -t && nginx -s reload
 
             echo "=== 部署完成 ==="
+            free -h
             pm2 status
