@@ -1,4 +1,4 @@
-﻿﻿import {
+﻿import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
@@ -899,7 +899,7 @@ export function useSky(
         if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
       }
       // 阈值
-      if (bestDist < 0.0015 && bestId !== -1) {
+      if (bestDist < 0.003 && bestId !== -1) {
         if (bestId !== hoveredStarId) {
           // 清除旧的长悬浮计时器
           if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
@@ -929,20 +929,42 @@ export function useSky(
     canvas.addEventListener('pointerup', (e) => {
       if (disposed) return
       if (clickDrag) return // 是拖动不是点击
+
+      // 更新 mouse 坐标（确保点击时坐标正确）
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      // 优先用悬浮检测结果（快速路径）
       if (hoveredStarId !== -1) {
         options?.onStarClick?.(hoveredStarId)
+        return
       }
+
+      // 悬浮检测未命中，用 Raycaster 作为后备方案直接检测星星点击
+      skyGroup.updateMatrixWorld()
+      const raycaster = new Raycaster()
+      raycaster.setFromCamera(mouse, camera)
+      raycaster.params.Points!.threshold = 8
+      const starHits = raycaster.intersectObjects(starPointsRefs)
+      console.log('[useSky] click raycaster hits:', starHits.length, 'mouse:', mouse.x.toFixed(3), mouse.y.toFixed(3))
+      if (starHits.length > 0) {
+        const hit = starHits[0]
+        const tier = (hit.object as Points).userData.tierIndex as number
+        const starId = tierStarIds[tier]?.[hit.index!]
+        console.log('[useSky] clicked star:', starId, 'tier:', tier, 'index:', hit.index)
+        if (starId != null) {
+          options?.onStarClick?.(starId)
+          return
+        }
+      }
+
       // 检测行星点击
-      if (hoveredStarId === -1 && planetMeshes.length) {
-        const rect = canvas.getBoundingClientRect()
-        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-        const raycaster = new Raycaster()
-        raycaster.setFromCamera(mouse, camera)
+      if (planetMeshes.length) {
         raycaster.params.Points!.threshold = 8
-        const hits = raycaster.intersectObjects(planetMeshes)
-        if (hits.length) {
-          const pm = hits[0].object as Mesh
+        const planetHits = raycaster.intersectObjects(planetMeshes)
+        if (planetHits.length) {
+          const pm = planetHits[0].object as Mesh
           const pd = pm.userData as { planetName: string; planetNameCN: string }
           if (pd.planetName) {
             options?.onPlanetClick?.(pd.planetName, pd.planetNameCN)
@@ -1834,8 +1856,8 @@ export function useSky(
 
   return {
     camera,
-    zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); },
-    zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); },
+    zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
+    zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
     setObserver,
     setStarStatsCache(cache) {
       cache.forEach((v, k) => statsCache.set(k, v))
@@ -2024,7 +2046,7 @@ export function useSky(
           })
         }
       })
-      ;(labelRenderer as unknown as { dispose: () => void }).dispose()
+      // CSS2DRenderer 是 DOM 渲染器，无 dispose 方法，DOM 元素已在上面移除
       // 释放后处理资源（composer 内部 renderTarget）
       composer.dispose()
       renderer.dispose()

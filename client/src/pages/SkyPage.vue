@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -34,28 +34,31 @@
           👤 {{ username }}
         </span>
         <button v-if="username" class="nav-btn" @click="doLogout">退出</button>
+        <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
       </div>
     </nav>
 
-    <SkyCanvas v-if="locationReady && userLat != null" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
       <div class="loading-spinner"></div>
       <p class="loading-text">正在获取你的位置...</p>
     </div>
-    <div v-if="locationFailed" class="location-fallback">
-      <p class="fallback-title">无法获取你的位置</p>
-      <p class="fallback-desc">请在浏览器地址栏允许位置权限，或手动选择一个城市：</p>
-      <div class="city-grid">
-        <button v-for="c in cities" :key="c.name" class="city-btn" @click="selectCity(c)">
-          {{ c.name }}
-        </button>
+    <div v-if="locationFailed" class="location-fallback-backdrop">
+      <div class="location-fallback-panel">
+        <p class="fallback-title">无法获取你的位置</p>
+        <p class="fallback-desc">请在浏览器地址栏允许位置权限，或手动选择一个城市：</p>
+        <div class="city-grid">
+          <button v-for="c in cities" :key="c.name" class="city-btn" @click="selectCity(c)">
+            {{ c.name }}
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- 三张叙事引导牌 -->
-    <div v-if="userLat != null" class="guide-cards">
+    <div v-if="locationReady" class="guide-cards">
       <div class="guide-card">
         <div class="guide-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -86,7 +89,7 @@
       </div>
     </div>
 
-    <div v-if="userLat != null" class="zoom-controls">
+    <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
       <div class="zoom-divider"></div>
@@ -94,7 +97,7 @@
         <Settings :size="16" />
       </button>
     </div>
-    <div v-if="userLat != null" class="hint">
+    <div v-if="locationReady" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
@@ -236,7 +239,7 @@ if (navigator.geolocation) {
       locationReady.value = true
       locationFailed.value = true
     },
-    { timeout: 10000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: false },
   )
 } else {
   locationReady.value = true
@@ -265,6 +268,11 @@ onMounted(async () => {
 })
 
 function doLogout() {
+  localStorage.removeItem('token')
+  router.push('/')
+}
+
+function goLogin() {
   localStorage.removeItem('token')
   router.push('/')
 }
@@ -656,6 +664,11 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   color: #7a759c; font-size: 0.8rem; cursor: pointer;
 }
 .nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
+.nav-login-btn {
+  color: #ffd98a; border-color: rgba(255, 217, 138, 0.3);
+  background: rgba(40, 35, 18, 0.35);
+}
+.nav-login-btn:hover { color: #ffe6b0; border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
 .nav-center { flex: 1; display: flex; justify-content: center; }
 .search-box { position: relative; width: 260px; }
 .search-icon {
@@ -770,18 +783,31 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   margin: 0;
 }
 
-/* ─── 城市选择 ─── */
-.location-fallback {
+/* ─── 城市选择浮动面板 ─── */
+.location-fallback-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 8, 22, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+.location-fallback-panel {
+  pointer-events: auto;
+  background: rgba(16, 20, 43, 0.95);
+  border: 1px solid rgba(48, 55, 87, 0.5);
+  border-radius: var(--radius-lg, 12px);
+  padding: 1.5rem 2rem;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: var(--bg-deep, #070816);
   gap: 0.8rem;
-  padding: 1rem;
 }
 .fallback-title {
   color: var(--ink, #f6f1ff);

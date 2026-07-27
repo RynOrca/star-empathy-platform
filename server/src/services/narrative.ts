@@ -62,26 +62,92 @@ function getStarInfo(catalogStarId: number): CatalogStar | null {
   return cat.stars.find(s => s.id === catalogStarId) ?? null
 }
 
-/** 查找今日是否有缓存的叙事 */
-function getCachedNarrative(catalogStarId: number): string | null {
+/** 查找今日是否有缓存的叙事（区分地平线上下） */
+function getCachedNarrative(catalogStarId: number, isVisible: boolean): string | null {
   const row = db.prepare(`
     SELECT content FROM narratives
-    WHERE catalog_star_id = ? AND date(generated_at) = date('now')
+    WHERE catalog_star_id = ? AND date(generated_at) = date('now') AND is_visible = ?
     ORDER BY generated_at DESC LIMIT 1
-  `).get(catalogStarId) as { content: string } | undefined
+  `).get(catalogStarId, isVisible ? 1 : 0) as { content: string } | undefined
   return row?.content ?? null
 }
 
 /** 保存叙事到缓存 */
-function cacheNarrative(catalogStarId: number, content: string): void {
+function cacheNarrative(catalogStarId: number, content: string, isVisible: boolean): void {
   db.prepare(`
-    INSERT OR REPLACE INTO narratives (catalog_star_id, content, generated_at)
-    VALUES (?, ?, datetime('now'))
-  `).run(catalogStarId, content)
+    INSERT OR REPLACE INTO narratives (catalog_star_id, content, generated_at, is_visible)
+    VALUES (?, ?, datetime('now'), ?)
+  `).run(catalogStarId, content, isVisible ? 1 : 0)
+}
+
+/** 将 hex 颜色值转为人类可读描述，避免 AI 直接输出 hex 颜色 */
+function colorToDescription(hex: string): string {
+  const map: Record<string, string> = {
+    '#ffa850': '温暖的橙黄色',
+    '#ffcc6f': '柔和的金黄色',
+    '#ffffff': '纯净的白色',
+    '#c8d9ff': '淡蓝白色',
+    '#ffd2a0': '柔和的杏色',
+    '#a0c8ff': '清冷的蓝白色',
+    '#ff9830': '明亮的橙色',
+    '#ff7070': '温暖的红色',
+    '#90b0ff': '静谧的蓝白色',
+    '#ffb860': '温润的蜜色',
+    '#ffe0a0': '柔和的奶油色',
+    '#d0e0ff': '淡淡的蓝白色',
+    '#ffc080': '柔和的暖金色',
+    '#e0c0ff': '淡雅的白紫色',
+    '#80c0ff': '清冷的淡蓝色',
+    '#ff9060': '明亮的橙红色',
+    '#c0d0ff': '淡蓝色',
+    '#ffd080': '柔和的暖黄色',
+    '#b0d0ff': '淡蓝白色',
+    '#ffe8c0': '暖白色',
+    '#a0d0ff': '淡天蓝色',
+  }
+  return map[hex.toLowerCase()] || '肉眼可见的星光'
+}
+
+/** 计算儒略日（Julian Date） */
+function getJulianDate(date: Date): number {
+  const y = date.getUTCFullYear()
+  const m = date.getUTCMonth() + 1
+  const d = date.getUTCDate()
+  const h = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600
+
+  let a = Math.floor((14 - m) / 12)
+  let year = y + 4800 - a
+  let month = m + 12 * a - 3
+
+  let jd = d + Math.floor((153 * month + 2) / 5) + 365 * year
+    + Math.floor(year / 4) - Math.floor(year / 100) + Math.floor(year / 400) - 32045
+  jd += (h - 12) / 24
+
+  return jd
+}
+
+/** 计算恒星是否在地平线以上 */
+function isAboveHorizon(star: CatalogStar, lat: number, lng: number): boolean {
+  const now = new Date()
+  // 儒略日 → 距 J2000.0 纪元的天数
+  const jd = getJulianDate(now)
+  const d = jd - 2451545.0
+  // 格林尼治恒星时（小时）
+  const gmst = (18.697374558 + 24.06570982441908 * d) % 24
+  // 本地恒星时
+  const lst = ((gmst + lng / 15) % 24 + 24) % 24
+  // 时角（度）
+  const ha = ((lst - star.ra) * 15 % 360 + 360) % 360
+  const haRad = ha * Math.PI / 180
+  const decRad = star.dec * Math.PI / 180
+  const latRad = lat * Math.PI / 180
+  // 高度角的正弦
+  const sinAlt = Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad)
+  return sinAlt > -0.05 // 考虑大气折射，略低于地平线也算可见
 }
 
 /** 生成恒星的叙事 Prompt */
-function buildNarrativePrompt(star: CatalogStar): { system: string; user: string } {
+function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { system: string; user: string } {
   const starName = star.name || `RA ${star.ra.toFixed(1)}h Dec ${star.dec.toFixed(1)}°`
   const conMap: Record<string, string> = {
     And: '仙女座', Aqr: '宝瓶座', Ari: '白羊座', Aur: '御夫座',
@@ -101,6 +167,95 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
 
   // 检查该星是否有古人关联
   const hasFigures = getFiguresForStar(star.name, star.con).length > 0
+
+  // 星星不可见时的特殊处理
+  if (!isVisible) {
+    if (!hasFigures) {
+      // 不可见 + 无古诗记录
+      const system = `你是"星语穹庭"的星空叙事者。根据用户提供的恒星信息，写一段"古今共望"叙事短文。
+
+**注意：这颗星目前在地平线以下，无法直接用肉眼看到。请你如实而优美地表达这一点。**
+
+**你必须严格按照以下格式输出：**
+
+# 此刻，{星名}正在地平线之下
+
+它并未消失，只是暂时隐于大地的另一侧。
+
+（一段描写这颗星本身的文字：它的亮度、颜色、星座位置，1~2句）
+
+（坦诚地说明：这颗星尚无古人留下诗篇，但它的光芒穿越千年，等待属于它的故事——用优美、文艺的语言，1~2句）
+
+（结尾：愿未来的某一天，当它升起时，有人为它写下第一行诗，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 此刻，"开头，后跟星名和"正在地平线之下"
+2. 每个段落之间必须空一行
+3. 不要编造不存在的古诗或人物
+4. 不要使用 # 和 > 之外的任何 markdown 符号
+5. 文字优美凝练、温暖治愈，120~180字
+6. 中文输出`
+
+      const user = `恒星名称：${starName}
+所属星座：${conName}
+视星等：${star.mag.toFixed(1)} 等（${brightness}）
+颜色/光谱：${colorToDescription(star.color)}
+赤经：${star.ra.toFixed(2)}h
+赤纬：${star.dec.toFixed(2)}°
+
+这颗星目前在地平线以下，无法看到。它没有已知的古人诗词记录。请为它写一段叙事，坦诚而优美地表达：它虽在地平线下，但仍在等待属于它的诗篇。第一行必须是 "# 此刻，${starName}正在地平线之下"。`
+
+      return { system, user }
+    }
+
+    // 不可见 + 有古诗记录
+    const system = `你是"星语穹庭"的星空叙事者。根据用户提供的恒星信息，写一段"古今共望"叙事短文。
+
+**注意：这颗星目前在地平线以下，无法直接用肉眼看到。请你如实而优美地表达这一点。**
+
+**你必须严格按照以下格式输出，逐字逐句，包括 # 和 > 符号：**
+
+# 此刻，{星名}正在地平线之下
+
+它并未消失，只是暂时隐于大地的另一侧。
+
+（一段联系古今的叙述，1~2句）
+
+（诗人名）写：
+
+> "{诗句}"（朝代·《出处》）
+
+（对诗句的解读，联系诗人当时的社会背景、心境，1~2句）
+
+（结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 此刻，"开头，后跟星名和"正在地平线之下"
+2. 每个段落之间必须空一行
+3. 诗句引用必须以"> "（大于号+空格）开头，诗句用双引号包裹
+4. 诗句后面用括号标注朝代和出处
+5. 不要把所有内容写成一段，必须分段
+6. 不要省略 # 和 > 符号
+
+**内容要求：**
+- 联系古今：提到至少一位古代诗人/天文学家/历史人物
+- 引用相关古诗词（一句即可，标注作者和朝代）
+- 勿编造不存在的人物和诗句
+- 文字优美凝练、温暖治愈，150~250字
+- 结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星
+- 中文输出`
+
+    const user = `恒星名称：${starName}
+所属星座：${conName}
+视星等：${star.mag.toFixed(1)} 等（${brightness}）
+颜色/光谱：${colorToDescription(star.color)}
+赤经：${star.ra.toFixed(2)}h
+赤纬：${star.dec.toFixed(2)}°
+
+这颗星目前在地平线以下，无法看到。请为它写一段"古今共望"叙事。记住：第一行必须是 "# 此刻，${starName}正在地平线之下"，诗句引用必须以 "> " 开头。`
+
+    return { system, user }
+  }
 
   if (!hasFigures) {
     // 无古诗记录的星星：文艺提示
@@ -129,7 +284,7 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
     const user = `恒星名称：${starName}
 所属星座：${conName}
 视星等：${star.mag.toFixed(1)} 等（${brightness}）
-颜色/光谱：${star.color}
+颜色/光谱：${colorToDescription(star.color)}
 赤经：${star.ra.toFixed(2)}h
 赤纬：${star.dec.toFixed(2)}°
 
@@ -174,7 +329,7 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
   const user = `恒星名称：${starName}
 所属星座：${conName}
 视星等：${star.mag.toFixed(1)} 等（${brightness}）
-颜色/光谱：${star.color}
+颜色/光谱：${colorToDescription(star.color)}
 赤经：${star.ra.toFixed(2)}h
 赤纬：${star.dec.toFixed(2)}°
 
@@ -191,21 +346,25 @@ export interface NarrativeResult {
 /**
  * 获取恒星叙事（优先缓存，无缓存则生成并缓存）
  */
-export async function getNarrative(catalogStarId: number): Promise<NarrativeResult> {
+export async function getNarrative(catalogStarId: number, lat?: number, lng?: number): Promise<NarrativeResult> {
   // 1. 查找恒星信息
   const star = getStarInfo(catalogStarId)
   if (!star) {
     throw Object.assign(new Error('恒星不存在'), { statusCode: 404 })
   }
 
-  // 2. 查缓存
-  const cached = getCachedNarrative(catalogStarId)
+  // 2. 计算地平线可见性
+  const hasPosition = lat !== undefined && lng !== undefined
+  const visible = hasPosition ? isAboveHorizon(star, lat, lng) : true
+
+  // 3. 查缓存（区分地平线上下）
+  const cached = getCachedNarrative(catalogStarId, visible)
   if (cached) {
     return { content: cached, cached: true }
   }
 
-  // 3. 生成叙事
-  const { system, user } = buildNarrativePrompt(star)
+  // 4. 生成叙事
+  const { system, user } = buildNarrativePrompt(star, visible)
   const content = await deepseekChat(
     [
       { role: 'system', content: system },
@@ -213,12 +372,14 @@ export async function getNarrative(catalogStarId: number): Promise<NarrativeResu
     ],
     {
       temperature: 0.9,
-      maxTokens: 600,
+      maxTokens: 3000,
     },
   )
 
-  // 4. 缓存
-  cacheNarrative(catalogStarId, content)
+  // 5. 缓存（仅在有位置信息时缓存，确保地平线判断正确）
+  if (hasPosition) {
+    cacheNarrative(catalogStarId, content, visible)
+  }
 
   return { content, cached: false }
 }

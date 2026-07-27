@@ -15,7 +15,9 @@ router.get('/:catalogStarId/narrative', async (req: Request, res: Response) => {
       return badRequest(res, '无效的 catalogStarId')
     }
 
-    const result = await getNarrative(catalogStarId)
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined
+    const result = await getNarrative(catalogStarId, lat, lng)
     ok(res, 'success', result)
   } catch (error: any) {
     if (error?.statusCode === 404) {

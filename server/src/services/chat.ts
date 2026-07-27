@@ -162,8 +162,7 @@ export async function streamChat(
         try {
           const parsed = JSON.parse(data)
           const delta = parsed.choices?.[0]?.delta
-          // DeepSeek v4 推理模型可能把内容放在 reasoning_content 而非 content
-          const chunk = delta?.content || delta?.reasoning_content
+          const chunk = delta?.content
           if (chunk) {
             res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`)
           }

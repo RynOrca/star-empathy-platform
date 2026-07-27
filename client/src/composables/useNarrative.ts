@@ -11,14 +11,20 @@ export function useNarrative() {
   const error = ref<string | null>(null)
   const cached = ref(false)
 
-  async function fetchNarrative(catalogStarId: number): Promise<void> {
+  async function fetchNarrative(catalogStarId: number, lat?: number, lng?: number): Promise<void> {
     loading.value = true
     error.value = null
     content.value = null
     cached.value = false
 
     try {
-      const res = await fetch(`/api/catalog/stars/${catalogStarId}/narrative`)
+      const params = new URLSearchParams()
+      if (lat !== undefined && lng !== undefined) {
+        params.set('lat', String(lat))
+        params.set('lng', String(lng))
+      }
+      const qs = params.toString()
+      const res = await fetch(`/api/catalog/stars/${catalogStarId}/narrative${qs ? '?' + qs : ''}`)
       const json = await res.json()
       if (!res.ok) {
         throw new Error(json.message || `HTTP ${res.status}`)

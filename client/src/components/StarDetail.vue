@@ -560,12 +560,27 @@ const detailStory = computed(() => {
 const justResonatedId = ref<number | null>(null)
 const viewMode = ref<'narrative' | 'stories'>('narrative')
 
+// ─── 用户当前位置（用于计算距离 + 传入叙事 API） ───
+const userPosition = ref<{ lat: number; lng: number } | null>(null)
+const positionReady = ref(false)
+
 // ─── 古今共望叙事 ───
 const narrative = useNarrative()
+
+/** 发起叙事请求（仅在位置就绪后调用） */
+function fetchNarrativeWithPosition() {
+  if (!props.catalogStarId) return
+  narrative.reset()
+  narrative.fetchNarrative(
+    props.catalogStarId,
+    userPosition.value?.lat,
+    userPosition.value?.lng,
+  )
+}
+
 watch(() => props.catalogStarId, (id) => {
-  if (id) {
-    narrative.reset()
-    narrative.fetchNarrative(id)
+  if (id && positionReady.value) {
+    fetchNarrativeWithPosition()
   }
 }, { immediate: true })
 
@@ -605,18 +620,24 @@ function onSimilarStarClick(catalogStarId: number) {
   window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
 }
 
-// ─── 用户当前位置（用于计算距离） ───
-const userPosition = ref<{ lat: number; lng: number } | null>(null)
-
 onMounted(() => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         userPosition.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        positionReady.value = true
+        fetchNarrativeWithPosition()
       },
-      () => { /* 静默 */ },
+      () => {
+        // 获取位置失败，仍标记为就绪（不带位置参数，后端默认 visible=true）
+        positionReady.value = true
+        fetchNarrativeWithPosition()
+      },
       { timeout: 5000 },
     )
+  } else {
+    // 不支持地理位置，直接标记就绪
+    positionReady.value = true
   }
 
   // 点击外部关闭排序下拉
