@@ -31,9 +31,6 @@ export const STAR_COLORS = {
 // 高共鸣阈值
 export const HIGH_RESONANCE_THRESHOLD = 50
 
-// 闪烁
-export const TWINKLE_RATIO = 0.1  // 10% 的星参与闪烁
-
 // Raycaster
 export const RAYCASTER_THRESHOLD = 8
 
