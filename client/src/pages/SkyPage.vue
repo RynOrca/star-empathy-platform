@@ -30,8 +30,11 @@
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
-        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="showMyStoriesOnly = !showMyStoriesOnly" title="只看我的故事">
+        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
           {{ showMyStoriesOnly ? '🌐 全部' : '⭐ 我的' }}
+        </button>
+        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" title="更改定位">
+          📍 定位
         </button>
         <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
           👤 {{ username }}
@@ -40,6 +43,11 @@
         <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
       </div>
     </nav>
+
+    <!-- 切换反馈提示 -->
+    <Transition name="toast-fade">
+      <div v-if="myToggleFeedback" class="toggle-toast">{{ myToggleFeedback }}</div>
+    </Transition>
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
 
@@ -160,6 +168,13 @@ const router = useRouter()
 const route = useRoute()
 const username = ref('')
 const showMyStoriesOnly = ref(false)
+const myToggleFeedback = ref('')
+
+function toggleMyStories() {
+  showMyStoriesOnly.value = !showMyStoriesOnly.value
+  myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
+  setTimeout(() => { myToggleFeedback.value = '' }, 2000)
+}
 const favoriteStarIds = ref<number[]>([])
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
@@ -312,23 +327,30 @@ onMounted(async () => {
   }) as EventListener)
 
   // 从个人主页收藏点击跳转过来：定位到指定星星
+  focusOnQueryStar()
+})
+
+// 提取定位逻辑为独立函数，供 onMounted 和 watch 共用
+function focusOnQueryStar() {
   const targetStarId = route.query.star
-  if (targetStarId) {
-    const starId = parseInt(targetStarId as string, 10)
-    if (!isNaN(starId)) {
-      // 等 sky 就绪后定位
-      const tryFocus = () => {
-        const star = catalogStarLookup.get(starId)
-        if (star && skyRef.value?.sky) {
-          skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
-          setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
-        } else {
-          setTimeout(tryFocus, 300)
-        }
-      }
-      setTimeout(tryFocus, 500)
+  if (!targetStarId) return
+  const starId = parseInt(targetStarId as string, 10)
+  if (isNaN(starId)) return
+  const tryFocus = () => {
+    const star = catalogStarLookup.get(starId)
+    if (star && skyRef.value?.sky) {
+      skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+      setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
+    } else {
+      setTimeout(tryFocus, 300)
     }
   }
+  setTimeout(tryFocus, 500)
+}
+
+// 监听路由 query 变化（从个人主页多次点击收藏时触发）
+watch(() => route.query.star, () => {
+  focusOnQueryStar()
 })
 
 function doLogout() {
@@ -740,11 +762,12 @@ function onStorySubmitted(story: StoryData) {
   existing.push(story)
   map.set(cid, existing)
   storiesByStarId.value = new Map(map)
+  // 更新天空统计（无论是否"只看我的"模式）
+  recalcFilteredStats()
   if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
     selectedStories.value = [...existing]
   }
   showForm.value = false
-  if (showMyStoriesOnly.value) recalcFilteredStats()
 }
 function onSwitchStory(index: number) { activeStoryIndex.value = index }
 function onIncrementViews() { if (catalogStats.value) catalogStats.value = { ...catalogStats.value, totalViews: catalogStats.value.totalViews + 1 } }
@@ -1108,6 +1131,26 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border-color: rgba(255, 217, 138, 0.35);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
+
+/* ─── 切换反馈 Toast ─── */
+.toggle-toast {
+  position: fixed; top: 3.5rem; left: 50%; transform: translateX(-50%);
+  z-index: 25; padding: 0.5rem 1.2rem; border-radius: 20px;
+  background: rgba(255, 217, 138, 0.15); border: 1px solid rgba(255, 217, 138, 0.3);
+  color: #ffd98a; font-size: 0.82rem; backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
+.toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
+.toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+.toast-fade-leave-to { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+
+/* ─── 定位刷新按钮 ─── */
+.nav-loc-btn {
+  color: #8a84a0; border-color: rgba(48, 55, 87, 0.5);
+  font-size: 0.75rem;
+}
+.nav-loc-btn:hover { color: #ffd98a; border-color: rgba(255, 217, 138, 0.3); }
 
 @media (max-width: 640px) {
   .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }

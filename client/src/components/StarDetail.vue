@@ -61,7 +61,7 @@
                   >
                     <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
                     <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
-                    <span class="resonate-count">{{ detailStory.resonanceCount }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
                   </button>
                 </div>
               </div>
@@ -146,7 +146,7 @@
                     <span v-if="formatDistance(story.locationLat, story.locationLng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.locationLat, story.locationLng).near }">{{ formatDistance(story.locationLat, story.locationLng).text }}</span>
                   </template>
                   <span class="meta-sep" v-if="(story.type === 'history' || formatTime(story.createdAt) || formatDistance(story.locationLat, story.locationLng).text)">·</span>
-                  <Sparkles :size="12" /> <span>{{ story.resonanceCount }}</span>
+                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
                   <span class="meta-sep">·</span>
                   <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
                 </div>
@@ -534,7 +534,7 @@ function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof
       }
     }
     case 'resonance':
-      return (a, b) => b.resonanceCount - a.resonanceCount
+      return (a, b) => getDisplayResonance(b) - getDisplayResonance(a)
     case 'views':
       return (a, b) => getStoryViewCount(b.id) - getStoryViewCount(a.id)
     case 'random': {
@@ -559,6 +559,16 @@ const detailStory = computed(() => {
 })
 const justResonatedId = ref<number | null>(null)
 const viewMode = ref<'narrative' | 'stories'>('narrative')
+
+// ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
+const resonanceOverrides = reactive(new Map<number, number>())
+function getDisplayResonance(story: { id: number; resonanceCount: number }): number {
+  return resonanceOverrides.get(story.id) ?? story.resonanceCount
+}
+// 当 props.stories 更新（SkyPage 返回权威数据），清除乐观覆盖
+watch(() => props.stories, () => {
+  resonanceOverrides.clear()
+})
 
 // ─── 用户当前位置（用于计算距离 + 传入叙事 API） ───
 const userPosition = ref<{ lat: number; lng: number } | null>(null)
@@ -655,6 +665,9 @@ function onDocumentClick(e: MouseEvent) {
 }
 
 function onResonate(story: { id: number; resonanceCount: number }) {
+  // 乐观更新：立即 +1，不等 API 返回
+  const current = getDisplayResonance(story)
+  resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
