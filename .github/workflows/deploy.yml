@@ -42,7 +42,7 @@ jobs:
             echo "=== 4/6 构建后端 ==="
             cd server
             npm install --silent
-            npm run build
+            npx tsc
             npm prune --production --silent
 
             if [ ! -f .env ]; then
@@ -55,7 +55,7 @@ jobs:
             echo "=== 5/6 构建前端 + 重启 ==="
             cd ../client
             npm install --silent
-            npm run build
+            NODE_OPTIONS="--max-old-space-size=4096" npx vite build
             cd ../server
             pm2 restart star-api 2>/dev/null || pm2 start dist/src/index.js --name star-api
             pm2 save
