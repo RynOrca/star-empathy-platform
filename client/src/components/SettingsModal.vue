@@ -14,7 +14,7 @@
             <div class="form-group">
               <label class="form-label">DeepSeek API Key</label>
               <p v-if="hasExistingKey && !apiKey" class="form-existing-hint">
-                ✅ API Key 已配置。如需更换，请在上方输入新 Key。
+                <Check :size="14" /> API Key 已配置。如需更换，请在上方输入新 Key。
               </p>
               <div class="input-wrap">
                 <input
@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { X, Eye, EyeOff, Zap, Loader2 } from 'lucide-vue-next'
+import { X, Eye, EyeOff, Zap, Loader2, Check } from 'lucide-vue-next'
 
 const props = defineProps<{
   visible: boolean
