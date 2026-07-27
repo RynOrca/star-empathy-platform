@@ -80,6 +80,34 @@ function cacheNarrative(catalogStarId: number, content: string): void {
   `).run(catalogStarId, content)
 }
 
+/** 将 hex 颜色值转为人类可读描述，避免 AI 直接输出 hex 颜色 */
+function colorToDescription(hex: string): string {
+  const map: Record<string, string> = {
+    '#ffa850': '温暖的橙黄色',
+    '#ffcc6f': '柔和的金黄色',
+    '#ffffff': '纯净的白色',
+    '#c8d9ff': '淡蓝白色',
+    '#ffd2a0': '柔和的杏色',
+    '#a0c8ff': '清冷的蓝白色',
+    '#ff9830': '明亮的橙色',
+    '#ff7070': '温暖的红色',
+    '#90b0ff': '静谧的蓝白色',
+    '#ffb860': '温润的蜜色',
+    '#ffe0a0': '柔和的奶油色',
+    '#d0e0ff': '淡淡的蓝白色',
+    '#ffc080': '柔和的暖金色',
+    '#e0c0ff': '淡雅的白紫色',
+    '#80c0ff': '清冷的淡蓝色',
+    '#ff9060': '明亮的橙红色',
+    '#c0d0ff': '淡蓝色',
+    '#ffd080': '柔和的暖黄色',
+    '#b0d0ff': '淡蓝白色',
+    '#ffe8c0': '暖白色',
+    '#a0d0ff': '淡天蓝色',
+  }
+  return map[hex.toLowerCase()] || '肉眼可见的星光'
+}
+
 /** 生成恒星的叙事 Prompt */
 function buildNarrativePrompt(star: CatalogStar): { system: string; user: string } {
   const starName = star.name || `RA ${star.ra.toFixed(1)}h Dec ${star.dec.toFixed(1)}°`
@@ -129,7 +157,7 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
     const user = `恒星名称：${starName}
 所属星座：${conName}
 视星等：${star.mag.toFixed(1)} 等（${brightness}）
-颜色/光谱：${star.color}
+颜色/光谱：${colorToDescription(star.color)}
 赤经：${star.ra.toFixed(2)}h
 赤纬：${star.dec.toFixed(2)}°
 
@@ -174,7 +202,7 @@ function buildNarrativePrompt(star: CatalogStar): { system: string; user: string
   const user = `恒星名称：${starName}
 所属星座：${conName}
 视星等：${star.mag.toFixed(1)} 等（${brightness}）
-颜色/光谱：${star.color}
+颜色/光谱：${colorToDescription(star.color)}
 赤经：${star.ra.toFixed(2)}h
 赤纬：${star.dec.toFixed(2)}°
 
