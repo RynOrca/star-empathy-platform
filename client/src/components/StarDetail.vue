@@ -727,7 +727,10 @@ function openStoryDetail(story: { id: number }) {
   // 通知父组件更新统计行
   emit('incrementViews')
   // 后端记录 + 重新拉取
-  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
+  const token = localStorage.getItem('token')
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  fetch(`/api/stories/${story.id}/view`, { method: 'POST', headers })
     .then(() => emit('refreshStories'))
     .catch(() => {
       // 失败回滚

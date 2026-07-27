@@ -83,6 +83,31 @@ db.exec(`
     generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_story_kernels_story ON story_kernels(story_id);
+
+  CREATE TABLE IF NOT EXISTS token_blacklist (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+
+  CREATE TABLE IF NOT EXISTS resonance_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id   INTEGER NOT NULL REFERENCES stars(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(story_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_resonance_log_story ON resonance_log(story_id);
+
+  CREATE TABLE IF NOT EXISTS story_views (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id  INTEGER NOT NULL REFERENCES stars(id),
+    user_id   INTEGER NOT NULL REFERENCES users(id),
+    viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_story_views_dedup ON story_views(story_id, user_id);
 `);
 
 // 兼容旧数据库：添加新列
@@ -105,5 +130,8 @@ try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narrative
 // 兼容旧数据库：添加新索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_user ON stars(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_created ON stars(created_at)'); } catch {}
+// 兼容旧数据库：catalog_visits 加 user_id 列
+try { db.exec('ALTER TABLE catalog_visits ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_visits(user_id)'); } catch {}
 
 export default db;

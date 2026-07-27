@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { recordCatalogVisit, getCatalogStats, getStoriesByCatalogStarId, addFavorite, removeFavorite } from '../services/starService';
-import { authRequired } from '../middleware/auth';
+import { authRequired, authOptional } from '../middleware/auth';
 import { ok, badRequest, serverError } from '../utils/response';
 import { getAggregatedTags, getSimilarStars, getAreaHighlights } from '../services/kernel';
 
@@ -32,12 +32,13 @@ router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   }
 });
 
-// 记录恒星浏览（打开详情页一次）
-router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
+// 记录恒星浏览（打开详情页一次，可选登录用于去重）
+router.post('/:catalogStarId/visit', authOptional, (req: Request, res: Response) => {
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
-    recordCatalogVisit(catalogStarId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    recordCatalogVisit(catalogStarId, user?.id);
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/catalog/stars/:catalogStarId/visit error:', error);

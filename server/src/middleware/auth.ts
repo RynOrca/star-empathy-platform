@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { unauthorized } from '../utils/response';
+import { isTokenBlacklisted } from '../services/userService';
 
 const envSecret = process.env.JWT_SECRET;
 const isDev = process.env.NODE_ENV !== 'production';
@@ -31,6 +32,9 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
   const token = header.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    if (isTokenBlacklisted(token)) {
+      return unauthorized(res, '登录已过期');
+    }
     (req as Request & { user: AuthUser }).user = decoded;
     next();
   } catch {

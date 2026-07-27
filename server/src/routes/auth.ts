@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, guestLogin, getUserById, updateSignature } from '../services/userService';
+import { register, login, guestLogin, getUserById, updateSignature, changePassword, blacklistToken } from '../services/userService';
 import { authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, send } from '../utils/response';
 
@@ -66,6 +66,37 @@ router.patch('/signature', authRequired, (req: Request, res: Response) => {
     ok(res, '签名已更新', updated);
   } catch (error: any) {
     send(res, 500, error.message || '更新失败');
+  }
+});
+
+// 修改密码
+router.patch('/password', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || typeof oldPassword !== 'string') {
+      return badRequest(res, '请输入旧密码');
+    }
+    if (!newPassword || typeof newPassword !== 'string') {
+      return badRequest(res, '请输入新密码');
+    }
+    changePassword(user.id, oldPassword, newPassword);
+    ok(res, '密码已修改');
+  } catch (error: any) {
+    send(res, 400, error.message || '修改失败');
+  }
+});
+
+// 退出登录
+router.post('/logout', authRequired, (req: Request, res: Response) => {
+  try {
+    const header = req.headers.authorization;
+    if (header && header.startsWith('Bearer ')) {
+      blacklistToken(header.slice(7));
+    }
+    ok(res, '已退出');
+  } catch (error: any) {
+    send(res, 500, error.message || '退出失败');
   }
 });
 

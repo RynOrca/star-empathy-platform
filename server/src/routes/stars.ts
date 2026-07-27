@@ -103,14 +103,16 @@ router.post('/story', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 共鸣点亮
-router.post('/:storyId/resonate', (req: Request, res: Response) => {
+// 共鸣点亮（可选登录，用于去重）
+router.post('/:storyId/resonate', authOptional, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
-    const result = resonate(storyId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    const result = resonate(storyId, user?.id);
     if (!result) return notFound(res, '故事不存在');
+    if (result.already) return ok(res, '已共鸣', result);
 
     ok(res, '共鸣已点亮', result);
   } catch (error) {
@@ -132,12 +134,13 @@ router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   }
 });
 
-// 记录恒星浏览（打开详情页一次）
-router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
+// 记录恒星浏览（打开详情页一次，可选登录用于去重）
+router.post('/:catalogStarId/visit', authOptional, (req: Request, res: Response) => {
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
-    recordCatalogVisit(catalogStarId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    recordCatalogVisit(catalogStarId, user?.id);
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stars/:catalogStarId/visit error:', error);
@@ -145,12 +148,13 @@ router.post('/:catalogStarId/visit', (req: Request, res: Response) => {
   }
 });
 
-// 记录故事浏览（点击进入故事详情）
-router.post('/story/:storyId/view', (req: Request, res: Response) => {
+// 记录故事浏览（点击进入故事详情，可选登录用于去重）
+router.post('/story/:storyId/view', authOptional, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
-    recordStoryView(storyId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    recordStoryView(storyId, user?.id);
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stars/story/:storyId/view error:', error);

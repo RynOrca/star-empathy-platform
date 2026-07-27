@@ -402,7 +402,16 @@ watch(() => route.query.star, () => {
   focusOnQueryStar()
 })
 
-function doLogout() {
+async function doLogout() {
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch { /* 即使 API 失败也清除本地状态 */ }
+  }
   localStorage.removeItem('token')
   router.push('/')
 }
@@ -835,7 +844,10 @@ function onUpdateFavoriteList(data: { catalogStarId: number; favorited: boolean 
 async function onResonate(storyId: number) {
   resonating.value = true
   try {
-    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST' })
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST', headers })
     const json = await res.json()
     if (res.ok) {
       // 更新当前选中故事列表

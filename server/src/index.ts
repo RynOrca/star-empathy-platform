@@ -15,6 +15,7 @@ import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
 import { ok, badRequest, serverError } from './utils/response';
 import { setApiKey, getApiKey } from './services/deepseek';
+import { cleanExpiredTokens } from './services/userService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -202,6 +203,11 @@ app.listen(PORT, () => {
   console.log(`   POST /api/stories               - 投递心事`);
   console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
   console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
+
+  // 定时清理过期 token 黑名单（每 10 分钟）
+  setInterval(() => {
+    try { cleanExpiredTokens(); } catch { /* 静默 */ }
+  }, 10 * 60 * 1000);
 });
 
 export default app;

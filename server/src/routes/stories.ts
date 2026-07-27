@@ -90,14 +90,16 @@ router.post('/', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 共鸣故事
-router.post('/:storyId/resonate', (req: Request, res: Response) => {
+// 共鸣故事（可选登录，用于去重）
+router.post('/:storyId/resonate', authOptional, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
 
-    const result = resonate(storyId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    const result = resonate(storyId, user?.id);
     if (!result) return notFound(res, '故事不存在');
+    if (result.already) return ok(res, '已共鸣', result);
 
     ok(res, '共鸣已点亮', result);
   } catch (error) {
@@ -106,12 +108,13 @@ router.post('/:storyId/resonate', (req: Request, res: Response) => {
   }
 });
 
-// 故事级浏览 +1
-router.post('/:storyId/view', (req: Request, res: Response) => {
+// 故事级浏览 +1（可选登录，用于去重）
+router.post('/:storyId/view', authOptional, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
-    recordStoryView(storyId);
+    const user = (req as Request & { user?: { id: number } }).user;
+    recordStoryView(storyId, user?.id);
     ok(res, 'success');
   } catch (error) {
     console.error('POST /api/stories/:storyId/view error:', error);
