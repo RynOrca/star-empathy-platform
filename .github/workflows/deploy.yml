@@ -9,7 +9,39 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Backend
+        run: |
+          cd server
+          npm ci --silent
+          npm run build
+
+      - name: Build Frontend
+        run: |
+          cd client
+          npm ci --silent
+          npm run build
+
+      - name: Package
+        run: tar -czf /tmp/deploy.tar.gz server/dist server/package.json server/package-lock.json client/dist
+
+      - name: Upload to Server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -P 22 \
+            /tmp/deploy.tar.gz \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/deploy.tar.gz
+
+      - name: Extract & Restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -19,26 +51,23 @@ jobs:
           script: |
             set -e
             cd /var/www/star-empathy-platform
-            echo "=== 1/5 拉取代码 ==="
+
+            # 备份 .env
             cp server/.env /tmp/star-env 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
-            git clean -fdx
+
+            # 清理旧构建产物
+            rm -rf server/dist client/dist
+
+            # 解压新构建
+            tar -xzf /tmp/deploy.tar.gz
+            rm /tmp/deploy.tar.gz
+
+            # 恢复 .env
             cp /tmp/star-env server/.env 2>/dev/null || true
 
-            echo "=== 1.5/5 检查合并冲突 ==="
-            if grep -rn "^<<<<<<< \|^=======\|^>>>>>>> " client/src/ server/src/ 2>/dev/null; then
-              echo "❌ 检测到未解决的合并冲突标记，终止部署！"
-              exit 1
-            fi
-            echo "✅ 无合并冲突标记"
-
-            echo "=== 2/5 构建后端 ==="
             cd server
-            npm install --silent
-            npm run build
-            npm prune --production --silent
 
+            # 确保 .env 存在
             if [ ! -f .env ]; then
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
               echo "API_PORT=3000" >> .env
@@ -46,16 +75,14 @@ jobs:
               echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" >> .env
             fi
 
-            echo "=== 3/5 启动后端 ==="
-            pm2 restart star-api 2>/dev/null || pm2 start dist/src/index.js --name star-api
+            # 安装生产依赖
+            npm install --production --silent
+
+            # 重启后端
+            pm2 restart star-api 2>/dev/null || pm2 start dist/index.js --name star-api
             pm2 save
 
-            echo "=== 4/5 构建前端 ==="
-            cd ../client
-            npm install --silent
-            npm run build
-
-            echo "=== 5/5 重载 Nginx ==="
+            # 重载 Nginx
             nginx -t && nginx -s reload
 
             echo "=== 部署完成 ==="
