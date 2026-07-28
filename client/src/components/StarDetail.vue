@@ -21,8 +21,7 @@
         <div class="tab-content">
           <!-- Tab 1: AI 叙事（默认） -->
           <template v-if="activeTab === 'narrative'">
-            <!-- 原有叙事内容，后续 Task 迁移 -->
-            <template v-if="true">
+            <div class="narrative-scroll">
               <StarNarrative
                 :content="narrative.content.value"
                 :loading="narrative.loading.value"
@@ -30,7 +29,138 @@
                 :cached="narrative.cached.value"
                 @retry="narrative.fetchNarrative(catalogStarId)"
               />
-            </template>
+
+              <!-- 标签 -->
+              <div class="info-section">
+                <div class="info-label">
+                  标签
+                  <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+                  <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+                  <button
+                    v-if="!editingTags"
+                    class="tag-edit-btn"
+                    title="编辑标签"
+                    @click="startEditTags"
+                  >
+                    <PenSquare :size="11" />
+                  </button>
+                </div>
+
+                <!-- 编辑模式 -->
+                <div v-if="editingTags" class="tag-editor">
+                  <div class="tag-editor-tags">
+                    <span
+                      v-for="(t, i) in customTags"
+                      :key="i"
+                      class="tag tag-editable"
+                      @click="removeCustomTag(i)"
+                    >
+                      {{ t }}
+                      <X :size="10" class="tag-remove-x" />
+                    </span>
+                    <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+                  </div>
+                  <div class="tag-editor-input-row">
+                    <input
+                      v-model="newTagInput"
+                      class="tag-editor-input"
+                      placeholder="输入自定义标签..."
+                      @keydown.enter="addCustomTag"
+                    />
+                    <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+                  </div>
+                  <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+                    <span class="tag-editor-suggest-label">AI 建议：</span>
+                    <span
+                      v-for="t in displayTags"
+                      :key="t.tag"
+                      class="tag tag-suggestion"
+                      :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                      @click="addCustomTagFromSuggestion(t.tag)"
+                    >
+                      {{ t.tag }}
+                    </span>
+                  </div>
+                  <div class="tag-editor-actions">
+                    <button class="tag-editor-save" @click="saveTags">保存</button>
+                    <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+                  </div>
+                </div>
+
+                <!-- 展示模式 -->
+                <div v-else class="info-tags">
+                  <span
+                    v-for="t in mergedTags"
+                    :key="t.tag"
+                    class="tag"
+                    :class="{
+                      'tag-emotion': t.type === 'emotion',
+                      'tag-theme': t.type === 'theme',
+                      'tag-custom': t.custom,
+                    }"
+                  >
+                    {{ t.tag }}
+                    <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
+                  </span>
+                  <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
+                </div>
+              </div>
+
+              <!-- 相似星星 -->
+              <div class="info-section" v-if="similarStars.similarStars.value.length > 0">
+                <div class="info-label">内核相似的星星</div>
+                <div class="similar-list">
+                  <div
+                    v-for="s in similarStars.similarStars.value.slice(0, 5)"
+                    :key="s.catalogStarId"
+                    class="similar-item"
+                    @click="onSimilarStarClick(s.catalogStarId)"
+                  >
+                    <div class="similar-info">
+                      <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
+                      <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
+                    </div>
+                    <div class="similar-tags">
+                      <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 天区故事精选 -->
+              <div class="info-section" v-if="areaHighlightsData.length > 0">
+                <div class="info-label">
+                  天区故事精选
+                  <span v-if="areaLoading" class="tag-loading">凝练中...</span>
+                </div>
+                <div class="highlight-list">
+                  <div
+                    v-for="(h, hi) in areaHighlightsData"
+                    :key="h.catalogStarId"
+                    class="highlight-card"
+                    :class="{ 'is-target': hi === 0 && h.score === 0 }"
+                    @click="h.catalogStarId !== catalogStarId && onSimilarStarClick(h.catalogStarId)"
+                  >
+                    <div class="highlight-head">
+                      <span class="highlight-star-name">
+                        <span class="highlight-dot" :class="{ 'dot-target': hi === 0 && h.score === 0 }"></span>
+                        {{ getStarName(h.catalogStarId) }}
+                      </span>
+                      <span v-if="h.score > 0" class="highlight-score">{{ Math.round(h.score * 100) }}%</span>
+                      <span v-else class="highlight-badge-target">当前</span>
+                    </div>
+                    <div class="highlight-emotions" v-if="h.sharedEmotions.length > 0">
+                      <span v-for="tag in h.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+                    </div>
+                    <div class="highlight-essences">
+                      <p v-for="(essence, ei) in h.essences" :key="ei" class="highlight-essence">
+                        "{{ essence }}"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </template>
 
           <!-- Tab 2: 历史故事 -->
@@ -516,82 +646,6 @@
           </div>
         </div>
 
-        <!-- 标签 -->
-        <div class="info-section">
-          <div class="info-label">
-            标签
-            <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
-            <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
-            <button
-              v-if="!editingTags"
-              class="tag-edit-btn"
-              title="编辑标签"
-              @click="startEditTags"
-            >
-              <PenSquare :size="11" />
-            </button>
-          </div>
-
-          <!-- 编辑模式 -->
-          <div v-if="editingTags" class="tag-editor">
-            <div class="tag-editor-tags">
-              <span
-                v-for="(t, i) in customTags"
-                :key="i"
-                class="tag tag-editable"
-                @click="removeCustomTag(i)"
-              >
-                {{ t }}
-                <X :size="10" class="tag-remove-x" />
-              </span>
-              <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
-            </div>
-            <div class="tag-editor-input-row">
-              <input
-                v-model="newTagInput"
-                class="tag-editor-input"
-                placeholder="输入自定义标签..."
-                @keydown.enter="addCustomTag"
-              />
-              <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
-            </div>
-            <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
-              <span class="tag-editor-suggest-label">AI 建议：</span>
-              <span
-                v-for="t in displayTags"
-                :key="t.tag"
-                class="tag tag-suggestion"
-                :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
-                @click="addCustomTagFromSuggestion(t.tag)"
-              >
-                {{ t.tag }}
-              </span>
-            </div>
-            <div class="tag-editor-actions">
-              <button class="tag-editor-save" @click="saveTags">保存</button>
-              <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
-            </div>
-          </div>
-
-          <!-- 展示模式 -->
-          <div v-else class="info-tags">
-            <span
-              v-for="t in mergedTags"
-              :key="t.tag"
-              class="tag"
-              :class="{
-                'tag-emotion': t.type === 'emotion',
-                'tag-theme': t.type === 'theme',
-                'tag-custom': t.custom,
-              }"
-            >
-              {{ t.tag }}
-              <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
-            </span>
-            <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
-          </div>
-        </div>
-
         <!-- ─── P1-2：北极星岁差变迁科普（14-B §2 岁差） ─── -->
         <div v-if="catalogStarId === 4" class="info-section precession-lore">
           <div class="info-label">北极星不是永恒的</div>
@@ -623,61 +677,6 @@
             <MessagesSquare :size="14" />
             <span>与古人共赏</span>
           </button>
-        </div>
-
-        <!-- 相似星星 -->
-        <div class="info-section" v-if="similarStars.similarStars.value.length > 0">
-          <div class="info-label">内核相似的星星</div>
-          <div class="similar-list">
-            <div
-              v-for="s in similarStars.similarStars.value.slice(0, 5)"
-              :key="s.catalogStarId"
-              class="similar-item"
-              @click="onSimilarStarClick(s.catalogStarId)"
-            >
-              <div class="similar-info">
-                <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
-                <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
-              </div>
-              <div class="similar-tags">
-                <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 天区故事精选 -->
-        <div class="info-section" v-if="areaHighlightsData.length > 0">
-          <div class="info-label">
-            天区故事精选
-            <span v-if="areaLoading" class="tag-loading">凝练中...</span>
-          </div>
-          <div class="highlight-list">
-            <div
-              v-for="(h, hi) in areaHighlightsData"
-              :key="h.catalogStarId"
-              class="highlight-card"
-              :class="{ 'is-target': hi === 0 && h.score === 0 }"
-              @click="h.catalogStarId !== catalogStarId && onSimilarStarClick(h.catalogStarId)"
-            >
-              <div class="highlight-head">
-                <span class="highlight-star-name">
-                  <span class="highlight-dot" :class="{ 'dot-target': hi === 0 && h.score === 0 }"></span>
-                  {{ getStarName(h.catalogStarId) }}
-                </span>
-                <span v-if="h.score > 0" class="highlight-score">{{ Math.round(h.score * 100) }}%</span>
-                <span v-else class="highlight-badge-target">当前</span>
-              </div>
-              <div class="highlight-emotions" v-if="h.sharedEmotions.length > 0">
-                <span v-for="tag in h.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
-              </div>
-              <div class="highlight-essences">
-                <p v-for="(essence, ei) in h.essences" :key="ei" class="highlight-essence">
-                  "{{ essence }}"
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1437,6 +1436,32 @@ watch(() => props.catalogStarId, () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ─── Narrative Tab Scroll Container ─── */
+.narrative-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.narrative-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.narrative-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.narrative-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.narrative-scroll .info-section {
+  margin: 0;
+  padding: 16px 28px 20px;
+}
+.narrative-scroll .info-section:first-of-type {
+  border-top: 1px solid var(--rule);
 }
 
 /* ─── Panel Header (back button) ─── */
