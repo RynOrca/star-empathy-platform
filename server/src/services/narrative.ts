@@ -339,7 +339,7 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 }
 
 // ─── 太阳系星体映射 ───
-const PLANET_MAP: Record<number, { name: string; nameCN: string }> = {
+const PLANET_MAP: Record<string, { name: string; nameCN: string }> = {
   '-100': { name: 'Sun', nameCN: '太阳' },
   '-101': { name: 'Moon', nameCN: '月球' },
   '-102': { name: 'Venus', nameCN: '金星' },
