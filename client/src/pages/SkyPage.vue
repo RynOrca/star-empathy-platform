@@ -282,13 +282,15 @@ function setCachedLocation(lat: number, lng: number) {
   localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
 }
 
-// 反向地理编码：获取城市名称
+// 反向地理编码：通过后端代理获取城市名称（BigDataCloud 主 + Nominatim 备，5s 超时）
 async function fetchCityName(lat: number, lng: number): Promise<string> {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
-    const data = await res.json()
-    const addr = data.address || {}
-    const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
+    const ctrl = new AbortController()
+    const timeout = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`, { signal: ctrl.signal })
+    clearTimeout(timeout)
+    const json = await res.json()
+    const city = json?.data?.city || ''
     console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
     return city
   } catch (e) {
@@ -301,7 +303,7 @@ function showLocationToast(city: string) {
   const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
   console.log('[SkyPage] showLocationToast:', text)
   locationCityToast.value = text
-  setTimeout(() => { locationCityToast.value = '' }, 10000)
+  setTimeout(() => { locationCityToast.value = '' }, 3000)
 }
 
 function fetchLocation() {
@@ -326,7 +328,7 @@ function fetchLocation() {
       locationReady.value = true
       locationFailed.value = true
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 
@@ -336,6 +338,7 @@ function refreshLocation() {
     showLocationToast('')
     return
   }
+  locationCityToast.value = '正在获取定位...'
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
       userLat.value = pos.coords.latitude
@@ -348,7 +351,7 @@ function refreshLocation() {
     () => {
       showLocationToast('')
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 

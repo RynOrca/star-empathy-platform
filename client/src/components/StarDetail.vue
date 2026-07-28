@@ -30,19 +30,6 @@
                 :cached="narrative.cached.value"
                 @retry="narrative.fetchNarrative(catalogStarId)"
               />
-              <!-- 跳转到其他 Tab 的快捷入口 -->
-              <div class="narrative-quick-links">
-                <button class="quick-link-btn" @click="activeTab = 'history'">
-                  <BookOpen :size="14" />
-                  <span>查看历史故事</span>
-                  <span class="quick-link-badge" v-if="historyStories.length > 0">{{ historyStories.length }}条</span>
-                </button>
-                <button class="quick-link-btn" @click="activeTab = 'all'">
-                  <List :size="14" />
-                  <span>浏览所有故事</span>
-                  <span class="quick-link-badge" v-if="userStories.length > 0">{{ userStories.length }}条</span>
-                </button>
-              </div>
             </template>
           </template>
 
@@ -1312,42 +1299,6 @@ watch(() => props.catalogStarId, () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-/* ─── Narrative Quick Links ─── */
-.narrative-quick-links {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  border-top: 1px solid var(--rule);
-  margin-top: auto;
-  flex-shrink: 0;
-}
-.quick-link-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.015);
-  border: none;
-  color: var(--ink-secondary);
-  font-family: var(--font);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  text-align: left;
-}
-.quick-link-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--ink);
-}
-.quick-link-badge {
-  margin-left: auto;
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--muted-light);
 }
 
 /* ─── Panel Header (back button) ─── */
