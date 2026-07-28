@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1611,15 +1611,7 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   opacity: 0;
 }
 
-@media (max-width: 640px) {
-  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }
-  .guide-card { width: 180px; padding: 0.5rem 0.7rem 0.45rem; }
-  .guide-card svg { width: 16px; height: 16px; }
-  .city-panel { width: 92vw; max-height: 65vh; padding: 1.2rem; border-radius: 14px; }
-  .city-panel .city-btn { padding: 0.35rem 0.6rem; font-size: 0.74rem; }
-}
-
-/* ─── Comprehensive Mobile Responsive (<=768px) ─── */
+/* ─── Mobile Responsive (<=768px) ─── */
 @media (max-width: 768px) {
   /* Navigation bar */
   .sky-nav {
@@ -1728,19 +1720,72 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     max-height: 75vh;
     border-radius: 20px 20px 0 0;
     padding: 1.2rem 1rem 1.5rem;
+    animation: slideUpCityPanel 0.28s ease-out;
+    box-sizing: border-box;
+  }
+
+  @keyframes slideUpCityPanel {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .panel-fade-enter-from .city-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
+
+  .panel-fade-leave-to .city-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
+
+  .panel-fade-enter-from {
+    opacity: 1;
+  }
+
+  .panel-fade-leave-to {
+    opacity: 1;
   }
 
   /* Location fallback panel */
+  .location-fallback-backdrop {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+
   .location-fallback-panel {
-    width: 92%;
-    max-width: 92%;
-    padding: 1.2rem 1rem;
-    margin-bottom: 1rem;
+    width: 100%;
+    max-width: 100%;
+    padding: 1.2rem 1.2rem 1.5rem;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+    margin-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    border: none;
+    border-top: 1px solid rgba(255, 217, 138, 0.15);
+    animation: slideUpCityPanel 0.28s ease-out;
+    box-sizing: border-box;
+  }
+
+  .fallback-title {
+    font-size: 0.95rem;
+  }
+
+  .fallback-desc {
+    font-size: 0.78rem;
+    text-align: center;
   }
 
   .city-grid {
     max-width: 100%;
     justify-content: flex-start;
+  }
+
+  .refresh-loc-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    font-size: 0.78rem;
   }
 }
 
