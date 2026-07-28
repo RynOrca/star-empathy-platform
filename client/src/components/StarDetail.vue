@@ -1,10 +1,10 @@
 <template>
-  <div class="overlay" @click.self="$emit('close')">
+  <div class="overlay" :class="{ 'is-closing': isClosing }" @click.self="closeWithAnimation">
     <div
       ref="detailWrapRef"
       class="detail-wrap"
-      :class="{ 'is-dragging': isDragging }"
-      :style="{ transform: `translateY(${dragY}px)`, transition: isDragging ? 'none' : '' }"
+      :class="{ 'is-dragging': isDragging, 'is-closing': isClosing }"
+      :style="getWrapStyle()"
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
@@ -13,7 +13,7 @@
       <!-- 移动端顶部拖动条 + 关闭指示 -->
       <div class="mobile-top-bar">
         <div class="mobile-drag-indicator"></div>
-        <button class="mobile-close-chevron" @click="$emit('close')">
+        <button class="mobile-close-chevron" @click.stop="closeWithAnimation">
           <ChevronDown :size="22" />
         </button>
       </div>
@@ -108,7 +108,7 @@
             @click="activeTab = tab.id"
             :title="tab.label"
           >
-            <component :is="tab.icon" :size="16" />
+            <component :is="tab.icon" :size="20" />
             <span class="tab-label">{{ tab.label }}</span>
           </button>
         </div>
@@ -900,6 +900,25 @@ const tabs: { id: TabId; label: string; icon: Component }[] = [
 const activeTab = ref<TabId>('narrative')
 const mobileInfoExpanded = ref(false)
 
+// ─── 关闭动画控制 ───
+const isClosing = ref(false)
+function closeWithAnimation() {
+  if (isClosing.value) return
+  // 第一步：先重置拖拽位置，回到原位
+  dragY.value = 0
+  isDragging.value = false
+  // 第二步：等待一帧，让DOM更新到原位，再触发关闭状态
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      isClosing.value = true
+      // 等待动画完成后再真正关闭（与CSS transition时间一致）
+      setTimeout(() => {
+        emit('close')
+      }, 350)
+    })
+  })
+}
+
 // ─── 移动端手势下拉关闭 ───
 const dragY = ref(0)
 const isDragging = ref(false)
@@ -908,6 +927,7 @@ let startDragY = 0
 const detailWrapRef = ref<HTMLElement | null>(null)
 
 function onTouchStart(e: TouchEvent) {
+  if (isClosing.value) return
   // 只有在顶部区域或内容滚动到顶部时才允许下拉关闭
   const target = e.target as HTMLElement
   const tabContent = target.closest('.tab-content') as HTMLElement | null
@@ -919,7 +939,7 @@ function onTouchStart(e: TouchEvent) {
 }
 
 function onTouchMove(e: TouchEvent) {
-  if (!isDragging.value) return
+  if (!isDragging.value || isClosing.value) return
   const currentY = e.touches[0].clientY
   const diff = currentY - startY
 
@@ -938,20 +958,37 @@ function onTouchEnd() {
   if (!isDragging.value) return
   isDragging.value = false
 
-  // 超过阈值则关闭，否则回弹
+  // 超过阈值则关闭（带动画），否则回弹
   if (dragY.value > 120) {
-    emit('close')
+    closeWithAnimation()
   } else {
     dragY.value = 0
   }
 }
 
-// 切换星星时重置拖动状态
+// 切换星星时重置状态
 watch(() => props.catalogStarId, () => {
+  isClosing.value = false
   mobileInfoExpanded.value = false
   dragY.value = 0
   isDragging.value = false
 })
+
+// ─── 面板动态样式 ───
+function getWrapStyle() {
+  if (isClosing.value) {
+    return {
+      transform: 'translateY(100%)',
+      transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s',
+      opacity: 0.9,
+    }
+  }
+  return {
+    transform: `translateY(${dragY.value}px)`,
+    transition: isDragging.value ? 'none' : 'transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
+    opacity: 1,
+  }
+}
 
 // ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
 const resonanceOverrides = reactive(new Map<number, number>())
@@ -1378,11 +1415,19 @@ watch(() => props.catalogStarId, () => {
   inset: 0;
   background: rgba(7, 8, 22, 0.3);
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1), background 0.3s, backdrop-filter 0.3s;
+}
+.overlay.is-closing {
+  opacity: 0;
+  background: rgba(7, 8, 22, 0);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1393,10 +1438,16 @@ watch(() => props.catalogStarId, () => {
   align-items: flex-start;
   width: 88vw;
   max-width: 1300px;
-  animation: slideUp 0.2s ease-out;
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s;
+  will-change: transform;
+}
+.detail-wrap.is-closing {
+  transform: translateY(30px) !important;
+  opacity: 0 !important;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -2794,7 +2845,7 @@ watch(() => props.catalogStarId, () => {
     border-radius: 24px 24px 0 0;
     border: none;
     border-top: 0.5px solid rgba(255,255,255,0.1);
-    animation: slideUpFull 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+    animation: slideUpFull 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, rgba(26,30,53,0.98) 0%, rgba(18,20,40,0.995) 100%);
@@ -2802,10 +2853,16 @@ watch(() => props.catalogStarId, () => {
     -webkit-backdrop-filter: blur(30px);
     box-shadow: 0 -10px 40px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.05) inset;
     will-change: transform;
+    transform: translateY(0);
   }
 
   .detail-wrap.is-dragging {
     transition: none !important;
+  }
+
+  .detail-wrap.is-closing {
+    transform: translateY(100%) !important;
+    opacity: 0.8 !important;
   }
 
   @keyframes slideUpFull {
@@ -2940,6 +2997,7 @@ watch(() => props.catalogStarId, () => {
 
   /* ─── Mobile expanded star details ─── */
   .mobile-star-details {
+    display: block;
     padding: 4px 20px 16px;
     background: transparent;
     border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -3077,62 +3135,59 @@ watch(() => props.catalogStarId, () => {
 
   /* ─── Panel stories (main content) ─── */
   .panel-stories {
-    width: 100%;
-    flex: 1;
-    min-height: 0;
-    height: auto;
-    max-height: none;
-    border-radius: 0;
-    border: none;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: 0;
-    background: transparent;
+    display: contents; /* 让子元素提升到detail-wrap层级 */
   }
 
-  /* ─── Tab bar with sliding indicator ─── */
+  /* ─── Flex order for mobile layout ─── */
+  .mobile-top-bar { order: 1; }
+  .mobile-star-summary { order: 2; }
+  .mobile-star-details { order: 3; }
+  .tab-content { order: 4; flex: 1; min-height: 0; }
+  .mobile-bottom-bar { order: 5; }
+  .tab-bar { order: 6; }
+
+  /* ─── Tab bar (bottom navigation - modern iOS/Android style) ─── */
   .tab-bar {
-    padding: 0 12px;
-    gap: 0;
-    flex-shrink: 0;
-    border-bottom: none;
-    background: transparent;
-    position: relative;
     display: flex;
-  }
-
-  .tab-bar::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 12px;
-    right: 12px;
-    height: 1px;
-    background: rgba(255,255,255,0.05);
+    flex-shrink: 0;
+    padding: 6px 16px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+    gap: 0;
+    background: rgba(18,20,40,0.99);
+    border-top: 0.5px solid rgba(255,255,255,0.06);
+    border-bottom: none;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
   }
 
   .tab-btn {
     flex: 1;
+    display: flex;
     flex-direction: column;
-    padding: 10px 4px 12px;
-    font-size: 0.65rem;
-    gap: 4px;
-    border-radius: 0;
-    border: none;
-    border-bottom: 2.5px solid transparent;
-    background: none;
-    color: var(--muted, #9994ad);
-    min-height: 52px;
+    align-items: center;
     justify-content: center;
-    position: relative;
-    transition: color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    gap: 3px;
+    padding: 6px 4px;
+    min-height: 50px;
+    border: none;
+    background: none;
+    color: rgba(153,148,173,0.8);
+    font-family: inherit;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    transition: color 0.2s ease, transform 0.15s ease;
+    position: relative;
+  }
+
+  .tab-btn:active {
+    transform: scale(0.92);
   }
 
   .tab-btn svg {
-    width: 22px;
-    height: 22px;
-    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.8;
+    transition: transform 0.2s ease;
   }
 
   .tab-btn.active svg {
@@ -3140,20 +3195,28 @@ watch(() => props.catalogStarId, () => {
   }
 
   .tab-btn .tab-label {
-    font-size: 0.68rem;
-    font-weight: 600;
+    font-size: 0.65rem;
+    font-weight: 500;
     white-space: nowrap;
-    opacity: 0;
-    max-width: 0;
-    overflow: hidden;
-    transition: opacity 0.25s cubic-bezier(0.32, 0.72, 0, 1), max-width 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-    letter-spacing: 0.2px;
+    letter-spacing: 0.3px;
+    line-height: 1;
   }
 
   .tab-btn.active {
     color: var(--accent, #ffd98a);
-    background: none;
-    border-bottom-color: var(--accent, #ffd98a);
+  }
+
+  /* Active indicator - thin top bar like modern apps */
+  .tab-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2.5px;
+    border-radius: 0 0 2px 2px;
+    background: var(--accent, #ffd98a);
   }
 
   .tab-btn.active::after {
@@ -3161,8 +3224,7 @@ watch(() => props.catalogStarId, () => {
   }
 
   .tab-btn.active .tab-label {
-    opacity: 1;
-    max-width: 70px;
+    font-weight: 600;
   }
 
   /* ─── Tab content ─── */
@@ -3171,9 +3233,10 @@ watch(() => props.catalogStarId, () => {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 12px 16px 100px;
+    padding: 12px 16px 20px;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+    display: block; /* 覆盖桌面端的 flex */
   }
 
   /* List toolbar */
@@ -3343,20 +3406,14 @@ watch(() => props.catalogStarId, () => {
     font-weight: 500;
   }
 
-  /* ─── Mobile bottom action bar ─── */
+  /* ─── Mobile action bar (above tab bar) ─── */
   .mobile-bottom-bar {
     display: flex;
-    gap: 10px;
-    padding: 12px 20px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
-    background: linear-gradient(180deg, transparent 0%, rgba(18,20,40,0.95) 20%, rgba(26,30,53,0.98) 100%);
-    border-top: 1px solid rgba(255,255,255,0.04);
     flex-shrink: 0;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
+    gap: 12px;
+    padding: 10px 16px;
+    background: rgba(26,30,53,0.98);
+    border-top: 0.5px solid rgba(255,255,255,0.04);
   }
 
   .mobile-action-btn {
@@ -3364,49 +3421,48 @@ watch(() => props.catalogStarId, () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    padding: 14px 10px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 12px;
+    border: none;
     background: rgba(255,255,255,0.06);
     color: var(--ink-secondary, #b8b2cc);
-    font-size: 0.88rem;
+    font-family: inherit;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
     -webkit-tap-highlight-color: transparent;
-    letter-spacing: 0.3px;
+    transition: all 0.15s ease;
+    letter-spacing: 0.2px;
   }
+
   .mobile-action-btn:active {
     transform: scale(0.96);
+    background: rgba(255,255,255,0.1);
   }
+
   .mobile-action-btn svg {
-    width: 19px;
-    height: 19px;
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+    flex-shrink: 0;
   }
 
   .mobile-write-btn {
-    background: linear-gradient(135deg, rgba(255,217,138,0.25) 0%, rgba(255,180,100,0.15) 100%);
-    border-color: rgba(255,217,138,0.35);
+    background: linear-gradient(135deg, rgba(255,217,138,0.2) 0%, rgba(255,180,100,0.12) 100%);
     color: var(--accent, #ffd98a);
-    box-shadow: 0 4px 15px rgba(255,217,138,0.12);
   }
   .mobile-write-btn:active {
-    background: linear-gradient(135deg, rgba(255,217,138,0.4) 0%, rgba(255,180,100,0.3) 100%);
-    box-shadow: 0 2px 8px rgba(255,217,138,0.2);
-    transform: scale(0.96);
+    background: linear-gradient(135deg, rgba(255,217,138,0.3) 0%, rgba(255,180,100,0.2) 100%);
   }
 
   .mobile-fav-btn.favorited {
     color: var(--accent, #ffd98a);
-    border-color: rgba(255,217,138,0.3);
     background: rgba(255,217,138,0.12);
-    box-shadow: 0 2px 10px rgba(255,217,138,0.1);
   }
 
   .mobile-chat-btn {
     color: #c8b4ff;
-    border-color: rgba(200,180,255,0.2);
     background: rgba(200,180,255,0.08);
   }
   .mobile-chat-btn:active {
@@ -3454,17 +3510,18 @@ watch(() => props.catalogStarId, () => {
   }
   .mobile-star-name { font-size: 1.1rem; }
   .mobile-star-details { padding: 4px 16px 14px; }
-  .tab-btn { padding: 8px 2px 10px; min-height: 48px; }
-  .tab-btn svg { width: 20px; height: 20px; }
-  .tab-btn .tab-label { font-size: 0.62rem; }
+  .tab-btn { padding: 5px 2px; min-height: 46px; }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .tab-btn .tab-label { font-size: 0.6rem; }
   .mobile-action-btn {
-    padding: 12px 8px;
-    font-size: 0.82rem;
-    gap: 5px;
+    padding: 11px 6px;
+    font-size: 0.78rem;
+    gap: 4px;
   }
-  .mobile-action-btn svg { width: 17px; height: 17px; }
+  .mobile-action-btn svg { width: 16px; height: 16px; }
   .story-card { padding: 12px 14px; }
   .list-toolbar { padding: 6px 4px 10px; }
-  .mobile-bottom-bar { padding: 10px 16px; padding-bottom: max(10px, env(safe-area-inset-bottom, 10px)); gap: 8px; }
+  .tab-bar { padding: 5px 12px; padding-bottom: max(5px, env(safe-area-inset-bottom, 5px)); }
+  .mobile-bottom-bar { padding: 8px 12px; gap: 8px; }
 }
 </style>
