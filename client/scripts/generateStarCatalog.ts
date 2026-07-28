@@ -1,7 +1,8 @@
 /**
  * 生成真实天文星表 JSON
  * 数据来源: IAU 星名 + Yale Bright Star Catalog + SIMBAD
- * 输出格式: { stars: [...], lines: [[id,id],...] }
+ * 输出格式: { stars: [...] }
+ * 星座连线已迁移至 src/data/constellations.json（按星座分组，基于星名）
  */
 
 import * as fs from 'fs'

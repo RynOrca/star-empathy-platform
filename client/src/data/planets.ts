@@ -1,13 +1,18 @@
 export interface PlanetInfo {
-  planetId?: number       // 行星编号（0=太阳, 1=水星, ..., 8=海王星, 9=月球）
   name: string
   nameCN: string
   color: number          // 保留，用于 fallback
   texture: string        // 纹理文件路径（/textures/planets/xxx.jpg）
   size: number // 渲染半径
+  /** 行星 ID（负数，与 stars 表的 catalog_star_id 区分；用于点击回调与故事查询 */
+  planetId: number
   ringColor?: number     // 保留向后兼容
   ringSize?: number
   ringTexture?: string   // 土星环纹理（带 alpha 通道）
+  /** 土星环内半径因子（相对 planet.size 的倍数）；默认 1.4 */
+  ringInnerFactor?: number
+  /** 土星环外半径因子（相对 planet.size 的倍数）；默认 2.3 */
+  ringOuterFactor?: number
   // 简化轨道参数（日心，AU 单位）
   semiMajorAxis: number
   eccentricity: number
@@ -15,12 +20,15 @@ export interface PlanetInfo {
   period: number // 年
   rotationPeriod?: number // 自转周期（小时），14-A §4；负值表示逆向自转
   axialTilt?: number      // 轴倾角（度），14-A §4
-  atmosphere?: {          // 大气层光晕（Physical-Lite shader, OPT-9）
+  atmosphere?: {          // 大气层光晕（菲涅尔 shader）
     color: number         // 大气颜色（如地球蓝、金星黄）
     intensity: number     // 强度 0~1
-    rayleigh?: [number, number, number]  // Rayleigh 散射系数 RGB（物理大气散射）
-    mie?: number          // Mie 散射系数
-    mieG?: number         // Mie 不对称因子（-1~1，正值=前向散射）
+    /** Rayleigh 散射系数 [r, g, b]（OPT-9 Physical-Lite shader，可选） */
+    rayleigh?: [number, number, number]
+    /** Mie 散射系数（OPT-9 Physical-Lite shader，可选） */
+    mie?: number
+    /** Henyey-Greenstein 不对称参数 g（OPT-9，可选） */
+    mieG?: number
   }
 }
 
@@ -30,55 +38,79 @@ export type PlanetData = PlanetInfo
 export const planets: PlanetData[] = [
   {
     name: 'Sun', nameCN: '太阳', color: 0xffdd88, texture: '/textures/planets/2k_sun.jpg',
-    size: 5, semiMajorAxis: 0, eccentricity: 0, inclination: 0, period: 0,
+    size: 5, planetId: -100, semiMajorAxis: 0, eccentricity: 0, inclination: 0, period: 0,
     rotationPeriod: 609.12, axialTilt: 7.25,
   },
   {
     name: 'Mercury', nameCN: '水星', color: 0x999999, texture: '/textures/planets/2k_mercury.jpg',
-    size: 1.0, semiMajorAxis: 0.387, eccentricity: 0.206, inclination: 7.0, period: 0.241,
+    size: 1.0, planetId: -106, semiMajorAxis: 0.387, eccentricity: 0.206, inclination: 7.0, period: 0.241,
     rotationPeriod: 1407.6, axialTilt: 0.03,
   },
   {
     name: 'Venus', nameCN: '金星', color: 0xe8cda0, texture: '/textures/planets/2k_venus_surface.jpg',
-    size: 1.8, semiMajorAxis: 0.723, eccentricity: 0.007, inclination: 3.4, period: 0.615,
+    size: 1.8, planetId: -102, semiMajorAxis: 0.723, eccentricity: 0.007, inclination: 3.4, period: 0.615,
     rotationPeriod: -5832.5, axialTilt: 177.36, // 逆向自转
-    atmosphere: { color: 0xffe0a0, intensity: 0.6 }, // 浓密黄色大气
+    // 浓密黄色 CO2 大气：Rayleigh 偏暖黄（蓝光被吸收），Mie 高浑浊度
+    atmosphere: {
+      color: 0xffe0a0, intensity: 0.6,
+      rayleigh: [0.8, 0.7, 0.4], mie: 0.5, mieG: 0.85,
+    },
   },
   {
     name: 'Moon', nameCN: '月球', color: 0xcccccc, texture: '/textures/planets/2k_moon.jpg',
-    size: 1.2, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
+    size: 1.2, planetId: -101, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
     rotationPeriod: 655.7, axialTilt: 6.68,
   },
   {
     name: 'Mars', nameCN: '火星', color: 0xdd6644, texture: '/textures/planets/2k_mars.jpg',
-    size: 1.4, semiMajorAxis: 1.524, eccentricity: 0.093, inclination: 1.85, period: 1.881,
+    size: 1.4, planetId: -103, semiMajorAxis: 1.524, eccentricity: 0.093, inclination: 1.85, period: 1.881,
     rotationPeriod: 24.6, axialTilt: 25.19,
-    atmosphere: { color: 0xff8866, intensity: 0.35 }, // 稀薄红色大气
+    // 稀薄红色 CO2 大气：Rayleigh 偏暖红，Mie 低浑浊度（大气薄）
+    atmosphere: {
+      color: 0xff8866, intensity: 0.35,
+      rayleigh: [0.6, 0.5, 0.4], mie: 0.3, mieG: 0.8,
+    },
   },
   {
     name: 'Jupiter', nameCN: '木星', color: 0xddaa77, texture: '/textures/planets/2k_jupiter.jpg',
-    size: 3.5, semiMajorAxis: 5.203, eccentricity: 0.048, inclination: 1.3, period: 11.86,
+    size: 3.5, planetId: -104, semiMajorAxis: 5.203, eccentricity: 0.048, inclination: 1.3, period: 11.86,
     rotationPeriod: 9.93, axialTilt: 3.13,
-    atmosphere: { color: 0xeed8a8, intensity: 0.45 }, // 厚氢气大气
+    // 厚 H2/He 大气：Rayleigh 偏冷蓝（气体巨星），Mie 中等浑浊度
+    atmosphere: {
+      color: 0xeed8a8, intensity: 0.45,
+      rayleigh: [0.5, 0.6, 0.8], mie: 0.4, mieG: 0.75,
+    },
   },
   {
     name: 'Saturn', nameCN: '土星', color: 0xddcc99, texture: '/textures/planets/2k_saturn.jpg',
-    size: 3.0, ringColor: 0xccbb88, ringSize: 5.5, ringTexture: '/textures/planets/2k_saturn_ring_alpha.png',
+    size: 3.0, planetId: -105, ringColor: 0xccbb88, ringSize: 5.5, ringTexture: '/textures/planets/2k_saturn_ring_alpha.png',
+    ringInnerFactor: 1.4, ringOuterFactor: 2.3,
     semiMajorAxis: 9.537, eccentricity: 0.054, inclination: 2.49, period: 29.46,
     rotationPeriod: 10.7, axialTilt: 26.73,
-    atmosphere: { color: 0xeed8a8, intensity: 0.45 },
+    atmosphere: {
+      color: 0xeed8a8, intensity: 0.45,
+      rayleigh: [0.5, 0.6, 0.8], mie: 0.4, mieG: 0.75,
+    },
   },
   {
     name: 'Uranus', nameCN: '天王星', color: 0x88ccdd, texture: '/textures/planets/2k_uranus.jpg',
-    size: 2.2, semiMajorAxis: 19.191, eccentricity: 0.047, inclination: 0.77, period: 84.01,
+    size: 2.2, planetId: -107, semiMajorAxis: 19.191, eccentricity: 0.047, inclination: 0.77, period: 84.01,
     rotationPeriod: -17.24, axialTilt: 97.77, // 侧躺自转
-    atmosphere: { color: 0x88dde8, intensity: 0.55 }, // 甲烷大气
+    // 甲烷大气：Rayleigh 偏青蓝（CH4 吸收红光），Mie 低浑浊度
+    atmosphere: {
+      color: 0x88dde8, intensity: 0.55,
+      rayleigh: [0.3, 0.5, 0.9], mie: 0.3, mieG: 0.75,
+    },
   },
   {
     name: 'Neptune', nameCN: '海王星', color: 0x3366cc, texture: '/textures/planets/2k_neptune.jpg',
-    size: 2.1, semiMajorAxis: 30.069, eccentricity: 0.009, inclination: 1.77, period: 164.79,
+    size: 2.1, planetId: -108, semiMajorAxis: 30.069, eccentricity: 0.009, inclination: 1.77, period: 164.79,
     rotationPeriod: 16.11, axialTilt: 28.32,
-    atmosphere: { color: 0x4488ff, intensity: 0.6 }, // 甲烷大气深蓝
+    // 甲烷大气深蓝：Rayleigh 偏深蓝，Mie 低浑浊度
+    atmosphere: {
+      color: 0x4488ff, intensity: 0.6,
+      rayleigh: [0.2, 0.4, 1.0], mie: 0.3, mieG: 0.75,
+    },
   },
 ]
 

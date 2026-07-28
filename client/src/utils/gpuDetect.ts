@@ -78,10 +78,14 @@ export function getRenderParams(tier: RenderTier): {
   bloom: boolean
   vignette: boolean
   meteorParticles: number
+  /** 设备像素比上限（OPT-29）：限制 DPR 防止高分屏 GPU 过载 */
   maxDpr: number
-  antialias: boolean
+  /** 标签显示模式（OPT-26）：'all' 显示所有标签，'major-only' 仅主要天体，'none' 低端降级 */
   labelMode: 'all' | 'major-only' | 'none'
+  /** 标签距离 LOD 阈值（场景单位，0=禁用）；超过该距离的非主要标签隐藏 */
   labelLODDistance: number
+  /** 抗锯齿（MSAA）：仅 high tier 启用（星点 Points 不需要 MSAA） */
+  antialias: boolean
 } {
   switch (tier) {
     case 'high':   return { sphereSegments: [64, 32], starCount: 2000, instancedMesh: true,  bloom: true,  vignette: true,  meteorParticles: 60, maxDpr: 3, antialias: true,  labelMode: 'all',         labelLODDistance: 280 }

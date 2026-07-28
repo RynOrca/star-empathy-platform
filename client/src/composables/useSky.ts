@@ -318,8 +318,10 @@ export function useSky(
   // 在 animate 循环中按相机距离阈值切换 visible，降低 CSS2DRenderer DOM 操作开销
   type LabelLODItem = { label: CSS2DObject; parent: Object3D; isMajor: boolean }
   const labelLODItems: LabelLODItem[] = []
-  // 土星环更新器：每帧重算 uSunDirLocal（太阳方向在 ring 局部坐标系的表示）
-  type RingUpdater = { ringMat: ShaderMaterial; axialTilt: number }
+  // 土星环更新器：每帧重算 uSunDirWorld / uPlanetCenter（世界坐标系）
+  // P1 优化：从 local-space 改为 world-space，支持 HG 前向散射 + Blinn-Phong 冰粒高光
+  // 参考 celestiary/web PR #58 — world-space 计算更自然，避免逆矩阵变换
+  type RingUpdater = { ringMat: ShaderMaterial; tiltGroup: Group }
   const ringUpdaters: RingUpdater[] = []
   // OPT-16：土星环阴影投射到行星表面（参考 celestiary/web PR #58 onBeforeCompile 注入）
   // 仅土星启用，注入到 MeshPhongMaterial，不替换为 ShaderMaterial 以保留 OPT-13 双模材质行为
@@ -355,6 +357,10 @@ export function useSky(
   // 复用对象，避免每帧 new 导致 GC 压力（行星/卫星/土星环/彗星更新共用）
   const _reusedObserver = { latitude: 0, longitude: 0, height: 0 } as unknown as import('astronomy-engine').Observer
   const _reusedSunDir = new Vector3()
+  // P1 修复：土星环 world-space 计算所需的临时向量（避免每帧 new Vector3）
+  // skyGroup 会被 applyAstroRotation 旋转，必须用 getWorldPosition 获取世界坐标
+  const _reusedSunWorld = new Vector3()
+  const _reusedRingWorld = new Vector3()
   // OPT-14：彗星拖尾末端位置复用（避免每帧 new Vector3）
   const _reusedTailEnd = new Vector3()
   // OPT-26：标签距离 LOD 复用向量（避免每帧 new Vector3）
@@ -454,7 +460,7 @@ const starById = new Map<number, CatStar>()
 for (const s of stars) starById.set(s.id, s)
 
   // ═══ 星星分层 ═══
-  // P2 全量闪烁：bins 增加 mag 数组，供 shader 基于星等调制闪烁幅度（亮星少闪）
+  // 按视星等分 6 个 tier，每 tier 用独立 Points 渲染（不同 size 的星点纹理）
   // 物理依据：亮星视圆面较大，大气湍流在视圆面上被部分平均（Dravins et al. 1997/1998）
   const tiers = [
     { maxMag: -0.5, size: 11 },
@@ -464,20 +470,16 @@ for (const s of stars) starById.set(s.id, s)
     { maxMag:  4.5, size: 2.8 },
     { maxMag: 99,    size: 1.8 },
   ]
-  const bins = tiers.map(() => ({ pos: [] as number[], col: [] as number[], mag: [] as number[] }))
+  const bins = tiers.map(() => ({ pos: [] as number[], col: [] as number[] }))
   const tierStarIds: number[][] = tiers.map(() => [])
   for (let i = 0; i < n; i++) {
     const s = stars[i]; const [r,g,b] = hexRGB(s.color)
     for (let t = 0; t < tiers.length; t++) {
-      if (s.mag <= tiers[t].maxMag) { bins[t].pos.push(s.x,s.y,s.z); bins[t].col.push(r,g,b); bins[t].mag.push(s.mag); tierStarIds[t].push(s.id); break }
+      if (s.mag <= tiers[t].maxMag) { bins[t].pos.push(s.x,s.y,s.z); bins[t].col.push(r,g,b); tierStarIds[t].push(s.id); break }
     }
   }
   const texCache = new Map<number, CanvasTexture>()
   const starPointsRefs: Points[] = []
-  // P2 全量闪烁：收集所有注入闪烁 Shader 的材质，用于动画循环中统一更新 uTime
-  // 包含 6 个恒星 tier 的 PointsMaterial + 3 个 spike 光芒的 PointsMaterial
-  // 仅 high/medium GPU tier 注入（低端设备关闭闪烁以保性能）
-  const starTwinkleMats: PointsMaterial[] = []
   for (let t = 0; t < tiers.length; t++) {
     const b = bins[t]; if (b.pos.length === 0) continue
     const sz = tiers[t].size
@@ -485,45 +487,10 @@ for (const s of stars) starById.set(s.id, s)
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array(b.pos), 3))
     g.setAttribute('color', new BufferAttribute(new Float32Array(b.col), 3))
-    // P2 全量闪烁：添加 magnitude 属性，供闪烁 shader 基于星等调制幅度（亮星少闪）
-    g.setAttribute('magnitude', new BufferAttribute(new Float32Array(b.mag), 1))
     const tierMat = new PointsMaterial({
       size: sz, map: texCache.get(sz)!, blending: AdditiveBlending,
       depthWrite: false, depthTest: true, transparent: true, vertexColors: true, sizeAttenuation: true,
     })
-    // P2 全量闪烁：为恒星 tier 注入全量闪烁 Shader（5980 颗星全量闪烁）
-    // 物理模型：多频率正弦叠加（2.3/5.7/11.0 Hz）模拟大气湍流闪烁
-    // 星等调制：亮星少闪（brightness 高 → twinkleAmt 接近 1.0），暗星全闪
-    // Dave Hoskins 整数 hash 生成稳定随机相位，避免同步闪烁
-    if (gpuCap.tier === 'high' || gpuCap.tier === 'medium') {
-      tierMat.onBeforeCompile = (shader) => {
-        shader.uniforms.uTime = { value: 0 }
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', `
-            #include <common>
-            uniform float uTime;
-            attribute float magnitude;
-            float hashStar(vec3 p) {
-              p = fract(p * 0.3183099 + 0.1);
-              p *= 17.0;
-              return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-            }
-          `)
-          .replace('#include <color_vertex>', `
-            #include <color_vertex>
-            float phase = hashStar(position) * 6.28318;
-            float tw1 = sin(uTime * 2.3 + phase) * 0.15;
-            float tw2 = sin(uTime * 5.7 + phase * 2.0) * 0.08;
-            float tw3 = sin(uTime * 11.0 + phase * 3.0) * 0.04;
-            float twinkleRaw = 1.0 + (tw1 + tw2 + tw3);
-            float brightness = pow(2.512, -magnitude);
-            float twinkleAmt = mix(1.0, twinkleRaw, clamp(1.0 - brightness * 0.5, 0.2, 1.0));
-            vColor *= twinkleAmt;
-          `)
-        ;(tierMat.userData as { uTimeRef?: { value: number } }).uTimeRef = shader.uniforms.uTime
-      }
-      starTwinkleMats.push(tierMat)
-    }
     const pts = new Points(g, tierMat)
     pts.userData.tierIndex = t
     starPointsRefs.push(pts)
@@ -535,9 +502,7 @@ for (const s of stars) starById.set(s.id, s)
   // - 1 等以上的星肉眼可见十字芒，是被相机/眼镜折射后形成的视觉现象
   // - 用独立的 Points 层 + spike 纹理 + AdditiveBlending，配合 Bloom 形成真实星芒
   // - 颜色继承自原星色（vertexColors 与白 spike 相乘）
-  // - P2 全量闪烁：spike 光芒与星点同步脉动（P1-2 修复）
-  //   旧实现（issue #34）移除了 spike 闪烁，导致星点变暗时十字芒保持全亮，视觉不一致
-  //   现注入与 tier 相同的闪烁 Shader + magnitude attribute，加入 starTwinkleMats 统一更新
+  // - issue #34：移除 P2 spike 闪烁 shader，星点与星芒保持稳定亮度
   const SPIKE_TEX = spikeTex(128)
   const spikeTiers = [
     { tier: 0, size: 44, opacity: 0.95 },  // 天狼、老人等极亮星
@@ -549,43 +514,11 @@ for (const s of stars) starById.set(s.id, s)
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array(b.pos), 3))
     g.setAttribute('color', new BufferAttribute(new Float32Array(b.col), 3))
-    // P2 全量闪烁：spike 也需要 magnitude attribute（与 tier 共享同一 bins[cfg.tier].mag）
-    g.setAttribute('magnitude', new BufferAttribute(new Float32Array(b.mag), 1))
     const spikeMat = new PointsMaterial({
       size: cfg.size, map: SPIKE_TEX, blending: AdditiveBlending,
       depthWrite: false, depthTest: true, transparent: true,
       vertexColors: true, sizeAttenuation: true, opacity: cfg.opacity,
     })
-    // P2 全量闪烁：spike 注入与 tier 相同的闪烁 Shader，实现星点与光芒同步脉动
-    if (gpuCap.tier === 'high' || gpuCap.tier === 'medium') {
-      spikeMat.onBeforeCompile = (shader) => {
-        shader.uniforms.uTime = { value: 0 }
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', `
-            #include <common>
-            uniform float uTime;
-            attribute float magnitude;
-            float hashStar(vec3 p) {
-              p = fract(p * 0.3183099 + 0.1);
-              p *= 17.0;
-              return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-            }
-          `)
-          .replace('#include <color_vertex>', `
-            #include <color_vertex>
-            float phase = hashStar(position) * 6.28318;
-            float tw1 = sin(uTime * 2.3 + phase) * 0.15;
-            float tw2 = sin(uTime * 5.7 + phase * 2.0) * 0.08;
-            float tw3 = sin(uTime * 11.0 + phase * 3.0) * 0.04;
-            float twinkleRaw = 1.0 + (tw1 + tw2 + tw3);
-            float brightness = pow(2.512, -magnitude);
-            float twinkleAmt = mix(1.0, twinkleRaw, clamp(1.0 - brightness * 0.5, 0.2, 1.0));
-            vColor *= twinkleAmt;
-          `)
-        ;(spikeMat.userData as { uTimeRef?: { value: number } }).uTimeRef = shader.uniforms.uTime
-      }
-      starTwinkleMats.push(spikeMat)
-    }
     const pts = new Points(g, spikeMat)
     pts.renderOrder = 5  // 在普通星点之上、UI 元素之下
     skyGroup.add(pts)
@@ -759,9 +692,9 @@ for (const s of stars) starById.set(s.id, s)
   // 验证：银心(RA=17h45.6m, Dec=-28.94°)、NGP(RA=12h51.4m, Dec=+27.13°)、反银心(RA=5h45.6m, Dec=+28.94°) 三点对齐
   {
     const texLoader = new TextureLoader()
-    // 使用 WebP 版本：240KB vs JPG 4.6MB，节省 95% 流量
-    // 天球内壁 opacity=0.45 + AdditiveBlending，2K 分辨率肉眼无感知差异
-    const mwTex = texLoader.load('/textures/skybox/milky_way_2k.webp')
+    // 使用 JPG 版本（实际存在的资源文件）
+    // 天球内壁 opacity=0.45 + AdditiveBlending
+    const mwTex = texLoader.load('/textures/skybox/milky_way.jpg')
     mwTex.colorSpace = 'srgb'
     // 水平翻转贴图：让 mesh 局部 +Z 也变左手系（与项目 raDecXYZ 一致）
     mwTex.wrapS = RepeatWrapping
@@ -1197,21 +1130,18 @@ for (const s of stars) starById.set(s.id, s)
       raycaster.setFromCamera(mouse, camera)
       raycaster.params.Points!.threshold = 8
       const starHits = raycaster.intersectObjects(starPointsRefs)
-      console.log('[useSky] click raycaster hits:', starHits.length, 'mouse:', mouse.x.toFixed(3), mouse.y.toFixed(3))
       if (starHits.length > 0) {
         const hit = starHits[0]
         const tier = (hit.object as Points).userData.tierIndex as number
         const starId = tierStarIds[tier]?.[hit.index!]
-        console.log('[useSky] clicked star:', starId, 'tier:', tier, 'index:', hit.index)
         if (starId != null) {
           options?.onStarClick?.(starId)
           return
         }
       }
 
-      // 检测行星点击
+      // 检测行星点击（Mesh 检测不需要 Points.threshold）
       if (planetMeshes.length) {
-        raycaster.params.Points!.threshold = 8
         const planetHits = raycaster.intersectObjects(planetMeshes)
         if (planetHits.length) {
           const pm = planetHits[0].object as Mesh
@@ -1337,6 +1267,25 @@ for (const s of stars) starById.set(s.id, s)
     // 同步更新 composer 尺寸，避免 Bloom 模糊错位
     composer.setSize(canvas.clientWidth, canvas.clientHeight)
     if (bloomPass) bloomPass.setSize(canvas.clientWidth, canvas.clientHeight)
+  }, { signal: abortController.signal })
+
+  // WebGL 上下文丢失处理（Safari GPU 进程崩溃 / GPU 显存耗尽 / GPU 切换）
+  // 不处理会导致 canvas 黑屏 + animate 循环空转浪费 CPU
+  // 策略：阻止默认行为（允许恢复），停止动画循环，提示用户刷新
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault()  // 允许后续 contextrestored 事件
+    cancelAnimationFrame(af)
+    console.error('[useSky] WebGL context lost — 3D 渲染已停止，请刷新页面')
+    // 在 canvas 上叠加错误提示（轻量 DOM，不依赖 Three.js）
+    const overlay = document.createElement('div')
+    overlay.textContent = 'GPU 上下文已丢失，请刷新页面'
+    overlay.style.cssText = [
+      'position:absolute', 'top:50%', 'left:50%', 'transform:translate(-50%,-50%)',
+      'color:#ffd98a', 'font-size:16px', 'background:rgba(7,8,22,0.9)',
+      'padding:16px 24px', 'border-radius:12px', 'border:1px solid rgba(255,217,138,0.3)',
+      'z-index:9999', 'pointer-events:none', 'text-align:center',
+    ].join(';')
+    canvas.parentElement?.appendChild(overlay)
   }, { signal: abortController.signal })
 
   // ═══ 太阳系行星 ═══
@@ -1787,13 +1736,19 @@ for (const s of stars) starById.set(s.id, s)
         tiltGroup.add(new Mesh(atmoGeo, atmoMat))
       }
 
-      // 土星环：ShaderMaterial，含本影 + 透射 + 冰粒散射（参考 Solar-Wanderer）
-      // ring 挂到 tiltGroup（自动跟随土星公转），uSunDirLocal 每帧由 animate 循环更新
+      // ═══ 土星环：ShaderMaterial（P1 优化 — world-space HG 前向散射 + Blinn-Phong 冰粒高光） ═══
+      // 参考 celestiary/web PR #58 — world-space 计算更自然，避免逆矩阵变换
+      // 改进点：
+      //   1. HG 前向散射（g=0.7）：背光时环变亮，模拟冰粒透射光
+      //   2. Blinn-Phong 高光（shininess=60）：冰粒表面镜面反射，视角依赖闪烁
+      //   3. 双面渲染光照：abs(N·L) + max(spec, -N·H spec) 处理背面
+      //   4. 解析本影：sphere intersection test，15% ambient 漏入本影
+      //   5. 内/外半径数据驱动（ringInnerFactor / ringOuterFactor）
       if (planet.ringTexture) {
         const ringTex = texLoader.load(planet.ringTexture)
         ringTex.colorSpace = 'srgb'
-        const innerR = planet.size * 1.4
-        const outerR = planet.size * 2.3
+        const innerR = planet.size * (planet.ringInnerFactor ?? 1.4)
+        const outerR = planet.size * (planet.ringOuterFactor ?? 2.3)
         const ringGeo = new RingGeometry(innerR, outerR, 128, 1)
         // 修正 UV：u = 径向归一化（0=内缘, 1=外缘），v = 0.5（采 1D 横条）
         const uvAttr = ringGeo.attributes.uv
@@ -1810,52 +1765,90 @@ for (const s of stars) starById.set(s.id, s)
           uniforms: {
             uMap: { value: ringTex },
             uPlanetR: { value: planet.size },
-            uSunDirLocal: { value: new Vector3(1, 0, 0) },  // 每帧由 animate 更新
+            uPlanetCenter: { value: new Vector3() },   // 每帧由 animate 更新（世界坐标）
+            uSunDirWorld: { value: new Vector3(1, 0, 0) },  // 每帧由 animate 更新
             uTint: { value: new Color(0xddc8a0) },
           },
           vertexShader: `
             varying vec2 vUv;
-            varying vec3 vLocalPos;
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
             void main() {
               vUv = uv;
-              vLocalPos = position;
-              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              vec4 worldPos4 = modelMatrix * vec4(position, 1.0);
+              vWorldPos = worldPos4.xyz;
+              // RingGeometry 法向量默认 (0,0,1)，经 rotation.x=π/2 后为 (0,1,0)
+              // 用 mat3(modelMatrix) 变换到世界空间（纯旋转等价于 normalMatrix，无非均匀 scale）
+              vWorldNormal = normalize(mat3(modelMatrix) * normal);
+              gl_Position = projectionMatrix * viewMatrix * worldPos4;
             }
           `,
           fragmentShader: `
             uniform sampler2D uMap;
             uniform float uPlanetR;
-            uniform vec3 uSunDirLocal;
+            uniform vec3 uPlanetCenter;
+            uniform vec3 uSunDirWorld;
             uniform vec3 uTint;
             varying vec2 vUv;
-            varying vec3 vLocalPos;
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
+
+            // ─── Henyey-Greenstein 相位函数（冰粒前向散射） ───
+            // f(θ) = (1 - g²) / (1 + g² - 2g·cosθ)^1.5
+            // g=0.7：冰粒典型前向散射，前后比约 182:1（forward≈18.9, backward≈0.10）
+            float hgPhase(float cosTheta, float g) {
+              float g2 = g * g;
+              float denom = 1.0 + g2 - 2.0 * g * cosTheta;
+              return (1.0 - g2) / pow(max(denom, 0.001), 1.5);
+            }
+
             void main() {
               // 采样环纹理（1D 径向条带）
               vec4 tex = texture2D(uMap, vec2(vUv.x, 0.5));
-              vec3 col = tex.rgb * uTint;
+              vec3 baseColor = tex.rgb * uTint;
 
-              // ring 局部坐标系下环法向量为 (0,0,1)
-              vec3 N = vec3(0.0, 0.0, 1.0);
-              float ndl = dot(N, uSunDirLocal);
+              // 归一化方向向量（世界坐标系）
+              vec3 N = normalize(vWorldNormal);
+              vec3 L = normalize(uSunDirWorld);
+              // cameraPosition 是 Three.js ShaderMaterial 内置 uniform（世界坐标）
+              vec3 V = normalize(cameraPosition - vWorldPos);
 
-              // 受光面反射
-              float lit = max(ndl, 0.0);
-              // 背光面透射（冰粒散射）
-              float trans = pow(max(-ndl, 0.0), 0.7) * 0.35;
-              // 掠射散射（边缘亮）
-              float graz = 0.45 * (1.0 - abs(ndl));
+              // ─── 1. 朗伯漫反射（双面：abs 处理背面） ───
+              float nDotL = abs(dot(N, L));
+              float diffuse = max(nDotL, 0.05);  // 5% ambient floor 避免全黑
 
-              float intensity = lit + trans + graz;
-              col *= 0.4 + intensity * 0.8;
+              // ─── 2. Blinn-Phong 冰粒高光（双面取最大） ───
+              vec3 H = normalize(L + V);
+              float specFront = pow(max(dot(N, H), 0.0), 60.0);
+              float specBack = pow(max(dot(-N, H), 0.0), 60.0);
+              float spec = max(specFront, specBack);
+              // 冰粒高光偏蓝白（0.9, 0.95, 1.0），强度 0.25 避免过曝
+              vec3 specular = vec3(0.9, 0.95, 1.0) * spec * 0.25;
 
-              // 行星本影：行星中心在 ring 局部坐标系原点 (0,0,0)
-              vec3 toRing = vLocalPos;
-              float along = dot(toRing, uSunDirLocal);
-              float perp = length(toRing - along * uSunDirLocal);
-              float shadow = smoothstep(uPlanetR * 0.985, uPlanetR * 1.02, perp);
-              if (along < 0.0) col *= 0.2 + 0.8 * shadow;
+              // ─── 3. HG 前向散射（背光时环变亮） ───
+              // cosTheta = dot(-L, V)：当相机朝向太阳穿过环时为负，使 hg 变大
+              float cosTheta = dot(-L, V);
+              float hg = hgPhase(cosTheta, 0.7);
+              // scatter 强度 0.15，乘以环色避免白色泛光
+              vec3 scatter = baseColor * hg * 0.15;
 
-              gl_FragColor = vec4(col, tex.a * 0.95);
+              // ─── 4. 行星本影（解析 sphere intersection test） ───
+              // 从环片元向太阳射线，判断是否被行星球体遮挡
+              vec3 oc = vWorldPos - uPlanetCenter;
+              float b = dot(oc, L);
+              float c = dot(oc, oc) - uPlanetR * uPlanetR;
+              float disc = b * b - c;
+              // disc > 0: 射线命中行星球；b < 0: 行星在环片元与太阳之间
+              float inShadow = (disc > 0.0 && b < 0.0) ? 1.0 : 0.0;
+              // 15% ambient 漏入本影，避免纯黑
+              float shadowFactor = 1.0 - inShadow * 0.85;
+
+              // ─── 最终合成（linear space，tonemapping 前） ───
+              // 掠射散射（边缘微亮，保留原有视觉风格）— 也受本影衰减
+              float graz = 0.45 * (1.0 - abs(dot(N, L)));
+              vec3 lit = (baseColor * diffuse + specular + scatter + baseColor * graz * 0.3) * shadowFactor;
+
+              gl_FragColor = vec4(lit, tex.a * 0.95);
             }
           `,
           side: DoubleSide,
@@ -1867,8 +1860,8 @@ for (const s of stars) starById.set(s.id, s)
         // ring 还需绕 X 轴旋转 90° 让环面水平（RingGeometry 默认在 XY 平面）
         ring.rotation.x = Math.PI / 2
         tiltGroup.add(ring)
-        // 注册到 ringUpdaters，供 animate 循环每帧更新 uSunDirLocal
-        ringUpdaters.push({ ringMat, axialTilt: planet.axialTilt ?? 0 })
+        // 注册到 ringUpdaters，供 animate 循环每帧更新 uSunDirWorld / uPlanetCenter
+        ringUpdaters.push({ ringMat, tiltGroup })
 
         // ═══ OPT-16：土星环阴影投射到行星表面（参考 celestiary/web PR #58） ═══
         // 当前已有"行星阴影投射到环上"（ringMat fragment shader 中），缺少反向"环阴影投射到行星"
@@ -2334,7 +2327,7 @@ for (const s of stars) starById.set(s.id, s)
     COMETS.forEach((comet: CometElement) => {
       // ── 彗核 ──
       const nucGeo = new IcosahedronGeometry(comet.nucleusSize * 0.8, 1)
-      const [r, g, b] = hexRGB(comet.color)
+      const [r, g, b] = hexRGB('#' + comet.color.toString(16).padStart(6, '0'))
       const nucMat = new MeshBasicMaterial({
         color: new Color(r, g, b),
         transparent: true,
@@ -2415,7 +2408,7 @@ for (const s of stars) starById.set(s.id, s)
     // Low/Fallback tier：仅渲染彗核（无拖尾，省 GPU）
     COMETS.forEach((comet: CometElement) => {
       const nucGeo = new IcosahedronGeometry(comet.nucleusSize * 0.8, 0)
-      const [r, g, b] = hexRGB(comet.color)
+      const [r, g, b] = hexRGB('#' + comet.color.toString(16).padStart(6, '0'))
       const nucMat = new MeshBasicMaterial({
         color: new Color(r, g, b),
         transparent: true,
@@ -2685,44 +2678,32 @@ for (const s of stars) starById.set(s.id, s)
           // 卫星位置计算失败静默跳过
         }
       }
-      // ─── 土星环 uSunDirLocal 每帧更新（太阳与土星都在运动） ───
-      // 太阳方向在 skyGroup 局部坐标系 = sunPos - saturnPos
-      // 转 ring 局部坐标系：先撤销 tiltGroup 的 z 轴倾角，再撤销 ring 的 x 轴 90° 旋转
+      // ─── 土星环 uSunDirWorld / uPlanetCenter 每帧更新（P1 优化：world-space） ───
+      // 注意：sunLight 和 tiltGroup 都是 skyGroup 的子节点，其 .position 是 skyGroup-local 坐标
+      // 而 shader 中的 vWorldPos 是世界坐标，必须统一用世界坐标
+      // 否则 skyGroup 旋转后（applyAstroRotation/rotateX/Y/Z），光照方向会偏离真实太阳-土星几何
+      // 与 OPT-16（line 2785-2789）保持一致：用 getWorldPosition 获取世界坐标
       if (ringUpdaters.length > 0 && sunLightRef) {
-        // 找到土星 tiltGroup 的当前位置（即土星 planetUpdater 的 tiltGroup）
-        const saturnUpdater = planetUpdaters.find(u => u.bodyName === 'Saturn')
-        if (saturnUpdater) {
-          const sunPos = sunLightRef.position
-          const satPos = saturnUpdater.tiltGroup.position
-          _reusedSunDir.set(sunPos.x - satPos.x, sunPos.y - satPos.y, sunPos.z - satPos.z).normalize()
-          for (const { ringMat, axialTilt } of ringUpdaters) {
-            // 撤销 tiltGroup 的 z 轴旋转（axialTilt）
-            const tiltRad = axialTilt * Math.PI / 180
-            const cosT = Math.cos(-tiltRad), sinT = Math.sin(-tiltRad)
-            // 撤销 ring 的 x 轴 90° 旋转
-            const ringRotX = Math.PI / 2
-            const cosX = Math.cos(-ringRotX), sinX = Math.sin(-ringRotX)
-            // 先撤销 z 轴倾角：x'=x*cos+y*cos, y'=-x*sin+y*cos, z'=z
-            const x1 = _reusedSunDir.x * cosT + _reusedSunDir.y * sinT
-            const y1 = -_reusedSunDir.x * sinT + _reusedSunDir.y * cosT
-            const z1 = _reusedSunDir.z
-            // 再撤销 x 轴 90°：y''=y*cos-z*sin, z''=y*sin+z*cos
-            const x2 = x1
-            const y2 = y1 * cosX - z1 * sinX
-            const z2 = y1 * sinX + z1 * cosX
-            ;(ringMat.uniforms.uSunDirLocal.value as Vector3).set(x2, y2, z2).normalize()
-          }
+        for (const { ringMat, tiltGroup } of ringUpdaters) {
+          sunLightRef.getWorldPosition(_reusedSunWorld)
+          tiltGroup.getWorldPosition(_reusedRingWorld)
+          _reusedSunDir.copy(_reusedSunWorld).sub(_reusedRingWorld).normalize()
+          ;(ringMat.uniforms.uSunDirWorld.value as Vector3).copy(_reusedSunDir)
+          ;(ringMat.uniforms.uPlanetCenter.value as Vector3).copy(_reusedRingWorld)
         }
       }
       // ─── OPT-9 大气层 uSunDirWorld 每帧更新（太阳与行星都在运动） ───
-      // 太阳方向（世界坐标）= sunPos - planetPos，对每颗有 Physical-Lite 大气的行星独立计算
+      // 注意：sunLight 和 tiltGroup 都是 skyGroup 的子节点，其 .position 是 skyGroup-local 坐标
+      // 而 shader 中的 uSunDirWorld 是世界坐标，必须用 getWorldPosition 统一
+      // 否则 skyGroup 旋转后（applyAstroRotation），大气光照方向会偏离真实太阳-行星几何
+      // P1 修复：与土星环（ringUpdaters）和 OPT-16 阴影保持一致，使用 world-space
       if (atmosphereUpdaters.length > 0 && sunLightRef) {
-        const sunPos = sunLightRef.position
+        sunLightRef.getWorldPosition(_reusedSunWorld)
         for (const { atmoMat, planetName } of atmosphereUpdaters) {
           const updater = planetUpdaters.find(u => u.bodyName === planetName)
           if (!updater) continue
-          const pPos = updater.tiltGroup.position
-          _reusedSunDir.set(sunPos.x - pPos.x, sunPos.y - pPos.y, sunPos.z - pPos.z).normalize()
+          updater.tiltGroup.getWorldPosition(_reusedRingWorld)
+          _reusedSunDir.copy(_reusedSunWorld).sub(_reusedRingWorld).normalize()
           ;(atmoMat.uniforms.uSunDirWorld.value as Vector3).copy(_reusedSunDir)
         }
       }
@@ -2858,17 +2839,6 @@ for (const s of stars) starById.set(s.id, s)
     const meteorTime = simTimeMs / 1000
     if (meteorTrailMat) (meteorTrailMat.uniforms.uTime.value as number) = meteorTime
     if (meteorHeadMat) (meteorHeadMat.uniforms.uTime.value as number) = meteorTime
-    // P2 全量闪烁：更新 starTwinkleMats 的 uTime（使用真实时间，避免高 timeScale 混叠）
-    // 物理依据：大气闪烁是观测者真实时间尺度的现象（10ms 级），与天文时间加速无关
-    // 若用 simTimeMs，timeScale=1000 时 sin(uTime*11) 每帧相位增量 1834rad = 292 周期，
-    // 远超 Nyquist 极限，导致闪烁退化为高频混叠白噪声
-    if (starTwinkleMats.length > 0) {
-      const twinkleTime = _now / 1000
-      for (const m of starTwinkleMats) {
-        const ref = (m.userData as { uTimeRef?: { value: number } }).uTimeRef
-        if (ref) ref.value = twinkleTime
-      }
-    }
     if (meteorTrailLines && maxParticles > 0) {
       const TRAIL_SEGMENTS = 8
       const posAttr = meteorTrailLines.geometry.attributes.position as BufferAttribute
