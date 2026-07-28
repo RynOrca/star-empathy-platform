@@ -53,8 +53,8 @@ const uploadsDir = path.resolve(__dirname, '../data/uploads')
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
+  destination: (_req: Express.Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => cb(null, uploadsDir),
+  filename: (_req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     const extMap: Record<string, string> = {
       'image/jpeg': '.jpg',
       'image/png': '.png',
@@ -68,7 +68,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (allowed.includes(file.mimetype)) {
       cb(null, true)
@@ -120,7 +120,7 @@ const clientDist = path.resolve(projectRoot, 'client/dist')
 app.use(express.static(clientDist, {
   maxAge: '1y',
   immutable: true,
-  setHeaders: (res, filePath) => {
+  setHeaders: (res: Response, filePath: string) => {
     // 纹理资源：1 年 immutable 缓存
     if (filePath.includes('/textures/') || filePath.match(/\.(jpg|jpeg|png|webp)$/i)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
@@ -156,8 +156,9 @@ app.post('/api/stories/:storyId/view', writeLimiter);
 // 图片上传（放在 storiesRouter 之前，避免被 :storyId 匹配）
 app.post('/api/upload', authRequired, writeLimiter, upload.single('image'), (req: Request, res: Response) => {
   try {
-    if (!req.file) return badRequest(res, '请选择图片')
-    const imageUrl = `/uploads/${req.file.filename}`
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) return badRequest(res, '请选择图片')
+    const imageUrl = `/uploads/${file.filename}`
     ok(res, '上传成功', { imageUrl })
   } catch (error) {
     console.error('POST /api/upload error:', error)
