@@ -535,9 +535,9 @@ for (const s of stars) starById.set(s.id, s)
   {
     const namedStars = stars.filter(s => s.name !== null)
     for (const s of namedStars) {
-      const el = document.createElement('div')
-      el.textContent = s.name!.split(' ')[0] // 只取中文名
-      el.style.cssText = `
+      const inner = document.createElement('div')
+      inner.textContent = s.name!.split(' ')[0]
+      inner.style.cssText = `
         color: ${cfg.nameLabelColor};
         font-size: ${cfg.nameLabelFontSize}px;
         font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
@@ -547,6 +547,8 @@ for (const s of stars) starById.set(s.id, s)
         opacity: 0;
         transform: translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px));
       `
+      const el = document.createElement('div')
+      el.appendChild(inner)
       const label = new CSS2DObject(el)
       label.position.set(s.x, s.y, s.z)
       label.visible = false
@@ -910,8 +912,11 @@ for (const s of stars) starById.set(s.id, s)
 
   const tooltipEl = document.createElement('div')
   tooltipEl.className = 'star-tooltip'
-  tooltipEl.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
-  tooltipEl.innerHTML = `
+  // 偏移在 inner 上，因为 CSS2DRenderer 会覆盖外层 transform
+  const tooltipInner = document.createElement('div')
+  tooltipInner.className = 'tt-inner'
+  tooltipInner.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
+  tooltipInner.innerHTML = `
     <div class="tt-name"></div>
     <div class="tt-row">
       <span class="tt-stat" title="故事"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><em class="tt-val">0</em></span>
@@ -922,18 +927,22 @@ for (const s of stars) starById.set(s.id, s)
       <span class="tt-stat" title="收藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><em class="tt-val">0</em></span>
     </div>
   `
+  tooltipEl.appendChild(tooltipInner)
   // 注入 tooltip 样式（issue #34：字体大小/颜色/背景通过 cfg 可定制）
   // 屏幕空间偏移由 CSS transform: translate(-50%, -100%) 控制，缩放时保持稳定
   const ttStyle = document.createElement('style')
   ttStyle.textContent = `
     .star-tooltip {
+      pointer-events:none;
+    }
+    .tt-inner {
       font-family:"Inter","Microsoft YaHei",system-ui,sans-serif;
       font-size:${cfg.tooltipFontSize}px; color:${cfg.tooltipTextColor};
       background:${cfg.tooltipBgColor};
       padding:8px 12px; border-radius:8px;
       border:1px solid rgba(255,255,255,0.06);
       backdrop-filter:blur(8px);
-      white-space:nowrap; pointer-events:none;
+      white-space:nowrap;
       opacity:0; transition:opacity 0.15s;
       line-height:1;
       transform:translate(-50%, calc(-100% + var(--tt-offset, 0px)));
@@ -1015,7 +1024,7 @@ for (const s of stars) starById.set(s.id, s)
         tooltipLabel.position.set(_w.x, _w.y, _w.z)
         hoverGlow.position.set(_w.x, _w.y, _w.z)
       }
-      tooltipEl.style.opacity = '1'
+      tooltipInner.style.opacity = '1'
       hoverGlow.visible = true
       hoverGlowTargetOpacity = 0.95
       options?.onStarHover?.(starId)
@@ -1135,7 +1144,7 @@ for (const s of stars) starById.set(s.id, s)
           applyConstellationVisibility(null)
         }
         hoveredStarId = -1
-        tooltipEl.style.opacity = '0'
+        tooltipInner.style.opacity = '0'
         hoverGlowTargetOpacity = 0
         options?.onStarHover?.(null)
       }
@@ -3006,10 +3015,10 @@ for (const s of stars) starById.set(s.id, s)
         starNameOpacities.set(starId, next)
         if (next > 0.005) {
           if (!label.visible) label.visible = true
-          ;(label.element as HTMLElement).style.opacity = String(next)
+          ;(label.element.firstChild as HTMLElement).style.opacity = String(next)
         } else if (label.visible) {
           label.visible = false
-          ;(label.element as HTMLElement).style.opacity = '0'
+          ;(label.element.firstChild as HTMLElement).style.opacity = '0'
         }
       }
     }
@@ -3140,15 +3149,15 @@ for (const s of stars) starById.set(s.id, s)
         cfg.nameLabelOffsetPx !== patch.nameLabelOffsetPx
       if (nameLabelStyleChanged) {
         for (const label of starNameLabels.values()) {
-          const el = label.element as HTMLElement
-          el.style.color = cfg.nameLabelColor
-          el.style.fontSize = `${cfg.nameLabelFontSize}px`
-          el.style.transform = `translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px))`
+          const inner = label.element.firstChild as HTMLElement
+          inner.style.color = cfg.nameLabelColor
+          inner.style.fontSize = `${cfg.nameLabelFontSize}px`
+          inner.style.transform = `translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px))`
         }
       }
       // tooltip 偏移变更
       if (cfg.tooltipOffsetPx !== patch.tooltipOffsetPx) {
-        tooltipEl.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
+        tooltipInner.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
       }
       // showAllConstellations 状态变更：立即应用可见性
       if (cfg.showAllConstellations !== oldShowAll) {
