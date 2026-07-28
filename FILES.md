@@ -1,6 +1,8 @@
 # FILES.md — 星语穹庭 文件清单
 
 > 为 AI Agent 和开发者提供快速导航。每个文件标注用途，方便定位修改目标。
+>
+> **维护规则**：在创建、修改或删除文件后，必须同步更新本文件。如需了解项目文件作用，请先查阅本文件。
 
 ---
 
@@ -66,7 +68,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()` |
+| `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()`。<br>**含 `convertKeys` 函数**：自动将 snake_case 键转为 camelCase（如 `image_url` → `imageUrl`），SQL 查询中无需重复别名 |
 | `position.ts` | 位置计算工具 |
 
 ### 中间件 `src/middleware/`
