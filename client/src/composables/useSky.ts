@@ -545,7 +545,7 @@ for (const s of stars) starById.set(s.id, s)
         pointer-events: none;
         white-space: nowrap;
         opacity: 0;
-        transform: translate(-50%, -120%);
+        transform: translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px));
       `
       const label = new CSS2DObject(el)
       label.position.set(s.x, s.y, s.z)
@@ -910,6 +910,7 @@ for (const s of stars) starById.set(s.id, s)
 
   const tooltipEl = document.createElement('div')
   tooltipEl.className = 'star-tooltip'
+  tooltipEl.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
   tooltipEl.innerHTML = `
     <div class="tt-name"></div>
     <div class="tt-row">
@@ -935,7 +936,7 @@ for (const s of stars) starById.set(s.id, s)
       white-space:nowrap; pointer-events:none;
       opacity:0; transition:opacity 0.15s;
       line-height:1;
-      transform:translate(-50%, -100%);
+      transform:translate(-50%, calc(-100% + var(--tt-offset, 0px)));
     }
     .star-tooltip .tt-name {
       font-size:${cfg.tooltipNameFontSize}px; font-weight:600;
@@ -3132,13 +3133,22 @@ for (const s of stars) starById.set(s.id, s)
           el.style.color = cfg.constellationLabelColor
         }
       }
-      // 星名标注颜色/字体变更
-      if (cfg.nameLabelColor !== patch.nameLabelColor || cfg.nameLabelFontSize !== patch.nameLabelFontSize) {
+      // 星名标注颜色/字体/偏移变更
+      const nameLabelStyleChanged =
+        cfg.nameLabelColor !== patch.nameLabelColor ||
+        cfg.nameLabelFontSize !== patch.nameLabelFontSize ||
+        cfg.nameLabelOffsetPx !== patch.nameLabelOffsetPx
+      if (nameLabelStyleChanged) {
         for (const label of starNameLabels.values()) {
           const el = label.element as HTMLElement
           el.style.color = cfg.nameLabelColor
           el.style.fontSize = `${cfg.nameLabelFontSize}px`
+          el.style.transform = `translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px))`
         }
+      }
+      // tooltip 偏移变更
+      if (cfg.tooltipOffsetPx !== patch.tooltipOffsetPx) {
+        tooltipEl.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
       }
       // showAllConstellations 状态变更：立即应用可见性
       if (cfg.showAllConstellations !== oldShowAll) {

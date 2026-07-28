@@ -65,6 +65,10 @@ export interface StarDisplayConfig {
   nameLabelFontSize: number
   /** 星名标注颜色（CSS rgba） */
   nameLabelColor: string
+  /** 星名标注：相对星星锚点的屏幕像素偏移（负值=上方，正值=下方） */
+  nameLabelOffsetPx: number
+  /** tooltip：相对星星锚点的屏幕像素偏移（负值=上方，正值=下方） */
+  tooltipOffsetPx: number
 }
 
 export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
@@ -93,4 +97,6 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   nameLabelFovDeg: 15,
   nameLabelFontSize: 10,
   nameLabelColor: 'rgba(255,217,138,0.7)',
+  nameLabelOffsetPx: -12,
+  tooltipOffsetPx: -8,
 }
