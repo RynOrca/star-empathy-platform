@@ -7,91 +7,105 @@
       </div>
 
       <div class="form-body">
-        <div class="field">
-          <label class="field-label">标题</label>
-          <input
-            v-model="title"
-            class="field-input"
-            placeholder="给你的故事起个名字..."
-            maxlength="60"
-          />
-        </div>
-
-        <div class="field">
-          <label class="field-label">故事</label>
-          <textarea
-            v-model="content"
-            class="field-textarea"
-            placeholder="此刻你在这颗星下想起了什么？写下你的心事吧..."
-            maxlength="300"
-            rows="6"
-            ref="textareaRef"
-          ></textarea>
-          <div class="char-count" :class="{ warn: content.length >= 280 }">
-            {{ content.length }} / 300
+        <template v-if="step === 1">
+          <div class="field">
+            <label class="field-label">标题</label>
+            <input
+              v-model="title"
+              class="field-input"
+              placeholder="给你的故事起个名字..."
+              maxlength="60"
+            />
           </div>
-        </div>
 
-        <!-- 情绪标签 -->
-        <div class="field">
-          <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
-          <div class="tag-picker">
-            <button
-              v-for="t in tagOptions"
-              :key="t"
-              class="tag-btn"
-              :class="{ active: selectedTag === t, ['tag-' + t]: true }"
-              @click="selectedTag = selectedTag === t ? null : t"
-            >{{ t }}</button>
+          <div class="field">
+            <label class="field-label">故事</label>
+            <textarea
+              v-model="content"
+              class="field-textarea"
+              placeholder="此刻你在这颗星下想起了什么？写下你的心事吧..."
+              maxlength="300"
+              rows="6"
+              ref="textareaRef"
+            ></textarea>
+            <div class="char-count" :class="{ warn: content.length >= 280 }">
+              {{ content.length }} / 300
+            </div>
           </div>
-        </div>
 
-        <!-- 图片上传 -->
-        <div class="field">
-          <label class="field-label">图片 <span class="optional">- 可选</span></label>
-          <div
-            class="image-upload-zone"
-            :class="{ 'has-image': imagePreview }"
-            @click="triggerFileInput"
-            @dragover.prevent
-            @drop.prevent="onDrop"
-          >
-            <template v-if="!imagePreview">
-              <ImageIcon :size="24" class="upload-icon" />
-              <span class="upload-text">点击或拖拽上传图片</span>
-              <span class="upload-hint">支持 JPG/PNG/WebP/GIF，最大 5MB</span>
-            </template>
-            <template v-else>
-              <img :src="imagePreview" class="upload-preview" />
-              <button class="upload-remove" @click.stop="removeImage">
-                <X :size="14" />
-              </button>
-            </template>
+          <button class="submit-btn" :disabled="!title.trim() || !content.trim()" @click="step = 2">
+            <span>下一页</span>
+            <ChevronRight :size="14" />
+          </button>
+        </template>
+
+        <template v-else>
+          <button class="back-btn" @click="step = 1">
+            <ArrowLeft :size="14" />
+            <span>返回</span>
+          </button>
+
+          <!-- 情绪标签 -->
+          <div class="field">
+            <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
+            <div class="tag-picker">
+              <button
+                v-for="t in tagOptions"
+                :key="t"
+                class="tag-btn"
+                :class="{ active: selectedTag === t, ['tag-' + t]: true }"
+                @click="selectedTag = selectedTag === t ? null : t"
+              >{{ t }}</button>
+            </div>
           </div>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            class="file-input-hidden"
-            @change="onFileChange"
-          />
-          <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
-        </div>
 
-        <!-- 匿名投递 -->
-        <div class="field">
-          <label class="field-checkbox">
-            <input type="checkbox" v-model="isAnonymous" />
-            <span>匿名投递（故事属于你，但不显示你的名字）</span>
-          </label>
-        </div>
+          <!-- 图片上传 -->
+          <div class="field">
+            <label class="field-label">图片 <span class="optional">- 可选</span></label>
+            <div
+              class="image-upload-zone"
+              :class="{ 'has-image': imagePreview }"
+              @click="triggerFileInput"
+              @dragover.prevent
+              @drop.prevent="onDrop"
+            >
+              <template v-if="!imagePreview">
+                <ImageIcon :size="24" class="upload-icon" />
+                <span class="upload-text">点击或拖拽上传图片</span>
+                <span class="upload-hint">支持 JPG/PNG/WebP/GIF，最大 5MB</span>
+              </template>
+              <template v-else>
+                <img :src="imagePreview" class="upload-preview" />
+                <button class="upload-remove" @click.stop="removeImage">
+                  <X :size="14" />
+                </button>
+              </template>
+            </div>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              class="file-input-hidden"
+              @change="onFileChange"
+            />
+            <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
+          </div>
 
-        <p v-if="error" class="form-error">{{ error }}</p>
+          <!-- 匿名投递 -->
+          <div class="field">
+            <label class="field-checkbox">
+              <input type="checkbox" v-model="isAnonymous" />
+              <span>匿名投递（故事属于你，但不显示你的名字）</span>
+            </label>
+          </div>
 
-        <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
-          <Send :size="14" />
-          <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
-        </button>
+          <p v-if="error" class="form-error">{{ error }}</p>
+
+          <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
+            <Send :size="14" />
+            <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -99,7 +113,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { PenSquare, X, Send, Image as ImageIcon } from 'lucide-vue-next'
+import { PenSquare, X, Send, Image as ImageIcon, ChevronRight, ArrowLeft } from 'lucide-vue-next'
 
 const props = defineProps<{
   starName: string
@@ -113,6 +127,7 @@ const emit = defineEmits<{
 
 const title = ref('')
 const content = ref('')
+const step = ref<1 | 2>(1)
 const submitting = ref(false)
 const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -407,6 +422,25 @@ async function onSubmit() {
   background: rgba(255, 139, 125, 0.06);
   border: 1px solid rgba(255, 139, 125, 0.12);
   border-radius: var(--radius-sm);
+}
+
+/* ─── Back Button ─── */
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+  align-self: flex-start;
+}
+.back-btn:hover {
+  color: var(--ink);
 }
 
 /* ─── Submit Button ─── */
