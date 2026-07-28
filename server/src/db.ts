@@ -72,9 +72,10 @@ db.exec(`
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     catalog_star_id INTEGER NOT NULL,
     content         TEXT NOT NULL,
-    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    is_visible      INTEGER NOT NULL DEFAULT 1
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at));
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at), is_visible);
 
   CREATE TABLE IF NOT EXISTS story_kernels (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

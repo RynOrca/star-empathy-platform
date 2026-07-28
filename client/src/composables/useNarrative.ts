@@ -11,7 +11,7 @@ export function useNarrative() {
   const error = ref<string | null>(null)
   const cached = ref(false)
 
-  async function fetchNarrative(catalogStarId: number, lat?: number, lng?: number): Promise<void> {
+  async function fetchNarrative(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<void> {
     loading.value = true
     error.value = null
     content.value = null
@@ -23,6 +23,8 @@ export function useNarrative() {
         params.set('lat', String(lat))
         params.set('lng', String(lng))
       }
+      if (ra !== undefined) params.set('ra', String(ra))
+      if (dec !== undefined) params.set('dec', String(dec))
       const qs = params.toString()
       const res = await fetch(`/api/catalog/stars/${catalogStarId}/narrative${qs ? '?' + qs : ''}`)
       const json = await res.json()
