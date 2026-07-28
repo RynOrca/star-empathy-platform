@@ -47,7 +47,10 @@
                   <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
                   <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
                 </div>
-                <p class="story-excerpt">{{ story.content }}</p>
+                <div class="story-body">
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                </div>
                 <div class="story-meta">
                   <span class="meta-history">来自星河</span>
                   <span class="meta-sep">·</span>
@@ -81,7 +84,10 @@
                     <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
                     <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
                   </div>
-                  <div class="detail-body">{{ detailStory.content }}</div>
+                  <div class="detail-body">
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                  </div>
                   <div class="detail-footer">
                     <button
                       class="resonate-btn detail-resonate"
@@ -154,21 +160,24 @@
                   @click="openStoryDetail(story)"
                 >
                   <div class="story-head">
-                    <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
-                    <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
-                    <span v-else class="story-sender is-anon">匿名星语</span>
-                    <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
-                    <button
-                      class="resonate-btn"
-                      :class="{ done: justResonatedId === story.id }"
-                      :disabled="resonating"
-                      @click.stop="onResonate(story)"
-                    >
-                      <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
-                      <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
-                    </button>
-                  </div>
-                  <p class="story-excerpt">{{ story.content }}</p>
+                  <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                  <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+                  <span v-else class="story-sender is-anon">匿名星语</span>
+                  <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
+                  <button
+                    class="resonate-btn"
+                    :class="{ done: justResonatedId === story.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(story)"
+                  >
+                    <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
+                    <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
+                  </button>
+                </div>
+                <div class="story-body">
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                </div>
                   <div class="story-meta">
                     <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
                     <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
@@ -222,7 +231,10 @@
                     <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
                   </button>
                 </div>
-                <p class="story-excerpt">{{ story.content }}</p>
+                <div class="story-body">
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                </div>
                 <div class="story-meta">
                   <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
                   <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
@@ -614,6 +626,8 @@ import { useSimilarStars } from '../composables/useSimilarStars'
 import { useAreaHighlights } from '../composables/useAreaHighlights'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../composables/useAstroEvents'
 import catalogData from '../data/stars.json'
+import { marked } from 'marked'
+marked.setOptions({ breaks: true, gfm: true })
 
 const props = defineProps<{
   stories: Array<{
@@ -630,6 +644,7 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     userId: number | null
+    imageUrl: string | null
   }>
   activeIndex: number
   starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -758,6 +773,12 @@ function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof
       return () => rng() - 0.5
     }
   }
+}
+
+// Markdown 渲染
+function renderMarkdown(text: string): string {
+  if (!text) return ''
+  return marked.parse(text) as string
 }
 
 // 本地浏览数覆盖（乐观更新）
@@ -2548,5 +2569,88 @@ watch(() => props.catalogStarId, () => {
 .delete-confirm-btn:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+
+/* ─── Story Image ─── */
+.story-image {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.detail-image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+/* ─── Markdown 渲染样式 ─── */
+.story-excerpt :deep(p) {
+  margin: 0 0 0.5em;
+  line-height: 1.6;
+  color: var(--ink-secondary);
+  font-size: 0.84rem;
+}
+.story-excerpt :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.story-excerpt :deep(em) {
+  color: #c9b8e8;
+}
+.story-excerpt :deep(strong) {
+  color: var(--ink);
+}
+.story-excerpt :deep(blockquote) {
+  border-left: 2px solid rgba(255,255,255,0.15);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.story-excerpt :deep(code) {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+.story-excerpt :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.detail-content :deep(p) {
+  margin: 0 0 0.8em;
+  line-height: 1.75;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+}
+.detail-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.detail-content :deep(em) {
+  color: #c9b8e8;
+}
+.detail-content :deep(strong) {
+  color: var(--ink);
+}
+.detail-content :deep(blockquote) {
+  border-left: 2px solid rgba(255,255,255,0.15);
+  padding-left: 14px;
+  margin: 0.8em 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.detail-content :deep(code) {
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.82rem;
+}
+.detail-content :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
 }
 </style>
