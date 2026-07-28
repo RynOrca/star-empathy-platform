@@ -265,6 +265,10 @@ export function deleteStory(storyId: number, userId: number): {
   const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
   if (!existing) return { success: false, notFound: true };
   if (existing.user_id !== userId) return { success: false, notOwner: true };
+  // 先清理外键关联数据，再删除故事本身
+  db.prepare('DELETE FROM resonance_log WHERE story_id = ?').run(storyId);
+  db.prepare('DELETE FROM story_views WHERE story_id = ?').run(storyId);
+  db.prepare('DELETE FROM story_kernels WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
   return { success: true };
 }
