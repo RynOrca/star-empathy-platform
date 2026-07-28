@@ -30,21 +30,49 @@
                 :cached="narrative.cached.value"
                 @retry="narrative.fetchNarrative(catalogStarId)"
               />
-              <button class="stories-entry-btn" @click="activeTab = 'all'">
-                <span class="stories-entry-text">
-                  关于{{ starInfo?.displayName || '这颗星星' }}的故事...
-                </span>
-                <span class="stories-entry-badge" v-if="realStories.length > 0">{{ realStories.length }}条</span>
-                <ChevronDown :size="16" class="stories-entry-arrow" />
-              </button>
+              <!-- 跳转到其他 Tab 的快捷入口 -->
+              <div class="narrative-quick-links">
+                <button class="quick-link-btn" @click="activeTab = 'history'">
+                  <BookOpen :size="14" />
+                  <span>查看历史故事</span>
+                  <span class="quick-link-badge" v-if="historyStories.length > 0">{{ historyStories.length }}条</span>
+                </button>
+                <button class="quick-link-btn" @click="activeTab = 'all'">
+                  <List :size="14" />
+                  <span>浏览所有故事</span>
+                  <span class="quick-link-badge" v-if="userStories.length > 0">{{ userStories.length }}条</span>
+                </button>
+              </div>
             </template>
           </template>
 
-          <!-- Tab 2: 历史故事（占位，Task 3 实现） -->
+          <!-- Tab 2: 历史故事 -->
           <template v-else-if="activeTab === 'history'">
-            <div class="empty-state">
+            <div v-if="historyStories.length > 0" class="story-list">
+              <div
+                v-for="(story, index) in historyStories"
+                :key="story.id"
+                class="story-card"
+                :style="{ animationDelay: `${index * 30}ms` }"
+                @click="openStoryDetail(story)"
+              >
+                <div class="story-head">
+                  <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
+                  <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
+                </div>
+                <p class="story-excerpt">{{ story.content }}</p>
+                <div class="story-meta">
+                  <span class="meta-history">来自星河</span>
+                  <span class="meta-sep">·</span>
+                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
+                  <span class="meta-sep">·</span>
+                  <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
               <BookOpen :size="20" class="empty-icon" />
-              <p>历史故事（即将实现）</p>
+              <p>这颗星还没有历史故事</p>
             </div>
           </template>
 
@@ -61,6 +89,14 @@
             <div class="empty-state">
               <User :size="20" class="empty-icon" />
               <p>我的故事（即将实现）</p>
+            </div>
+          </template>
+
+          <!-- fallback：未知 Tab（不应出现） -->
+          <template v-else>
+            <div class="empty-state">
+              <AlertTriangle :size="20" class="empty-icon" />
+              <p>未知视图</p>
             </div>
           </template>
         </div>
@@ -420,8 +456,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon, List, User } from 'lucide-vue-next'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, type Component } from 'vue'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon, List, User, AlertTriangle } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
@@ -477,6 +513,16 @@ const emit = defineEmits<{
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
+
+// 历史故事（星河种子数据）
+const historyStories = computed(() =>
+  realStories.value.filter(s => s.type === 'history')
+)
+
+// 用户投递的故事（非历史）
+const userStories = computed(() =>
+  realStories.value.filter(s => s.type !== 'history')
+)
 
 // ─── 天文事件（升落 / 中天 / 月相）───
 // 当 starInfo 或 observer 位置变化时自动重算（同步 API，<5ms）
@@ -579,7 +625,7 @@ const detailStory = computed(() => {
 })
 const justResonatedId = ref<number | null>(null)
 type TabId = 'narrative' | 'history' | 'all' | 'mine'
-const tabs: { id: TabId; label: string; icon: any }[] = [
+const tabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
   { id: 'history', label: '历史故事', icon: BookOpen },
   { id: 'all', label: '所有故事', icon: List },
@@ -1102,42 +1148,40 @@ watch(() => props.catalogStarId, () => {
   flex-direction: column;
 }
 
-/* ─── Stories Entry Button ─── */
-.stories-entry-btn {
-  padding: 14px 28px;
-  border: none;
+/* ─── Narrative Quick Links ─── */
+.narrative-quick-links {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   border-top: 1px solid var(--rule);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--ink-secondary);
-  font-family: var(--font);
-  font-size: 0.84rem;
-  cursor: pointer;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+.quick-link-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  gap: 8px;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.015);
+  border: none;
+  color: var(--ink-secondary);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
   transition: background 0.15s, color 0.15s;
-  margin-top: auto;
+  text-align: left;
 }
-.stories-entry-btn:hover {
+.quick-link-btn:hover {
   background: rgba(255, 255, 255, 0.04);
   color: var(--ink);
 }
-.stories-entry-text {
-  flex: 1;
-  text-align: left;
-  font-weight: 500;
-}
-.stories-entry-badge {
-  font-size: 0.72rem;
+.quick-link-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted-light);
-}
-.stories-entry-arrow {
-  color: var(--muted-light);
-  transition: transform 0.2s;
 }
 
 /* ─── Panel Header (back button) ─── */
@@ -1422,6 +1466,15 @@ watch(() => props.catalogStarId, () => {
   background: rgba(202, 167, 255, 0.1);
   border: 1px solid rgba(202, 167, 255, 0.15);
   color: var(--star-purple);
+}
+
+.story-origin {
+  font-size: 0.7rem;
+  color: var(--star-purple);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(202, 167, 255, 0.08);
+  flex-shrink: 0;
 }
 
 /* ─── Detail View ─── */
