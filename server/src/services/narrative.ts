@@ -339,7 +339,7 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 }
 
 // ─── 太阳系星体映射 ───
-const PLANET_MAP: Record<string, { name: string; nameCN: string }> = {
+export const PLANET_MAP: Record<string, { name: string; nameCN: string }> = {
   '-100': { name: 'Sun', nameCN: '太阳' },
   '-101': { name: 'Moon', nameCN: '月球' },
   '-102': { name: 'Venus', nameCN: '金星' },
@@ -352,7 +352,7 @@ const PLANET_MAP: Record<string, { name: string; nameCN: string }> = {
 }
 
 /** 判断是否为太阳系星体（planetId 为负数） */
-function isPlanetId(id: number): boolean {
+export function isPlanetId(id: number): boolean {
   return String(id) in PLANET_MAP
 }
 

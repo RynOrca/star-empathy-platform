@@ -932,10 +932,13 @@ const narrative = useNarrative()
 function fetchNarrativeWithPosition() {
   if (!props.catalogStarId) return
   narrative.reset()
+  // 优先使用 SkyPage 传入的观测者位置（用于地平线判断），回退到 StarDetail 自己的定位
+  const lat = props.observerLat ?? userPosition.value?.lat
+  const lng = props.observerLng ?? userPosition.value?.lng
   narrative.fetchNarrative(
     props.catalogStarId,
-    userPosition.value?.lat,
-    userPosition.value?.lng,
+    lat,
+    lng,
     props.starInfo?.ra,
     props.starInfo?.dec,
   )
@@ -945,7 +948,7 @@ watch(() => props.catalogStarId, (id) => {
   activeTab.value = 'narrative' // 切换星星时回到默认 Tab
   searchQuery.value = ''        // 清空搜索
   detailStoryId.value = null    // 关闭故事详情
-  if (id && positionReady.value) {
+  if (id && (positionReady.value || props.observerLat != null)) {
     fetchNarrativeWithPosition()
   }
 }, { immediate: true })
