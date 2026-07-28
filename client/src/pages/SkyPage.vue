@@ -245,7 +245,7 @@ import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
-import { getMoonPhase, getSolarTerm } from '../data/planets'
+import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 
 
 const router = useRouter()
@@ -933,19 +933,27 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   // 'HaleBopp': { color: '#d8e8f8', conName: '海尔-波普彗星' },
 }
 
-function onPlanetClick(name: string, nameCN: string, planetId: number) {
+async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
   const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
+
+  // 计算行星当前 RA/Dec（用于后端判断地平线可见性）
+  let ra = 0, dec = 0
+  if (userLat.value !== undefined && userLng.value !== undefined) {
+    const pos = await getBodyPosition(name, userLat.value, userLng.value)
+    if (pos) { ra = pos.ra; dec = pos.dec }
+  }
+
   selectedStarInfo.value = {
     displayName: nameCN,
     con: '',
     mag: 0,
     conName: nameCN,
     distance: null,
-    ra: 0,
-    dec: 0,
+    ra,
+    dec,
     color: info?.color || '#ffdd88',
   }
   selectedCatalogStarId.value = planetId

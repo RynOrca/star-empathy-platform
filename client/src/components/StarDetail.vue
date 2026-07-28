@@ -936,6 +936,8 @@ function fetchNarrativeWithPosition() {
     props.catalogStarId,
     userPosition.value?.lat,
     userPosition.value?.lng,
+    props.starInfo?.ra,
+    props.starInfo?.dec,
   )
 }
 
