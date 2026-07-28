@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -636,20 +636,14 @@ watch(showMyStoriesOnly, async () => {
     // 关闭"只看我的"：清除连线
     skyRef.value?.sky?.setKernelLines([])
   }
-  // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
+  // 如果详情面板打开：仅当该星完全没有故事时关闭面板
+  // 注意：showMyStoriesOnly 只影响 3D 天空，不影响详情面板数据
   if (selectedStarInfo.value && selectedCatalogStarId.value) {
-    const filtered = getFilteredStories(selectedCatalogStarId.value)
-    if (filtered.length === 0) {
+    const allStories = storiesByStarId.value.get(selectedCatalogStarId.value)
+    if (!allStories || allStories.length === 0) {
       selectedStories.value = []
       selectedStarInfo.value = null
       catalogStats.value = null
-    } else {
-      selectedStories.value = filtered
-      catalogStats.value = {
-        storyCount: filtered.length,
-        totalResonance: filtered.reduce((s, x) => s + x.resonanceCount, 0),
-        totalViews: 0, starViews: 0, favoriteCount: 0,
-      }
     }
   }
 })
@@ -768,7 +762,9 @@ const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
-  const stories = getFilteredStories(starId)
+  // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
+  // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
+  const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
@@ -794,7 +790,7 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
 
 function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
-  const stories = getFilteredStories(planetId)
+  const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
   selectedStarInfo.value = {
