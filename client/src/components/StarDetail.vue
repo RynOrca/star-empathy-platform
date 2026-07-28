@@ -114,7 +114,7 @@
             </template>
           </template>
 
-          <!-- Tab 3: 所有故事 -->
+          <!-- Tab 3: 用户故事 -->
           <template v-else-if="activeTab === 'all'">
             <!-- 详情视图 -->
             <template v-if="detailStory">
@@ -896,7 +896,7 @@ type TabId = 'narrative' | 'history' | 'all' | 'mine'
 const tabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
   { id: 'history', label: '历史故事', icon: BookOpen },
-  { id: 'all', label: '所有故事', icon: List },
+  { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
 const activeTab = ref<TabId>('narrative')
@@ -905,7 +905,7 @@ const activeTab = ref<TabId>('narrative')
 const detailBackLabel = computed(() => {
   switch (activeTab.value) {
     case 'history': return '历史故事'
-    case 'all': return '所有故事'
+    case 'all': return '用户故事'
     case 'mine': return '我的故事'
     default: return '返回'
   }
