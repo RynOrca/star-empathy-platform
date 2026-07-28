@@ -35,46 +35,34 @@
 
           <!-- Tab 2: 历史故事 -->
           <template v-else-if="activeTab === 'history'">
-            <div v-if="historyStories.length > 0" class="story-list">
-              <div
-                v-for="(story, index) in historyStories"
-                :key="story.id"
-                class="story-card"
-                :style="{ animationDelay: `${index * 30}ms` }"
-                @click="openStoryDetail(story)"
-              >
-                <div class="story-head">
-                  <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
-                  <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
-                </div>
-                <div class="story-body">
-                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
-                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
-                </div>
-                <div class="story-meta">
-                  <span class="meta-history">来自星河</span>
-                  <span class="meta-sep">·</span>
-                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
-                  <span class="meta-sep">·</span>
-                  <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <BookOpen :size="20" class="empty-icon" />
-              <p>这颗星还没有历史故事</p>
-            </div>
-          </template>
-
-          <!-- Tab 3: 所有故事 -->
-          <template v-else-if="activeTab === 'all'">
             <!-- 详情视图 -->
             <template v-if="detailStory">
-              <div class="panel-header">
+              <div class="detail-toolbar">
                 <button class="back-btn" @click="detailStoryId = null">
                   <ArrowLeft :size="15" />
-                  <span>所有故事</span>
+                  <span>{{ detailBackLabel }}</span>
                 </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
               </div>
               <Transition name="detail" mode="out-in">
                 <div :key="detailStory.id" class="detail-view">
@@ -85,29 +73,89 @@
                     <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
                   </div>
                   <div class="detail-body">
-                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
                     <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
                   </div>
-                  <div class="detail-footer">
-                    <button
-                      class="resonate-btn detail-resonate"
-                      :class="{ done: justResonatedId === detailStory.id }"
-                      :disabled="resonating"
-                      @click.stop="onResonate(detailStory)"
-                    >
-                      <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
-                      <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
-                      <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
-                    </button>
-                    <button
-                      v-if="detailStory.userId != null && detailStory.userId === currentUserId"
-                      class="delete-story-btn"
-                      @click.stop="confirmDelete(detailStory.id)"
-                      :disabled="deleting"
-                    >
-                      <Trash2 :size="14" />
-                      <span>删除</span>
-                    </button>
+                </div>
+              </Transition>
+            </template>
+
+            <!-- 列表视图 -->
+            <template v-else>
+              <div v-if="historyStories.length > 0" class="story-list">
+                <div
+                  v-for="(story, index) in historyStories"
+                  :key="story.id"
+                  class="story-card"
+                  :style="{ animationDelay: `${index * 30}ms` }"
+                  @click="openStoryDetail(story)"
+                >
+                  <div class="story-head">
+                    <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
+                    <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
+                  </div>
+                  <div class="story-body">
+                    <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                    <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                  </div>
+                  <div class="story-meta">
+                    <span class="meta-history">来自星河</span>
+                    <span class="meta-sep">·</span>
+                    <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
+                    <span class="meta-sep">·</span>
+                    <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-state">
+                <BookOpen :size="20" class="empty-icon" />
+                <p>这颗星还没有历史故事</p>
+              </div>
+            </template>
+          </template>
+
+          <!-- Tab 3: 所有故事 -->
+          <template v-else-if="activeTab === 'all'">
+            <!-- 详情视图 -->
+            <template v-if="detailStory">
+              <div class="detail-toolbar">
+                <button class="back-btn" @click="detailStoryId = null">
+                  <ArrowLeft :size="15" />
+                  <span>{{ detailBackLabel }}</span>
+                </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
+              </div>
+              <Transition name="detail" mode="out-in">
+                <div :key="detailStory.id" class="detail-view">
+                  <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+                  <div class="detail-info-bar">
+                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
+                  </div>
+                  <div class="detail-body">
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
                   </div>
                 </div>
               </Transition>
@@ -175,8 +223,8 @@
                   </button>
                 </div>
                 <div class="story-body">
-                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
                   <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
                 </div>
                   <div class="story-meta">
                     <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
@@ -211,6 +259,50 @@
               <p>请先登录后查看我的故事</p>
               <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
             </div>
+            <!-- 详情视图 -->
+            <template v-else-if="detailStory">
+              <div class="detail-toolbar">
+                <button class="back-btn" @click="detailStoryId = null">
+                  <ArrowLeft :size="15" />
+                  <span>{{ detailBackLabel }}</span>
+                </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
+              </div>
+              <Transition name="detail" mode="out-in">
+                <div :key="detailStory.id" class="detail-view">
+                  <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+                  <div class="detail-info-bar">
+                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
+                  </div>
+                  <div class="detail-body">
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
+                  </div>
+                </div>
+              </Transition>
+            </template>
             <div v-else-if="myStories.length > 0" class="story-list">
               <div
                 v-for="(story, index) in myStories"
@@ -232,8 +324,8 @@
                   </button>
                 </div>
                 <div class="story-body">
-                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
                   <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
                 </div>
                 <div class="story-meta">
                   <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
@@ -809,6 +901,16 @@ const tabs: { id: TabId; label: string; icon: Component }[] = [
 ]
 const activeTab = ref<TabId>('narrative')
 
+// 详情视图"返回"按钮的文案，随当前 Tab 变化
+const detailBackLabel = computed(() => {
+  switch (activeTab.value) {
+    case 'history': return '历史故事'
+    case 'all': return '所有故事'
+    case 'mine': return '我的故事'
+    default: return '返回'
+  }
+})
+
 // ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
 const resonanceOverrides = reactive(new Map<number, number>())
 function getDisplayResonance(story: { id: number; resonanceCount: number }): number {
@@ -845,6 +947,11 @@ watch(() => props.catalogStarId, (id) => {
     fetchNarrativeWithPosition()
   }
 }, { immediate: true })
+
+// 切换 Tab 时关闭故事详情，避免详情视图跨 Tab 残留
+watch(activeTab, () => {
+  detailStoryId.value = null
+})
 
 // ─── AI 故事内核标签 ───
 const kernel = useKernel()
@@ -1674,11 +1781,17 @@ watch(() => props.catalogStarId, () => {
   word-break: break-word;
   overflow-wrap: break-word;
 }
-.detail-footer {
+.detail-toolbar {
   flex-shrink: 0;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.detail-actions {
+  display: flex;
+  gap: 8px;
 }
 .detail-resonate {
   padding: 8px 16px;
@@ -2582,14 +2695,14 @@ watch(() => props.catalogStarId, () => {
   max-height: 160px;
   object-fit: cover;
   border-radius: var(--radius-sm);
-  margin-bottom: 10px;
+  margin-top: 10px;
 }
 .detail-image {
   width: 100%;
   max-height: 300px;
   object-fit: cover;
   border-radius: var(--radius-md);
-  margin-bottom: 16px;
+  margin-top: 16px;
 }
 
 /* ─── Markdown 渲染样式 ─── */
