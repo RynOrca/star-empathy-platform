@@ -8,6 +8,8 @@
 server/data/
 .runtime-key
 server/.runtime-key
+.runtime-amap-key
+server/.runtime-amap-key
 
 # ─── 构建产物 ───
 *.bat
