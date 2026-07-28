@@ -1,6 +1,8 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="form-panel">
+      <!-- 移动端拖拽手柄 -->
+      <div class="mobile-drag-handle" @click="$emit('close')"></div>
       <div class="form-header">
         <h2 class="form-heading"><PenSquare :size="16" /> 写我的故事</h2>
         <button class="close-icon" @click="$emit('close')"><X :size="15" /></button>
@@ -349,5 +351,143 @@ async function onSubmit() {
 .submit-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* ─── Mobile Drag Handle (desktop hidden) ─── */
+.mobile-drag-handle {
+  display: none;
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin: 10px auto 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.mobile-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+    background: rgba(7, 8, 22, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .mobile-drag-handle {
+    display: block;
+  }
+
+  .form-panel {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: slideUpForm 0.28s ease-out;
+  }
+
+  @keyframes slideUpForm {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .form-header {
+    padding: 14px 18px;
+    flex-shrink: 0;
+  }
+
+  .form-heading {
+    font-size: 0.95rem;
+  }
+
+  .close-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .form-body {
+    padding: 16px 18px 20px;
+    gap: 16px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .field-label {
+    font-size: 0.82rem;
+  }
+
+  .field-input {
+    padding: 11px 14px;
+    font-size: 0.88rem;
+  }
+
+  .field-textarea {
+    min-height: 120px;
+    padding: 12px 14px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+
+  .char-count {
+    font-size: 0.72rem;
+  }
+
+  .tag-picker {
+    gap: 6px;
+  }
+
+  .tag-btn {
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    border-radius: 16px;
+  }
+
+  .field-checkbox {
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .field-checkbox input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+  }
+
+  .form-error {
+    font-size: 0.8rem;
+    padding: 10px 12px;
+  }
+
+  .submit-btn {
+    padding: 13px 0;
+    font-size: 0.9rem;
+    margin-top: 6px;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .form-panel {
+    max-height: 94vh;
+  }
+  .form-header {
+    padding: 12px 14px;
+  }
+  .form-body {
+    padding: 14px 14px 18px;
+  }
+  .tag-btn {
+    padding: 5px 12px;
+    font-size: 0.75rem;
+  }
 }
 </style>

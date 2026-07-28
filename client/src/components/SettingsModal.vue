@@ -536,4 +536,62 @@ async function clearAmap() {
 .modal-fade-leave-to { opacity: 0; }
 .modal-fade-enter-from .modal-card { transform: scale(0.96) translateY(8px); }
 .modal-fade-leave-to .modal-card { transform: scale(0.96); }
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 85vh;
+    animation: slideUpSettings 0.28s ease-out;
+  }
+
+  @keyframes slideUpSettings {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-fade-enter-from .modal-card { transform: translateY(100%); }
+  .modal-fade-leave-to .modal-card { transform: translateY(100%); }
+
+  .modal-header {
+    padding: 16px 18px;
+  }
+
+  .modal-title {
+    font-size: 0.95rem;
+  }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+  }
+
+  .modal-body {
+    padding: 18px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .form-input {
+    padding: 10px 80px 10px 12px;
+    font-size: 0.84rem;
+  }
+
+  .btn {
+    padding: 9px 16px;
+    font-size: 0.82rem;
+  }
+
+  .modal-footer {
+    padding: 12px 18px;
+  }
+}
 </style>

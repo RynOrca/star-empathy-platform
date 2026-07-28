@@ -717,4 +717,119 @@ function renderMarkdown(text: string): string {
 .drawer-slide-enter-from { opacity: 0; }
 .drawer-slide-leave-to .chat-drawer { transform: translateX(100%); }
 .drawer-slide-leave-to { opacity: 0; }
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .chat-drawer-overlay {
+    justify-content: flex-end;
+    align-items: flex-end;
+    background: rgba(7, 8, 22, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .chat-drawer {
+    width: 100%;
+    height: 88vh;
+    border-left: none;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
+    animation: slideUpChat 0.28s ease-out;
+  }
+
+  @keyframes slideUpChat {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .drawer-slide-enter-from .chat-drawer { transform: translateY(100%); }
+  .drawer-slide-leave-to .chat-drawer { transform: translateY(100%); }
+
+  .chat-drawer-header {
+    padding: 16px 18px;
+  }
+
+  .chat-drawer-title {
+    font-size: 0.95rem;
+  }
+
+  .chat-drawer-close {
+    width: 32px;
+    height: 32px;
+  }
+
+  .chat-figure-select {
+    padding: 16px;
+  }
+
+  .chat-select-hint {
+    font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+
+  .chat-figure-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .chat-figure-avatar {
+    font-size: 1.5rem;
+    width: 36px;
+  }
+
+  .chat-figure-name {
+    font-size: 0.85rem;
+  }
+
+  .chat-figure-intro {
+    max-width: 90px;
+    font-size: 0.7rem;
+  }
+
+  .chat-role-bar {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+
+  .chat-messages {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+
+  .chat-bubble {
+    max-width: 90%;
+    gap: 6px;
+  }
+
+  .chat-bubble-text {
+    padding: 9px 12px;
+    font-size: 0.82rem;
+    line-height: 1.65;
+  }
+
+  .chat-input-area {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .chat-input {
+    padding: 10px 14px;
+    font-size: 0.84rem;
+  }
+
+  .chat-send-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .chat-drawer {
+    height: 92vh;
+  }
+  .chat-figure-intro {
+    display: none;
+  }
+}
 </style>

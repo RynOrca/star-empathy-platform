@@ -1,6 +1,8 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="detail-wrap">
+      <!-- 移动端拖拽手柄 -->
+      <div class="mobile-drag-handle" @click="$emit('close')"></div>
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
@@ -2548,5 +2550,363 @@ watch(() => props.catalogStarId, () => {
 .delete-confirm-btn:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+
+/* ─── Mobile Drag Handle (desktop hidden) ─── */
+.mobile-drag-handle {
+  display: none;
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.mobile-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+    background: rgba(7, 8, 22, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .mobile-drag-handle {
+    display: block;
+  }
+
+  .detail-wrap {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: 88vh;
+    max-height: 88vh;
+    gap: 0;
+    border-radius: 20px 20px 0 0;
+    animation: slideUpMobile 0.28s ease-out;
+    overflow: hidden;
+  }
+
+  @keyframes slideUpMobile {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Stories panel takes available space */
+  .panel-stories {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* Info panel becomes bottom section */
+  .panel-info {
+    width: 100%;
+    flex-shrink: 0;
+    height: auto;
+    max-height: 38vh;
+    border-radius: 0;
+    border: none;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  /* Close button reposition */
+  .close-btn {
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    z-index: 10;
+    background: rgba(26, 30, 53, 0.9);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Tab bar: horizontal scroll */
+  .tab-bar {
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 0;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    gap: 4px;
+  }
+  .tab-btn span { white-space: nowrap; }
+
+  /* Panel header */
+  .panel-header {
+    padding: 12px 16px;
+  }
+
+  /* List toolbar */
+  .list-toolbar {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .search-input {
+    padding: 8px 28px 8px 30px;
+    font-size: 0.82rem;
+  }
+  .sort-btn {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+
+  /* Story list */
+  .story-list {
+    padding: 8px;
+    gap: 2px;
+  }
+
+  /* Story cards */
+  .story-card {
+    padding: 14px 14px;
+    border-radius: var(--radius-md);
+  }
+  .story-head {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .story-title {
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .story-excerpt {
+    font-size: 0.84rem;
+    line-height: 1.6;
+    -webkit-line-clamp: 3;
+  }
+  .story-meta {
+    font-size: 0.72rem;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .resonate-btn {
+    padding: 5px 10px;
+    font-size: 0.76rem;
+  }
+
+  /* Story sender and tags */
+  .story-sender {
+    font-size: 0.7rem;
+    margin-left: 0;
+    width: 100%;
+    order: 3;
+  }
+  .story-tag {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+  }
+
+  /* Detail view */
+  .detail-view {
+    padding: 16px 18px;
+  }
+  .detail-title {
+    font-size: 1.05rem;
+    padding-bottom: 10px;
+  }
+  .detail-info-bar {
+    font-size: 0.75rem;
+    padding-top: 8px;
+    flex-wrap: wrap;
+  }
+  .detail-body {
+    font-size: 0.88rem;
+    line-height: 1.8;
+  }
+  .detail-footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    display: flex;
+    gap: 8px;
+  }
+  .detail-resonate {
+    flex: 1;
+    padding: 10px 14px;
+    justify-content: center;
+  }
+  .delete-story-btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Info panel: star header */
+  .star-header {
+    gap: 10px;
+    padding-right: 40px;
+  }
+  .star-color-dot {
+    width: 32px;
+    height: 32px;
+  }
+  .star-name {
+    font-size: 0.95rem;
+  }
+  .star-subtitle {
+    font-size: 0.75rem;
+  }
+
+  /* Info rows */
+  .info-rows {
+    margin-top: 14px;
+    padding-top: 12px;
+    gap: 10px;
+  }
+  .info-row {
+    gap: 8px;
+  }
+  .info-row-value {
+    font-size: 0.8rem;
+  }
+
+  /* Stats row */
+  .stats-row {
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+  .stat-item {
+    padding: 8px 0;
+  }
+  .stat-num {
+    font-size: 0.92rem;
+  }
+  .stat-label {
+    font-size: 0.65rem;
+  }
+
+  /* Astro events */
+  .astro-events {
+    margin-top: 14px;
+    padding: 12px;
+  }
+  .astro-events-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+  }
+  .astro-event-value {
+    font-size: 0.78rem;
+  }
+
+  /* Info sections */
+  .info-section {
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+  .info-tags {
+    gap: 5px;
+  }
+  .tag {
+    padding: 3px 8px;
+    font-size: 0.72rem;
+  }
+
+  /* Action buttons */
+  .action-buttons {
+    margin-top: 14px;
+    gap: 8px;
+  }
+  .write-btn {
+    padding: 11px 0;
+    font-size: 0.84rem;
+  }
+  .fav-btn {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+  }
+  .action-buttons-secondary {
+    margin-top: 8px;
+  }
+  .chat-btn {
+    padding: 10px 0;
+    font-size: 0.82rem;
+  }
+
+  /* Similar stars & highlights */
+  .similar-item,
+  .highlight-card {
+    padding: 8px 10px;
+  }
+
+  /* Tag editor */
+  .tag-editor {
+    padding: 10px;
+  }
+  .tag-editor-input-row {
+    flex-direction: column;
+  }
+  .tag-editor-actions {
+    justify-content: stretch;
+  }
+  .tag-editor-save,
+  .tag-editor-cancel {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Precession lore */
+  .precession-lore .lore-year {
+    min-width: 90px;
+    font-size: 0.7rem;
+  }
+
+  /* Delete confirm */
+  .delete-confirm-card {
+    width: 88%;
+    max-width: 88%;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  /* Empty state */
+  .empty-state {
+    padding: 20px;
+    font-size: 0.82rem;
+  }
+
+  /* Back button */
+  .back-btn {
+    font-size: 0.82rem;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .detail-wrap {
+    height: 92vh;
+    max-height: 92vh;
+  }
+  .tab-btn {
+    padding: 10px 8px;
+    font-size: 0.74rem;
+  }
+  .tab-btn span { display: none; }
+  .panel-info {
+    max-height: 42vh;
+    padding: 12px;
+  }
+  .story-card {
+    padding: 12px;
+  }
 }
 </style>

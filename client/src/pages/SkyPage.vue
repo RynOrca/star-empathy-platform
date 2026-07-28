@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1617,5 +1617,152 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   .guide-card svg { width: 16px; height: 16px; }
   .city-panel { width: 92vw; max-height: 65vh; padding: 1.2rem; border-radius: 14px; }
   .city-panel .city-btn { padding: 0.35rem 0.6rem; font-size: 0.74rem; }
+}
+
+/* ─── Comprehensive Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  /* Navigation bar */
+  .sky-nav {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-center {
+    order: 3;
+    width: 100%;
+    flex: none;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .search-input {
+    font-size: 0.8rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .nav-right {
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  /* Hide solar term and moon phase text on small screens */
+  .solar-term,
+  .moon-phase {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .term-next {
+    display: none;
+  }
+
+  .moon-text {
+    display: none;
+  }
+
+  .solar-term .term-text {
+    font-size: 0.75rem;
+  }
+
+  .nav-btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  .nav-user {
+    font-size: 0.78rem;
+  }
+
+  .nav-user span:last-child {
+    display: none;
+  }
+
+  /* Guide cards */
+  .guide-cards {
+    display: none;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    right: 0.75rem;
+    bottom: 6rem;
+  }
+
+  .zoom-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+  }
+
+  /* Hint text */
+  .hint {
+    display: none;
+  }
+
+  /* Toasts */
+  .toggle-toast {
+    top: auto;
+    bottom: 1rem;
+    font-size: 0.78rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .location-toast {
+    top: auto;
+    bottom: 4rem;
+    font-size: 0.8rem;
+    padding: 0.55rem 1.2rem;
+  }
+
+  /* City selection panel - bottom sheet */
+  .city-panel-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .city-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.2rem 1rem 1.5rem;
+  }
+
+  /* Location fallback panel */
+  .location-fallback-panel {
+    width: 92%;
+    max-width: 92%;
+    padding: 1.2rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .city-grid {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .sky-nav {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .solar-term,
+  .moon-phase {
+    display: none;
+  }
+
+  .nav-btn {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.72rem;
+  }
+
+  .zoom-controls {
+    right: 0.5rem;
+    bottom: 5rem;
+  }
 }
 </style>
