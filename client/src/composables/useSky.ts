@@ -545,12 +545,10 @@ for (const s of stars) starById.set(s.id, s)
         pointer-events: none;
         white-space: nowrap;
         opacity: 0;
+        transform: translate(-50%, -120%);
       `
       const label = new CSS2DObject(el)
-      // 沿径向向外偏移，避免标签遮挡星星本身
-      const len = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)
-      const r = len > 0 ? 10 / len : 0
-      label.position.set(s.x * (1 + r), s.y * (1 + r), s.z * (1 + r))
+      label.position.set(s.x, s.y, s.z)
       label.visible = false
       skyGroup.add(label)
       starNameLabels.set(s.id, label)
@@ -924,8 +922,7 @@ for (const s of stars) starById.set(s.id, s)
     </div>
   `
   // 注入 tooltip 样式（issue #34：字体大小/颜色/背景通过 cfg 可定制）
-  // 关键修复：移除 CSS margin-top（与 tooltipLabel.position Y 偏移叠加会导致位置异常）
-  // 现在仅通过 cfg.tooltipYOffset 在 3D 空间控制位置，CSS2DObject 自动投影
+  // 屏幕空间偏移由 CSS transform: translate(-50%, -100%) 控制，缩放时保持稳定
   const ttStyle = document.createElement('style')
   ttStyle.textContent = `
     .star-tooltip {
@@ -1010,11 +1007,11 @@ for (const s of stars) starById.set(s.id, s)
       vals[3].textContent = stats ? String(stats.favorites) : '0'
       _lastStatsKey = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
       // tooltip + hoverGlow 位置（通过 skyGroup.matrixWorld 变换到世界坐标）
-      // 修复：tooltip Y 偏移通过 cfg.tooltipYOffset 控制，不再用 CSS margin-top（避免双重偏移）
+      // 屏幕空间偏移由 CSS transform: translate(-50%, -100%) 控制，不依赖世界坐标
       const sn = starNormMap.get(starId)
       if (sn) {
         _w.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld)
-        tooltipLabel.position.set(_w.x, _w.y + cfg.tooltipYOffset, _w.z)
+        tooltipLabel.position.set(_w.x, _w.y, _w.z)
         hoverGlow.position.set(_w.x, _w.y, _w.z)
       }
       tooltipEl.style.opacity = '1'
@@ -1027,7 +1024,7 @@ for (const s of stars) starById.set(s.id, s)
       const sn = starNormMap.get(starId)
       if (!sn) return
       _w.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld)
-      tooltipLabel.position.set(_w.x, _w.y + cfg.tooltipYOffset, _w.z)
+      tooltipLabel.position.set(_w.x, _w.y, _w.z)
       hoverGlow.position.set(_w.x, _w.y, _w.z)
     }
     function refreshTooltipStats(starId: number) {

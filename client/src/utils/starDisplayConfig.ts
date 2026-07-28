@@ -26,8 +26,6 @@ export interface StarDisplayConfig {
   /** 长悬浮触发延时（毫秒） */
   hoverLongDelayMs: number
 
-  /** tooltip 在世界坐标系下相对星位置的 Y 偏移（负数=下方，正数=上方） */
-  tooltipYOffset: number
   /** tooltip 字体大小（px） */
   tooltipFontSize: number
   /** tooltip 名称字体大小（px） */
@@ -74,7 +72,6 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   hoverThrottleMs: 80,
   hoverLongDelayMs: 1000,
 
-  tooltipYOffset: -50,
   tooltipFontSize: 11,
   tooltipNameFontSize: 13,
   tooltipBgColor: 'rgba(12,12,28,0.92)',
