@@ -504,12 +504,12 @@ for (const s of stars) starById.set(s.id, s)
   // - 颜色继承自原星色（vertexColors 与白 spike 相乘）
   const SPIKE_TEX = spikeTex(128)
   const spikeTiers = [
-    { tier: 0, size: 44, opacity: 0.95 },  // mag <= -0.5  天狼、老人等极亮星
-    { tier: 1, size: 32, opacity: 0.75 },  // mag <=  0.5  织女、五车二等亮星
-    { tier: 2, size: 22, opacity: 0.50 },  // mag <=  1.8  1 等左右星
-    { tier: 3, size: 14, opacity: 0.30 },  // mag <=  3.0  2~3 等星
-    { tier: 4, size:  9, opacity: 0.15 },  // mag <=  4.5  3~4.5 等星
-    { tier: 5, size:  5, opacity: 0.06 },  // mag <=   99  暗星，微弱光晕
+    { tier: 0, size: 48, opacity: 1.00 },  // mag <= -0.5  天狼、老人等极亮星
+    { tier: 1, size: 36, opacity: 0.85 },  // mag <=  0.5  织女、五车二等亮星
+    { tier: 2, size: 26, opacity: 0.65 },  // mag <=  1.8  1 等左右星
+    { tier: 3, size: 18, opacity: 0.45 },  // mag <=  3.0  2~3 等星
+    { tier: 4, size: 12, opacity: 0.28 },  // mag <=  4.5  3~4.5 等星
+    { tier: 5, size:  8, opacity: 0.14 },  // mag <=   99  暗星，微弱光晕
   ]
   for (const cfg of spikeTiers) {
     const b = bins[cfg.tier]; if (b.pos.length === 0) continue
