@@ -213,6 +213,7 @@
             <div v-if="props.currentUserId == null" class="empty-state">
               <User :size="20" class="empty-icon" />
               <p>请先登录后查看我的故事</p>
+              <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
             </div>
             <div v-else-if="myStories.length > 0" class="story-list">
               <div
@@ -824,6 +825,9 @@ function fetchNarrativeWithPosition() {
 }
 
 watch(() => props.catalogStarId, (id) => {
+  activeTab.value = 'narrative' // 切换星星时回到默认 Tab
+  searchQuery.value = ''        // 清空搜索
+  detailStoryId.value = null    // 关闭故事详情
   if (id && positionReady.value) {
     fetchNarrativeWithPosition()
   }
@@ -1722,6 +1726,22 @@ watch(() => props.catalogStarId, () => {
   font-size: 0.85rem;
 }
 .empty-icon { opacity: 0.2; }
+
+.empty-login-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.empty-login-btn:hover {
+  background: rgba(255, 217, 138, 0.15);
+}
 
 /* ─── Right: Info Panel ─── */
 .panel-info {
