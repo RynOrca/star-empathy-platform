@@ -1,51 +1,91 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
-      <div class="nav-center">
-        <div class="search-box">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" style="padding-left: 2rem" />
-          <div v-if="searchOpen && searchResults.length" class="search-dropdown">
-            <div v-for="r in searchResults" :key="r.id" class="search-item" @click="flyToStar(r.id); searchOpen = false; searchQuery = ''">
-              <span class="sr-name">{{ r.name || r.conName }}</span>
-              <span class="sr-con">{{ r.conName }}</span>
-              <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
-              <button class="sr-locate" title="定位到这颗星" @click.stop="locateStar(r.id); searchOpen = false; searchQuery = ''">
-                <Crosshair :size="14" />
-              </button>
-            </div>
-          </div>
-          <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
-            <div class="search-item muted">未找到匹配的星星</div>
-          </div>
-        </div>
-      </div>
-      <div class="nav-right">
+      <div class="nav-left">
+        <!-- 节气（桌面端） -->
         <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
         </span>
+        <!-- 月相（桌面端） -->
         <span v-if="moonPhase" class="moon-phase" :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）`">
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
-        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
-          <component :is="showMyStoriesOnly ? Globe : Star" :size="14" />
-          <span>{{ showMyStoriesOnly ? '全部' : '我的' }}</span>
+      </div>
+      <div class="nav-right">
+        <!-- 搜索按钮 -->
+        <button class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+          <Search :size="18" />
         </button>
-        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位（悬停 2 秒可选择城市）">
-          <MapPin :size="14" />
-          <span>定位</span>
+        <!-- 我的/全部切换 -->
+        <button v-if="username" class="nav-icon-btn" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" :title="showMyStoriesOnly ? '查看全部故事' : '只看我的故事'">
+          <component :is="showMyStoriesOnly ? Globe : Star" :size="18" />
         </button>
-        <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
-          <User :size="14" />
-          <span>{{ username }}</span>
-        </span>
-        <button v-if="username" class="nav-btn" @click="doLogout">退出</button>
-        <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
+        <!-- 定位 -->
+        <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
+          <MapPin :size="18" />
+        </button>
+        <!-- 设置 -->
+        <button v-if="locationReady" class="nav-icon-btn" @click="showSettings = true" title="设置">
+          <Settings :size="18" />
+        </button>
+        <!-- 用户 -->
+        <button v-if="username" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+          <User :size="18" />
+        </button>
+        <button v-if="!username" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+          <User :size="18" />
+        </button>
       </div>
     </nav>
+
+    <!-- 搜索底部弹窗 -->
+    <Transition name="sheet-fade">
+      <div v-if="showSearch" class="search-sheet-overlay" @click.self="showSearch = false">
+        <div class="search-sheet">
+          <div class="sheet-handle" @click="showSearch = false"></div>
+          <div class="search-sheet-header">
+            <h3 class="search-sheet-title">搜索星星</h3>
+            <button class="search-sheet-close" @click="showSearch = false"><X :size="18" /></button>
+          </div>
+          <div class="search-sheet-input-wrap">
+            <Search :size="18" class="search-sheet-icon" />
+            <input
+              ref="searchInputRef"
+              v-model="searchQuery"
+              placeholder="输入星名、星座..."
+              class="search-sheet-input"
+              @input="onSearchInput"
+              @keydown.escape="showSearch = false"
+            />
+            <button v-if="searchQuery" class="search-sheet-clear" @click="clearSearch"><X :size="16" /></button>
+          </div>
+          <div v-if="searching" class="search-loading">搜索中...</div>
+          <div v-else-if="searchQuery && searchResults.length === 0" class="search-empty">未找到匹配的星星</div>
+          <div v-else-if="searchResults.length > 0" class="search-results">
+            <div
+              v-for="r in searchResults"
+              :key="r.id"
+              class="search-result-item"
+              @click="onSearchSelect(r.id)"
+            >
+              <div class="sr-info">
+                <span class="sr-name">{{ r.name || r.conName }}</span>
+                <span class="sr-con">{{ r.conName }}</span>
+              </div>
+              <div class="sr-meta">
+                <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+                <button class="sr-locate" title="定位但不打开" @click.stop="locateStar(r.id); showSearch = false">
+                  <Crosshair :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 切换反馈提示 -->
     <Transition name="toast-fade">
@@ -183,10 +223,6 @@
     <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
-      <div class="zoom-divider"></div>
-      <button class="zoom-btn settings-entry" @click="showSettings = true" title="设置">
-        <Settings :size="16" />
-      </button>
     </div>
     <div v-if="locationReady" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
@@ -234,9 +270,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -571,10 +607,34 @@ function goLogin() {
 }
 
 // ─── 搜索星星 ───
+const showSearch = ref(false)
 const searchQuery = ref('')
-const searchOpen = ref(false)
 const searching = ref(false)
 const searchResults = ref<any[]>([])
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+// 打开搜索弹窗时自动聚焦
+watch(showSearch, async (val) => {
+  if (val) {
+    await nextTick()
+    searchInputRef.value?.focus()
+  } else {
+    // 关闭时清空
+    searchQuery.value = ''
+    searchResults.value = []
+  }
+})
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  searchInputRef.value?.focus()
+}
+
+function onSearchSelect(starId: number) {
+  showSearch.value = false
+  flyToStar(starId)
+}
 
 async function onSearchInput() {
   const q = searchQuery.value.trim()
@@ -1062,12 +1122,27 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .sky-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0.6rem 1.5rem;
+  padding: 0.6rem 1rem;
   background: transparent;
   border-bottom: none;
 }
 .nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
-.nav-right { display: flex; align-items: center; gap: 0.75rem; }
+.nav-left { display: flex; align-items: center; gap: 0.5rem; }
+.nav-right { display: flex; align-items: center; gap: 0.35rem; }
+
+/* ─── Icon-only nav buttons ─── */
+.nav-icon-btn {
+  width: 40px; height: 40px; border-radius: 12px;
+  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.06);
+  color: #a09bc0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s;
+}
+.nav-icon-btn:hover { color: #ffd98a; border-color: rgba(255,217,138,0.3); background: rgba(40,35,18,0.4); }
+.nav-icon-btn.active { color: #ffd98a; border-color: rgba(255,217,138,0.4); background: rgba(40,35,18,0.5); }
+.nav-icon-btn.nav-login-btn { color: #ffd98a; border-color: rgba(255,217,138,0.3); background: rgba(40,35,18,0.35); }
+
 .solar-term {
   display: inline-flex; align-items: baseline; gap: 0.4rem;
   padding: 0.3rem 0.7rem; border-radius: 14px;
@@ -1107,88 +1182,113 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   font-size: 0.78rem; color: #c8c2d8;
   letter-spacing: 0.04em;
 }
-.nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-.nav-user:hover { color: #f6f1ff; }
-.nav-btn {
-  padding: 0.3rem 0.8rem; border-radius: 8px;
-  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05);
-  color: #7a759c; font-size: 0.8rem; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px;
+
+/* ─── Search bottom sheet ─── */
+.search-sheet-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(7,8,22,0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
-.nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
-.nav-login-btn {
-  color: #ffd98a; border-color: rgba(255, 217, 138, 0.3);
-  background: rgba(40, 35, 18, 0.35);
+.search-sheet {
+  width: 100%; max-height: 80vh;
+  background: var(--bg-card, #12102a);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--accent-subtle, rgba(255,217,138,0.12));
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
-.nav-login-btn:hover { color: #ffe6b0; border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
-.nav-my-toggle {
-  color: #ffd98a; border-color: rgba(255, 217, 138, 0.25);
-  background: rgba(40, 35, 18, 0.3); transition: all 0.25s;
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255,217,138,0.25);
+  margin: 10px auto 4px;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.2s;
 }
-.nav-my-toggle:hover { border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
-.nav-my-toggle.active {
-  color: #7a759c; border-color: rgba(48, 55, 87, 0.5);
-  background: rgba(255, 255, 255, 0.05);
+.sheet-handle:active { background: var(--accent, #ffd98a); }
+.search-sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 20px 12px;
 }
-.nav-my-toggle.active:hover { color: #b9b4d6; }
-.nav-center { flex: 1; display: flex; justify-content: center; }
-.search-box { position: relative; width: 260px; }
-.search-icon {
-  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-  color: var(--muted-light); pointer-events: none; z-index: 1;
+.search-sheet-title {
+  font-size: 1rem; font-weight: 600; color: var(--ink, #f0e6d8);
+  margin: 0;
 }
-.search-input {
-  width: 100%; padding: 0.45rem 0.9rem; border-radius: var(--radius-lg);
-  border: 1px solid var(--rule); background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: var(--ink); font-size: 0.82rem; outline: none;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+.search-sheet-close {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: none; background: rgba(255,255,255,0.06);
+  color: var(--muted, #8a849e); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
-.search-input:focus {
-  border-color: var(--accent-border);
-  box-shadow: var(--shadow-glow);
-  background: rgba(255,255,255,0.08);
+.search-sheet-close:hover { color: var(--ink); background: rgba(255,255,255,0.1); }
+.search-sheet-input-wrap {
+  position: relative; margin: 0 20px 12px; flex-shrink: 0;
 }
-.search-input::placeholder { color: var(--muted-light); }
-.search-dropdown {
-  position: absolute; top: 110%; left: 0; right: 0;
-  background: rgba(16,20,43,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--rule); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto; z-index: 30;
+.search-sheet-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--muted-light, #a09bc0);
 }
-.search-dropdown::-webkit-scrollbar { width: 4px; }
-.search-dropdown::-webkit-scrollbar-track { background: transparent; }
-.search-dropdown::-webkit-scrollbar-thumb { background: rgba(255,217,138,0.2); border-radius: 4px; }
-.search-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(255,217,138,0.4); }
-.search-item {
-  padding: 0.5rem 0.8rem 0.5rem 1.6rem; display: flex; justify-content: space-between;
-  align-items: center; cursor: pointer; font-size: 0.8rem;
-  border-bottom: 1px solid rgba(48,55,87,0.2);
-  position: relative;
+.search-sheet-input {
+  width: 100%; padding: 12px 44px 12px 42px;
+  border-radius: 12px; border: 1px solid var(--rule, rgba(48,55,87,0.5));
+  background: rgba(255,255,255,0.06);
+  color: var(--ink); font-size: 16px; outline: none;
+  transition: border-color 0.2s;
 }
-.search-item::before {
-  content: ''; position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--muted-light); transition: background 0.15s ease;
+.search-sheet-input:focus {
+  border-color: var(--accent-border, rgba(255,217,138,0.5));
 }
-.search-item:last-child { border-bottom: none; }
-.search-item:hover { background: var(--accent-subtle); }
-.search-item:hover::before { background: var(--accent); }
-.search-item.muted { color: var(--muted-light); cursor: default; padding: 0.6rem 0.8rem 0.6rem 1.6rem; }
-.search-item.muted::before { display: none; }
-.sr-name { color: var(--accent); font-weight: 500; }
-.sr-con { color: var(--ink-secondary); }
-.sr-mag { color: var(--muted-light); font-size: 0.7rem; }
+.search-sheet-input::placeholder { color: var(--muted-light, #8a849e); }
+.search-sheet-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  border: none; background: rgba(255,255,255,0.08);
+  color: var(--muted-light); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.search-sheet-clear:hover { color: var(--ink); background: rgba(255,255,255,0.15); }
+.search-loading, .search-empty {
+  padding: 30px 20px; text-align: center;
+  color: var(--muted-light); font-size: 0.85rem;
+}
+.search-results {
+  flex: 1; overflow-y: auto; padding: 0 12px 12px;
+}
+.search-results::-webkit-scrollbar { width: 4px; }
+.search-results::-webkit-scrollbar-track { background: transparent; }
+.search-results::-webkit-scrollbar-thumb { background: rgba(255,217,138,0.2); border-radius: 4px; }
+.search-result-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 10px;
+  cursor: pointer; transition: background 0.15s;
+  border-bottom: 1px solid rgba(48,55,87,0.15);
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: rgba(255,217,138,0.06); }
+.sr-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.sr-info .sr-name { color: var(--accent); font-weight: 500; font-size: 0.9rem; }
+.sr-info .sr-con { color: var(--muted-light); font-size: 0.78rem; }
+.sr-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sr-meta .sr-mag { color: var(--muted); font-size: 0.72rem; }
 .sr-locate {
-  background: none; border: 1px solid transparent; border-radius: 4px;
-  color: var(--muted-light); cursor: pointer; padding: 3px 5px;
-  display: flex; align-items: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
-  flex-shrink: 0; margin-left: 4px;
+  background: none; border: 1px solid transparent; border-radius: 8px;
+  color: var(--muted-light); cursor: pointer; padding: 6px;
+  display: flex; align-items: center; transition: all 0.15s;
 }
 .sr-locate:hover {
-  color: var(--accent); border-color: var(--accent-border);
-  background: rgba(255, 217, 138, 0.08);
+  color: var(--accent); border-color: var(--accent-border, rgba(255,217,138,0.3));
+  background: rgba(255,217,138,0.08);
 }
+
+/* Sheet transition */
+.sheet-fade-enter-active { transition: opacity 0.25s ease-out; }
+.sheet-fade-leave-active { transition: opacity 0.2s ease-in; }
+.sheet-fade-enter-from, .sheet-fade-leave-to { opacity: 0; }
+.sheet-fade-enter-active .search-sheet { animation: slideUpSheet 0.28s ease-out; }
+.sheet-fade-leave-active .search-sheet { animation: slideDownSheet 0.2s ease-in; }
+@keyframes slideUpSheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slideDownSheet { from { transform: translateY(0); } to { transform: translateY(100%); } }
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
   flex-direction: column; gap: 4px; z-index: 10;
@@ -1616,59 +1716,38 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   /* Navigation bar */
   .sky-nav {
     padding: 0.5rem 0.75rem;
-    gap: 0.5rem;
-    flex-wrap: wrap;
   }
 
-  .nav-center {
-    order: 3;
-    width: 100%;
-    flex: none;
-  }
-
-  .search-box {
-    width: 100%;
-  }
-
-  .search-input {
-    font-size: 0.8rem;
-    padding: 0.45rem 0.75rem;
+  .nav-left {
+    display: none;
   }
 
   .nav-right {
     gap: 0.4rem;
-    flex-wrap: wrap;
+    margin-left: auto;
   }
 
-  /* Hide solar term and moon phase text on small screens */
-  .solar-term,
-  .moon-phase {
-    padding: 0.3rem 0.5rem;
+  .nav-icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
   }
 
-  .term-next {
-    display: none;
+  /* Search sheet */
+  .search-sheet {
+    max-height: 85vh;
   }
 
-  .moon-text {
-    display: none;
+  .search-sheet-header {
+    padding: 6px 16px 10px;
   }
 
-  .solar-term .term-text {
-    font-size: 0.75rem;
+  .search-sheet-input-wrap {
+    margin: 0 16px 10px;
   }
 
-  .nav-btn {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.75rem;
-  }
-
-  .nav-user {
-    font-size: 0.78rem;
-  }
-
-  .nav-user span:last-child {
-    display: none;
+  .search-sheet-input {
+    padding: 10px 40px 10px 38px;
   }
 
   /* Guide cards */
@@ -1795,14 +1874,18 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     padding: 0.4rem 0.5rem;
   }
 
-  .solar-term,
-  .moon-phase {
+  .nav-left {
     display: none;
   }
 
-  .nav-btn {
-    padding: 0.3rem 0.5rem;
-    font-size: 0.72rem;
+  .nav-right {
+    gap: 0.3rem;
+  }
+
+  .nav-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
   }
 
   .zoom-controls {

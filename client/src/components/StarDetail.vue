@@ -1,9 +1,92 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="detail-wrap">
-      <!-- 移动端拖拽手柄 -->
-      <div class="mobile-drag-handle" @click="$emit('close')"></div>
-      <!-- 左：叙事 + 故事面板 -->
+      <!-- 移动端顶部关闭指示（V形） -->
+      <div class="mobile-top-bar">
+        <button class="mobile-close-chevron" @click="$emit('close')">
+          <ChevronDown :size="24" />
+        </button>
+      </div>
+
+      <!-- 移动端星星概要栏（始终可见，可展开详情） -->
+      <div class="mobile-star-summary" @click="mobileInfoExpanded = !mobileInfoExpanded">
+        <div class="mobile-star-main">
+          <div class="star-color-dot" :style="{ background: starInfo?.color || '#fff6e8' }"></div>
+          <div class="mobile-star-text">
+            <span class="mobile-star-name">{{ starInfo?.displayName }}</span>
+            <span class="mobile-star-con">{{ starInfo?.conName }}</span>
+          </div>
+        </div>
+        <ChevronDown :size="18" class="mobile-expand-chevron" :class="{ expanded: mobileInfoExpanded }" />
+      </div>
+
+      <!-- 移动端可展开的星星详情 -->
+      <Transition name="info-expand">
+        <div v-if="mobileInfoExpanded" class="mobile-star-details">
+          <!-- 星等、距离等基本信息 -->
+          <div class="mobile-info-rows" v-if="starInfo">
+            <div class="mobile-info-chip">
+              <Sun :size="12" />
+              <span>{{ starInfo.mag.toFixed(1) }} 等</span>
+            </div>
+            <div v-if="starInfo.distance" class="mobile-info-chip">
+              <Navigation :size="12" />
+              <span>{{ starInfo.distance }} 光年</span>
+            </div>
+            <div class="mobile-info-chip">
+              <Thermometer :size="12" />
+              <span>{{ getStarTemperature(starInfo.color) }}</span>
+            </div>
+          </div>
+          <!-- 统计 -->
+          <div class="mobile-stats-row" v-if="catalogStats">
+            <div class="mobile-stat">
+              <BookOpen :size="13" />
+              <span class="mobile-stat-num">{{ catalogStats.storyCount }}</span>
+              <span class="mobile-stat-label">故事</span>
+            </div>
+            <div class="mobile-stat">
+              <Heart :size="13" />
+              <span class="mobile-stat-num">{{ catalogStats.totalResonance }}</span>
+              <span class="mobile-stat-label">共鸣</span>
+            </div>
+            <div class="mobile-stat">
+              <Eye :size="13" />
+              <span class="mobile-stat-num">{{ catalogStats.starViews }}</span>
+              <span class="mobile-stat-label">访问</span>
+            </div>
+            <div class="mobile-stat">
+              <Star :size="13" :class="{ 'is-favorited': isFavorited }" />
+              <span class="mobile-stat-num">{{ catalogStats.favoriteCount }}</span>
+              <span class="mobile-stat-label">收藏</span>
+            </div>
+          </div>
+          <!-- 天文事件 -->
+          <div class="mobile-astro-brief" v-if="astroData?.star">
+            <span class="mobile-astro-badge" :class="{ 'is-visible': astroData.star.currentlyAboveHorizon }">
+              {{ astroData.star.currentlyAboveHorizon ? '地平线以上' : '地平线以下' }}
+            </span>
+            <span class="mobile-astro-text">
+              {{ formatAltitude(astroData.star.currentAltitude) }} · {{ azimuthToDirection(astroData.star.currentAzimuth) }}
+            </span>
+          </div>
+          <!-- 标签 -->
+          <div class="mobile-tags-row" v-if="mergedTags.length > 0">
+            <span
+              v-for="t in mergedTags.slice(0, 6)"
+              :key="t.tag"
+              class="mobile-tag"
+              :class="{
+                'tag-emotion': t.type === 'emotion',
+                'tag-theme': t.type === 'theme',
+                'tag-custom': t.custom,
+              }"
+            >{{ t.tag }}</span>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- 左：叙事 + 故事面板（桌面端）/ 主内容区（移动端） -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
         <div class="tab-bar">
@@ -13,9 +96,10 @@
             class="tab-btn"
             :class="{ active: activeTab === tab.id }"
             @click="activeTab = tab.id"
+            :title="tab.label"
           >
-            <component :is="tab.icon" :size="14" />
-            <span>{{ tab.label }}</span>
+            <component :is="tab.icon" :size="16" />
+            <span class="tab-label">{{ tab.label }}</span>
           </button>
         </div>
 
@@ -578,6 +662,26 @@
           </div>
         </div>
       </div>
+
+      <!-- 移动端底部固定操作栏 -->
+      <div class="mobile-bottom-bar">
+        <button class="mobile-action-btn mobile-write-btn" @click="onWriteStory">
+          <PenSquare :size="18" />
+          <span>写故事</span>
+        </button>
+        <button
+          class="mobile-action-btn mobile-fav-btn"
+          :class="{ favorited: isFavorited }"
+          @click="toggleFavorite"
+        >
+          <Star :size="18" :fill="isFavorited ? 'currentColor' : 'none'" />
+          <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
+        </button>
+        <button class="mobile-action-btn mobile-chat-btn" @click="openChat">
+          <MessagesSquare :size="18" />
+          <span>共赏</span>
+        </button>
+      </div>
     </div>
 
     <!-- 古人陪看聊天抽屉 -->
@@ -784,6 +888,12 @@ const tabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'mine', label: '我的故事', icon: User },
 ]
 const activeTab = ref<TabId>('narrative')
+const mobileInfoExpanded = ref(false)
+
+// 切换星星时重置展开状态和Tab
+watch(() => props.catalogStarId, () => {
+  mobileInfoExpanded.value = false
+})
 
 // ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
 const resonanceOverrides = reactive(new Map<number, number>())
@@ -1230,6 +1340,28 @@ watch(() => props.catalogStarId, () => {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Mobile-only elements: hidden on desktop by default ─── */
+.mobile-top-bar,
+.mobile-star-summary,
+.mobile-star-details,
+.mobile-bottom-bar {
+  display: none;
+}
+
+/* ─── Expand/collapse animation for star info ─── */
+@keyframes infoExpandIn {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 300px; }
+}
+.info-expand-enter-active {
+  animation: infoExpandIn 0.25s ease-out;
+  overflow: hidden;
+}
+.info-expand-leave-active {
+  animation: infoExpandIn 0.2s ease-in reverse;
+  overflow: hidden;
 }
 
 /* ─── Panel Base ─── */
@@ -2573,33 +2705,245 @@ watch(() => props.catalogStarId, () => {
   .overlay {
     align-items: flex-end;
     padding: 0;
-    background: rgba(7, 8, 22, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(7, 8, 22, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
 
+  /* Hide old mobile drag handle */
   .mobile-drag-handle {
-    display: block;
+    display: none;
+  }
+
+  /* Hide desktop info panel on mobile */
+  .panel-info {
+    display: none;
+  }
+
+  /* Hide desktop close button */
+  .close-btn {
+    display: none;
   }
 
   .detail-wrap {
     flex-direction: column;
     width: 100%;
     max-width: 100%;
-    height: 88vh;
-    max-height: 88vh;
+    height: 100vh;
+    max-height: 100vh;
     gap: 0;
-    border-radius: 20px 20px 0 0;
-    animation: slideUpMobile 0.28s ease-out;
+    border-radius: 0;
+    border: none;
+    animation: slideUpFull 0.3s ease-out;
     overflow: hidden;
+    position: relative;
   }
 
-  @keyframes slideUpMobile {
+  @keyframes slideUpFull {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
   }
 
-  /* Stories panel takes available space */
+  /* ─── Mobile top bar (V close) ─── */
+  .mobile-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding-top: env(safe-area-inset-top, 8px);
+    background: var(--bg-card, #12102a);
+  }
+
+  .mobile-close-chevron {
+    background: none;
+    border: none;
+    color: var(--accent, #ffd98a);
+    cursor: pointer;
+    width: 44px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .mobile-close-chevron:active { opacity: 1; }
+
+  /* ─── Mobile star summary bar ─── */
+  .mobile-star-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px 10px;
+    background: var(--bg-card, #12102a);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--rule, rgba(48,55,87,0.3));
+  }
+
+  .mobile-star-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .star-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .mobile-star-text {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .mobile-star-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ink, #f0e6d8);
+  }
+
+  .mobile-star-con {
+    font-size: 0.75rem;
+    color: var(--muted-light, #8a849e);
+  }
+
+  .mobile-expand-chevron {
+    color: var(--muted, #8a849e);
+    flex-shrink: 0;
+    transition: transform 0.25s ease, color 0.2s;
+  }
+  .mobile-expand-chevron.expanded {
+    transform: rotate(180deg);
+    color: var(--accent, #ffd98a);
+  }
+
+  /* ─── Mobile expanded star details ─── */
+  .mobile-star-details {
+    padding: 0 16px 12px;
+    background: var(--bg-card, #12102a);
+    border-bottom: 1px solid var(--rule, rgba(48,55,87,0.3));
+    flex-shrink: 0;
+  }
+
+  .info-expand-enter-active {
+    animation: expandDown 0.25s ease-out;
+    overflow: hidden;
+  }
+  .info-expand-leave-active {
+    animation: expandUp 0.2s ease-in;
+    overflow: hidden;
+  }
+  @keyframes expandDown {
+    from { max-height: 0; opacity: 0; }
+    to { max-height: 400px; opacity: 1; }
+  }
+  @keyframes expandUp {
+    from { max-height: 400px; opacity: 1; }
+    to { max-height: 0; opacity: 0; }
+  }
+
+  .mobile-info-rows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .mobile-info-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--rule, rgba(48,55,87,0.4));
+    font-size: 0.72rem;
+    color: var(--ink-secondary, #c8c2d8);
+  }
+
+  .mobile-stats-row {
+    display: flex;
+    gap: 0;
+    margin-bottom: 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 8px 0;
+  }
+
+  .mobile-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--muted-light, #8a849e);
+    position: relative;
+  }
+  .mobile-stat:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: var(--rule, rgba(48,55,87,0.3));
+  }
+  .mobile-stat svg { color: var(--accent, #ffd98a); opacity: 0.7; }
+  .mobile-stat .is-favorited { color: var(--accent, #ffd98a); fill: var(--accent, #ffd98a); }
+  .mobile-stat-num { font-size: 0.95rem; font-weight: 600; color: var(--ink, #f0e6d8); }
+  .mobile-stat-label { font-size: 0.62rem; color: var(--muted, #6a6680); }
+
+  .mobile-astro-brief {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 0.72rem;
+  }
+
+  .mobile-astro-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    background: rgba(255,100,100,0.15);
+    color: #ff8888;
+    border: 1px solid rgba(255,100,100,0.2);
+  }
+  .mobile-astro-badge.is-visible {
+    background: rgba(100,200,150,0.15);
+    color: #88ddaa;
+    border-color: rgba(100,200,150,0.2);
+  }
+  .mobile-astro-text { color: var(--muted-light, #8a849e); }
+
+  .mobile-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .mobile-tag {
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: rgba(255,255,255,0.05);
+    color: var(--ink-secondary, #c8c2d8);
+    border: 1px solid var(--rule, rgba(48,55,87,0.3));
+  }
+  .mobile-tag.tag-emotion { color: #e8b4a0; border-color: rgba(232,180,160,0.2); background: rgba(232,180,160,0.08); }
+  .mobile-tag.tag-theme { color: #a0c8e8; border-color: rgba(160,200,232,0.2); background: rgba(160,200,232,0.08); }
+  .mobile-tag.tag-custom { color: var(--accent, #ffd98a); border-color: rgba(255,217,138,0.2); background: rgba(255,217,138,0.08); }
+
+  /* ─── Panel stories (main content) ─── */
   .panel-stories {
     width: 100%;
     flex: 1;
@@ -2608,58 +2952,71 @@ watch(() => props.catalogStarId, () => {
     max-height: none;
     border-radius: 0;
     border: none;
-    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
   }
 
-  /* Info panel becomes bottom section */
-  .panel-info {
-    width: 100%;
-    flex-shrink: 0;
-    height: auto;
-    max-height: 38vh;
-    border-radius: 0;
-    border: none;
-    padding: 16px;
-    overflow-y: auto;
-  }
-
-  /* Close button reposition */
-  .close-btn {
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    z-index: 10;
-    background: rgba(26, 30, 53, 0.9);
-    backdrop-filter: blur(8px);
-  }
-
-  /* Tab bar: horizontal scroll */
+  /* ─── Tab bar: icon-only for inactive, icon+text for active ─── */
   .tab-bar {
-    padding: 0 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    padding: 0;
     gap: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--rule, rgba(48,55,87,0.3));
+    background: var(--bg-card, #12102a);
   }
-  .tab-bar::-webkit-scrollbar { display: none; }
 
   .tab-btn {
-    flex: 0 0 auto;
-    padding: 10px 12px;
-    font-size: 0.78rem;
-    gap: 4px;
+    flex: 1;
+    flex-direction: column;
+    padding: 8px 4px 6px;
+    font-size: 0.65rem;
+    gap: 2px;
+    border-radius: 0;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--muted, #6a6680);
+    min-height: 44px;
+    justify-content: center;
   }
-  .tab-btn span { white-space: nowrap; }
 
-  /* Panel header */
-  .panel-header {
-    padding: 12px 16px;
+  .tab-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tab-btn .tab-label {
+    font-size: 0.62rem;
+    white-space: nowrap;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s, max-width 0.2s;
+  }
+
+  .tab-btn.active {
+    color: var(--accent, #ffd98a);
+    background: none;
+    border-bottom-color: var(--accent, #ffd98a);
+  }
+
+  .tab-btn.active .tab-label {
+    opacity: 1;
+    max-width: 60px;
+  }
+
+  /* ─── Tab content ─── */
+  .tab-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 80px; /* space for bottom bar */
   }
 
   /* List toolbar */
   .list-toolbar {
-    padding: 10px 12px;
+    padding: 8px 12px;
     gap: 6px;
   }
   .search-input {
@@ -2671,73 +3028,89 @@ watch(() => props.catalogStarId, () => {
     font-size: 0.78rem;
   }
 
+  /* Panel header (back button) */
+  .panel-header {
+    padding: 10px 12px;
+  }
+  .back-btn {
+    font-size: 0.82rem;
+    padding: 4px 0;
+  }
+
   /* Story list */
   .story-list {
-    padding: 8px;
-    gap: 2px;
+    padding: 6px 12px;
+    gap: 6px;
   }
 
   /* Story cards */
   .story-card {
-    padding: 14px 14px;
-    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    border-radius: 12px;
   }
   .story-head {
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
+    align-items: center;
   }
   .story-title {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     flex: 1;
     min-width: 0;
   }
   .story-excerpt {
-    font-size: 0.84rem;
-    line-height: 1.6;
+    font-size: 0.82rem;
+    line-height: 1.65;
     -webkit-line-clamp: 3;
   }
   .story-meta {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     flex-wrap: wrap;
     gap: 4px;
   }
   .resonate-btn {
-    padding: 5px 10px;
-    font-size: 0.76rem;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    gap: 3px;
   }
+  .resonate-btn svg { width: 13px; height: 13px; }
 
-  /* Story sender and tags */
   .story-sender {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     margin-left: 0;
     width: 100%;
     order: 3;
   }
   .story-tag {
-    font-size: 0.68rem;
-    padding: 2px 7px;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+  .story-origin {
+    font-size: 0.62rem;
+    padding: 1px 6px;
   }
 
-  /* Detail view */
+  /* Detail view (story detail) */
   .detail-view {
-    padding: 16px 18px;
+    padding: 14px 16px;
   }
   .detail-title {
-    font-size: 1.05rem;
-    padding-bottom: 10px;
+    font-size: 1rem;
+    padding-bottom: 8px;
   }
   .detail-info-bar {
-    font-size: 0.75rem;
-    padding-top: 8px;
+    font-size: 0.72rem;
+    padding-top: 6px;
     flex-wrap: wrap;
+    gap: 4px;
   }
   .detail-body {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     line-height: 1.8;
   }
   .detail-footer {
-    margin-top: 16px;
-    padding-top: 14px;
+    margin-top: 14px;
+    padding-top: 12px;
     display: flex;
     gap: 8px;
   }
@@ -2748,165 +3121,117 @@ watch(() => props.catalogStarId, () => {
   }
   .delete-story-btn {
     padding: 8px 12px;
-    font-size: 0.8rem;
-  }
-
-  /* Info panel: star header */
-  .star-header {
-    gap: 10px;
-    padding-right: 40px;
-  }
-  .star-color-dot {
-    width: 32px;
-    height: 32px;
-  }
-  .star-name {
-    font-size: 0.95rem;
-  }
-  .star-subtitle {
-    font-size: 0.75rem;
-  }
-
-  /* Info rows */
-  .info-rows {
-    margin-top: 14px;
-    padding-top: 12px;
-    gap: 10px;
-  }
-  .info-row {
-    gap: 8px;
-  }
-  .info-row-value {
-    font-size: 0.8rem;
-  }
-
-  /* Stats row */
-  .stats-row {
-    margin-top: 14px;
-    padding-top: 12px;
-  }
-  .stat-item {
-    padding: 8px 0;
-  }
-  .stat-num {
-    font-size: 0.92rem;
-  }
-  .stat-label {
-    font-size: 0.65rem;
-  }
-
-  /* Astro events */
-  .astro-events {
-    margin-top: 14px;
-    padding: 12px;
-  }
-  .astro-events-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 10px;
-  }
-  .astro-event-value {
     font-size: 0.78rem;
-  }
-
-  /* Info sections */
-  .info-section {
-    margin-top: 16px;
-    padding-top: 12px;
-  }
-  .info-tags {
-    gap: 5px;
-  }
-  .tag {
-    padding: 3px 8px;
-    font-size: 0.72rem;
-  }
-
-  /* Action buttons */
-  .action-buttons {
-    margin-top: 14px;
-    gap: 8px;
-  }
-  .write-btn {
-    padding: 11px 0;
-    font-size: 0.84rem;
-  }
-  .fav-btn {
-    padding: 10px 14px;
-    font-size: 0.82rem;
-  }
-  .action-buttons-secondary {
-    margin-top: 8px;
-  }
-  .chat-btn {
-    padding: 10px 0;
-    font-size: 0.82rem;
-  }
-
-  /* Similar stars & highlights */
-  .similar-item,
-  .highlight-card {
-    padding: 8px 10px;
-  }
-
-  /* Tag editor */
-  .tag-editor {
-    padding: 10px;
-  }
-  .tag-editor-input-row {
-    flex-direction: column;
-  }
-  .tag-editor-actions {
-    justify-content: stretch;
-  }
-  .tag-editor-save,
-  .tag-editor-cancel {
-    flex: 1;
-    text-align: center;
-  }
-
-  /* Precession lore */
-  .precession-lore .lore-year {
-    min-width: 90px;
-    font-size: 0.7rem;
-  }
-
-  /* Delete confirm */
-  .delete-confirm-card {
-    width: 88%;
-    max-width: 88%;
-    padding: 20px;
-    margin-bottom: 20px;
   }
 
   /* Empty state */
   .empty-state {
-    padding: 20px;
+    padding: 40px 20px;
+    font-size: 0.82rem;
+  }
+  .empty-state .empty-icon { width: 28px; height: 28px; }
+  .empty-login-btn {
+    margin-top: 12px;
+    padding: 8px 20px;
     font-size: 0.82rem;
   }
 
-  /* Back button */
-  .back-btn {
-    font-size: 0.82rem;
+  /* ─── Mobile bottom action bar ─── */
+  .mobile-bottom-bar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    background: var(--bg-card, #12102a);
+    border-top: 1px solid var(--rule, rgba(48,55,87,0.4));
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
   }
+
+  .mobile-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--rule, rgba(48,55,87,0.4));
+    background: rgba(255,255,255,0.05);
+    color: var(--ink-secondary, #c8c2d8);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-action-btn:active { transform: scale(0.97); }
+
+  .mobile-write-btn {
+    background: linear-gradient(135deg, rgba(255,217,138,0.2), rgba(255,180,100,0.15));
+    border-color: rgba(255,217,138,0.4);
+    color: var(--accent, #ffd98a);
+  }
+  .mobile-write-btn:active { background: linear-gradient(135deg, rgba(255,217,138,0.3), rgba(255,180,100,0.25)); }
+
+  .mobile-fav-btn.favorited {
+    color: var(--accent, #ffd98a);
+    border-color: rgba(255,217,138,0.3);
+    background: rgba(255,217,138,0.1);
+  }
+
+  .mobile-chat-btn {
+    color: #c8b4e8;
+    border-color: rgba(200,180,232,0.2);
+  }
+
+  /* Delete confirm mobile */
+  .delete-confirm-overlay {
+    padding: 16px;
+    align-items: center;
+  }
+  .delete-confirm-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 20px;
+    border-radius: 16px;
+  }
+  .delete-confirm-card h3 { font-size: 1rem; }
+  .delete-confirm-card p { font-size: 0.82rem; }
+  .delete-confirm-actions { gap: 10px; }
+  .delete-cancel-btn,
+  .delete-confirm-btn {
+    padding: 10px 16px;
+    font-size: 0.84rem;
+    flex: 1;
+  }
+
+  /* Tag editor mobile */
+  .tag-editor { padding: 8px; }
+  .tag-editor-input-row { flex-direction: column; }
+  .tag-editor-actions { justify-content: stretch; }
+  .tag-editor-save,
+  .tag-editor-cancel { flex: 1; text-align: center; }
 }
 
 /* ─── Very small screens (<=380px) ─── */
 @media (max-width: 380px) {
-  .detail-wrap {
-    height: 92vh;
-    max-height: 92vh;
+  .mobile-star-summary {
+    padding: 6px 12px 8px;
   }
-  .tab-btn {
-    padding: 10px 8px;
-    font-size: 0.74rem;
+  .mobile-star-name { font-size: 1rem; }
+  .mobile-star-details { padding: 0 12px 10px; }
+  .tab-btn { padding: 6px 2px 5px; min-height: 40px; }
+  .tab-btn svg { width: 18px; height: 18px; }
+  .tab-btn .tab-label { font-size: 0.58rem; }
+  .mobile-action-btn {
+    padding: 10px 6px;
+    font-size: 0.8rem;
+    gap: 4px;
   }
-  .tab-btn span { display: none; }
-  .panel-info {
-    max-height: 42vh;
-    padding: 12px;
-  }
-  .story-card {
-    padding: 12px;
-  }
+  .mobile-action-btn svg { width: 16px; height: 16px; }
+  .story-card { padding: 10px 12px; }
+  .list-toolbar { padding: 6px 10px; }
 }
 </style>
