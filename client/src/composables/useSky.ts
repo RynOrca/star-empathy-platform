@@ -498,16 +498,18 @@ for (const s of stars) starById.set(s.id, s)
   }
 
   // ═══ P0-5：亮星十字光芒（diffraction spikes） ═══
-  // 给前 3 层（mag <= 1.8）的亮星叠加十字光芒纹理
-  // - 1 等以上的星肉眼可见十字芒，是被相机/眼镜折射后形成的视觉现象
+  // 所有 6 层星星叠加十字光芒，按视星等分配强弱
+  // - 亮星 spike 大且亮，暗星 spike 小且淡，形成自然的亮度梯度
   // - 用独立的 Points 层 + spike 纹理 + AdditiveBlending，配合 Bloom 形成真实星芒
   // - 颜色继承自原星色（vertexColors 与白 spike 相乘）
-  // - issue #34：移除 P2 spike 闪烁 shader，星点与星芒保持稳定亮度
   const SPIKE_TEX = spikeTex(128)
   const spikeTiers = [
-    { tier: 0, size: 44, opacity: 0.95 },  // 天狼、老人等极亮星
-    { tier: 1, size: 32, opacity: 0.75 },  // 织女、五车二等亮星
-    { tier: 2, size: 22, opacity: 0.50 },  // 1 等左右星
+    { tier: 0, size: 44, opacity: 0.95 },  // mag <= -0.5  天狼、老人等极亮星
+    { tier: 1, size: 32, opacity: 0.75 },  // mag <=  0.5  织女、五车二等亮星
+    { tier: 2, size: 22, opacity: 0.50 },  // mag <=  1.8  1 等左右星
+    { tier: 3, size: 14, opacity: 0.30 },  // mag <=  3.0  2~3 等星
+    { tier: 4, size:  9, opacity: 0.15 },  // mag <=  4.5  3~4.5 等星
+    { tier: 5, size:  5, opacity: 0.06 },  // mag <=   99  暗星，微弱光晕
   ]
   for (const cfg of spikeTiers) {
     const b = bins[cfg.tier]; if (b.pos.length === 0) continue
