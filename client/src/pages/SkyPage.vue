@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -779,21 +779,20 @@ function onStarClick(starId: number) {
 }
 
 // 行星数据映射（用于故事详情展示）
+// planetId 由 useSky.ts 直接从 mesh.userData 传出，无需前端硬编码映射表
 const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   'Sun':     { color: '#ffdd88', conName: '太阳' },
   'Moon':    { color: '#cccccc', conName: '月球' },
+  'Mercury': { color: '#999999', conName: '水星' },
   'Venus':   { color: '#e8cda0', conName: '金星' },
   'Mars':    { color: '#dd6644', conName: '火星' },
   'Jupiter': { color: '#ddaa77', conName: '木星' },
   'Saturn':  { color: '#ddcc99', conName: '土星' },
-}
-const PLANET_ID_MAP: Record<string, number> = {
-  'Sun': -100, 'Moon': -101, 'Venus': -102, 'Mars': -103, 'Jupiter': -104, 'Saturn': -105,
+  'Uranus':  { color: '#88ccdd', conName: '天王星' },
+  'Neptune': { color: '#3366cc', conName: '海王星' },
 }
 
-function onPlanetClick(name: string, nameCN: string) {
-  const planetId = PLANET_ID_MAP[name]
-  if (planetId == null) return
+function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
   const stories = getFilteredStories(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
