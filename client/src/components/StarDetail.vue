@@ -76,12 +76,136 @@
             </div>
           </template>
 
-          <!-- Tab 3: 所有故事（占位，Task 4 实现） -->
+          <!-- Tab 3: 所有故事 -->
           <template v-else-if="activeTab === 'all'">
-            <div class="empty-state">
-              <List :size="20" class="empty-icon" />
-              <p>所有故事（即将实现）</p>
-            </div>
+            <!-- 详情视图 -->
+            <template v-if="detailStory">
+              <div class="panel-header">
+                <button class="back-btn" @click="detailStoryId = null">
+                  <ArrowLeft :size="15" />
+                  <span>所有故事</span>
+                </button>
+              </div>
+              <Transition name="detail" mode="out-in">
+                <div :key="detailStory.id" class="detail-view">
+                  <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+                  <div class="detail-info-bar">
+                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
+                  </div>
+                  <div class="detail-body">{{ detailStory.content }}</div>
+                  <div class="detail-footer">
+                    <button
+                      class="resonate-btn detail-resonate"
+                      :class="{ done: justResonatedId === detailStory.id }"
+                      :disabled="resonating"
+                      @click.stop="onResonate(detailStory)"
+                    >
+                      <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                      <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                      <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                    </button>
+                    <button
+                      v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                      class="delete-story-btn"
+                      @click.stop="confirmDelete(detailStory.id)"
+                      :disabled="deleting"
+                    >
+                      <Trash2 :size="14" />
+                      <span>删除</span>
+                    </button>
+                  </div>
+                </div>
+              </Transition>
+            </template>
+
+            <!-- 列表视图 -->
+            <template v-else>
+              <!-- 搜索 + 排序 -->
+              <div class="list-toolbar" v-if="userStories.length > 0">
+                <div class="search-box">
+                  <Search :size="13" class="search-icon" />
+                  <input
+                    v-model="searchQuery"
+                    class="search-input"
+                    placeholder="搜索故事..."
+                    @input="onSearchInput"
+                  />
+                  <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''"><X :size="12" /></button>
+                </div>
+                <div class="sort-group" ref="sortGroupRef">
+                  <ArrowUpDown :size="13" class="sort-icon" />
+                  <button class="sort-btn" @click="sortOpen = !sortOpen">
+                    <span>{{ sortLabels[sortKey] }}</span>
+                    <ChevronDown :size="12" class="sort-chevron" :class="{ open: sortOpen }" />
+                  </button>
+                  <Transition name="dropdown">
+                    <ul v-if="sortOpen" class="sort-dropdown">
+                      <li
+                        v-for="(label, key) in sortLabels"
+                        :key="key"
+                        class="sort-option"
+                        :class="{ active: sortKey === key }"
+                        @click="sortKey = key as SortKey; sortOpen = false; onSortChange()"
+                      >
+                        <Check v-if="sortKey === key" :size="12" />
+                        <span>{{ label }}</span>
+                      </li>
+                    </ul>
+                  </Transition>
+                </div>
+              </div>
+
+              <!-- 故事卡片列表 -->
+              <div v-if="userStories.length > 0" class="story-list">
+                <div
+                  v-for="(story, index) in displayedStories"
+                  :key="story.id"
+                  class="story-card"
+                  :style="{ animationDelay: `${index * 30}ms` }"
+                  @click="openStoryDetail(story)"
+                >
+                  <div class="story-head">
+                    <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                    <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+                    <span v-else class="story-sender is-anon">匿名星语</span>
+                    <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
+                    <button
+                      class="resonate-btn"
+                      :class="{ done: justResonatedId === story.id }"
+                      :disabled="resonating"
+                      @click.stop="onResonate(story)"
+                    >
+                      <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
+                      <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
+                    </button>
+                  </div>
+                  <p class="story-excerpt">{{ story.content }}</p>
+                  <div class="story-meta">
+                    <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
+                    <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
+                    <span v-if="formatDistance(story.locationLat, story.locationLng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.locationLat, story.locationLng).near }">{{ formatDistance(story.locationLat, story.locationLng).text }}</span>
+                    <span class="meta-sep">·</span>
+                    <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
+                    <span class="meta-sep">·</span>
+                    <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 搜索无结果 -->
+              <div v-else-if="searchQuery && userStories.length > 0" class="empty-state">
+                <Search :size="20" class="empty-icon" />
+                <p class="empty-text">没有匹配的故事</p>
+              </div>
+
+              <!-- 无故事 -->
+              <div v-else class="empty-state">
+                <Star :size="20" class="empty-icon" />
+                <p>这颗星还在等待它的故事</p>
+              </div>
+            </template>
           </template>
 
           <!-- Tab 4: 我的故事（占位，Task 5 实现） -->
@@ -537,8 +661,8 @@ const { data: astroData } = useAstroEvents({
 const searchQuery = ref('')
 const filteredStories = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return realStories.value
-  return realStories.value.filter(s =>
+  if (!q) return userStories.value
+  return userStories.value.filter(s =>
     (s.title || '').toLowerCase().includes(q) ||
     s.content.toLowerCase().includes(q)
   )
@@ -572,13 +696,10 @@ function seededRandom(seed: number): () => number {
   }
 }
 
-// 排序后的列表：来自星河始终置顶
+// 排序后的列表
 const displayedStories = computed(() => {
-  const history = filteredStories.value.filter(s => s.type === 'history')
-  const user = filteredStories.value.filter(s => s.type !== 'history')
-
   const sortFn = getSortFn(sortKey.value)
-  return [...history, ...user.sort(sortFn)]
+  return [...filteredStories.value].sort(sortFn)
 })
 
 function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof filteredStories.value[0]) => number {
