@@ -55,7 +55,13 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg'
+    const extMap: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+    }
+    const ext = extMap[file.mimetype] || '.jpg'
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`)
   },
 })
@@ -156,6 +162,13 @@ app.post('/api/upload', authRequired, writeLimiter, upload.single('image'), (req
   } catch (error) {
     console.error('POST /api/upload error:', error)
     serverError(res)
+  }
+})
+
+// multer 错误处理 — 将文件类型/大小错误转为 400 而非 500
+app.use('/api/upload', (err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err) {
+    badRequest(res, err.message || '上传失败')
   }
 })
 app.use('/api/stories', storiesRouter);

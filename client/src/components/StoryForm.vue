@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { PenSquare, X, Send, Image as ImageIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -157,12 +157,17 @@ function processFile(file: File) {
 }
 
 function removeImage() {
+  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
   imageFile.value = null
   imagePreview.value = null
   imageUrl.value = null
   uploadError.value = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
+
+onBeforeUnmount(() => {
+  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
+})
 
 onMounted(() => {
   textareaRef.value?.focus()

@@ -627,6 +627,7 @@ import { useAreaHighlights } from '../composables/useAreaHighlights'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../composables/useAstroEvents'
 import catalogData from '../data/stars.json'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })
 
 const props = defineProps<{
@@ -778,7 +779,11 @@ function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof
 // Markdown 渲染
 function renderMarkdown(text: string): string {
   if (!text) return ''
-  return marked.parse(text) as string
+  const raw = marked.parse(text) as string
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'a', 'img', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+  })
 }
 
 // 本地浏览数覆盖（乐观更新）
