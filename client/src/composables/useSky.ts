@@ -545,9 +545,10 @@ for (const s of stars) starById.set(s.id, s)
         pointer-events: none;
         white-space: nowrap;
         opacity: 0;
-        transform: translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px));
+        transform: translateY(calc(-100% + ${cfg.nameLabelOffsetPx}px));
       `
       const el = document.createElement('div')
+      el.style.cssText = 'display:flex;justify-content:center'
       el.appendChild(inner)
       const label = new CSS2DObject(el)
       label.position.set(s.x, s.y, s.z)
@@ -934,6 +935,7 @@ for (const s of stars) starById.set(s.id, s)
   ttStyle.textContent = `
     .star-tooltip {
       pointer-events:none;
+      display:flex; justify-content:center;
     }
     .tt-inner {
       font-family:"Inter","Microsoft YaHei",system-ui,sans-serif;
@@ -945,7 +947,7 @@ for (const s of stars) starById.set(s.id, s)
       white-space:nowrap;
       opacity:0; transition:opacity 0.15s;
       line-height:1;
-      transform:translate(-50%, calc(-100% + var(--tt-offset, 0px)));
+      transform:translateY(calc(-100% + var(--tt-offset, 0px)));
     }
     .star-tooltip .tt-name {
       font-size:${cfg.tooltipNameFontSize}px; font-weight:600;
@@ -3152,7 +3154,7 @@ for (const s of stars) starById.set(s.id, s)
           const inner = label.element.firstChild as HTMLElement
           inner.style.color = cfg.nameLabelColor
           inner.style.fontSize = `${cfg.nameLabelFontSize}px`
-          inner.style.transform = `translate(-50%, calc(-100% + ${cfg.nameLabelOffsetPx}px))`
+          inner.style.transform = `translateY(calc(-100% + ${cfg.nameLabelOffsetPx}px))`
         }
       }
       // tooltip 偏移变更
