@@ -365,6 +365,9 @@ export function useSky(
   const _reusedTailEnd = new Vector3()
   // OPT-26：标签距离 LOD 复用向量（避免每帧 new Vector3）
   const _lodVec = new Vector3()
+  // 星名标注：角度计算复用向量
+  const _camDir = new Vector3()
+  const _starDir = new Vector3()
   // OPT-30：旋转矩阵复用（避免用户拖拽时高频 new Matrix4 导致 GC 压力）
   // 用于 rotateX/Y/Z/rotate/setRotation 方法，makeRotation* 会重置矩阵为单位+旋转
   const _rotMat = new Matrix4()
@@ -524,6 +527,31 @@ for (const s of stars) starById.set(s.id, s)
     const pts = new Points(g, spikeMat)
     pts.renderOrder = 5  // 在普通星点之上、UI 元素之下
     skyGroup.add(pts)
+  }
+
+  // ═══ 星名标注：靠近视角中心时显示名称 ═══
+  const starNameLabels = new Map<number, CSS2DObject>()
+  {
+    const namedStars = stars.filter(s => s.name !== null)
+    for (const s of namedStars) {
+      const el = document.createElement('div')
+      el.textContent = s.name!.split(' ')[0] // 只取中文名
+      el.style.cssText = `
+        color: ${cfg.nameLabelColor};
+        font-size: ${cfg.nameLabelFontSize}px;
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        text-shadow: 0 0 6px rgba(0,0,0,0.8);
+        pointer-events: none;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.15s;
+      `
+      const label = new CSS2DObject(el)
+      label.position.set(s.x, s.y, s.z)
+      label.visible = false
+      skyGroup.add(label)
+      starNameLabels.set(s.id, label)
+    }
   }
 
   // ═══ 悬浮高亮辉光（加到 scene，不随 skyGroup 旋转） ═══
@@ -2957,6 +2985,22 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
     }
+    // 星名标注：靠近视角中心时显示名称
+    if (starNameLabels.size > 0) {
+      camera.getWorldDirection(_camDir)
+      const thresholdRad = cfg.nameLabelFovDeg * D2R
+      for (const [starId, label] of starNameLabels) {
+        const star = starById.get(starId)
+        if (!star) continue
+        _starDir.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld).normalize()
+        const angle = Math.acos(Math.max(-1, Math.min(1, _camDir.dot(_starDir))))
+        if (angle < thresholdRad - 0.02) {
+          if (!label.visible) { label.visible = true; (label.element as HTMLElement).style.opacity = '1' }
+        } else if (angle > thresholdRad + 0.02) {
+          if (label.visible) { label.visible = false; (label.element as HTMLElement).style.opacity = '0' }
+        }
+      }
+    }
     // OPT-28：沉浸模式下跳过 labelRenderer.render()，节省 DOM 操作开销
     if (labelsVisible) {
       labelRenderer.render(scene, camera)
@@ -3075,6 +3119,14 @@ for (const s of stars) starById.set(s.id, s)
       if (cfg.constellationLabelColor !== oldLabelColor) {
         for (const el of constellationLabelEls.values()) {
           el.style.color = cfg.constellationLabelColor
+        }
+      }
+      // 星名标注颜色/字体变更
+      if (cfg.nameLabelColor !== patch.nameLabelColor || cfg.nameLabelFontSize !== patch.nameLabelFontSize) {
+        for (const label of starNameLabels.values()) {
+          const el = label.element as HTMLElement
+          el.style.color = cfg.nameLabelColor
+          el.style.fontSize = `${cfg.nameLabelFontSize}px`
         }
       }
       // showAllConstellations 状态变更：立即应用可见性

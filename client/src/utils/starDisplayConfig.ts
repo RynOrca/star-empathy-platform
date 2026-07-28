@@ -60,6 +60,13 @@ export interface StarDisplayConfig {
   constellationGlowColor: number
   /** 星座标签色（CSS rgba） */
   constellationLabelColor: string
+
+  /** 星名标注：视角中心阈值（度），星星偏离视角中心小于此角度时显示名称 */
+  nameLabelFovDeg: number
+  /** 星名标注字体大小（px） */
+  nameLabelFontSize: number
+  /** 星名标注颜色（CSS rgba） */
+  nameLabelColor: string
 }
 
 export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
@@ -85,4 +92,8 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   constellationLineColor: 0x6677aa,
   constellationGlowColor: 0xffd98a,
   constellationLabelColor: 'rgba(102,119,170,0.6)',
+
+  nameLabelFovDeg: 15,
+  nameLabelFontSize: 10,
+  nameLabelColor: 'rgba(255,217,138,0.7)',
 }
