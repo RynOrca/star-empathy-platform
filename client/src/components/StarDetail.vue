@@ -248,6 +248,96 @@
           </div>
         </div>
 
+        <!-- 天文事件 widget（升落 / 中天 / 当前位置） -->
+        <div class="astro-events" v-if="astroData?.star">
+          <div class="astro-events-header">
+            <Compass :size="13" class="astro-icon" />
+            <span class="astro-events-title">天文事件</span>
+            <span
+              class="astro-visibility-badge"
+              :class="{ 'is-visible': astroData.star.currentlyAboveHorizon }"
+            >
+              {{ astroData.star.currentlyAboveHorizon ? '地平线以上' : '地平线以下' }}
+            </span>
+          </div>
+
+          <div class="astro-events-grid">
+            <!-- 当前高度 / 方位 -->
+            <div class="astro-event-item">
+              <Sun :size="12" class="astro-event-icon" />
+              <div class="astro-event-content">
+                <span class="astro-event-label">当前</span>
+                <span class="astro-event-value">
+                  {{ formatAltitude(astroData.star.currentAltitude) }} · {{ azimuthToDirection(astroData.star.currentAzimuth) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 升起时间 -->
+            <div class="astro-event-item">
+              <Sunrise :size="12" class="astro-event-icon" />
+              <div class="astro-event-content">
+                <span class="astro-event-label">升起</span>
+                <span class="astro-event-value">{{ formatClockTime(astroData.star.rise) }}</span>
+              </div>
+            </div>
+
+            <!-- 中天时刻 + 高度 -->
+            <div class="astro-event-item">
+              <Clock :size="12" class="astro-event-icon" />
+              <div class="astro-event-content">
+                <span class="astro-event-label">中天</span>
+                <span class="astro-event-value">
+                  {{ formatClockTime(astroData.star.transit) }}
+                  <span class="astro-event-sub">({{ formatAltitude(astroData.star.transitAltitude) }})</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- 落下时间 -->
+            <div class="astro-event-item">
+              <Sunset :size="12" class="astro-event-icon" />
+              <div class="astro-event-content">
+                <span class="astro-event-label">落下</span>
+                <span class="astro-event-value">{{ formatClockTime(astroData.star.set) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 月相 widget（全局，不依赖当前星星） -->
+        <div class="astro-events moon-widget" v-if="astroData?.moon">
+          <div class="astro-events-header">
+            <Moon :size="13" class="astro-icon" />
+            <span class="astro-events-title">今日月相</span>
+            <span
+              class="moon-phase-icon"
+              :style="{ '--moon-brightness': astroData.moon.phaseBrightness + '%' }"
+              :title="astroData.moon.phaseLabel"
+            ></span>
+          </div>
+          <div class="astro-events-grid">
+            <div class="astro-event-item">
+              <div class="astro-event-content">
+                <span class="astro-event-label">相位</span>
+                <span class="astro-event-value">{{ astroData.moon.phaseLabel }}</span>
+              </div>
+            </div>
+            <div class="astro-event-item">
+              <div class="astro-event-content">
+                <span class="astro-event-label">亮面</span>
+                <span class="astro-event-value">{{ (astroData.moon.illumination * 100).toFixed(0) }}%</span>
+              </div>
+            </div>
+            <div class="astro-event-item" v-if="astroData.moon.nextFullMoon">
+              <div class="astro-event-content">
+                <span class="astro-event-label">下次满月</span>
+                <span class="astro-event-value">{{ formatDateTime(astroData.moon.nextFullMoon) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 标签 -->
         <div class="info-section">
           <div class="info-label">
@@ -441,13 +531,14 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2 } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
 import { useKernel } from '../composables/useKernel'
 import { useSimilarStars } from '../composables/useSimilarStars'
 import { useAreaHighlights } from '../composables/useAreaHighlights'
+import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../composables/useAstroEvents'
 import catalogData from '../data/stars.json'
 
 const props = defineProps<{
@@ -473,6 +564,10 @@ const props = defineProps<{
   resonating: boolean
   favoriteStarIds: number[]
   currentUserId: number | null
+  /** 观测者纬度（度）— 用于天文事件计算 */
+  observerLat?: number | null
+  /** 观测者经度（度）— 用于天文事件计算 */
+  observerLng?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -492,6 +587,15 @@ const emit = defineEmits<{
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
+
+// ─── 天文事件（升落 / 中天 / 月相）───
+// 当 starInfo 或 observer 位置变化时自动重算（同步 API，<5ms）
+const { data: astroData } = useAstroEvents({
+  raHours: () => props.starInfo?.ra ?? null,
+  decDeg: () => props.starInfo?.dec ?? null,
+  observerLat: () => props.observerLat ?? null,
+  observerLon: () => props.observerLng ?? null,
+})
 
 // ─── 搜索 ───
 const searchQuery = ref('')
@@ -1571,6 +1675,93 @@ watch(() => props.catalogStarId, () => {
 .stat-label {
   font-size: 0.7rem;
   color: var(--muted-light);
+}
+
+/* ─── 天文事件 widget ─── */
+.astro-events {
+  margin-top: 20px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 217, 138, 0.04), rgba(255, 217, 138, 0.01));
+}
+.astro-events-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.astro-icon { color: var(--accent); flex-shrink: 0; }
+.astro-events-title {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  flex: 1;
+}
+.astro-visibility-badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(180, 180, 180, 0.12);
+  color: var(--muted-light);
+}
+.astro-visibility-badge.is-visible {
+  background: rgba(120, 200, 120, 0.16);
+  color: #8ad88a;
+}
+.moon-phase-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1a1a2e;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.moon-phase-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #e8e0d0 var(--moon-brightness, 0%), transparent var(--moon-brightness, 0%));
+}
+.astro-events-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.astro-event-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.astro-event-icon { color: var(--muted-light); flex-shrink: 0; }
+.astro-event-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.astro-event-label {
+  font-size: 0.66rem;
+  color: var(--muted-light);
+}
+.astro-event-value {
+  font-size: 0.82rem;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.astro-event-sub {
+  font-size: 0.68rem;
+  color: var(--muted-light);
+}
+.moon-widget {
+  margin-top: 10px;
+  background: linear-gradient(180deg, rgba(180, 200, 255, 0.04), rgba(180, 200, 255, 0.01));
 }
 
 .info-section {

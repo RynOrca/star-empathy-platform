@@ -53,7 +53,11 @@
   "Aps": {
     "name": "天燕座",
     "nameEn": "Apus",
-    "labelPos": null,
+    "labelPos": [
+      -70.65,
+      -490.89,
+      63.54
+    ],
     "lines": []
   },
   "Aql": {
@@ -391,13 +395,21 @@
   "Cae": {
     "name": "雕具座",
     "nameEn": "Caelum",
-    "labelPos": null,
+    "labelPos": [
+      126.32,
+      -333.68,
+      -350.29
+    ],
     "lines": []
   },
   "Cam": {
     "name": "鹿豹座",
     "nameEn": "Camelopardalis",
-    "labelPos": null,
+    "labelPos": [
+      60.65,
+      434.93,
+      -239.08
+    ],
     "lines": []
   },
   "Cap": {
@@ -677,13 +689,21 @@
   "Cha": {
     "name": "蝘蜓座",
     "nameEn": "Chamaeleon",
-    "labelPos": null,
+    "labelPos": [
+      -64.33,
+      -487.02,
+      -93.12
+    ],
     "lines": []
   },
   "Cir": {
     "name": "圆规座",
     "nameEn": "Circinus",
-    "labelPos": null,
+    "labelPos": [
+      -160.47,
+      -453.06,
+      137.78
+    ],
     "lines": []
   },
   "Cnc": {
@@ -724,31 +744,51 @@
   "Col": {
     "name": "天鸽座",
     "nameEn": "Columba",
-    "labelPos": null,
+    "labelPos": [
+      36.28,
+      -280.13,
+      -412.57
+    ],
     "lines": []
   },
   "Com": {
     "name": "后发座",
     "nameEn": "Coma Berenices",
-    "labelPos": null,
+    "labelPos": [
+      -420.41,
+      233.8,
+      136.36
+    ],
     "lines": []
   },
   "CrA": {
     "name": "南冕座",
     "nameEn": "Corona Australis",
-    "labelPos": null,
+    "labelPos": [
+      118.27,
+      -307.17,
+      376.37
+    ],
     "lines": []
   },
   "CrB": {
     "name": "北冕座",
     "nameEn": "Corona Borealis",
-    "labelPos": null,
+    "labelPos": [
+      -264.6,
+      224.78,
+      359.81
+    ],
     "lines": []
   },
   "Crt": {
     "name": "巨爵座",
     "nameEn": "Crater",
-    "labelPos": [-460.95, -153.12, -118.67],
+    "labelPos": [
+      -460.95,
+      -153.12,
+      -118.67
+    ],
     "lines": [
       [
         "翼宿一 Alkes",
@@ -919,7 +959,11 @@
   "Dor": {
     "name": "剑鱼座",
     "nameEn": "Dorado",
-    "labelPos": null,
+    "labelPos": [
+      104.97,
+      -409.8,
+      -266.54
+    ],
     "lines": []
   },
   "Dra": {
@@ -996,7 +1040,11 @@
   "Equ": {
     "name": "小马座",
     "nameEn": "Equuleus",
-    "labelPos": null,
+    "labelPos": [
+      375.37,
+      45.73,
+      327.11
+    ],
     "lines": []
   },
   "Eri": {
@@ -1037,7 +1085,11 @@
   "For": {
     "name": "天炉座",
     "nameEn": "Fornax",
-    "labelPos": null,
+    "labelPos": [
+      292.48,
+      -242.31,
+      -325.18
+    ],
     "lines": []
   },
   "Gem": {
@@ -1129,7 +1181,11 @@
   "Hor": {
     "name": "时钟座",
     "nameEn": "Horologium",
-    "labelPos": [160.39, -329.9, -339.77],
+    "labelPos": [
+      160.39,
+      -329.9,
+      -339.77
+    ],
     "lines": [
       [
         "时钟座α Hor",
@@ -1207,25 +1263,41 @@
   "Hyi": {
     "name": "水蛇座",
     "nameEn": "Hydrus",
-    "labelPos": null,
+    "labelPos": [
+      109.61,
+      -487.68,
+      -12.42
+    ],
     "lines": []
   },
   "Ind": {
     "name": "印第安座",
     "nameEn": "Indus",
-    "labelPos": null,
+    "labelPos": [
+      215.42,
+      -367.4,
+      261.93
+    ],
     "lines": []
   },
   "LMi": {
     "name": "小狮座",
     "nameEn": "Leo Minor",
-    "labelPos": null,
+    "labelPos": [
+      -396.23,
+      281.14,
+      -118.16
+    ],
     "lines": []
   },
   "Lac": {
     "name": "蝎虎座",
     "nameEn": "Lacerta",
-    "labelPos": null,
+    "labelPos": [
+      295.79,
+      384.6,
+      120.8
+    ],
     "lines": []
   },
   "Leo": {
@@ -1328,7 +1400,11 @@
   "Lup": {
     "name": "豺狼座",
     "nameEn": "Lupus",
-    "labelPos": null,
+    "labelPos": [
+      -257.47,
+      -367.98,
+      219.77
+    ],
     "lines": []
   },
   "Lyr": {
@@ -1377,7 +1453,11 @@
   "Mic": {
     "name": "显微镜座",
     "nameEn": "Microscopium",
-    "labelPos": [251.24, -317.1, 293.82],
+    "labelPos": [
+      251.24,
+      -317.1,
+      293.82
+    ],
     "lines": [
       [
         "显微镜座γ Mic",
@@ -1407,13 +1487,21 @@
   "Mus": {
     "name": "苍蝇座",
     "nameEn": "Musca",
-    "labelPos": null,
+    "labelPos": [
+      -175.71,
+      -467.21,
+      28.92
+    ],
     "lines": []
   },
   "Oct": {
     "name": "南极座",
     "nameEn": "Octans",
-    "labelPos": [56.86, -496.18, 23.94],
+    "labelPos": [
+      56.86,
+      -496.18,
+      23.94
+    ],
     "lines": [
       [
         "南极座σ Oct",
@@ -1587,12 +1675,6 @@
       ]
     ]
   },
-  "Pavo": {
-    "name": "孔雀座",
-    "nameEn": "Pavo",
-    "labelPos": null,
-    "lines": []
-  },
   "Peg": {
     "name": "飞马座",
     "nameEn": "Pegasus",
@@ -1718,13 +1800,21 @@
   "Phe": {
     "name": "凤凰座",
     "nameEn": "Phoenix",
-    "labelPos": null,
+    "labelPos": [
+      367.34,
+      -336.54,
+      -42.41
+    ],
     "lines": []
   },
   "Pic": {
     "name": "绘架座",
     "nameEn": "Pictor",
-    "labelPos": null,
+    "labelPos": [
+      -49.02,
+      -441.23,
+      -230.03
+    ],
     "lines": []
   },
   "PsA": {
@@ -1773,7 +1863,11 @@
   "Psc": {
     "name": "双鱼座",
     "nameEn": "Pisces",
-    "labelPos": [454.05, 72.26, -196.51],
+    "labelPos": [
+      454.05,
+      72.26,
+      -196.51
+    ],
     "lines": [
       [
         "外屏七 Alrescha",
@@ -1816,19 +1910,31 @@
   "Pup": {
     "name": "船尾座",
     "nameEn": "Puppis",
-    "labelPos": null,
+    "labelPos": [
+      -196.69,
+      -321.41,
+      -328.64
+    ],
     "lines": []
   },
   "Ret": {
     "name": "网罟座",
     "nameEn": "Reticulum",
-    "labelPos": null,
+    "labelPos": [
+      102.91,
+      -443.4,
+      -206.9
+    ],
     "lines": []
   },
   "Scl": {
     "name": "玉夫座",
     "nameEn": "Sculptor",
-    "labelPos": null,
+    "labelPos": [
+      421.58,
+      -245.13,
+      -110.36
+    ],
     "lines": []
   },
   "Sco": {
@@ -1901,19 +2007,31 @@
   "Sct": {
     "name": "盾牌座",
     "nameEn": "Scutum",
-    "labelPos": null,
+    "labelPos": [
+      75.36,
+      -71.69,
+      489.06
+    ],
     "lines": []
   },
   "Ser": {
     "name": "巨蛇座",
     "nameEn": "Serpens",
-    "labelPos": null,
+    "labelPos": [
+      -277.44,
+      55.96,
+      412.18
+    ],
     "lines": []
   },
   "Sex": {
     "name": "六分仪座",
     "nameEn": "Sextans",
-    "labelPos": null,
+    "labelPos": [
+      -441.57,
+      -3.24,
+      -234.54
+    ],
     "lines": []
   },
   "Sgr": {
@@ -2049,7 +2167,11 @@
   "Tel": {
     "name": "望远镜座",
     "nameEn": "Telescopium",
-    "labelPos": [69.98, -391.55, 302.96],
+    "labelPos": [
+      69.98,
+      -391.55,
+      302.96
+    ],
     "lines": [
       [
         "望远镜座α Tel",
@@ -2064,19 +2186,31 @@
   "TrA": {
     "name": "南三角座",
     "nameEn": "Triangulum Australe",
-    "labelPos": null,
+    "labelPos": [
+      -54.81,
+      -466.88,
+      170.36
+    ],
     "lines": []
   },
   "Tri": {
     "name": "三角座",
     "nameEn": "Triangulum",
-    "labelPos": null,
+    "labelPos": [
+      382.74,
+      246.81,
+      -206.39
+    ],
     "lines": []
   },
   "Tuc": {
     "name": "杜鹃座",
     "nameEn": "Tucana",
-    "labelPos": null,
+    "labelPos": [
+      224.12,
+      -434.14,
+      106.25
+    ],
     "lines": []
   },
   "UMa": {
@@ -2270,7 +2404,11 @@
   "Vol": {
     "name": "飞鱼座",
     "nameEn": "Volans",
-    "labelPos": [-91.96, -461.65, -168.6],
+    "labelPos": [
+      -91.96,
+      -461.65,
+      -168.6
+    ],
     "lines": [
       [
         "飞鱼座α Vol",
@@ -2285,7 +2423,101 @@
   "Vul": {
     "name": "狐狸座",
     "nameEn": "Vulpecula",
-    "labelPos": null,
+    "labelPos": [
+      171.68,
+      208.66,
+      420.7
+    ],
+    "lines": []
+  },
+  "Ant": {
+    "name": "天线座",
+    "nameEn": "Antlia",
+    "labelPos": [
+      -393.63,
+      -258.03,
+      -168.75
+    ],
+    "lines": []
+  },
+  "CVn": {
+    "name": "猎犬座",
+    "nameEn": "Canes Venatici",
+    "labelPos": [
+      -380.62,
+      310.01,
+      94.97
+    ],
+    "lines": []
+  },
+  "Gru": {
+    "name": "天鹤座",
+    "nameEn": "Grus",
+    "labelPos": [
+      301.63,
+      -365.44,
+      159.6
+    ],
+    "lines": []
+  },
+  "Lyn": {
+    "name": "天猫座",
+    "nameEn": "Lynx",
+    "labelPos": [
+      -317.29,
+      282.43,
+      -263.74
+    ],
+    "lines": []
+  },
+  "Men": {
+    "name": "山案座",
+    "nameEn": "Mensa",
+    "labelPos": [
+      -5.85,
+      -482.4,
+      -131.37
+    ],
+    "lines": []
+  },
+  "Nor": {
+    "name": "矩尺座",
+    "nameEn": "Norma",
+    "labelPos": [
+      -145.58,
+      -380.83,
+      289.45
+    ],
+    "lines": []
+  },
+  "Pyx": {
+    "name": "罗盘座",
+    "nameEn": "Pyxis",
+    "labelPos": [
+      -274,
+      -273.68,
+      -316.26
+    ],
+    "lines": []
+  },
+  "Sge": {
+    "name": "天箭座",
+    "nameEn": "Sagitta",
+    "labelPos": [
+      250.08,
+      150.55,
+      405.95
+    ],
+    "lines": []
+  },
+  "Pav": {
+    "name": "孔雀座",
+    "nameEn": "Pavo",
+    "labelPos": [
+      162.77,
+      -418.07,
+      220.73
+    ],
     "lines": []
   }
 }

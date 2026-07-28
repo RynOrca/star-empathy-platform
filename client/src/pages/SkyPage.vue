@@ -131,6 +131,8 @@
         :resonating="resonating"
         :favorite-star-ids="favoriteStarIds"
         :current-user-id="currentUserId"
+        :observer-lat="userLat"
+        :observer-lng="userLng"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
