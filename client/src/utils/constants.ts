@@ -5,8 +5,10 @@ export const SPHERE_RADIUS = 500
 export const BACKGROUND_STAR_COUNT = 2000
 
 // 相机
+// FOV_MIN=8 允许放大到行星附近（"上帝视角"），解决行星点击区域过小问题
+// 8° FOV 在 R=490 天球上相当于放大 7.5 倍，水星(半径1.0)在屏幕上放大到可点击尺寸
 export const DEFAULT_FOV = 60
-export const FOV_MIN = 25
+export const FOV_MIN = 8
 export const FOV_MAX = 75
 export const FOV_ZOOM_STEP = 1.5
 export const BREATHING_AMPLITUDE = 2
