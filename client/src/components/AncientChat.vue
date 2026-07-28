@@ -3,6 +3,8 @@
     <Transition name="drawer-slide">
       <div v-if="visible" class="chat-drawer-overlay" @click.self="$emit('close')">
         <div class="chat-drawer">
+          <!-- 移动端拖拽手柄 -->
+          <div class="mobile-drag-handle" @click="$emit('close')"></div>
           <!-- 头部 -->
           <div class="chat-drawer-header">
             <span class="chat-drawer-title">与古人共赏</span>
@@ -718,10 +720,37 @@ function renderMarkdown(text: string): string {
 .drawer-slide-leave-to .chat-drawer { transform: translateX(100%); }
 .drawer-slide-leave-to { opacity: 0; }
 
+/* ─── Mobile drag handle ─── */
+.mobile-drag-handle {
+  display: none;
+}
+
 /* ─── Mobile Responsive (<=768px) ─── */
 @media (max-width: 768px) {
+  .mobile-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .mobile-drag-handle::after {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 217, 138, 0.3);
+    transition: background 0.2s;
+  }
+
+  .mobile-drag-handle:active::after {
+    background: var(--accent);
+  }
+
   .chat-drawer-overlay {
-    justify-content: flex-end;
+    justify-content: center;
     align-items: flex-end;
     background: rgba(7, 8, 22, 0.5);
     backdrop-filter: blur(4px);

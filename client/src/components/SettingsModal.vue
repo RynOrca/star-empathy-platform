@@ -3,6 +3,8 @@
     <Transition name="modal-fade">
       <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
         <div class="modal-card">
+          <!-- 移动端拖拽手柄 -->
+          <div class="mobile-drag-handle" @click="$emit('close')"></div>
           <div class="modal-header">
             <span class="modal-title">设置</span>
             <button class="modal-close" @click="$emit('close')">
@@ -537,8 +539,35 @@ async function clearAmap() {
 .modal-fade-enter-from .modal-card { transform: scale(0.96) translateY(8px); }
 .modal-fade-leave-to .modal-card { transform: scale(0.96); }
 
+/* ─── Mobile drag handle ─── */
+.mobile-drag-handle {
+  display: none;
+}
+
 /* ─── Mobile Responsive (<=768px) ─── */
 @media (max-width: 768px) {
+  .mobile-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .mobile-drag-handle::after {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 217, 138, 0.3);
+    transition: background 0.2s;
+  }
+
+  .mobile-drag-handle:active::after {
+    background: var(--accent);
+  }
+
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
