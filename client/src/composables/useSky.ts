@@ -2708,12 +2708,12 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画（已禁用）
-    // for (const sg of storyGlows) {
-    //   const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
-    //   const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-    //   ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
-    // }
+    // 有故事的星：呼吸辉光动画
+    for (const sg of storyGlows) {
+      const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
+      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+      ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+    }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
     // clamp deltaMs 到 250ms：visibilitychange 已重置 lastFrameTime，但极端情况下（卡顿/调试断点）仍需兜底
     const deltaMs = Math.min(_now - lastFrameTime, 250)
@@ -3279,7 +3279,7 @@ for (const s of stars) starById.set(s.id, s)
     setObserver,
     setStarStatsCache(cache) {
       cache.forEach((v, k) => statsCache.set(k, v))
-      // updateStoryGlows(cache)  // 已禁用：有故事的星星光晕
+      updateStoryGlows(cache)
     },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
       // 已禁用：天球回归默认不旋转
