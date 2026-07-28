@@ -531,6 +531,7 @@ for (const s of stars) starById.set(s.id, s)
 
   // ═══ 星名标注：靠近视角中心时显示名称 ═══
   const starNameLabels = new Map<number, CSS2DObject>()
+  const starNameOpacities = new Map<number, number>() // 当前 opacity（帧间 lerp）
   {
     const namedStars = stars.filter(s => s.name !== null)
     for (const s of namedStars) {
@@ -544,13 +545,16 @@ for (const s of stars) starById.set(s.id, s)
         pointer-events: none;
         white-space: nowrap;
         opacity: 0;
-        transition: opacity 0.15s;
       `
       const label = new CSS2DObject(el)
-      label.position.set(s.x, s.y, s.z)
+      // 沿径向向外偏移，避免标签遮挡星星本身
+      const len = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)
+      const r = len > 0 ? 10 / len : 0
+      label.position.set(s.x * (1 + r), s.y * (1 + r), s.z * (1 + r))
       label.visible = false
       skyGroup.add(label)
       starNameLabels.set(s.id, label)
+      starNameOpacities.set(s.id, 0)
     }
   }
 
@@ -2985,19 +2989,29 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
     }
-    // 星名标注：靠近视角中心时显示名称
+    // 星名标注：靠近视角中心时显示名称（平滑淡入淡出）
     if (starNameLabels.size > 0) {
       camera.getWorldDirection(_camDir)
       const thresholdRad = cfg.nameLabelFovDeg * D2R
+      const innerRad = thresholdRad * 0.55  // 完全可见区
+      const outerRad = thresholdRad          // 完全隐藏区
+      const fadeRange = outerRad - innerRad
       for (const [starId, label] of starNameLabels) {
         const star = starById.get(starId)
         if (!star) continue
         _starDir.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld).normalize()
         const angle = Math.acos(Math.max(-1, Math.min(1, _camDir.dot(_starDir))))
-        if (angle < thresholdRad - 0.02) {
-          if (!label.visible) { label.visible = true; (label.element as HTMLElement).style.opacity = '1' }
-        } else if (angle > thresholdRad + 0.02) {
-          if (label.visible) { label.visible = false; (label.element as HTMLElement).style.opacity = '0' }
+        // 平滑过渡：inner 以内 opacity=1，outer 以外 opacity=0，中间线性插值
+        const target = angle <= innerRad ? 1 : angle >= outerRad ? 0 : 1 - (angle - innerRad) / fadeRange
+        const cur = starNameOpacities.get(starId) ?? 0
+        const next = cur + (target - cur) * 0.12 // 帧间 lerp
+        starNameOpacities.set(starId, next)
+        if (next > 0.005) {
+          if (!label.visible) label.visible = true
+          ;(label.element as HTMLElement).style.opacity = String(next)
+        } else if (label.visible) {
+          label.visible = false
+          ;(label.element as HTMLElement).style.opacity = '0'
         }
       }
     }
