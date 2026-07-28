@@ -18,7 +18,7 @@ const emit = defineEmits<{
   starClick: [starId: number]
   starHover: [starId: number | null]
   starHoverLong: [starId: number | null]
-  planetClick: [name: string, nameCN: string]
+  planetClick: [name: string, nameCN: string, planetId: number]
 }>()
 
 onMounted(() => {
@@ -26,7 +26,7 @@ onMounted(() => {
     onStarClick: (starId) => emit('starClick', starId),
     onStarHover: (starId) => emit('starHover', starId),
     onStarHoverLong: (starId) => emit('starHoverLong', starId),
-    onPlanetClick: (name, nameCN) => emit('planetClick', name, nameCN),
+    onPlanetClick: (name, nameCN, planetId) => emit('planetClick', name, nameCN, planetId),
     observerLat: props.observerLat,
     observerLng: props.observerLng,
   })
