@@ -208,11 +208,47 @@
             </template>
           </template>
 
-          <!-- Tab 4: 我的故事（占位，Task 5 实现） -->
+          <!-- Tab 4: 我的故事 -->
           <template v-else-if="activeTab === 'mine'">
-            <div class="empty-state">
+            <div v-if="props.currentUserId == null" class="empty-state">
               <User :size="20" class="empty-icon" />
-              <p>我的故事（即将实现）</p>
+              <p>请先登录后查看我的故事</p>
+            </div>
+            <div v-else-if="myStories.length > 0" class="story-list">
+              <div
+                v-for="(story, index) in myStories"
+                :key="story.id"
+                class="story-card"
+                :style="{ animationDelay: `${index * 30}ms` }"
+                @click="openStoryDetail(story)"
+              >
+                <div class="story-head">
+                  <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                  <button
+                    class="resonate-btn"
+                    :class="{ done: justResonatedId === story.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(story)"
+                  >
+                    <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
+                    <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
+                  </button>
+                </div>
+                <p class="story-excerpt">{{ story.content }}</p>
+                <div class="story-meta">
+                  <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
+                  <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
+                  <span v-if="formatDistance(story.locationLat, story.locationLng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.locationLat, story.locationLng).near }">{{ formatDistance(story.locationLat, story.locationLng).text }}</span>
+                  <span class="meta-sep">·</span>
+                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
+                  <span class="meta-sep">·</span>
+                  <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <PenSquare :size="20" class="empty-icon" />
+              <p>你还没有在这颗星上写过故事</p>
             </div>
           </template>
 
@@ -646,6 +682,11 @@ const historyStories = computed(() =>
 // 用户投递的故事（非历史）
 const userStories = computed(() =>
   realStories.value.filter(s => s.type !== 'history')
+)
+
+// 我的故事（当前用户投递的故事）
+const myStories = computed(() =>
+  realStories.value.filter(s => s.userId != null && s.userId === props.currentUserId)
 )
 
 // ─── 天文事件（升落 / 中天 / 月相）───
