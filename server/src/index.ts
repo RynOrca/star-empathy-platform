@@ -13,8 +13,10 @@ import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
 import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
+import locationRouter from './routes/location';
 import { ok, badRequest, serverError } from './utils/response';
 import { setApiKey, getApiKey } from './services/deepseek';
+import { setAmapKey, getAmapKey } from './services/amap';
 import { cleanExpiredTokens } from './services/userService';
 
 const app = express();
@@ -140,6 +142,9 @@ app.use('/api/stars', starsRouter);
 // 个人主页
 app.use('/api/profile', profileRouter);
 
+// 定位（IP 定位 + 反向地理编码）
+app.use('/api/location', locationRouter);
+
 // 设置 API Key（运行时覆盖）
 app.get('/api/settings/api-key', (_req: Request, res: Response) => {
   ok(res, 'ok', { hasKey: !!getApiKey() });
@@ -179,6 +184,44 @@ app.post('/api/settings/test-key', async (req: Request, res: Response) => {
       ok(res, '星河已连通');
     } else {
       badRequest(res, '未能连通');
+    }
+  } catch (e: any) {
+    serverError(res, `网络错误: ${e.message}`);
+  }
+});
+
+// 高德地图 API Key（运行时覆盖）
+app.get('/api/settings/amap-key', (_req: Request, res: Response) => {
+  ok(res, 'ok', { hasKey: !!getAmapKey() });
+});
+app.post('/api/settings/amap-key', (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+    setAmapKey(null);
+    ok(res, '已清除高德 Key');
+    return;
+  }
+  setAmapKey(apiKey.trim());
+  ok(res, '高德 Key 已保存');
+});
+
+// 测试高德 Key 连通性
+app.post('/api/settings/test-amap-key', async (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getAmapKey();
+  if (!key) {
+    return badRequest(res, '请先设置高德 API Key');
+  }
+  try {
+    const resp = await fetch(
+      `https://restapi.amap.com/v3/geocode/regeo?key=${encodeURIComponent(key)}&location=116.4,39.9&output=JSON`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    const data = await resp.json() as { status: string; info?: string };
+    if (data.status === '1') {
+      ok(res, '高德地图已连通');
+    } else {
+      badRequest(res, `高德返回错误: ${data.info || '未知错误'}`);
     }
   } catch (e: any) {
     serverError(res, `网络错误: ${e.message}`);

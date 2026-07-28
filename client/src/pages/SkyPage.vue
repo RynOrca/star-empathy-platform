@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -282,13 +282,15 @@ function setCachedLocation(lat: number, lng: number) {
   localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
 }
 
-// 反向地理编码：获取城市名称
+// 反向地理编码：通过后端代理获取城市名称（BigDataCloud 主 + Nominatim 备，5s 超时）
 async function fetchCityName(lat: number, lng: number): Promise<string> {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
-    const data = await res.json()
-    const addr = data.address || {}
-    const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
+    const ctrl = new AbortController()
+    const timeout = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`, { signal: ctrl.signal })
+    clearTimeout(timeout)
+    const json = await res.json()
+    const city = json?.data?.city || ''
     console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
     return city
   } catch (e) {
@@ -301,7 +303,7 @@ function showLocationToast(city: string) {
   const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
   console.log('[SkyPage] showLocationToast:', text)
   locationCityToast.value = text
-  setTimeout(() => { locationCityToast.value = '' }, 10000)
+  setTimeout(() => { locationCityToast.value = '' }, 3000)
 }
 
 function fetchLocation() {
@@ -326,7 +328,7 @@ function fetchLocation() {
       locationReady.value = true
       locationFailed.value = true
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 
@@ -336,6 +338,7 @@ function refreshLocation() {
     showLocationToast('')
     return
   }
+  locationCityToast.value = '正在获取定位...'
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
       userLat.value = pos.coords.latitude
@@ -348,7 +351,7 @@ function refreshLocation() {
     () => {
       showLocationToast('')
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 
@@ -636,20 +639,14 @@ watch(showMyStoriesOnly, async () => {
     // 关闭"只看我的"：清除连线
     skyRef.value?.sky?.setKernelLines([])
   }
-  // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
+  // 如果详情面板打开：仅当该星完全没有故事时关闭面板
+  // 注意：showMyStoriesOnly 只影响 3D 天空，不影响详情面板数据
   if (selectedStarInfo.value && selectedCatalogStarId.value) {
-    const filtered = getFilteredStories(selectedCatalogStarId.value)
-    if (filtered.length === 0) {
+    const allStories = storiesByStarId.value.get(selectedCatalogStarId.value)
+    if (!allStories || allStories.length === 0) {
       selectedStories.value = []
       selectedStarInfo.value = null
       catalogStats.value = null
-    } else {
-      selectedStories.value = filtered
-      catalogStats.value = {
-        storyCount: filtered.length,
-        totalResonance: filtered.reduce((s, x) => s + x.resonanceCount, 0),
-        totalViews: 0, starViews: 0, favoriteCount: 0,
-      }
     }
   }
 })
@@ -768,7 +765,9 @@ const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
-  const stories = getFilteredStories(starId)
+  // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
+  // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
+  const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
@@ -794,7 +793,7 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
 
 function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
-  const stories = getFilteredStories(planetId)
+  const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
   selectedStarInfo.value = {
