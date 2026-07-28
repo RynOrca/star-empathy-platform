@@ -51,6 +51,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
   CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
 
+  CREATE TABLE IF NOT EXISTS stories (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    type            TEXT NOT NULL DEFAULT 'user',
+    title           TEXT,
+    content         TEXT NOT NULL,
+    resonance_count INTEGER NOT NULL DEFAULT 0,
+    pos_x           REAL NOT NULL,
+    pos_y           REAL NOT NULL,
+    pos_z           REAL NOT NULL,
+    catalog_star_id INTEGER,
+    location_lat    REAL,
+    location_lng    REAL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    view_count      INTEGER NOT NULL DEFAULT 0,
+    origin          TEXT,
+    user_id         INTEGER REFERENCES users(id),
+    tag             TEXT,
+    is_anonymous    INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_stories_type ON stories(type);
+  CREATE INDEX IF NOT EXISTS idx_stories_catalog ON stories(catalog_star_id);
+  CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id);
+  CREATE INDEX IF NOT EXISTS idx_stories_created ON stories(created_at);
+
   CREATE TABLE IF NOT EXISTS catalog_visits (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     catalog_star_id INTEGER NOT NULL,
@@ -77,7 +101,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS story_kernels (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    story_id        INTEGER NOT NULL UNIQUE REFERENCES stars(id),
+    story_id        INTEGER NOT NULL UNIQUE REFERENCES stories(id),
     emotional_tags  TEXT NOT NULL DEFAULT '[]',
     essence         TEXT NOT NULL DEFAULT '',
     themes          TEXT NOT NULL DEFAULT '[]',
@@ -95,7 +119,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS resonance_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    story_id   INTEGER NOT NULL REFERENCES stars(id),
+    story_id   INTEGER NOT NULL REFERENCES stories(id),
     user_id    INTEGER NOT NULL REFERENCES users(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(story_id, user_id)
@@ -104,7 +128,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS story_views (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    story_id  INTEGER NOT NULL REFERENCES stars(id),
+    story_id  INTEGER NOT NULL REFERENCES stories(id),
     user_id   INTEGER NOT NULL REFERENCES users(id),
     viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -130,6 +154,13 @@ try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 
 try { db.exec('ALTER TABLE stars ADD COLUMN origin TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN tag TEXT'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN location_lat REAL'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN location_lng REAL'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN origin TEXT'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN tag TEXT'); } catch {}
+try { db.exec('ALTER TABLE stories ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 // 兼容旧数据库：favorites 表加 user_id 列
 try { db.exec('ALTER TABLE favorites ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
 try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorites(catalog_star_id, user_id)'); } catch {}
@@ -147,5 +178,24 @@ try { db.exec('ALTER TABLE catalog_visits ADD COLUMN user_id INTEGER REFERENCES 
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_visits(user_id)'); } catch {}
 // 兼容旧数据库：stars 加 is_anonymous 列
 try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
+
+// 从旧 stars 迁移历史/用户故事到 stories（幂等）
+try {
+  db.exec(`
+    INSERT OR IGNORE INTO stories (
+      id, type, title, content, resonance_count,
+      pos_x, pos_y, pos_z, catalog_star_id,
+      location_lat, location_lng, created_at, view_count, origin,
+      user_id, tag, is_anonymous
+    )
+    SELECT
+      id, type, title, content, resonance_count,
+      pos_x, pos_y, pos_z, catalog_star_id,
+      location_lat, location_lng, created_at, view_count, origin,
+      user_id, tag, COALESCE(is_anonymous, 0)
+    FROM stars
+    WHERE type IN ('user', 'history')
+  `);
+} catch {}
 
 export default db;

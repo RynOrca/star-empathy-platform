@@ -24,7 +24,7 @@ export function getAllStars(): (Star & { username: string | null; tag: string | 
     SELECT s.*, s.user_id as userId,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
       s.tag
-    FROM stars s
+    FROM stories s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
   `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
@@ -42,7 +42,7 @@ export function getAllStarsPaged(page: number, limit: number): {
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
 
-  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as { cnt: number };
+  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stories').get() as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l);
 
@@ -50,7 +50,7 @@ export function getAllStarsPaged(page: number, limit: number): {
     SELECT s.*, s.user_id as userId,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
       s.tag
-    FROM stars s
+    FROM stories s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
@@ -73,7 +73,7 @@ export function createStar(
   const validTags = ['思念', '等待', '离别', '愿望', '孤独'];
   const safeTag = tag && validTags.includes(tag) ? tag : null;
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous)
+    INSERT INTO stories (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous)
     VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
@@ -90,7 +90,7 @@ export function createStar(
   return db.prepare(`
     SELECT s.*, s.user_id as userId,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
-    FROM stars s
+    FROM stories s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
   `).get(result.lastInsertRowid) as unknown as Star & { username: string | null; userId: number | null };
@@ -98,7 +98,7 @@ export function createStar(
 
 // 共鸣 +1（支持去重）
 export function resonate(id: number, userId?: number): { id: number; resonance_count: number; already?: boolean } | null {
-  const star = db.prepare('SELECT * FROM stars WHERE id = ?').get(id) as unknown as Star | undefined;
+  const star = db.prepare('SELECT * FROM stories WHERE id = ?').get(id) as unknown as Star | undefined;
   if (!star) return null;
 
   // 登录用户去重：同一用户对同一故事只能共鸣一次
@@ -107,7 +107,7 @@ export function resonate(id: number, userId?: number): { id: number; resonance_c
       'SELECT id FROM resonance_log WHERE story_id = ? AND user_id = ?'
     ).get(id, userId) as unknown as { id: number } | undefined;
     if (existing) {
-      const current = db.prepare('SELECT id, resonance_count FROM stars WHERE id = ?').get(id) as unknown as {
+      const current = db.prepare('SELECT id, resonance_count FROM stories WHERE id = ?').get(id) as unknown as {
         id: number; resonance_count: number;
       };
       return { ...current, already: true };
@@ -115,8 +115,8 @@ export function resonate(id: number, userId?: number): { id: number; resonance_c
     db.prepare('INSERT INTO resonance_log (story_id, user_id) VALUES (?, ?)').run(id, userId);
   }
 
-  db.prepare('UPDATE stars SET resonance_count = resonance_count + 1 WHERE id = ?').run(id);
-  const updated = db.prepare('SELECT id, resonance_count FROM stars WHERE id = ?').get(id) as unknown as {
+  db.prepare('UPDATE stories SET resonance_count = resonance_count + 1 WHERE id = ?').run(id);
+  const updated = db.prepare('SELECT id, resonance_count FROM stories WHERE id = ?').get(id) as unknown as {
     id: number;
     resonance_count: number;
   };
@@ -125,7 +125,7 @@ export function resonate(id: number, userId?: number): { id: number; resonance_c
 
 // 浏览 +1（按 catalog_star_id 批量 +1）
 export function incrementView(catalogStarId: number): void {
-  db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE catalog_star_id = ?').run(catalogStarId);
+  db.prepare('UPDATE stories SET view_count = view_count + 1 WHERE catalog_star_id = ?').run(catalogStarId);
 }
 
 // 星星级浏览记录（打开详情页一次 = +1，纯计数不去重）
@@ -135,7 +135,7 @@ export function recordCatalogVisit(catalogStarId: number): void {
 
 // 故事级浏览 +1（点击进入故事详情 = +1，纯计数不去重）
 export function recordStoryView(storyId: number): void {
-  db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE id = ?').run(storyId);
+  db.prepare('UPDATE stories SET view_count = view_count + 1 WHERE id = ?').run(storyId);
 }
 
 // 按 catalog_star_id 获取统计数据
@@ -145,7 +145,7 @@ export function getCatalogStats(catalogStarId: number): { storyCount: number; to
       COUNT(*) as story_count,
       COALESCE(SUM(resonance_count), 0) as total_resonance,
       COALESCE(SUM(view_count), 0) as total_story_views
-    FROM stars
+    FROM stories
     WHERE catalog_star_id = ?
   `).get(catalogStarId) as unknown as { story_count: number; total_resonance: number; total_story_views: number };
 
@@ -182,9 +182,9 @@ export function removeFavorite(catalogStarId: number, userId: number): void {
 
 // 全局统计
 export function getGlobalStats(): { starCount: number; userCount: number; totalResonance: number } {
-  const starRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as unknown as { cnt: number };
+  const starRow = db.prepare('SELECT COUNT(*) as cnt FROM stories').get() as unknown as { cnt: number };
   const userRow = db.prepare('SELECT COUNT(*) as cnt FROM users').get() as unknown as { cnt: number };
-  const resRow = db.prepare('SELECT COALESCE(SUM(resonance_count), 0) as cnt FROM stars').get() as unknown as { cnt: number };
+  const resRow = db.prepare('SELECT COALESCE(SUM(resonance_count), 0) as cnt FROM stories').get() as unknown as { cnt: number };
   return { starCount: starRow.cnt, userCount: userRow.cnt, totalResonance: resRow.cnt };
 }
 
@@ -192,7 +192,7 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
   const row = db.prepare(`
     SELECT s.*, u.username, s.tag
-    FROM stars s
+    FROM stories s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
   `).get(storyId) as unknown as (Star & { username: string | null; tag: string | null }) | undefined;
@@ -203,7 +203,7 @@ export function getStoryById(storyId: number): (Star & { username: string | null
 export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
     SELECT s.*, u.username, s.tag
-    FROM stars s
+    FROM stories s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.catalog_star_id = ?
     ORDER BY s.created_at DESC
@@ -214,7 +214,7 @@ export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { user
 export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
     SELECT s.*, u.username, s.tag
-    FROM stars s LEFT JOIN users u ON s.user_id = u.id
+    FROM stories s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
 }
@@ -230,13 +230,13 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
 
-  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_id = ?').get(userId) as { cnt: number };
+  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stories WHERE user_id = ?').get(userId) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
     SELECT s.*, u.username, s.tag
-    FROM stars s LEFT JOIN users u ON s.user_id = u.id
+    FROM stories s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
   `).all(userId, l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
@@ -258,9 +258,9 @@ export function deleteStory(storyId: number, userId: number): {
   notFound?: boolean;
   notOwner?: boolean;
 } {
-  const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
+  const existing = db.prepare('SELECT user_id FROM stories WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
   if (!existing) return { success: false, notFound: true };
   if (existing.user_id !== userId) return { success: false, notOwner: true };
-  db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
+  db.prepare('DELETE FROM stories WHERE id = ?').run(storyId);
   return { success: true };
 }

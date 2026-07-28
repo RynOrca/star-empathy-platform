@@ -171,7 +171,7 @@ export function getAggregatedTags(catalogStarId: number): {
   const rows = db.prepare(`
     SELECT sk.emotional_tags, sk.themes, sk.essence
     FROM story_kernels sk
-    JOIN stars s ON sk.story_id = s.id
+    JOIN stories s ON sk.story_id = s.id
     WHERE s.catalog_star_id = ?
   `).all(catalogStarId) as {
     emotional_tags: string
@@ -214,7 +214,7 @@ function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: 
   const rows = db.prepare(`
     SELECT DISTINCT s.catalog_star_id, sk.emotional_tags, sk.themes
     FROM story_kernels sk
-    JOIN stars s ON sk.story_id = s.id
+    JOIN stories s ON sk.story_id = s.id
     WHERE s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
   `).all() as { catalog_star_id: number; emotional_tags: string; themes: string }[]
 
@@ -268,7 +268,7 @@ export function getSimilarStars(catalogStarId: number, limit = 8): SimilarStar[]
     const sharedThemes = [...target.themes].filter(t => tags.themes.has(t))
 
     const storyCount = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+      'SELECT COUNT(*) as cnt FROM stories WHERE catalog_star_id = ?'
     ).get(cid) as { cnt: number }).cnt
 
     results.push({ catalogStarId: cid, score: Math.round(score * 100) / 100, sharedEmotions, sharedThemes, storyCount })
@@ -293,7 +293,7 @@ export function getAreaHighlights(catalogStarId: number, limit = 6): AreaHighlig
   // 目标恒星自己的内核
   const targetEssences = getAggregatedTags(catalogStarId).essences
   const targetStoryCount = (db.prepare(
-    'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+    'SELECT COUNT(*) as cnt FROM stories WHERE catalog_star_id = ?'
   ).get(catalogStarId) as { cnt: number }).cnt
 
   const result: AreaHighlight[] = []
@@ -349,7 +349,7 @@ export function getUserKernelLines(userId: number, limit = 20): KernelLine[] {
   const rows = db.prepare(`
     SELECT s.id as story_id, s.catalog_star_id, s.pos_x, s.pos_y, s.pos_z,
            sk.emotional_tags, sk.themes
-    FROM stars s
+    FROM stories s
     JOIN story_kernels sk ON s.id = sk.story_id
     WHERE s.user_id = ? AND s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
   `).all(userId) as {
