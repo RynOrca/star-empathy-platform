@@ -1,102 +1,7 @@
 <template>
-  <div class="overlay" :class="{ 'is-closing': isClosing }" @click.self="closeWithAnimation">
-    <div
-      ref="detailWrapRef"
-      class="detail-wrap"
-      :class="{ 'is-dragging': isDragging, 'is-closing': isClosing }"
-      :style="getWrapStyle()"
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @touchcancel="onTouchEnd"
-    >
-      <!-- 移动端顶部拖动条 + 关闭指示 -->
-      <div class="mobile-top-bar">
-        <div class="mobile-drag-indicator"></div>
-        <button class="mobile-close-chevron" @click.stop="closeWithAnimation">
-          <ChevronDown :size="22" />
-        </button>
-      </div>
-
-      <!-- 移动端星星概要栏（始终可见，可展开详情） -->
-      <div class="mobile-star-summary" @click="mobileInfoExpanded = !mobileInfoExpanded">
-        <div class="mobile-star-main">
-          <div class="star-color-dot" :style="{ background: starInfo?.color || '#fff6e8' }"></div>
-          <div class="mobile-star-text">
-            <span class="mobile-star-name">{{ starInfo?.displayName }}</span>
-            <span class="mobile-star-con">{{ starInfo?.conName }}</span>
-          </div>
-        </div>
-        <ChevronDown :size="18" class="mobile-expand-chevron" :class="{ expanded: mobileInfoExpanded }" />
-      </div>
-
-      <!-- 移动端可展开的星星详情 -->
-      <Transition name="info-expand">
-        <div v-if="mobileInfoExpanded" class="mobile-star-details">
-          <!-- 星等、距离等基本信息 -->
-          <div class="mobile-info-rows" v-if="starInfo">
-            <div class="mobile-info-chip">
-              <Sun :size="12" />
-              <span>{{ starInfo.mag.toFixed(1) }} 等</span>
-            </div>
-            <div v-if="starInfo.distance" class="mobile-info-chip">
-              <Navigation :size="12" />
-              <span>{{ starInfo.distance }} 光年</span>
-            </div>
-            <div class="mobile-info-chip">
-              <Thermometer :size="12" />
-              <span>{{ getStarTemperature(starInfo.color) }}</span>
-            </div>
-          </div>
-          <!-- 统计 -->
-          <div class="mobile-stats-row" v-if="catalogStats">
-            <div class="mobile-stat">
-              <BookOpen :size="13" />
-              <span class="mobile-stat-num">{{ catalogStats.storyCount }}</span>
-              <span class="mobile-stat-label">故事</span>
-            </div>
-            <div class="mobile-stat">
-              <Heart :size="13" />
-              <span class="mobile-stat-num">{{ catalogStats.totalResonance }}</span>
-              <span class="mobile-stat-label">共鸣</span>
-            </div>
-            <div class="mobile-stat">
-              <Eye :size="13" />
-              <span class="mobile-stat-num">{{ catalogStats.starViews }}</span>
-              <span class="mobile-stat-label">访问</span>
-            </div>
-            <div class="mobile-stat">
-              <Star :size="13" :class="{ 'is-favorited': isFavorited }" />
-              <span class="mobile-stat-num">{{ catalogStats.favoriteCount }}</span>
-              <span class="mobile-stat-label">收藏</span>
-            </div>
-          </div>
-          <!-- 天文事件 -->
-          <div class="mobile-astro-brief" v-if="astroData?.star">
-            <span class="mobile-astro-badge" :class="{ 'is-visible': astroData.star.currentlyAboveHorizon }">
-              {{ astroData.star.currentlyAboveHorizon ? '地平线以上' : '地平线以下' }}
-            </span>
-            <span class="mobile-astro-text">
-              {{ formatAltitude(astroData.star.currentAltitude) }} · {{ azimuthToDirection(astroData.star.currentAzimuth) }}
-            </span>
-          </div>
-          <!-- 标签 -->
-          <div class="mobile-tags-row" v-if="mergedTags.length > 0">
-            <span
-              v-for="t in mergedTags.slice(0, 6)"
-              :key="t.tag"
-              class="mobile-tag"
-              :class="{
-                'tag-emotion': t.type === 'emotion',
-                'tag-theme': t.type === 'theme',
-                'tag-custom': t.custom,
-              }"
-            >{{ t.tag }}</span>
-          </div>
-        </div>
-      </Transition>
-
-      <!-- 左：叙事 + 故事面板（桌面端）/ 主内容区（移动端） -->
+  <div class="overlay" @click.self="$emit('close')">
+    <div class="detail-wrap">
+      <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
         <div class="tab-bar">
@@ -106,10 +11,9 @@
             class="tab-btn"
             :class="{ active: activeTab === tab.id }"
             @click="activeTab = tab.id"
-            :title="tab.label"
           >
-            <component :is="tab.icon" :size="20" />
-            <span class="tab-label">{{ tab.label }}</span>
+            <component :is="tab.icon" :size="14" />
+            <span>{{ tab.label }}</span>
           </button>
         </div>
 
@@ -131,43 +35,34 @@
 
           <!-- Tab 2: 历史故事 -->
           <template v-else-if="activeTab === 'history'">
-            <div v-if="historyStories.length > 0" class="story-list">
-              <div
-                v-for="(story, index) in historyStories"
-                :key="story.id"
-                class="story-card"
-                :style="{ animationDelay: `${index * 30}ms` }"
-                @click="openStoryDetail(story)"
-              >
-                <div class="story-head">
-                  <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
-                  <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
-                </div>
-                <p class="story-excerpt">{{ story.content }}</p>
-                <div class="story-meta">
-                  <span class="meta-history">来自星河</span>
-                  <span class="meta-sep">·</span>
-                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
-                  <span class="meta-sep">·</span>
-                  <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-state">
-              <BookOpen :size="20" class="empty-icon" />
-              <p>这颗星还没有历史故事</p>
-            </div>
-          </template>
-
-          <!-- Tab 3: 所有故事 -->
-          <template v-else-if="activeTab === 'all'">
             <!-- 详情视图 -->
             <template v-if="detailStory">
-              <div class="panel-header">
+              <div class="detail-toolbar">
                 <button class="back-btn" @click="detailStoryId = null">
                   <ArrowLeft :size="15" />
-                  <span>所有故事</span>
+                  <span>{{ detailBackLabel }}</span>
                 </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
               </div>
               <Transition name="detail" mode="out-in">
                 <div :key="detailStory.id" class="detail-view">
@@ -177,27 +72,90 @@
                     <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
                     <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
                   </div>
-                  <div class="detail-body">{{ detailStory.content }}</div>
-                  <div class="detail-footer">
-                    <button
-                      class="resonate-btn detail-resonate"
-                      :class="{ done: justResonatedId === detailStory.id }"
-                      :disabled="resonating"
-                      @click.stop="onResonate(detailStory)"
-                    >
-                      <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
-                      <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
-                      <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
-                    </button>
-                    <button
-                      v-if="detailStory.userId != null && detailStory.userId === currentUserId"
-                      class="delete-story-btn"
-                      @click.stop="confirmDelete(detailStory.id)"
-                      :disabled="deleting"
-                    >
-                      <Trash2 :size="14" />
-                      <span>删除</span>
-                    </button>
+                  <div class="detail-body">
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
+                  </div>
+                </div>
+              </Transition>
+            </template>
+
+            <!-- 列表视图 -->
+            <template v-else>
+              <div v-if="historyStories.length > 0" class="story-list">
+                <div
+                  v-for="(story, index) in historyStories"
+                  :key="story.id"
+                  class="story-card"
+                  :style="{ animationDelay: `${index * 30}ms` }"
+                  @click="openStoryDetail(story)"
+                >
+                  <div class="story-head">
+                    <h4 class="story-title">{{ story.title || '星河传说' }}</h4>
+                    <span v-if="story.origin" class="story-origin">{{ story.origin }}</span>
+                  </div>
+                  <div class="story-body">
+                    <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                    <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                  </div>
+                  <div class="story-meta">
+                    <span class="meta-history">来自星河</span>
+                    <span class="meta-sep">·</span>
+                    <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
+                    <span class="meta-sep">·</span>
+                    <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-state">
+                <BookOpen :size="20" class="empty-icon" />
+                <p>这颗星还没有历史故事</p>
+              </div>
+            </template>
+          </template>
+
+          <!-- Tab 3: 所有故事 -->
+          <template v-else-if="activeTab === 'all'">
+            <!-- 详情视图 -->
+            <template v-if="detailStory">
+              <div class="detail-toolbar">
+                <button class="back-btn" @click="detailStoryId = null">
+                  <ArrowLeft :size="15" />
+                  <span>{{ detailBackLabel }}</span>
+                </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
+              </div>
+              <Transition name="detail" mode="out-in">
+                <div :key="detailStory.id" class="detail-view">
+                  <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+                  <div class="detail-info-bar">
+                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
+                  </div>
+                  <div class="detail-body">
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
                   </div>
                 </div>
               </Transition>
@@ -250,21 +208,24 @@
                   @click="openStoryDetail(story)"
                 >
                   <div class="story-head">
-                    <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
-                    <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
-                    <span v-else class="story-sender is-anon">匿名星语</span>
-                    <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
-                    <button
-                      class="resonate-btn"
-                      :class="{ done: justResonatedId === story.id }"
-                      :disabled="resonating"
-                      @click.stop="onResonate(story)"
-                    >
-                      <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
-                      <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
-                    </button>
-                  </div>
-                  <p class="story-excerpt">{{ story.content }}</p>
+                  <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
+                  <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+                  <span v-else class="story-sender is-anon">匿名星语</span>
+                  <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
+                  <button
+                    class="resonate-btn"
+                    :class="{ done: justResonatedId === story.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(story)"
+                  >
+                    <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
+                    <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
+                  </button>
+                </div>
+                <div class="story-body">
+                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                </div>
                   <div class="story-meta">
                     <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
                     <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
@@ -298,6 +259,50 @@
               <p>请先登录后查看我的故事</p>
               <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
             </div>
+            <!-- 详情视图 -->
+            <template v-else-if="detailStory">
+              <div class="detail-toolbar">
+                <button class="back-btn" @click="detailStoryId = null">
+                  <ArrowLeft :size="15" />
+                  <span>{{ detailBackLabel }}</span>
+                </button>
+                <div class="detail-actions">
+                  <button
+                    class="resonate-btn detail-resonate"
+                    :class="{ done: justResonatedId === detailStory.id }"
+                    :disabled="resonating"
+                    @click.stop="onResonate(detailStory)"
+                  >
+                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
+                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
+                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                  </button>
+                  <button
+                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                    class="delete-story-btn"
+                    @click.stop="confirmDelete(detailStory.id)"
+                    :disabled="deleting"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
+                  </button>
+                </div>
+              </div>
+              <Transition name="detail" mode="out-in">
+                <div :key="detailStory.id" class="detail-view">
+                  <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
+                  <div class="detail-info-bar">
+                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
+                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
+                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
+                  </div>
+                  <div class="detail-body">
+                    <div class="detail-content" v-html="renderMarkdown(detailStory.content)"></div>
+                    <img v-if="detailStory.imageUrl" :src="detailStory.imageUrl" class="detail-image" @click.stop />
+                  </div>
+                </div>
+              </Transition>
+            </template>
             <div v-else-if="myStories.length > 0" class="story-list">
               <div
                 v-for="(story, index) in myStories"
@@ -318,7 +323,10 @@
                     <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
                   </button>
                 </div>
-                <p class="story-excerpt">{{ story.content }}</p>
+                <div class="story-body">
+                  <div class="story-excerpt" v-html="renderMarkdown(story.content)"></div>
+                  <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+                </div>
                 <div class="story-meta">
                   <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
                   <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
@@ -672,26 +680,6 @@
           </div>
         </div>
       </div>
-
-      <!-- 移动端底部固定操作栏 -->
-      <div class="mobile-bottom-bar">
-        <button class="mobile-action-btn mobile-write-btn" @click="onWriteStory">
-          <PenSquare :size="18" />
-          <span>写故事</span>
-        </button>
-        <button
-          class="mobile-action-btn mobile-fav-btn"
-          :class="{ favorited: isFavorited }"
-          @click="toggleFavorite"
-        >
-          <Star :size="18" :fill="isFavorited ? 'currentColor' : 'none'" />
-          <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
-        </button>
-        <button class="mobile-action-btn mobile-chat-btn" @click="openChat">
-          <MessagesSquare :size="18" />
-          <span>共赏</span>
-        </button>
-      </div>
     </div>
 
     <!-- 古人陪看聊天抽屉 -->
@@ -730,6 +718,9 @@ import { useSimilarStars } from '../composables/useSimilarStars'
 import { useAreaHighlights } from '../composables/useAreaHighlights'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../composables/useAstroEvents'
 import catalogData from '../data/stars.json'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+marked.setOptions({ breaks: true, gfm: true })
 
 const props = defineProps<{
   stories: Array<{
@@ -746,6 +737,7 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     userId: number | null
+    imageUrl: string | null
   }>
   activeIndex: number
   starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -876,6 +868,16 @@ function getSortFn(key: SortKey): (a: typeof filteredStories.value[0], b: typeof
   }
 }
 
+// Markdown 渲染
+function renderMarkdown(text: string): string {
+  if (!text) return ''
+  const raw = marked.parse(text) as string
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'a', 'img', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+  })
+}
+
 // 本地浏览数覆盖（乐观更新）
 const viewCountOverrides = reactive(new Map<number, number>())
 function getStoryViewCount(storyId: number): number {
@@ -898,97 +900,16 @@ const tabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'mine', label: '我的故事', icon: User },
 ]
 const activeTab = ref<TabId>('narrative')
-const mobileInfoExpanded = ref(false)
 
-// ─── 关闭动画控制 ───
-const isClosing = ref(false)
-function closeWithAnimation() {
-  if (isClosing.value) return
-  // 第一步：先重置拖拽位置，回到原位
-  dragY.value = 0
-  isDragging.value = false
-  // 第二步：等待一帧，让DOM更新到原位，再触发关闭状态
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      isClosing.value = true
-      // 等待动画完成后再真正关闭（与CSS transition时间一致）
-      setTimeout(() => {
-        emit('close')
-      }, 350)
-    })
-  })
-}
-
-// ─── 移动端手势下拉关闭 ───
-const dragY = ref(0)
-const isDragging = ref(false)
-let startY = 0
-let startDragY = 0
-const detailWrapRef = ref<HTMLElement | null>(null)
-
-function onTouchStart(e: TouchEvent) {
-  if (isClosing.value) return
-  // 只有在顶部区域或内容滚动到顶部时才允许下拉关闭
-  const target = e.target as HTMLElement
-  const tabContent = target.closest('.tab-content') as HTMLElement | null
-  if (tabContent && tabContent.scrollTop > 0) return
-
-  startY = e.touches[0].clientY
-  startDragY = dragY.value
-  isDragging.value = true
-}
-
-function onTouchMove(e: TouchEvent) {
-  if (!isDragging.value || isClosing.value) return
-  const currentY = e.touches[0].clientY
-  const diff = currentY - startY
-
-  // 只允许向下拖动
-  if (diff < 0) {
-    dragY.value = 0
-    return
+// 详情视图"返回"按钮的文案，随当前 Tab 变化
+const detailBackLabel = computed(() => {
+  switch (activeTab.value) {
+    case 'history': return '历史故事'
+    case 'all': return '所有故事'
+    case 'mine': return '我的故事'
+    default: return '返回'
   }
-
-  // 阻尼效果：越往下拖越难拖
-  const damped = diff * (1 - Math.min(diff / 800, 0.6))
-  dragY.value = Math.max(0, startDragY + damped)
-}
-
-function onTouchEnd() {
-  if (!isDragging.value) return
-  isDragging.value = false
-
-  // 超过阈值则关闭（带动画），否则回弹
-  if (dragY.value > 120) {
-    closeWithAnimation()
-  } else {
-    dragY.value = 0
-  }
-}
-
-// 切换星星时重置状态
-watch(() => props.catalogStarId, () => {
-  isClosing.value = false
-  mobileInfoExpanded.value = false
-  dragY.value = 0
-  isDragging.value = false
 })
-
-// ─── 面板动态样式 ───
-function getWrapStyle() {
-  if (isClosing.value) {
-    return {
-      transform: 'translateY(100%)',
-      transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s',
-      opacity: 0.9,
-    }
-  }
-  return {
-    transform: `translateY(${dragY.value}px)`,
-    transition: isDragging.value ? 'none' : 'transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
-    opacity: 1,
-  }
-}
 
 // ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
 const resonanceOverrides = reactive(new Map<number, number>())
@@ -1011,10 +932,15 @@ const narrative = useNarrative()
 function fetchNarrativeWithPosition() {
   if (!props.catalogStarId) return
   narrative.reset()
+  // 优先使用 SkyPage 传入的观测者位置（用于地平线判断），回退到 StarDetail 自己的定位
+  const lat = props.observerLat ?? userPosition.value?.lat
+  const lng = props.observerLng ?? userPosition.value?.lng
   narrative.fetchNarrative(
     props.catalogStarId,
-    userPosition.value?.lat,
-    userPosition.value?.lng,
+    lat,
+    lng,
+    props.starInfo?.ra,
+    props.starInfo?.dec,
   )
 }
 
@@ -1022,10 +948,15 @@ watch(() => props.catalogStarId, (id) => {
   activeTab.value = 'narrative' // 切换星星时回到默认 Tab
   searchQuery.value = ''        // 清空搜索
   detailStoryId.value = null    // 关闭故事详情
-  if (id && positionReady.value) {
+  if (id && (positionReady.value || props.observerLat != null)) {
     fetchNarrativeWithPosition()
   }
 }, { immediate: true })
+
+// 切换 Tab 时关闭故事详情，避免详情视图跨 Tab 残留
+watch(activeTab, () => {
+  detailStoryId.value = null
+})
 
 // ─── AI 故事内核标签 ───
 const kernel = useKernel()
@@ -1415,19 +1346,11 @@ watch(() => props.catalogStarId, () => {
   inset: 0;
   background: rgba(7, 8, 22, 0.3);
   backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-  transition: opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1), background 0.3s, backdrop-filter 0.3s;
-}
-.overlay.is-closing {
-  opacity: 0;
-  background: rgba(7, 8, 22, 0);
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
+  animation: fadeIn 0.15s ease-out;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1438,39 +1361,11 @@ watch(() => props.catalogStarId, () => {
   align-items: flex-start;
   width: 88vw;
   max-width: 1300px;
-  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s;
-  will-change: transform;
-}
-.detail-wrap.is-closing {
-  transform: translateY(30px) !important;
-  opacity: 0 !important;
+  animation: slideUp 0.2s ease-out;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(30px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-/* ─── Mobile-only elements: hidden on desktop by default ─── */
-.mobile-top-bar,
-.mobile-star-summary,
-.mobile-star-details,
-.mobile-bottom-bar {
-  display: none;
-}
-
-/* ─── Expand/collapse animation for star info ─── */
-@keyframes infoExpandIn {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 300px; }
-}
-.info-expand-enter-active {
-  animation: infoExpandIn 0.25s ease-out;
-  overflow: hidden;
-}
-.info-expand-leave-active {
-  animation: infoExpandIn 0.2s ease-in reverse;
-  overflow: hidden;
 }
 
 /* ─── Panel Base ─── */
@@ -1891,11 +1786,17 @@ watch(() => props.catalogStarId, () => {
   word-break: break-word;
   overflow-wrap: break-word;
 }
-.detail-footer {
+.detail-toolbar {
   flex-shrink: 0;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.detail-actions {
+  display: flex;
+  gap: 8px;
 }
 .detail-resonate {
   padding: 8px 16px;
@@ -2793,735 +2694,86 @@ watch(() => props.catalogStarId, () => {
   cursor: wait;
 }
 
-/* ─── Mobile Drag Handle (desktop hidden) ─── */
-.mobile-drag-handle {
-  display: none;
-  width: 40px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-  margin: 10px auto 4px;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: background 0.2s;
+/* ─── Story Image ─── */
+.story-image {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-top: 10px;
 }
-.mobile-drag-handle:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-/* ─── Mobile Responsive (<=768px) ─── */
-@media (max-width: 768px) {
-  .overlay {
-    align-items: flex-end;
-    padding: 0;
-    background: rgba(7, 8, 22, 0.4);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    animation: fadeIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  /* Show drag indicator on mobile */
-  .mobile-drag-indicator {
-    display: block;
-  }
-
-  /* Hide desktop info panel on mobile */
-  .panel-info {
-    display: none;
-  }
-
-  /* Hide desktop close button */
-  .close-btn {
-    display: none;
-  }
-
-  .detail-wrap {
-    flex-direction: column;
-    width: 100%;
-    max-width: 100%;
-    height: calc(100vh - 0px);
-    max-height: calc(100vh - 0px);
-    gap: 0;
-    border-radius: 24px 24px 0 0;
-    border: none;
-    border-top: 0.5px solid rgba(255,255,255,0.1);
-    animation: slideUpFull 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
-    overflow: hidden;
-    position: relative;
-    background: linear-gradient(180deg, rgba(26,30,53,0.98) 0%, rgba(18,20,40,0.995) 100%);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.05) inset;
-    will-change: transform;
-    transform: translateY(0);
-  }
-
-  .detail-wrap.is-dragging {
-    transition: none !important;
-  }
-
-  .detail-wrap.is-closing {
-    transform: translateY(100%) !important;
-    opacity: 0.8 !important;
-  }
-
-  @keyframes slideUpFull {
-    from {
-      transform: translateY(100%);
-      opacity: 0.8;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  /* ─── Mobile top bar (drag indicator + V close) ─── */
-  .mobile-top-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    flex-shrink: 0;
-    padding-top: max(8px, env(safe-area-inset-top, 8px));
-    padding-bottom: 2px;
-    background: transparent;
-    cursor: grab;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-
-  .mobile-top-bar:active {
-    cursor: grabbing;
-  }
-
-  .mobile-drag-indicator {
-    display: none;
-    width: 36px;
-    height: 4px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.15);
-    margin-bottom: 4px;
-    transition: background 0.2s, width 0.2s;
-  }
-
-  .mobile-top-bar:hover .mobile-drag-indicator,
-  .detail-wrap.is-dragging .mobile-drag-indicator {
-    background: rgba(255,217,138,0.5);
-    width: 42px;
-  }
-
-  .mobile-close-chevron {
-    background: none;
-    border: none;
-    color: rgba(255,217,138,0.6);
-    cursor: pointer;
-    width: 44px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    opacity: 0.8;
-    transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s;
-  }
-  .mobile-close-chevron:active {
-    opacity: 1;
-    transform: translateY(4px) scale(0.9);
-  }
-
-  /* ─── Mobile star summary bar ─── */
-  .mobile-star-summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 20px 14px;
-    background: transparent;
-    cursor: pointer;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .mobile-star-summary:active {
-    background: rgba(255,255,255,0.03);
-  }
-
-  .mobile-star-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .star-color-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-  }
-
-  .mobile-star-text {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .mobile-star-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--ink, #f0ecf6);
-    letter-spacing: 0.3px;
-  }
-
-  .mobile-star-con {
-    font-size: 0.78rem;
-    color: var(--muted, #9994ad);
-    font-weight: 400;
-  }
-
-  .mobile-expand-chevron {
-    color: var(--muted, #9994ad);
-    flex-shrink: 0;
-    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), color 0.2s;
-    opacity: 0.7;
-  }
-  .mobile-expand-chevron.expanded {
-    transform: rotate(180deg);
-    color: var(--accent, #ffd98a);
-    opacity: 1;
-  }
-
-  /* ─── Mobile expanded star details ─── */
-  .mobile-star-details {
-    display: block;
-    padding: 4px 20px 16px;
-    background: transparent;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    flex-shrink: 0;
-  }
-
-  .info-expand-enter-active {
-    animation: expandDown 0.35s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow: hidden;
-  }
-  .info-expand-leave-active {
-    animation: expandUp 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow: hidden;
-  }
-  @keyframes expandDown {
-    from {
-      max-height: 0;
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-    to {
-      max-height: 400px;
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  @keyframes expandUp {
-    from {
-      max-height: 400px;
-      opacity: 1;
-      transform: translateY(0);
-    }
-    to {
-      max-height: 0;
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-  }
-
-  .mobile-info-rows {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-
-  .mobile-info-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    border-radius: 100px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    font-size: 0.75rem;
-    color: var(--ink-secondary, #b8b2cc);
-    font-weight: 500;
-  }
-
-  .mobile-stats-row {
-    display: flex;
-    gap: 0;
-    margin-bottom: 14px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 14px;
-    padding: 12px 0;
-    border: 1px solid rgba(255,255,255,0.04);
-  }
-
-  .mobile-stat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    color: var(--muted-light, #757090);
-    position: relative;
-  }
-  .mobile-stat:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 20%;
-    height: 60%;
-    width: 1px;
-    background: rgba(255,255,255,0.06);
-  }
-  .mobile-stat svg { color: var(--accent, #ffd98a); opacity: 0.8; }
-  .mobile-stat .is-favorited { color: var(--accent, #ffd98a); fill: var(--accent, #ffd98a); }
-  .mobile-stat-num { font-size: 1.05rem; font-weight: 600; color: var(--ink, #f0ecf6); }
-  .mobile-stat-label { font-size: 0.65rem; color: var(--muted, #9994ad); font-weight: 500; letter-spacing: 0.3px; }
-
-  .mobile-astro-brief {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    font-size: 0.75rem;
-  }
-
-  .mobile-astro-badge {
-    padding: 4px 10px;
-    border-radius: 100px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    background: rgba(255,100,100,0.12);
-    color: #ff8b7d;
-    border: 1px solid rgba(255,100,100,0.15);
-  }
-  .mobile-astro-badge.is-visible {
-    background: rgba(149,240,192,0.12);
-    color: #95f0c0;
-    border-color: rgba(149,240,192,0.15);
-  }
-  .mobile-astro-text { color: var(--muted, #9994ad); }
-
-  .mobile-tags-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .mobile-tag {
-    padding: 4px 10px;
-    border-radius: 100px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    background: rgba(255,255,255,0.05);
-    color: var(--ink-secondary, #b8b2cc);
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .mobile-tag.tag-emotion { color: #ffb8a8; border-color: rgba(255,139,125,0.15); background: rgba(255,139,125,0.08); }
-  .mobile-tag.tag-theme { color: #a8c8ff; border-color: rgba(134,168,255,0.15); background: rgba(134,168,255,0.08); }
-  .mobile-tag.tag-custom { color: var(--accent, #ffd98a); border-color: rgba(255,217,138,0.2); background: rgba(255,217,138,0.08); }
-
-  /* ─── Panel stories (main content) ─── */
-  .panel-stories {
-    display: contents; /* 让子元素提升到detail-wrap层级 */
-  }
-
-  /* ─── Flex order for mobile layout ─── */
-  .mobile-top-bar { order: 1; }
-  .mobile-star-summary { order: 2; }
-  .mobile-star-details { order: 3; }
-  .tab-content { order: 4; flex: 1; min-height: 0; }
-  .mobile-bottom-bar { order: 5; }
-  .tab-bar { order: 6; }
-
-  /* ─── Tab bar (bottom navigation - modern iOS/Android style) ─── */
-  .tab-bar {
-    display: flex;
-    flex-shrink: 0;
-    padding: 6px 16px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
-    gap: 0;
-    background: rgba(18,20,40,0.99);
-    border-top: 0.5px solid rgba(255,255,255,0.06);
-    border-bottom: none;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
-
-  .tab-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    padding: 6px 4px;
-    min-height: 50px;
-    border: none;
-    background: none;
-    color: rgba(153,148,173,0.8);
-    font-family: inherit;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: color 0.2s ease, transform 0.15s ease;
-    position: relative;
-  }
-
-  .tab-btn:active {
-    transform: scale(0.92);
-  }
-
-  .tab-btn svg {
-    width: 24px;
-    height: 24px;
-    stroke-width: 1.8;
-    transition: transform 0.2s ease;
-  }
-
-  .tab-btn.active svg {
-    transform: scale(1.08);
-  }
-
-  .tab-btn .tab-label {
-    font-size: 0.65rem;
-    font-weight: 500;
-    white-space: nowrap;
-    letter-spacing: 0.3px;
-    line-height: 1;
-  }
-
-  .tab-btn.active {
-    color: var(--accent, #ffd98a);
-  }
-
-  /* Active indicator - thin top bar like modern apps */
-  .tab-btn.active::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 2.5px;
-    border-radius: 0 0 2px 2px;
-    background: var(--accent, #ffd98a);
-  }
-
-  .tab-btn.active::after {
-    display: none;
-  }
-
-  .tab-btn.active .tab-label {
-    font-weight: 600;
-  }
-
-  /* ─── Tab content ─── */
-  .tab-content {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 12px 16px 20px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    display: block; /* 覆盖桌面端的 flex */
-  }
-
-  /* List toolbar */
-  .list-toolbar {
-    padding: 8px 4px 12px;
-    gap: 8px;
-  }
-  .search-input {
-    padding: 10px 32px 10px 36px;
-    font-size: 0.88rem;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  .search-input:focus {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,217,138,0.3);
-  }
-  .sort-btn {
-    padding: 10px 12px;
-    font-size: 0.82rem;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-
-  /* Panel header (back button) */
-  .panel-header {
-    padding: 8px 4px 12px;
-  }
-  .back-btn {
-    font-size: 0.85rem;
-    padding: 6px 0;
-    color: var(--accent, #ffd98a);
-    font-weight: 500;
-  }
-
-  /* Story list */
-  .story-list {
-    padding: 0 4px;
-    gap: 10px;
-  }
-
-  /* Story cards */
-  .story-card {
-    padding: 14px 16px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s;
-  }
-  .story-card:active {
-    transform: scale(0.985);
-    background: rgba(255,255,255,0.07);
-  }
-  .story-head {
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 6px;
-  }
-  .story-title {
-    font-size: 0.92rem;
-    font-weight: 600;
-    flex: 1;
-    min-width: 0;
-  }
-  .story-excerpt {
-    font-size: 0.85rem;
-    line-height: 1.7;
-    -webkit-line-clamp: 3;
-    color: var(--ink-secondary, #b8b2cc);
-  }
-  .story-meta {
-    font-size: 0.72rem;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  .resonate-btn {
-    padding: 6px 12px;
-    font-size: 0.75rem;
-    gap: 4px;
-    border-radius: 100px;
-    background: rgba(255,217,138,0.1);
-    border: 1px solid rgba(255,217,138,0.2);
-    color: var(--accent, #ffd98a);
-    font-weight: 500;
-    transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-  .resonate-btn:active {
-    transform: scale(0.95);
-    background: rgba(255,217,138,0.2);
-  }
-  .resonate-btn svg { width: 14px; height: 14px; }
-
-  .story-sender {
-    font-size: 0.7rem;
-    margin-left: 0;
-    width: 100%;
-    order: 3;
-    color: var(--muted, #9994ad);
-  }
-  .story-tag {
-    font-size: 0.68rem;
-    padding: 3px 8px;
-    border-radius: 100px;
-    font-weight: 500;
-  }
-  .story-origin {
-    font-size: 0.65rem;
-    padding: 2px 8px;
-    border-radius: 100px;
-    font-weight: 500;
-  }
-
-  /* Detail view (story detail) */
-  .detail-view {
-    padding: 8px 4px;
-  }
-  .detail-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding-bottom: 10px;
-  }
-  .detail-info-bar {
-    font-size: 0.75rem;
-    padding-top: 8px;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .detail-body {
-    font-size: 0.9rem;
-    line-height: 1.85;
-    color: var(--ink-secondary, #b8b2cc);
-  }
-  .detail-footer {
-    margin-top: 18px;
-    padding-top: 14px;
-    display: flex;
-    gap: 10px;
-  }
-  .detail-resonate {
-    flex: 1;
-    padding: 12px 16px;
-    justify-content: center;
-    border-radius: 14px;
-    font-weight: 600;
-  }
-  .delete-story-btn {
-    padding: 10px 14px;
-    font-size: 0.82rem;
-    border-radius: 12px;
-  }
-
-  /* Empty state */
-  .empty-state {
-    padding: 50px 24px;
-    font-size: 0.85rem;
-  }
-  .empty-state .empty-icon { width: 32px; height: 32px; opacity: 0.5; }
-  .empty-login-btn {
-    margin-top: 16px;
-    padding: 10px 24px;
-    font-size: 0.85rem;
-    border-radius: 12px;
-    font-weight: 500;
-  }
-
-  /* ─── Mobile action bar (above tab bar) ─── */
-  .mobile-bottom-bar {
-    display: flex;
-    flex-shrink: 0;
-    gap: 12px;
-    padding: 10px 16px;
-    background: rgba(26,30,53,0.98);
-    border-top: 0.5px solid rgba(255,255,255,0.04);
-  }
-
-  .mobile-action-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 12px 8px;
-    border-radius: 12px;
-    border: none;
-    background: rgba(255,255,255,0.06);
-    color: var(--ink-secondary, #b8b2cc);
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.15s ease;
-    letter-spacing: 0.2px;
-  }
-
-  .mobile-action-btn:active {
-    transform: scale(0.96);
-    background: rgba(255,255,255,0.1);
-  }
-
-  .mobile-action-btn svg {
-    width: 18px;
-    height: 18px;
-    stroke-width: 2;
-    flex-shrink: 0;
-  }
-
-  .mobile-write-btn {
-    background: linear-gradient(135deg, rgba(255,217,138,0.2) 0%, rgba(255,180,100,0.12) 100%);
-    color: var(--accent, #ffd98a);
-  }
-  .mobile-write-btn:active {
-    background: linear-gradient(135deg, rgba(255,217,138,0.3) 0%, rgba(255,180,100,0.2) 100%);
-  }
-
-  .mobile-fav-btn.favorited {
-    color: var(--accent, #ffd98a);
-    background: rgba(255,217,138,0.12);
-  }
-
-  .mobile-chat-btn {
-    color: #c8b4ff;
-    background: rgba(200,180,255,0.08);
-  }
-  .mobile-chat-btn:active {
-    background: rgba(200,180,255,0.15);
-  }
-
-  /* Delete confirm mobile */
-  .delete-confirm-overlay {
-    padding: 16px;
-    align-items: center;
-  }
-  .delete-confirm-card {
-    width: 100%;
-    max-width: 100%;
-    padding: 28px 24px;
-    border-radius: 20px;
-    background: rgba(26,30,53,0.98);
-    backdrop-filter: blur(30px);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  .delete-confirm-card h3 { font-size: 1.1rem; font-weight: 600; }
-  .delete-confirm-card p { font-size: 0.85rem; color: var(--muted, #9994ad); }
-  .delete-confirm-actions { gap: 12px; }
-  .delete-cancel-btn,
-  .delete-confirm-btn {
-    padding: 12px 18px;
-    font-size: 0.88rem;
-    font-weight: 500;
-    flex: 1;
-    border-radius: 14px;
-  }
-
-  /* Tag editor mobile */
-  .tag-editor { padding: 12px; border-radius: 16px; }
-  .tag-editor-input-row { flex-direction: column; }
-  .tag-editor-actions { justify-content: stretch; gap: 10px; }
-  .tag-editor-save,
-  .tag-editor-cancel { flex: 1; text-align: center; border-radius: 12px; padding: 10px; font-weight: 500; }
+.detail-image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-top: 16px;
 }
 
-/* ─── Very small screens (<=380px) ─── */
-@media (max-width: 380px) {
-  .mobile-star-summary {
-    padding: 8px 16px 12px;
-  }
-  .mobile-star-name { font-size: 1.1rem; }
-  .mobile-star-details { padding: 4px 16px 14px; }
-  .tab-btn { padding: 5px 2px; min-height: 46px; }
-  .tab-btn svg { width: 22px; height: 22px; }
-  .tab-btn .tab-label { font-size: 0.6rem; }
-  .mobile-action-btn {
-    padding: 11px 6px;
-    font-size: 0.78rem;
-    gap: 4px;
-  }
-  .mobile-action-btn svg { width: 16px; height: 16px; }
-  .story-card { padding: 12px 14px; }
-  .list-toolbar { padding: 6px 4px 10px; }
-  .tab-bar { padding: 5px 12px; padding-bottom: max(5px, env(safe-area-inset-bottom, 5px)); }
-  .mobile-bottom-bar { padding: 8px 12px; gap: 8px; }
+/* ─── Markdown 渲染样式 ─── */
+.story-excerpt :deep(p) {
+  margin: 0 0 0.5em;
+  line-height: 1.6;
+  color: var(--ink-secondary);
+  font-size: 0.84rem;
+}
+.story-excerpt :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.story-excerpt :deep(em) {
+  color: #c9b8e8;
+}
+.story-excerpt :deep(strong) {
+  color: var(--ink);
+}
+.story-excerpt :deep(blockquote) {
+  border-left: 2px solid rgba(255,255,255,0.15);
+  padding-left: 12px;
+  margin: 0.5em 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.story-excerpt :deep(code) {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+.story-excerpt :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.detail-content :deep(p) {
+  margin: 0 0 0.8em;
+  line-height: 1.75;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+}
+.detail-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.detail-content :deep(em) {
+  color: #c9b8e8;
+}
+.detail-content :deep(strong) {
+  color: var(--ink);
+}
+.detail-content :deep(blockquote) {
+  border-left: 2px solid rgba(255,255,255,0.15);
+  padding-left: 14px;
+  margin: 0.8em 0;
+  color: var(--muted);
+  font-style: italic;
+}
+.detail-content :deep(code) {
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.82rem;
+}
+.detail-content :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
 }
 </style>

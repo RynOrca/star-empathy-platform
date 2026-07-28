@@ -1,75 +1,119 @@
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="form-panel">
-      <!-- 移动端拖拽手柄 -->
-      <div class="mobile-drag-handle" @click="$emit('close')"></div>
       <div class="form-header">
         <h2 class="form-heading"><PenSquare :size="16" /> 写我的故事</h2>
         <button class="close-icon" @click="$emit('close')"><X :size="15" /></button>
       </div>
 
       <div class="form-body">
-        <div class="field">
-          <label class="field-label">标题</label>
-          <input
-            v-model="title"
-            class="field-input"
-            placeholder="给你的故事起个名字..."
-            maxlength="60"
-          />
-        </div>
-
-        <div class="field">
-          <label class="field-label">故事</label>
-          <textarea
-            v-model="content"
-            class="field-textarea"
-            placeholder="此刻你在这颗星下想起了什么？写下你的心事吧..."
-            maxlength="300"
-            rows="6"
-            ref="textareaRef"
-          ></textarea>
-          <div class="char-count" :class="{ warn: content.length >= 280 }">
-            {{ content.length }} / 300
+        <template v-if="step === 1">
+          <div class="field">
+            <label class="field-label">标题</label>
+            <input
+              v-model="title"
+              class="field-input"
+              placeholder="给你的故事起个名字..."
+              maxlength="60"
+            />
           </div>
-        </div>
 
-        <!-- 情绪标签 -->
-        <div class="field">
-          <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
-          <div class="tag-picker">
-            <button
-              v-for="t in tagOptions"
-              :key="t"
-              class="tag-btn"
-              :class="{ active: selectedTag === t, ['tag-' + t]: true }"
-              @click="selectedTag = selectedTag === t ? null : t"
-            >{{ t }}</button>
+          <div class="field">
+            <label class="field-label">故事</label>
+            <textarea
+              v-model="content"
+              class="field-textarea"
+              placeholder="此刻你在这颗星下想起了什么？写下你的心事吧..."
+              maxlength="300"
+              rows="6"
+              ref="textareaRef"
+            ></textarea>
+            <div class="char-count" :class="{ warn: content.length >= 280 }">
+              {{ content.length }} / 300
+            </div>
           </div>
-        </div>
 
-        <!-- 匿名投递 -->
-        <div class="field">
-          <label class="field-checkbox">
-            <input type="checkbox" v-model="isAnonymous" />
-            <span>匿名投递（故事属于你，但不显示你的名字）</span>
-          </label>
-        </div>
+          <button class="submit-btn" :disabled="!title.trim() || !content.trim()" @click="step = 2">
+            <span>下一页</span>
+            <ChevronRight :size="14" />
+          </button>
+        </template>
 
-        <p v-if="error" class="form-error">{{ error }}</p>
+        <template v-else>
+          <button class="back-btn" @click="step = 1">
+            <ArrowLeft :size="14" />
+            <span>返回</span>
+          </button>
 
-        <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
-          <Send :size="14" />
-          <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
-        </button>
+          <!-- 情绪标签 -->
+          <div class="field">
+            <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
+            <div class="tag-picker">
+              <button
+                v-for="t in tagOptions"
+                :key="t"
+                class="tag-btn"
+                :class="{ active: selectedTag === t, ['tag-' + t]: true }"
+                @click="selectedTag = selectedTag === t ? null : t"
+              >{{ t }}</button>
+            </div>
+          </div>
+
+          <!-- 图片上传 -->
+          <div class="field">
+            <label class="field-label">图片 <span class="optional">- 可选</span></label>
+            <div
+              class="image-upload-zone"
+              :class="{ 'has-image': imagePreview }"
+              @click="triggerFileInput"
+              @dragover.prevent
+              @drop.prevent="onDrop"
+            >
+              <template v-if="!imagePreview">
+                <ImageIcon :size="24" class="upload-icon" />
+                <span class="upload-text">点击或拖拽上传图片</span>
+                <span class="upload-hint">支持 JPG/PNG/WebP/GIF，最大 5MB</span>
+              </template>
+              <template v-else>
+                <img :src="imagePreview" class="upload-preview" />
+                <button class="upload-remove" @click.stop="removeImage">
+                  <X :size="14" />
+                </button>
+              </template>
+            </div>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              class="file-input-hidden"
+              @change="onFileChange"
+            />
+            <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
+          </div>
+
+          <!-- 匿名投递 -->
+          <div class="field">
+            <label class="field-checkbox">
+              <input type="checkbox" v-model="isAnonymous" />
+              <span>匿名投递（故事属于你，但不显示你的名字）</span>
+            </label>
+          </div>
+
+          <p v-if="error" class="form-error">{{ error }}</p>
+
+          <button class="submit-btn" :disabled="submitting || !title.trim() || !content.trim()" @click="onSubmit">
+            <Send :size="14" />
+            <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { PenSquare, X, Send } from 'lucide-vue-next'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { PenSquare, X, Send, Image as ImageIcon, ChevronRight, ArrowLeft } from 'lucide-vue-next'
 
 const props = defineProps<{
   starName: string
@@ -78,11 +122,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null; imageUrl: string | null }]
 }>()
 
 const title = ref('')
 const content = ref('')
+const step = ref<1 | 2>(1)
 const submitting = ref(false)
 const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -90,6 +135,54 @@ const userLocation = ref<{ lat: number; lng: number } | null>(null)
 const selectedTag = ref<string | null>(null)
 const isAnonymous = ref(false)
 const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
+const imageFile = ref<File | null>(null)
+const imagePreview = ref<string | null>(null)
+const imageUrl = ref<string | null>(null)
+const uploadError = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) processFile(file)
+}
+
+function onDrop(e: DragEvent) {
+  const file = e.dataTransfer?.files?.[0]
+  if (file) processFile(file)
+}
+
+function processFile(file: File) {
+  uploadError.value = ''
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowed.includes(file.type)) {
+    uploadError.value = '仅支持 JPG/PNG/WebP/GIF 格式'
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = '图片大小不能超过 5MB'
+    return
+  }
+  imageFile.value = file
+  imagePreview.value = URL.createObjectURL(file)
+}
+
+function removeImage() {
+  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
+  imageFile.value = null
+  imagePreview.value = null
+  imageUrl.value = null
+  uploadError.value = ''
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+onBeforeUnmount(() => {
+  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
+})
 
 onMounted(() => {
   textareaRef.value?.focus()
@@ -114,20 +207,44 @@ async function onSubmit() {
   error.value = ''
 
   try {
+    // 如果有图片，先上传
+    if (imageFile.value && !imageUrl.value) {
+      const formData = new FormData()
+      formData.append('image', imageFile.value)
+      const token = localStorage.getItem('token')
+      const uploadHeaders: Record<string, string> = {}
+      if (token) uploadHeaders['Authorization'] = `Bearer ${token}`
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: uploadHeaders,
+        body: formData,
+      })
+      const uploadJson = await uploadRes.json()
+      if (!uploadRes.ok) {
+        error.value = uploadJson.message || '图片上传失败'
+        submitting.value = false
+        return
+      }
+      imageUrl.value = uploadJson.data.imageUrl
+    }
+
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers['Authorization'] = `Bearer ${token}`
+    const body: Record<string, unknown> = {
+      catalogStarId: props.catalogStarId,
+      title: trimmedTitle,
+      content: trimmed,
+      location: userLocation.value,
+      tag: selectedTag.value,
+      isAnonymous: isAnonymous.value,
+    }
+    if (imageUrl.value) body.imageUrl = imageUrl.value
+
     const res = await fetch('/api/stories', {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        catalogStarId: props.catalogStarId,
-        title: trimmedTitle,
-        content: trimmed,
-        location: userLocation.value,
-        tag: selectedTag.value,
-        isAnonymous: isAnonymous.value,
-      }),
+      body: JSON.stringify(body),
     })
     const json = await res.json()
     if (res.ok) {
@@ -146,6 +263,7 @@ async function onSubmit() {
         username: json.data.username ?? null,
         tag: json.data.tag ?? selectedTag.value,
         userId: json.data.userId ?? null,
+        imageUrl: json.data.imageUrl ?? null,
       })
     } else {
       error.value = json.message || '提交失败，再试一次吧'
@@ -306,6 +424,25 @@ async function onSubmit() {
   border-radius: var(--radius-sm);
 }
 
+/* ─── Back Button ─── */
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+  align-self: flex-start;
+}
+.back-btn:hover {
+  color: var(--ink);
+}
+
 /* ─── Submit Button ─── */
 .submit-btn {
   width: 100%;
@@ -353,141 +490,72 @@ async function onSubmit() {
   cursor: not-allowed;
 }
 
-/* ─── Mobile Drag Handle (desktop hidden) ─── */
-.mobile-drag-handle {
-  display: none;
-  width: 40px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-  margin: 10px auto 0;
-  flex-shrink: 0;
+/* ─── Image Upload ─── */
+.image-upload-zone {
+  border: 2px dashed rgba(255,255,255,0.12);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+  min-height: 100px;
+  justify-content: center;
 }
-.mobile-drag-handle:hover {
-  background: rgba(255, 255, 255, 0.35);
+.image-upload-zone:hover {
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.02);
 }
-
-/* ─── Mobile Responsive (<=768px) ─── */
-@media (max-width: 768px) {
-  .overlay {
-    align-items: flex-end;
-    padding: 0;
-    background: rgba(7, 8, 22, 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
-  .mobile-drag-handle {
-    display: block;
-  }
-
-  .form-panel {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 20px 20px 0 0;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    animation: slideUpForm 0.28s ease-out;
-  }
-
-  @keyframes slideUpForm {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  .form-header {
-    padding: 14px 18px;
-    flex-shrink: 0;
-  }
-
-  .form-heading {
-    font-size: 0.95rem;
-  }
-
-  .close-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .form-body {
-    padding: 16px 18px 20px;
-    gap: 16px;
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .field-label {
-    font-size: 0.82rem;
-  }
-
-  .field-input {
-    padding: 11px 14px;
-    font-size: 0.88rem;
-  }
-
-  .field-textarea {
-    min-height: 120px;
-    padding: 12px 14px;
-    font-size: 0.88rem;
-    line-height: 1.7;
-  }
-
-  .char-count {
-    font-size: 0.72rem;
-  }
-
-  .tag-picker {
-    gap: 6px;
-  }
-
-  .tag-btn {
-    padding: 6px 14px;
-    font-size: 0.78rem;
-    border-radius: 16px;
-  }
-
-  .field-checkbox {
-    font-size: 0.78rem;
-    line-height: 1.5;
-  }
-
-  .field-checkbox input[type="checkbox"] {
-    width: 17px;
-    height: 17px;
-    flex-shrink: 0;
-  }
-
-  .form-error {
-    font-size: 0.8rem;
-    padding: 10px 12px;
-  }
-
-  .submit-btn {
-    padding: 13px 0;
-    font-size: 0.9rem;
-    margin-top: 6px;
-  }
+.image-upload-zone.has-image {
+  padding: 0;
+  border-style: solid;
+  border-color: rgba(255,255,255,0.08);
 }
-
-/* ─── Very small screens (<=380px) ─── */
-@media (max-width: 380px) {
-  .form-panel {
-    max-height: 94vh;
-  }
-  .form-header {
-    padding: 12px 14px;
-  }
-  .form-body {
-    padding: 14px 14px 18px;
-  }
-  .tag-btn {
-    padding: 5px 12px;
-    font-size: 0.75rem;
-  }
+.upload-icon {
+  color: var(--muted);
+}
+.upload-text {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.upload-hint {
+  font-size: 0.7rem;
+  color: var(--muted-light);
+}
+.upload-preview {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+.upload-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.upload-remove:hover {
+  background: rgba(255, 90, 90, 0.8);
+}
+.upload-error {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--star-red);
+}
+.file-input-hidden {
+  display: none;
 }
 </style>

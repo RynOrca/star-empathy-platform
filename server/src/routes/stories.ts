@@ -41,7 +41,7 @@ router.get('/:storyId', (req: Request, res: Response) => {
 // 投递故事（需登录）
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, location, tag, isAnonymous } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, location, tag, isAnonymous, imageUrl } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -66,9 +66,9 @@ router.post('/', authRequired, (req: Request, res: Response) => {
       locationData = { lat: location.lat, lng: location.lng };
     }
 
-    const esc = (s: string) => s.replace(/[<>&"]/g, (c) => {
+    const esc = (s: string) => s.replace(/[<&"]/g, (c) => {
       const map: Record<string, string> = {
-        '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;',
+        '<': '&lt;', '&': '&amp;', '"': '&quot;',
       };
       return map[c] || c;
     });
@@ -77,7 +77,7 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {

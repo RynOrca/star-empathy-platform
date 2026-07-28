@@ -1,4 +1,4 @@
-/**
+ /**
  * comets.ts — 彗星数据与位置计算
  *
  * ─── 设计要点 ───────────────────────────────────────────────────────
@@ -31,6 +31,8 @@
  * 4. **彗星选择**
  *    - 1P/Halley：最著名，周期 76 年，下次近日点 2061-07-28
  *    - 2P/Encke：最短周期 3.3 年，适合展示运动效果
+ *    - 67P/Churyumov-Gerasimenko：罗塞塔号 2014 年首次登陆彗星的目标，周期 6.44 年
+ *    - C/1995 O1 (Hale-Bopp)：1997 年世纪大彗星，周期约 2364 年，近 50 年最亮彗星
  *
  * 5. **拖尾方向**
  *    彗尾总是背向太阳。在天空球面上，拖尾方向 = 彗星 3D 位置 - 太阳 3D 位置（归一化）。
@@ -52,6 +54,8 @@ export interface CometElement {
   nucleusSize: number
   /** 颜色（十六进制，如 0xa8d8ff） */
   color: number
+  /** 彗星 ID（负数，与 stars 表 catalog_star_id 区分；用于点击回调与故事查询） */
+  planetId: number
   /** 近日距 q（AU） */
   q: number
   /** 偏心率 e */
@@ -76,6 +80,7 @@ export const COMETS: CometElement[] = [
     nameCN: '哈雷彗星',
     nucleusSize: 0.6,
     color: 0xa8d8ff,
+    planetId: -113,
     // 1P/Halley (J2000, epoch 1986-02-18)
     // Source: https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=1P
     q: 0.58597811,
@@ -91,6 +96,7 @@ export const COMETS: CometElement[] = [
     nameCN: '恩克彗星',
     nucleusSize: 0.45,
     color: 0xc8e8ff,
+    planetId: -114,
     // 2P/Encke (J2000, epoch 2023-04-05)
     // Source: https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=2P
     q: 0.33600561,
@@ -100,6 +106,40 @@ export const COMETS: CometElement[] = [
     argPeri: 186.23814,    // ω
     perihelionJD: 2460240.953,  // 2023-10-22.453
     periodYears: 3.30,
+  },
+  {
+    name: '67P',
+    nameCN: '丘留莫夫-格拉西缅科彗星',
+    nucleusSize: 0.4,
+    color: 0xb8d8b8,
+    planetId: -115,
+    // 67P/Churyumov-Gerasimenko (J2000, epoch 2015-12-21 = JD 2457305.5)
+    // Source: NASA JPL SBDB (orbit_id K213/6, 2024-02-01 solution)
+    // https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=67P&full-prec=1
+    q: 1.243265641416762,
+    e: 0.6409081306555051,
+    i: 7.040294906760007,
+    omega: 50.13557380441372,   // Ω
+    argPeri: 12.79824973415729, // ω
+    perihelionJD: 2457247.588657863465,  // 2015-08-13.09
+    periodYears: 6.44,          // 2353.08 天 / 365.25
+  },
+  {
+    name: 'HaleBopp',
+    nameCN: '海尔-波普彗星',
+    nucleusSize: 0.7,
+    color: 0xd8e8f8,
+    planetId: -116,
+    // C/1995 O1 (Hale-Bopp) (J2000, epoch 2022-12-16 = JD 2459837.5)
+    // Source: NASA JPL SBDB (orbit_id 226, 2022-08-01 solution)
+    // https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=C/1995%20O1&full-prec=1
+    q: 0.890537663547794,
+    e: 0.9949810027633206,
+    i: 89.28759424740302,
+    omega: 282.7334213961641,   // Ω
+    argPeri: 130.4146670659176, // ω
+    perihelionJD: 2450537.134907143944,  // 1997-04-01.63
+    periodYears: 2363.5,        // 863279.5 天 / 365.25
   },
 ]
 

@@ -281,7 +281,7 @@ import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
-import { getMoonPhase, getSolarTerm } from '../data/planets'
+import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 
 
 const router = useRouter()
@@ -718,8 +718,9 @@ interface StoryData {
   catalogStarId: number; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; userId: number | null
+  imageUrl: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -741,6 +742,7 @@ function mergeStoriesIntoMap(
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
+      imageUrl: s.imageUrl ?? null,
     })
     const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
     cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
@@ -979,21 +981,39 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   'Saturn':  { color: '#ddcc99', conName: '土星' },
   'Uranus':  { color: '#88ccdd', conName: '天王星' },
   'Neptune': { color: '#3366cc', conName: '海王星' },
+  // 伽利略卫星（木卫 1-4）
+  'Io':       { color: '#fff5d8', conName: '木卫一' },
+  'Europa':   { color: '#e8e0d0', conName: '木卫二' },
+  'Ganymede': { color: '#d8c8a8', conName: '木卫三' },
+  'Callisto': { color: '#a89888', conName: '木卫四' },
+  // [DISABLED 2026-07-28] 彗星系统已禁用，保留映射以备未来恢复
+  // 'Halley':   { color: '#a8d8ff', conName: '哈雷彗星' },
+  // 'Encke':    { color: '#c8e8ff', conName: '恩克彗星' },
+  // '67P':      { color: '#b8d8b8', conName: '丘留莫夫-格拉西缅科彗星' },
+  // 'HaleBopp': { color: '#d8e8f8', conName: '海尔-波普彗星' },
 }
 
-function onPlanetClick(name: string, nameCN: string, planetId: number) {
+async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
   const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
+
+  // 计算行星当前 RA/Dec（用于后端判断地平线可见性）
+  let ra = 0, dec = 0
+  if (userLat.value !== undefined && userLng.value !== undefined) {
+    const pos = await getBodyPosition(name, userLat.value, userLng.value)
+    if (pos) { ra = pos.ra; dec = pos.dec }
+  }
+
   selectedStarInfo.value = {
     displayName: nameCN,
     con: '',
     mag: 0,
     conName: nameCN,
     distance: null,
-    ra: 0,
-    dec: 0,
+    ra,
+    dec,
     color: info?.color || '#ffdd88',
   }
   selectedCatalogStarId.value = planetId

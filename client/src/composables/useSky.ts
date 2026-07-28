@@ -1,4 +1,4 @@
-﻿import {
+import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
@@ -25,8 +25,8 @@ import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosit
 import { ASTEROIDS } from '../data/asteroids'
 import { getActiveShowers, type MeteorShower } from '../data/meteorShowers'
 import { detectGPU, getRenderParams } from '../utils/gpuDetect'
-// OPT-10：彗星（哈雷 + 恩克）
-import { COMETS, getCometPositionSync, cometTailDirection, type CometElement } from '../data/comets'
+// [DISABLED 2026-07-28] 彗星系统已禁用（用户反馈不需要），保留文件以备未来恢复
+// import { COMETS, getCometPositionSync, cometTailDirection, type CometElement } from '../data/comets'
 
 // ─── 星表 ───
 interface CatStar { id: number; name: string | null; ra: number; dec: number; mag: number; color: string; con: string; x: number; y: number; z: number }
@@ -342,18 +342,19 @@ export function useSky(
   // [DISABLED 2026-07-27] 用户反馈小行星带效果不佳，暂时禁用
   // let asteroidInst: InstancedMesh | null = null
   // const asteroidDummy = new Object3D()
+  // [DISABLED 2026-07-28] 彗星系统已禁用，保留代码以备未来恢复
   // OPT-10 彗星更新器：每帧重算位置 + 拖尾方向（参考 axisrow/open-solar-system 粒子拖尾）
   // 彗星偏心率高，位置变化显著，必须每帧重算
-  type CometUpdater = {
-    nucleus: Mesh           // 彗核（小型 IcosahedronGeometry，bloom 友好）
-    tail: Points            // 拖尾（Points + 自定义 shader，沿反太阳方向衰减）
-    tailMat: ShaderMaterial  // 拖尾材质引用（更新 uTime/uFade）
-    comet: CometElement      // 轨道根数
-    // 拖尾顶点位置数组（弧度坐标缓存，避免每帧 new）
-    tailPositions: Float32Array
-    tailAlphas: Float32Array
-  }
-  const cometUpdaters: CometUpdater[] = []
+  // type CometUpdater = {
+  //   nucleus: Mesh           // 彗核（小型 IcosahedronGeometry，bloom 友好）
+  //   tail: Points            // 拖尾（Points + 自定义 shader，沿反太阳方向衰减）
+  //   tailMat: ShaderMaterial  // 拖尾材质引用（更新 uTime/uFade）
+  //   comet: CometElement      // 轨道根数
+  //   // 拖尾顶点位置数组（弧度坐标缓存，避免每帧 new）
+  //   tailPositions: Float32Array
+  //   tailAlphas: Float32Array
+  // }
+  // const cometUpdaters: CometUpdater[] = []
   // 复用对象，避免每帧 new 导致 GC 压力（行星/卫星/土星环/彗星更新共用）
   const _reusedObserver = { latitude: 0, longitude: 0, height: 0 } as unknown as import('astronomy-engine').Observer
   const _reusedSunDir = new Vector3()
@@ -1163,37 +1164,68 @@ for (const s of stars) starById.set(s.id, s)
         return
       }
       if (hoveredStarId !== -1) {
-        options?.onStarClick?.(hoveredStarId)
+        // 仍需与行星 hitbox 比较：hover 命中的恒星可能位于行星 hitbox 之后，
+        // 取几何距离最近者，避免恒星"吞掉"行星点击
+        skyGroup.updateMatrixWorld()
+        const raycaster = new Raycaster()
+        raycaster.setFromCamera(mouse, camera)
+        let bestStarDist = Infinity
+        let bestStarId = hoveredStarId
+        // 用 raycaster 复测恒星距离
+        raycaster.params.Points!.threshold = 8
+        const starHits = raycaster.intersectObjects(starPointsRefs)
+        if (starHits.length > 0) {
+          const tier = (starHits[0].object as Points).userData.tierIndex as number
+          const sid = tierStarIds[tier]?.[starHits[0].index!]
+          if (sid != null) bestStarDist = starHits[0].distance
+        }
+        // 同时检测行星 hitbox
+        let bestPlanetDist = Infinity
+        let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
+        if (planetMeshes.length) {
+          const planetHits = raycaster.intersectObjects(planetMeshes)
+          if (planetHits.length) {
+            const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
+            if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
+          }
+        }
+        // 几何距离最近者获胜：行星更近则命中行星，否则命中恒星
+        if (bestPlanetPd && bestPlanetDist < bestStarDist) {
+          options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
+        } else {
+          options?.onStarClick?.(bestStarId)
+        }
         return
       }
 
-      // 悬浮检测未命中，用 Raycaster 作为后备方案直接检测星星点击
+      // 悬浮检测未命中恒星，仍同时检测恒星和行星，取几何距离最近者
       skyGroup.updateMatrixWorld()
       const raycaster = new Raycaster()
       raycaster.setFromCamera(mouse, camera)
       raycaster.params.Points!.threshold = 8
       const starHits = raycaster.intersectObjects(starPointsRefs)
+      let bestStarDist = Infinity
+      let bestStarId: number | null = null
       if (starHits.length > 0) {
-        const hit = starHits[0]
-        const tier = (hit.object as Points).userData.tierIndex as number
-        const starId = tierStarIds[tier]?.[hit.index!]
-        if (starId != null) {
-          options?.onStarClick?.(starId)
-          return
-        }
+        const tier = (starHits[0].object as Points).userData.tierIndex as number
+        const sid = tierStarIds[tier]?.[starHits[0].index!]
+        if (sid != null) { bestStarDist = starHits[0].distance; bestStarId = sid }
       }
-
-      // 检测行星点击（Mesh 检测不需要 Points.threshold）
+      // 同时检测行星 hitbox
+      let bestPlanetDist = Infinity
+      let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
       if (planetMeshes.length) {
         const planetHits = raycaster.intersectObjects(planetMeshes)
         if (planetHits.length) {
-          const pm = planetHits[0].object as Mesh
-          // issue #34 修复：补回 planetId 字段
-          const pd = pm.userData as { planetName: string; planetNameCN: string; planetId: number }
-          if (pd.planetName) {
-            options?.onPlanetClick?.(pd.planetName, pd.planetNameCN, pd.planetId)
-          }
+          const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
+          if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
         }
+      }
+      // 几何距离最近者获胜
+      if (bestPlanetPd && bestPlanetDist < bestStarDist) {
+        options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
+      } else if (bestStarId != null) {
+        options?.onStarClick?.(bestStarId)
       }
     }, { signal: abortController.signal })
   }
@@ -1532,6 +1564,22 @@ for (const s of stars) starById.set(s.id, s)
       }
       planetMeshes.push(mesh)
 
+      // 不可见 hitbox：扩大点击命中区域，解决行星 mesh 半径过小（1.0~5.0）难以点击的问题
+      // 半径 = max(size * 2.5, 3.0)，确保水星(1.0)→3.0、木星(3.5)→8.75
+      // visible=false 不渲染但参与 raycast，userData 与主 mesh 一致
+      const hitboxRadius = Math.max(planet.size * 2.5, 3.0)
+      const hitboxGeo = new SphereGeometry(hitboxRadius, 8, 6)
+      const hitboxMat = new MeshBasicMaterial({ visible: false })
+      const hitboxMesh = new Mesh(hitboxGeo, hitboxMat)
+      hitboxMesh.userData = {
+        planetName: planet.name,
+        planetNameCN: planet.nameCN,
+        planetId: planet.planetId,
+        rotationPeriod: planet.rotationPeriod,
+      }
+      tiltGroup.add(hitboxMesh)
+      planetMeshes.push(hitboxMesh)
+
       // 注册到 planetUpdaters，供 animate 循环每帧重算位置 + 每 1s 重算视星等
       planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh })
 
@@ -1541,10 +1589,10 @@ for (const s of stars) starById.set(s.id, s)
       // 4 颗卫星：Io(1.2)/Europa(1.0)/Ganymede(1.4)/Callisto(1.3)，颜色按真实反照率
       if (planet.name === 'Jupiter') {
         const galileanMoons = [
-          { name: 'Io', nameCN: '木卫一', color: '#fff5d8', size: 1.2 },
-          { name: 'Europa', nameCN: '木卫二', color: '#e8e0d0', size: 1.0 },
-          { name: 'Ganymede', nameCN: '木卫三', color: '#d8c8a8', size: 1.4 },
-          { name: 'Callisto', nameCN: '木卫四', color: '#a89888', size: 1.3 },
+          { name: 'Io', nameCN: '木卫一', color: '#fff5d8', size: 1.2, planetId: -109 },
+          { name: 'Europa', nameCN: '木卫二', color: '#e8e0d0', size: 1.0, planetId: -110 },
+          { name: 'Ganymede', nameCN: '木卫三', color: '#d8c8a8', size: 1.4, planetId: -111 },
+          { name: 'Callisto', nameCN: '木卫四', color: '#a89888', size: 1.3, planetId: -112 },
         ]
         for (const moon of galileanMoons) {
           // 用 Sprite 而非 Mesh：卫星太小，Sprite 单顶点更省 GPU
@@ -1559,6 +1607,21 @@ for (const s of stars) starById.set(s.id, s)
           moonSprite.visible = false
           skyGroup.add(moonSprite)
           moonSprites.push(moonSprite)
+
+          // 卫星不可见 hitbox：扩大点击命中区域，半径 = max(size * 2.5, 2.5)
+          // 卫星尺寸小（1.0~1.4），hitbox 保证可点击性，与行星 hitbox 同模式
+          const moonHitboxRadius = Math.max(moon.size * 2.5, 2.5)
+          const moonHitboxGeo = new SphereGeometry(moonHitboxRadius, 8, 6)
+          const moonHitboxMat = new MeshBasicMaterial({ visible: false })
+          const moonHitbox = new Mesh(moonHitboxGeo, moonHitboxMat)
+          moonHitbox.userData = {
+            planetName: moon.name,
+            planetNameCN: moon.nameCN,
+            planetId: moon.planetId,
+            rotationPeriod: 0,
+          }
+          moonSprite.add(moonHitbox)
+          planetMeshes.push(moonHitbox)
           // 卫星标签：挂到 sprite（自动跟随位置）
           // OPT-26：labelMode='major-only' 时跳过卫星标签（低端设备降级）
           if (renderParams.labelMode === 'all') {
@@ -2357,6 +2420,7 @@ for (const s of stars) starById.set(s.id, s)
     particle.active = true
   }
 
+  /* [DISABLED 2026-07-28] 彗星渲染已禁用（用户反馈不需要），保留代码以备未来恢复
   // ═══ OPT-10：彗星渲染（哈雷 + 恩克，2 颗著名短/长周期彗星） ═══
   // 渲染策略（参考 axisrow/open-solar-system + N3rson/Solar-System-3D）：
   //   1. 彗核：IcosahedronGeometry + MeshBasicMaterial（additive，触发 bloom）
@@ -2394,6 +2458,20 @@ for (const s of stars) starById.set(s.id, s)
         // OPT-26：彗星标签注册到 LOD 数组（isMajor=false）
         labelLODItems.push({ label: cometLabel, parent: nucleus, isMajor: false })
       }
+
+      // 彗星不可见 hitbox：彗核尺寸极小（0.48~0.36），hitbox 半径 2.5 保证可点击
+      const cometHitboxRadius = 2.5
+      const cometHitboxGeo = new SphereGeometry(cometHitboxRadius, 8, 6)
+      const cometHitboxMat = new MeshBasicMaterial({ visible: false })
+      const cometHitbox = new Mesh(cometHitboxGeo, cometHitboxMat)
+      cometHitbox.userData = {
+        planetName: comet.name,
+        planetNameCN: comet.nameCN,
+        planetId: comet.planetId,
+        rotationPeriod: 0,
+      }
+      nucleus.add(cometHitbox)
+      planetMeshes.push(cometHitbox)
 
       // ── 拖尾（Points + ShaderMaterial） ──
       // 顶点：N 个粒子沿反太阳方向分布，alpha 从 1.0 线性衰减到 0
@@ -2474,6 +2552,19 @@ for (const s of stars) starById.set(s.id, s)
         // OPT-26：彗星标签注册到 LOD 数组（isMajor=false）
         labelLODItems.push({ label: cometLabel, parent: nucleus, isMajor: false })
       }
+      // 彗星不可见 hitbox（low tier 同样需要可点击）
+      const cometHitboxRadius = 2.5
+      const cometHitboxGeo = new SphereGeometry(cometHitboxRadius, 8, 6)
+      const cometHitboxMat = new MeshBasicMaterial({ visible: false })
+      const cometHitbox = new Mesh(cometHitboxGeo, cometHitboxMat)
+      cometHitbox.userData = {
+        planetName: comet.name,
+        planetNameCN: comet.nameCN,
+        planetId: comet.planetId,
+        rotationPeriod: 0,
+      }
+      nucleus.add(cometHitbox)
+      planetMeshes.push(cometHitbox)
       // 注册简化更新器（仅更新位置，无拖尾）
       cometUpdaters.push({
         nucleus, tail: null as unknown as Points,
@@ -2484,6 +2575,7 @@ for (const s of stars) starById.set(s.id, s)
       })
     })
   }
+  */ // [END DISABLED] 彗星渲染
 
   // ═══ 渲染 ═══
   let af = 0
@@ -2693,8 +2785,8 @@ for (const s of stars) starById.set(s.id, s)
       // 节省 ~10 次/帧的 HelioVector 调用（每次 50-100μs，共 500μs-1ms/帧）
       // 仅在至少一个下游需要时才提取（lazy 计算）
       // [DISABLED 2026-07-27] 小行星带已禁用，移除 asteroidInst 判断
+      // [DISABLED 2026-07-28] 彗星已禁用，移除 cometUpdaters 判断
       const needEarthHelio = (moonSprites.length === 4 && _reusedMoonVec)
-        || cometUpdaters.length > 0
       const earthHelio = needEarthHelio ? AE.HelioVector(AE.Body.Earth, simDate) : null
       // ─── 伽利略卫星（木卫 1-4）实时位置 ───
       // JupiterMoons 返回 jovicentric EQJ 向量（AU）
@@ -2791,6 +2883,8 @@ for (const s of stars) starById.set(s.id, s)
       //   }
       //   asteroidInst.instanceMatrix.needsUpdate = true
       // }
+      // ─── [DISABLED 2026-07-28] 彗星实时位置 + 拖尾更新已禁用 ───
+      /* 彗星系统已禁用，保留代码以备未来恢复
       // ─── OPT-10 彗星实时位置 + 拖尾更新（每帧重算） ───
       // 彗星高偏心率轨道，位置变化显著，必须每帧重算
       // 拖尾方向 = 反太阳方向（cometTailDirection 计算）
@@ -2806,7 +2900,8 @@ for (const s of stars) starById.set(s.id, s)
             _sunRaCache = sunEq.ra
             _sunDecCache = sunEq.dec
             _sunCacheFrame = frameCount
-          } catch { /* 太阳位置失败时拖尾方向退化为准 */ }
+          } catch { // 太阳位置失败时拖尾方向退化为准
+          }
         }
         const sunRa = _sunRaCache
         const sunDec = _sunDecCache
@@ -2859,6 +2954,7 @@ for (const s of stars) starById.set(s.id, s)
           }
         }
       }
+      */ // [END DISABLED] 彗星位置更新
     }
     for (const mesh of planetMeshes) {
       const ud = mesh.userData as { rotationPeriod?: number }
