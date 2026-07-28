@@ -3,177 +3,67 @@
     <div class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
-        <!-- 叙事视图（默认） -->
-        <template v-if="viewMode === 'narrative'">
-          <!-- 古今共望叙事 -->
-          <StarNarrative
-            :content="narrative.content.value"
-            :loading="narrative.loading.value"
-            :error="narrative.error.value"
-            :cached="narrative.cached.value"
-            @retry="narrative.fetchNarrative(catalogStarId)"
-          />
-
-          <!-- 关于这颗星星的故事... 按钮入口 -->
-          <button class="stories-entry-btn" @click="viewMode = 'stories'">
-            <span class="stories-entry-text">
-              关于{{ starInfo?.displayName || '这颗星星' }}的故事...
-            </span>
-            <span class="stories-entry-badge" v-if="realStories.length > 0">{{ realStories.length }}条</span>
-            <ChevronDown :size="16" class="stories-entry-arrow" />
+        <!-- Tab 栏 -->
+        <div class="tab-bar">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab-btn"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
+          >
+            <component :is="tab.icon" :size="14" />
+            <span>{{ tab.label }}</span>
           </button>
-        </template>
+        </div>
 
-        <!-- 故事列表视图 -->
-        <template v-else>
-          <!-- 详情视图 -->
-          <template v-if="detailStory">
-            <div class="panel-header">
-              <button class="back-btn" @click="detailStoryId = null">
-                <ArrowLeft :size="15" />
-                <span>所有故事</span>
+        <!-- Tab 内容区 -->
+        <div class="tab-content">
+          <!-- Tab 1: AI 叙事（默认） -->
+          <template v-if="activeTab === 'narrative'">
+            <!-- 原有叙事内容，后续 Task 迁移 -->
+            <template v-if="true">
+              <StarNarrative
+                :content="narrative.content.value"
+                :loading="narrative.loading.value"
+                :error="narrative.error.value"
+                :cached="narrative.cached.value"
+                @retry="narrative.fetchNarrative(catalogStarId)"
+              />
+              <button class="stories-entry-btn" @click="activeTab = 'all'">
+                <span class="stories-entry-text">
+                  关于{{ starInfo?.displayName || '这颗星星' }}的故事...
+                </span>
+                <span class="stories-entry-badge" v-if="realStories.length > 0">{{ realStories.length }}条</span>
+                <ChevronDown :size="16" class="stories-entry-arrow" />
               </button>
-              <button class="back-btn" @click="viewMode = 'narrative'; detailStoryId = null">
-                <span>返回叙事</span>
-              </button>
-            </div>
-            <Transition name="detail" mode="out-in">
-              <div :key="detailStory.id" class="detail-view">
-                <h2 class="detail-title">{{ detailStory.title || '匿名心事' }}</h2>
-                <div class="detail-info-bar">
-                  <span v-if="detailStory.type === 'history'" class="meta-history">
-                    来自星河
-                    <template v-if="detailStory.origin"> · {{ detailStory.origin }}</template>
-                  </span>
-                  <template v-else>
-                    <span v-if="formatTime(detailStory.createdAt)">{{ formatTime(detailStory.createdAt) }}</span>
-                    <span v-if="formatTime(detailStory.createdAt) && formatDistance(detailStory.locationLat, detailStory.locationLng).text">·</span>
-                    <span v-if="formatDistance(detailStory.locationLat, detailStory.locationLng).text" class="detail-dist" :class="{ 'meta-near': formatDistance(detailStory.locationLat, detailStory.locationLng).near }">{{ formatDistance(detailStory.locationLat, detailStory.locationLng).text }}</span>
-                  </template>
-                </div>
-                <div class="detail-body">{{ detailStory.content }}</div>
-                <div class="detail-footer">
-                  <button
-                    class="resonate-btn detail-resonate"
-                    :class="{ done: justResonatedId === detailStory.id }"
-                    :disabled="resonating"
-                    @click.stop="onResonate(detailStory)"
-                  >
-                    <component :is="justResonatedId === detailStory.id ? Check : Sparkles" :size="16" />
-                    <span>{{ justResonatedId === detailStory.id ? '已共鸣' : '共鸣' }}</span>
-                    <span class="resonate-count">{{ getDisplayResonance(detailStory) }}</span>
-                  </button>
-                  <button
-                    v-if="detailStory.userId != null && detailStory.userId === currentUserId"
-                    class="delete-story-btn"
-                    @click.stop="confirmDelete(detailStory.id)"
-                    :disabled="deleting"
-                  >
-                    <Trash2 :size="14" />
-                    <span>删除</span>
-                  </button>
-                </div>
-              </div>
-            </Transition>
+            </template>
           </template>
 
-          <!-- 列表视图 -->
-          <template v-else>
-            <div class="panel-header">
-              <button class="back-btn" @click="viewMode = 'narrative'">
-                <ArrowLeft :size="15" />
-                <span>返回叙事</span>
-              </button>
-            </div>
-            <!-- 搜索 + 排序 -->
-            <div class="list-toolbar" v-if="hasRealStory">
-              <div class="search-box">
-                <Search :size="13" class="search-icon" />
-                <input
-                  v-model="searchQuery"
-                  class="search-input"
-                  placeholder="搜索故事..."
-                  @input="onSearchInput"
-                />
-                <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''"><X :size="12" /></button>
-              </div>
-              <div class="sort-group" ref="sortGroupRef">
-                <ArrowUpDown :size="13" class="sort-icon" />
-                <button class="sort-btn" @click="sortOpen = !sortOpen">
-                  <span>{{ sortLabels[sortKey] }}</span>
-                  <ChevronDown :size="12" class="sort-chevron" :class="{ open: sortOpen }" />
-                </button>
-                <Transition name="dropdown">
-                  <ul v-if="sortOpen" class="sort-dropdown">
-                    <li
-                      v-for="(label, key) in sortLabels"
-                      :key="key"
-                      class="sort-option"
-                      :class="{ active: sortKey === key }"
-                      @click="sortKey = key as SortKey; sortOpen = false; onSortChange()"
-                    >
-                      <Check v-if="sortKey === key" :size="12" />
-                      <span>{{ label }}</span>
-                    </li>
-                  </ul>
-                </Transition>
-              </div>
-            </div>
-
-            <div v-if="hasRealStory" class="story-list">
-              <div
-                v-for="(story, index) in displayedStories"
-                :key="story.id"
-                class="story-card"
-                :style="{ animationDelay: `${index * 30}ms` }"
-                  @click="openStoryDetail(story)"
-              >
-                <div class="story-head">
-                  <h4 class="story-title">{{ story.title || '匿名心事' }}</h4>
-                  <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
-                  <span v-else class="story-sender is-anon">匿名星语</span>
-                  <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
-                  <button
-                    class="resonate-btn"
-                    :class="{ done: justResonatedId === story.id }"
-                    :disabled="resonating"
-                    @click.stop="onResonate(story)"
-                  >
-                    <component :is="justResonatedId === story.id ? Check : Sparkles" :size="13" />
-                    <span>{{ justResonatedId === story.id ? '已共鸣' : '共鸣' }}</span>
-                  </button>
-                </div>
-                <p class="story-excerpt">{{ story.content }}</p>
-                <div class="story-meta">
-                  <span v-if="story.type === 'history'" class="meta-history">
-                    来自星河
-                    <template v-if="story.origin"> · {{ story.origin }}</template>
-                  </span>
-                  <template v-else>
-                    <span v-if="formatTime(story.createdAt)" class="meta-time">{{ formatTime(story.createdAt) }}</span>
-                    <span v-if="formatTime(story.createdAt) && formatDistance(story.locationLat, story.locationLng).text" class="meta-sep">·</span>
-                    <span v-if="formatDistance(story.locationLat, story.locationLng).text" class="meta-dist" :class="{ 'meta-near': formatDistance(story.locationLat, story.locationLng).near }">{{ formatDistance(story.locationLat, story.locationLng).text }}</span>
-                  </template>
-                  <span class="meta-sep" v-if="(story.type === 'history' || formatTime(story.createdAt) || formatDistance(story.locationLat, story.locationLng).text)">·</span>
-                  <Sparkles :size="12" /> <span>{{ getDisplayResonance(story) }}</span>
-                  <span class="meta-sep">·</span>
-                  <Eye :size="11" /> <span>{{ getStoryViewCount(story.id) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 搜索无结果 -->
-            <div v-else-if="searchQuery && hasRealStory" class="empty-state">
-              <Search :size="20" class="empty-icon" />
-              <p class="empty-text">没有匹配的故事</p>
-            </div>
-
-            <div v-else class="empty-state">
-              <Star :size="20" class="empty-icon" />
-              <p>这颗星还在等待它的故事</p>
+          <!-- Tab 2: 历史故事（占位，Task 3 实现） -->
+          <template v-else-if="activeTab === 'history'">
+            <div class="empty-state">
+              <BookOpen :size="20" class="empty-icon" />
+              <p>历史故事（即将实现）</p>
             </div>
           </template>
-        </template>
+
+          <!-- Tab 3: 所有故事（占位，Task 4 实现） -->
+          <template v-else-if="activeTab === 'all'">
+            <div class="empty-state">
+              <List :size="20" class="empty-icon" />
+              <p>所有故事（即将实现）</p>
+            </div>
+          </template>
+
+          <!-- Tab 4: 我的故事（占位，Task 5 实现） -->
+          <template v-else-if="activeTab === 'mine'">
+            <div class="empty-state">
+              <User :size="20" class="empty-icon" />
+              <p>我的故事（即将实现）</p>
+            </div>
+          </template>
+        </div>
       </div>
 
       <!-- 右：恒星信息 -->
@@ -531,7 +421,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon, List, User } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
@@ -688,7 +578,14 @@ const detailStory = computed(() => {
   return realStories.value.find(s => s.id === detailStoryId.value) ?? null
 })
 const justResonatedId = ref<number | null>(null)
-const viewMode = ref<'narrative' | 'stories'>('narrative')
+type TabId = 'narrative' | 'history' | 'all' | 'mine'
+const tabs: { id: TabId; label: string; icon: any }[] = [
+  { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
+  { id: 'history', label: '历史故事', icon: BookOpen },
+  { id: 'all', label: '所有故事', icon: List },
+  { id: 'mine', label: '我的故事', icon: User },
+]
+const activeTab = ref<TabId>('narrative')
 
 // ─── 共鸣乐观更新：本地覆盖映射，API 返回前立即 +1 ───
 const resonanceOverrides = reactive(new Map<number, number>())
@@ -1151,6 +1048,58 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ─── Tab Bar ─── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  position: relative;
+}
+.tab-btn:hover {
+  color: var(--ink-secondary);
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+.tab-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Stories Entry Button ─── */
