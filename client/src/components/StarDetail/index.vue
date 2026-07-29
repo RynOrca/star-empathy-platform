@@ -1,5 +1,6 @@
 <template>
-  <div class="overlay" @click.self="$emit('close')">
+  <!-- ═══ PC 端布局 ═══ -->
+  <div v-if="!isMobile" class="overlay" @click.self="$emit('close')">
     <div class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
@@ -19,8 +20,102 @@
 
         <!-- Tab 内容区 -->
         <div class="tab-content">
-          <!-- Tab 1: AI 叙事（默认） -->
-          <template v-if="activeTab === 'narrative'">
+          <!-- Tab: 星信息 -->
+          <template v-if="activeTab === 'info'">
+            <StarHeader :starInfo="starInfo" />
+            <StarInfoPanel
+              :starInfo="starInfo"
+              :catalogStats="catalogStats"
+              :astroData="astroData"
+              :isFavorited="isFavorited"
+              :catalogStarId="catalogStarId"
+              :similarStars="similarStars.similarStars.value"
+              :areaHighlights="areaHighlightsData"
+              :areaLoading="areaLoading"
+              :getStarName="getStarName"
+              :getStarTemperature="getStarTemperature"
+              :getBrightnessLabel="getBrightnessLabel"
+              :formatAltitude="formatAltitude"
+              :azimuthToDirection="azimuthToDirection"
+              :formatClockTime="formatClockTime"
+              :formatDateTime="formatDateTime"
+              :onSimilarStarClick="onSimilarStarClick"
+            />
+            <!-- 标签 -->
+            <div class="info-section">
+              <div class="info-label">
+                标签
+                <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+                <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+                <button
+                  v-if="!editingTags"
+                  class="tag-edit-btn"
+                  title="编辑标签"
+                  @click="startEditTags"
+                >
+                  <PenSquare :size="11" />
+                </button>
+              </div>
+              <div v-if="editingTags" class="tag-editor">
+                <div class="tag-editor-tags">
+                  <span
+                    v-for="(t, i) in customTags"
+                    :key="i"
+                    class="tag tag-editable"
+                    @click="removeCustomTag(i)"
+                  >
+                    {{ t }}
+                    <X :size="10" class="tag-remove-x" />
+                  </span>
+                  <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+                </div>
+                <div class="tag-editor-input-row">
+                  <input
+                    v-model="newTagInput"
+                    class="tag-editor-input"
+                    placeholder="输入自定义标签..."
+                    @keydown.enter="addCustomTag"
+                  />
+                  <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+                </div>
+                <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+                  <span class="tag-editor-suggest-label">AI 建议：</span>
+                  <span
+                    v-for="t in displayTags"
+                    :key="t.tag"
+                    class="tag tag-suggestion"
+                    :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                    @click="addCustomTagFromSuggestion(t.tag)"
+                  >
+                    {{ t.tag }}
+                  </span>
+                </div>
+                <div class="tag-editor-actions">
+                  <button class="tag-editor-save" @click="saveTags">保存</button>
+                  <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+                </div>
+              </div>
+              <div v-else class="info-tags">
+                <span
+                  v-for="t in mergedTags"
+                  :key="t.tag"
+                  class="tag"
+                  :class="{
+                    'tag-emotion': t.type === 'emotion',
+                    'tag-theme': t.type === 'theme',
+                    'tag-custom': t.custom,
+                  }"
+                >
+                  {{ t.tag }}
+                  <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
+                </span>
+                <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Tab: AI 叙事 -->
+          <template v-else-if="activeTab === 'narrative'">
             <StarNarrative
               :content="narrative.content.value"
               :loading="narrative.loading.value"
@@ -30,7 +125,7 @@
             />
           </template>
 
-          <!-- Tab 2: 历史故事 -->
+          <!-- Tab: 历史故事 -->
           <template v-else-if="activeTab === 'history'">
             <StoryDetail
               v-if="detailStory"
@@ -65,7 +160,7 @@
             />
           </template>
 
-          <!-- Tab 3: 所有故事 -->
+          <!-- Tab: 所有故事 -->
           <template v-else-if="activeTab === 'all'">
             <StoryDetail
               v-if="detailStory"
@@ -106,7 +201,7 @@
             />
           </template>
 
-          <!-- Tab 4: 我的故事 -->
+          <!-- Tab: 我的故事 -->
           <template v-else-if="activeTab === 'mine'">
             <div v-if="props.currentUserId == null" class="empty-state">
               <User :size="20" class="empty-icon" />
@@ -268,7 +363,7 @@
       </div>
     </div>
 
-    <!-- 古人陪看聊天抽屉 -->
+    <!-- 古人陪看聊天抽屉 PC -->
     <AncientChat
       :visible="showChat"
       :catalogStarId="catalogStarId"
@@ -277,7 +372,7 @@
       @close="showChat = false"
     />
 
-    <!-- 删除确认弹窗 -->
+    <!-- 删除确认弹窗 PC -->
     <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click.self="cancelDelete">
       <div class="delete-confirm-card">
         <h3>确认删除</h3>
@@ -291,11 +386,293 @@
       </div>
     </div>
   </div>
+
+  <!-- ═══ 移动端布局：底部抽屉 ═══ -->
+  <template v-else>
+    <Transition name="mobile-sheet-fade">
+      <div class="mobile-overlay" @click.self="$emit('close')">
+        <div
+          class="mobile-sheet"
+          :style="{ height: sheetHeight }"
+          @touchstart.passive="onTouchStart"
+          @touchmove.passive="onTouchMove"
+          @touchend="onTouchEnd"
+        >
+          <!-- 拖拽条 -->
+          <div class="mobile-handle"></div>
+
+          <!-- 顶部栏：关闭 + Tab 下拉 -->
+          <div class="mobile-top-bar">
+            <button class="mobile-close-btn" @click="$emit('close')">
+              <X :size="18" />
+            </button>
+            <div class="mobile-tab-select-wrap">
+              <MobileTabSelect v-model="activeTab" :tabs="tabs" />
+            </div>
+          </div>
+
+          <!-- 滚动内容区 -->
+          <div class="mobile-content">
+                        <!-- 古人共赏内联模式 -->
+            <template v-if="showChat">
+              <div class="mobile-chat-inline">
+                <button class="mobile-chat-back" @click="showChat = false">
+                  <ChevronDown :size="18" style="transform: rotate(90deg)" />
+                  <span>返回</span>
+                </button>
+                <AncientChat
+                  :visible="true"
+                  :catalogStarId="catalogStarId"
+                  :starName="starInfo?.displayName || ''"
+                  :constellation="starInfo?.conName || ''"
+                  @close="showChat = false"
+                />
+              </div>
+            </template>
+
+            <!-- Tab 内容：下拉框切换 -->
+            <template v-else>
+              <!-- 星信息 -->
+              <template v-if="activeTab === 'info'">
+                <StarHeader :starInfo="starInfo" />
+
+                <StarInfoPanel
+                  :starInfo="starInfo"
+                  :catalogStats="catalogStats"
+                  :astroData="astroData"
+                  :isFavorited="isFavorited"
+                  :catalogStarId="catalogStarId"
+                  :similarStars="similarStars.similarStars.value"
+                  :areaHighlights="areaHighlightsData"
+                  :areaLoading="areaLoading"
+                  :getStarName="getStarName"
+                  :getStarTemperature="getStarTemperature"
+                  :getBrightnessLabel="getBrightnessLabel"
+                  :formatAltitude="formatAltitude"
+                  :azimuthToDirection="azimuthToDirection"
+                  :formatClockTime="formatClockTime"
+                  :formatDateTime="formatDateTime"
+                  :onSimilarStarClick="onSimilarStarClick"
+                />
+
+                <!-- 标签（内联编辑） -->
+                <div class="info-section-mobile">
+                  <div class="info-label">
+                    标签
+                    <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+                    <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+                    <button
+                      v-if="!editingTags"
+                      class="tag-edit-btn"
+                      title="编辑标签"
+                      @click="startEditTags"
+                    >
+                      <PenSquare :size="11" />
+                    </button>
+                  </div>
+
+                  <div v-if="editingTags" class="tag-editor">
+                    <div class="tag-editor-tags">
+                      <span
+                        v-for="(t, i) in customTags"
+                        :key="i"
+                        class="tag tag-editable"
+                        @click="removeCustomTag(i)"
+                      >
+                        {{ t }}
+                        <X :size="10" class="tag-remove-x" />
+                      </span>
+                      <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+                    </div>
+                    <div class="tag-editor-input-row">
+                      <input
+                        v-model="newTagInput"
+                        class="tag-editor-input"
+                        placeholder="输入自定义标签..."
+                        @keydown.enter="addCustomTag"
+                      />
+                      <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+                    </div>
+                    <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+                      <span class="tag-editor-suggest-label">AI 建议：</span>
+                      <span
+                        v-for="t in displayTags"
+                        :key="t.tag"
+                        class="tag tag-suggestion"
+                        :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                        @click="addCustomTagFromSuggestion(t.tag)"
+                      >
+                        {{ t.tag }}
+                      </span>
+                    </div>
+                    <div class="tag-editor-actions">
+                      <button class="tag-editor-save" @click="saveTags">保存</button>
+                      <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+                    </div>
+                  </div>
+
+                  <div v-else class="info-tags">
+                    <span
+                      v-for="t in mergedTags"
+                      :key="t.tag"
+                      class="tag"
+                      :class="{
+                        'tag-emotion': t.type === 'emotion',
+                        'tag-theme': t.type === 'theme',
+                        'tag-custom': t.custom,
+                      }"
+                    >
+                      {{ t.tag }}
+                      <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
+                    </span>
+                    <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- AI 叙事 -->
+              <template v-else-if="activeTab === 'narrative'">
+                <StarNarrative
+                  :content="narrative.content.value"
+                  :loading="narrative.loading.value"
+                  :error="narrative.error.value"
+                  :cached="narrative.cached.value"
+                  @retry="narrative.fetchNarrative(catalogStarId)"
+                />
+              </template>
+
+              <!-- 历史故事 -->
+              <template v-else-if="activeTab === 'history'">
+                <StoryList
+                  :stories="historyStories"
+                  variant="history"
+                  :resonating="resonating"
+                  :showToolbar="false"
+                  :emptyIcon="BookOpen"
+                  emptyMessage="这颗星还没有历史故事"
+                  :renderedContent="(s: any) => renderMarkdown(s.content)"
+                  :displayResonance="(s: any) => getDisplayResonance(s)"
+                  :displayViews="(s: any) => getStoryViewCount(s.id)"
+                  :isResonated="(s: any) => justResonatedId === s.id"
+                  @story-click="openStoryDetail"
+                  @resonate="onResonate"
+                />
+              </template>
+
+              <!-- 所有故事 -->
+              <template v-else-if="activeTab === 'all'">
+                <StoryList
+                  :stories="displayedStories"
+                  variant="all"
+                  :searchQuery="searchQuery"
+                  :sortKey="sortKey"
+                  :resonating="resonating"
+                  :showToolbar="true"
+                  :emptyIcon="Star"
+                  :emptyMessage="userStories.length > 0 ? '' : '这颗星还在等待它的故事'"
+                  :renderedContent="(s: any) => renderMarkdown(s.content)"
+                  :displayResonance="(s: any) => getDisplayResonance(s)"
+                  :displayViews="(s: any) => getStoryViewCount(s.id)"
+                  :isResonated="(s: any) => justResonatedId === s.id"
+                  :formattedTime="(s: any) => formatTime(s.createdAt)"
+                  :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+                  @update:searchQuery="searchQuery = $event"
+                  @update:sortKey="onSortKeyChange"
+                  @story-click="openStoryDetail"
+                  @resonate="onResonate"
+                />
+              </template>
+
+              <!-- 我的故事 -->
+              <template v-else-if="activeTab === 'mine'">
+                <div v-if="props.currentUserId == null" class="empty-state">
+                  <User :size="20" class="empty-icon" />
+                  <p>请先登录后查看我的故事</p>
+                  <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
+                </div>
+                <StoryList
+                  v-else
+                  :stories="myStories"
+                  variant="mine"
+                  :resonating="resonating"
+                  :showToolbar="false"
+                  :emptyIcon="PenSquare"
+                  emptyMessage="你还没有在这颗星上写过故事"
+                  :renderedContent="(s: any) => renderMarkdown(s.content)"
+                  :displayResonance="(s: any) => getDisplayResonance(s)"
+                  :displayViews="(s: any) => getStoryViewCount(s.id)"
+                  :isResonated="(s: any) => justResonatedId === s.id"
+                  :formattedTime="(s: any) => formatTime(s.createdAt)"
+                  :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+                  @story-click="openStoryDetail"
+                  @resonate="onResonate"
+                />
+              </template>
+
+              <template v-else>
+                <div class="empty-state">
+                  <AlertTriangle :size="20" class="empty-icon" />
+                  <p>未知视图</p>
+                </div>
+              </template>
+            </template>
+
+          <!-- 底部操作栏 -->
+          <div class="mobile-bottom-bar">
+            <BottomBar
+              :isFavorited="isFavorited"
+              @write-story="onWriteStory"
+              @toggle-favorite="toggleFavorite"
+              @open-chat="openChat"
+            />
+          </div>
+        </div>
+
+        <!-- 移动端故事详情全屏 -->
+        <Transition name="mobile-story-slide">
+          <div v-if="detailStory" class="mobile-story-detail">
+            <div class="mobile-story-detail-top">
+              <button class="mobile-story-back" @click="detailStoryId = null">
+                <ChevronDown :size="20" style="transform: rotate(90deg)" />
+              </button>
+              <span class="mobile-story-back-label">{{ detailBackLabel }}</span>
+              <div style="width: 20px"></div>
+            </div>
+            <div class="mobile-story-detail-body">
+              <StoryDetail
+                :story="detailStory"
+                :backLabel="detailBackLabel"
+                :renderedContent="renderMarkdown(detailStory.content)"
+                :displayResonance="getDisplayResonance(detailStory)"
+                :isResonated="justResonatedId === detailStory.id"
+                :resonating="resonating"
+                :deleting="deleting"
+                :currentUserId="currentUserId"
+                :formattedTime="formatTime(detailStory.createdAt)"
+                :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+                @back="detailStoryId = null"
+                @resonate="onResonate(detailStory)"
+                @delete="confirmDelete(detailStory.id)"
+              />
+            </div>
+          </div>
+        </Transition>
+
+        <!-- 移动端删除 Action Sheet -->
+        <MobileActionSheet
+          :visible="showDeleteConfirm"
+          :loading="deleting"
+          @confirm="doDeleteStory"
+          @cancel="cancelDelete"
+        />
+      </div>
+    </Transition>
+  </template>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component } from 'vue'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown } from 'lucide-vue-next'
 import StarNarrative from '../StarNarrative.vue'
 import AncientChat from '../AncientChat.vue'
 import StoryDetail from './StoryDetail.vue'
@@ -303,15 +680,53 @@ import StoryList from './StoryList.vue'
 import StarHeader from './StarHeader.vue'
 import StarInfoPanel from './StarInfoPanel.vue'
 import BottomBar from './BottomBar.vue'
+import MobileTabSelect from './MobileTabSelect.vue'
+import MobileActionSheet from './MobileActionSheet.vue'
 import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
 import { useSimilarStars } from '../../composables/useSimilarStars'
 import { useAreaHighlights } from '../../composables/useAreaHighlights'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
+import { useMediaQuery } from '../../composables/useMediaQuery'
 import catalogData from '../../data/stars.json'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })
+
+const { isMobile } = useMediaQuery()
+
+// ─── 移动端底部抽屉状态 ───
+const sheetHeight = ref('60vh')
+const touchStartY = ref(0)
+const touchStartHeight = ref(0)
+
+function onTouchStart(e: TouchEvent) {
+  touchStartY.value = e.touches[0].clientY
+  const sheet = (e.target as HTMLElement).closest('.mobile-sheet') as HTMLElement
+  touchStartHeight.value = sheet?.offsetHeight || window.innerHeight * 0.6
+}
+
+function onTouchMove(e: TouchEvent) {
+  const delta = touchStartY.value - e.touches[0].clientY
+  const newH = touchStartHeight.value + delta
+  const maxH = window.innerHeight * 0.9
+  const minH = window.innerHeight * 0.15
+  sheetHeight.value = `${Math.max(minH, Math.min(maxH, newH))}px`
+}
+
+function onTouchEnd() {
+  const sheet = document.querySelector('.mobile-sheet') as HTMLElement
+  const currentH = sheet?.offsetHeight || window.innerHeight * 0.6
+  const vh = window.innerHeight
+  if (currentH < vh * 0.3) {
+    // 下拉低于 30vh → 关闭
+    emit('close')
+  } else if (currentH < vh * 0.75) {
+    sheetHeight.value = '60vh'
+  } else {
+    sheetHeight.value = '90vh'
+  }
+}
 
 const props = defineProps<{
   stories: Array<{
@@ -454,17 +869,19 @@ const detailStory = computed(() => {
   return realStories.value.find(s => s.id === detailStoryId.value) ?? null
 })
 const justResonatedId = ref<number | null>(null)
-type TabId = 'narrative' | 'history' | 'all' | 'mine'
+type TabId = 'info' | 'narrative' | 'history' | 'all' | 'mine'
 const tabs: { id: TabId; label: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', icon: Star },
   { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
   { id: 'history', label: '历史故事', icon: BookOpen },
   { id: 'all', label: '所有故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-const activeTab = ref<TabId>('narrative')
+const activeTab = ref<TabId>('info')
 
 const detailBackLabel = computed(() => {
   switch (activeTab.value) {
+    case 'info': return '星信息'
     case 'history': return '历史故事'
     case 'all': return '所有故事'
     case 'mine': return '我的故事'
@@ -497,7 +914,7 @@ function fetchNarrativeWithPosition() {
 }
 
 watch(() => props.catalogStarId, (id) => {
-  activeTab.value = 'narrative'
+  activeTab.value = 'info'
   searchQuery.value = ''
   detailStoryId.value = null
   if (id && (positionReady.value || props.observerLat != null)) {
@@ -1292,5 +1709,280 @@ watch(() => props.catalogStarId, () => {
 .delete-confirm-btn:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+
+/* ═══════════════════════════════════════════
+   Mobile Styles
+   ═══════════════════════════════════════════ */
+
+/* ─── Mobile Overlay ─── */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(4, 4, 18, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* ─── Mobile Sheet ─── */
+.mobile-sheet {
+  width: 100%;
+  max-width: 500px;
+  background: rgba(12, 16, 36, 0.98);
+  border: 1px solid rgba(48, 55, 87, 0.4);
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: height;
+}
+
+/* ─── Drag Handle ─── */
+.mobile-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Mobile Top Bar ─── */
+.mobile-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px 10px;
+  flex-shrink: 0;
+}
+
+.mobile-close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.mobile-close-btn:hover {
+  color: var(--ink);
+  border-color: var(--rule-hover);
+}
+
+.mobile-tab-select-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Mobile Content ─── */
+.mobile-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px;
+}
+
+/* ─── Mobile Section (Collapsible) ─── */
+.mobile-section {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.mobile-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.mobile-section-header:hover {
+  color: var(--accent);
+}
+
+.mobile-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-section-arrow {
+  color: var(--muted);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mobile-section.collapsed .mobile-section-arrow {
+  transform: rotate(-90deg);
+}
+
+.mobile-section-body {
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 0.25s ease,
+              padding 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 2000px;
+  opacity: 1;
+  padding-bottom: 12px;
+}
+
+.mobile-section.collapsed .mobile-section-body {
+  max-height: 0;
+  opacity: 0;
+  padding-bottom: 0;
+}
+
+/* ─── Mobile Tags ─── */
+.info-section-mobile {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+/* ─── Mobile Bottom Bar ─── */
+.mobile-bottom-bar {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--rule);
+  background: rgba(12, 16, 36, 0.98);
+  backdrop-filter: blur(8px);
+}
+
+/* ─── Mobile Chat Inline ─── */
+.mobile-chat-inline {
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+}
+
+.mobile-chat-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: opacity 0.15s;
+}
+.mobile-chat-back:hover {
+  opacity: 0.8;
+}
+
+/* ─── Mobile Story Detail (Full Screen) ─── */
+.mobile-story-detail {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 16, 36, 0.99);
+  backdrop-filter: blur(16px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.mobile-story-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+
+.mobile-story-back {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.mobile-story-back:hover {
+  color: var(--ink);
+  border-color: var(--rule-hover);
+}
+
+.mobile-story-back-label {
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  font-weight: 500;
+}
+
+.mobile-story-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+
+/* ─── Mobile Transitions ─── */
+.mobile-sheet-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.mobile-sheet-fade-enter-active .mobile-sheet {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.mobile-sheet-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.mobile-sheet-fade-leave-active .mobile-sheet {
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.mobile-sheet-fade-enter-from {
+  opacity: 0;
+}
+.mobile-sheet-fade-enter-from .mobile-sheet {
+  transform: translateY(100%);
+}
+.mobile-sheet-fade-leave-to {
+  opacity: 0;
+}
+.mobile-sheet-fade-leave-to .mobile-sheet {
+  transform: translateY(100%);
+}
+
+.mobile-story-slide-enter-active {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.mobile-story-slide-leave-active {
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.mobile-story-slide-enter-from {
+  transform: translateX(100%);
+}
+.mobile-story-slide-leave-to {
+  transform: translateX(100%);
 }
 </style>

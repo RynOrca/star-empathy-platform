@@ -52,6 +52,8 @@ research/
 screenshots/
 
 # ─── 项目文档（不上传） ───
+UI_HANDOVER.md
+docs/
 CHANGELOG.md
 PLAN.md
 CODE_WIKI.md

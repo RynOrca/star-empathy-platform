@@ -121,6 +121,8 @@
 | `StarDetail/StarHeader.vue` | 星星概要子组件（名称、星座、颜色） |
 | `StarDetail/StarInfoPanel.vue` | 桌面端右侧信息面板子组件（天文数据、相似星星、天区故事） |
 | `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
+| `StarDetail/MobileTabSelect.vue` | 移动端下拉 Tab 选择器（替代 PC 端 Tab 栏） |
+| `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
 | `StoryForm.vue` | 投递心事表单 |
@@ -141,6 +143,7 @@
 | `useAreaHighlights.ts` | 天区故事精选 |
 | `useAstroEvents.ts` | 天文事件计算（日月出没、行星可见性） |
 | `useParticleSky.ts` | 粒子背景动画 |
+| `useMediaQuery.ts` | 响应式断点检测（768px PC/移动端分界） |
 
 ### 数据 `src/data/`
 
