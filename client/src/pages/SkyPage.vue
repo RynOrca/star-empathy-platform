@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -276,7 +276,7 @@ import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } 
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
-import StarDetail from '../components/StarDetail.vue'
+import StarDetail from '../components/StarDetail/index.vue'
 import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'

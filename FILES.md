@@ -114,7 +114,13 @@
 | 文件 | 用途 |
 |---|---|
 | `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停事件 |
-| `StarDetail.vue` | **星星详情面板**。4 个 Tab（AI 叙事/历史故事/所有故事/我的故事）、收藏、共鸣、叙事请求（含 `ra`/`dec` 传递）、天文事件面板 |
+| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、4 个 Tab（AI 叙事/历史故事/所有故事/我的故事）、标签编辑、删除确认 |
+| `StarDetail/StoryCard.vue` | 故事卡片子组件（4 个 Tab 复用） |
+| `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除） |
+| `StarDetail/StoryList.vue` | 故事列表子组件（搜索、排序、卡片列表） |
+| `StarDetail/StarHeader.vue` | 星星概要子组件（名称、星座、颜色） |
+| `StarDetail/StarInfoPanel.vue` | 桌面端右侧信息面板子组件（天文数据、相似星星、天区故事） |
+| `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
 | `StoryForm.vue` | 投递心事表单 |
@@ -218,7 +224,7 @@
 | 添加新 API 路由 | `server/src/routes/` 下新建，在 `server/src/index.ts` 注册 |
 | 修改数据库表结构 | `server/src/db.ts` |
 | 修改 3D 星空渲染 | `client/src/composables/useSky.ts` |
-| 修改星星详情面板 | `client/src/components/StarDetail.vue` |
+| 修改星星详情面板 | `client/src/components/StarDetail/index.vue` |
 | 修改古人聊天 UI | `client/src/components/AncientChat.vue` |
 | 修改行星数据/位置计算 | `client/src/data/planets.ts` |
 | 修改星空显示配置 | `client/src/utils/starDisplayConfig.ts` |
