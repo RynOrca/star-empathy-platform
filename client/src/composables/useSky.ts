@@ -1564,8 +1564,8 @@ for (const s of stars) starById.set(s.id, s)
       }
       planetMeshes.push(mesh)
 
-      // 不可见 hitbox：扩大点击命中区域，解决行星 mesh 半径过小（1.0~5.0）难以点击的问题
-      // 半径 = max(size * 2.5, 3.0)，确保水星(1.0)→3.0、木星(3.5)→8.75
+      // 不可见 hitbox：扩大点击命中区域，解决行星 mesh 半径过小难以点击的问题
+      // 半径 = max(size * 2.5, 3.0)，确保水星(0.023)→3.0、木星(0.104)→3.0
       // visible=false 不渲染但参与 raycast，userData 与主 mesh 一致
       const hitboxRadius = Math.max(planet.size * 2.5, 3.0)
       const hitboxGeo = new SphereGeometry(hitboxRadius, 8, 6)
@@ -1579,6 +1579,25 @@ for (const s of stars) starById.set(s.id, s)
       }
       tiltGroup.add(hitboxMesh)
       planetMeshes.push(hitboxMesh)
+
+      // Halo 辅助光点：物理直径比例下小天体（size < 0.5）盘面亚像素不可见
+      // 用 Sprite 渲染行星颜色的光点，辅助肉眼定位（类似 Stellarium hint circle）
+      // halo 不参与 raycast（点击靠 hitbox），不影响物理比例（盘面仍按 size 渲染）
+      if (planet.size < 0.5) {
+        const haloColor = '#' + planet.color.toString(16).padStart(6, '0')
+        const haloTex = glowTex(haloColor, 32)
+        const haloSprite = new Sprite(new SpriteMaterial({
+          map: haloTex,
+          blending: AdditiveBlending,
+          depthWrite: false,
+          depthTest: true,
+          transparent: true,
+          opacity: 0.7,
+        }))
+        // halo 半径固定 1.8，保证最小可见性（不随真实比例变化，因为是辅助层）
+        haloSprite.scale.set(1.8, 1.8, 1)
+        tiltGroup.add(haloSprite)
+      }
 
       // 注册到 planetUpdaters，供 animate 循环每帧重算位置 + 每 1s 重算视星等
       planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh })
