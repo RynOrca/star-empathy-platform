@@ -54,7 +54,7 @@ router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
 // 投递心事/创建星星（需登录）
 router.post('/story', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalog_star_id, location, tag, isAnonymous } = req.body;
+    const { title, content, catalog_star_id, catalog_star_ids, location, tag, isAnonymous } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -67,6 +67,9 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
     }
 
     const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
+    const catalogStarIds: number[] | undefined = Array.isArray(catalog_star_ids)
+      ? catalog_star_ids.filter((id: unknown) => typeof id === 'number')
+      : undefined;
 
     let locationData: { lat: number; lng: number } | undefined;
     if (
@@ -90,7 +93,7 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous);
+    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds);
 
     // 异步生成 AI 故事内核
     if (star && (star as { id: number }).id) {

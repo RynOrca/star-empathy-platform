@@ -5,6 +5,7 @@ interface SeedStory {
   title: string;
   content: string;
   catalog_star_id: number;
+  catalog_star_ids?: number[];
   origin: string | null;
 }
 
@@ -34,8 +35,8 @@ const seedData: SeedStory[] = [
   { title: '天蝎座',     content: '天蝎是大地女神盖亚派去刺杀猎人奥利安的毒蝎。完成任务后，天蝎被升为星空中的天蝎座，与猎户座遥遥相对，永不相见。', catalog_star_id: 219, origin: '古希腊' },
   { title: '双子座',     content: '卡斯托尔与波吕克斯是一对同母异父的兄弟。卡斯托尔死后，波吕克斯向宙斯哀求，希望能与兄弟共享永生。宙斯将他们升为星座，永不分离。', catalog_star_id: 266, origin: '古希腊' },
   { title: '仙女座',     content: '仙女安德洛墨达是埃塞俄比亚公主。因母亲得罪海神，被锁在礁石上等待海怪吞噬。英雄珀耳修斯救了她，宙斯将她升为星座，永驻星空。', catalog_star_id: 409, origin: '古希腊' },
-  { title: '北斗七星',   content: '北斗七星是大熊座的一部分，由天枢、天璇、天玑、天权、玉衡、开阳、摇光七颗星组成。古人用它来确定方向和季节，斗柄东指，天下皆春。', catalog_star_id: 4,  origin: '中国' },
-  { title: '参商二星',   content: '参星在西，商星在东，此出彼没，永不相见。杜甫诗云："人生不相见，动如参与商。"比喻亲友相隔两地，难以重逢。', catalog_star_id: 92, origin: '中国' },
+  { title: '北斗七星',   content: '北斗七星是大熊座的一部分，由天枢、天璇、天玑、天权、玉衡、开阳、摇光七颗星组成。古人用它来确定方向和季节，斗柄东指，天下皆春。', catalog_star_id: 4, catalog_star_ids: [1, 2, 3, 4, 5, 6, 7], origin: '中国' },
+  { title: '参商二星',   content: '参星在西，商星在东，此出彼没，永不相见。杜甫诗云："人生不相见，动如参与商。"比喻亲友相隔两地，难以重逢。', catalog_star_id: 92, catalog_star_ids: [92, 219], origin: '中国' },
 
   // ════════ 社区语录（origin = null）════════
   { title: '深夜独白',   content: '又是一个加班到深夜的日子。走在回家的路上，抬头看见一轮弯月，突然想起小时候奶奶讲的嫦娥故事。也许每个人心里都住着一片星空吧。', catalog_star_id: 114, origin: null },
@@ -55,7 +56,7 @@ const seedData: SeedStory[] = [
   // ② 天鹅座 · 宙斯的羽衣（天鹅座 α = 天津四 Deneb）+ 牛郎星 Altair（天鹰座 α）
   // 天津四位于「夏季大三角」之一，是天鹅的尾巴；
   // 民间常把天鹅与宙斯的化身联系起来。
-  { title: '天鹅与飞鸟', content: '天津四是一颗位于天鹅尾巴上的蓝超巨星，距地球约 2600 光年。在希腊神话中，它被视为宙斯化身的羽翼 —— 他曾以大天鹅之形降临人间。而在东亚天空里，这只"天鹅"横渡的正是那条阻断牛郎（河鼓二，天鹰座）与织女（织女一，天琴座）的银河。同一只鸟，被不同文明赋予了神使与渡桥的双重身份。', catalog_star_id: 175, origin: '跨文化' },
+  { title: '天鹅与飞鸟', content: '天津四是一颗位于天鹅尾巴上的蓝超巨星，距地球约 2600 光年。在希腊神话中，它被视为宙斯化身的羽翼 —— 他曾以大天鹅之形降临人间。而在东亚天空里，这只"天鹅"横渡的正是那条阻断牛郎（河鼓二，天鹰座）与织女（织女一，天琴座）的银河。同一只鸟，被不同文明赋予了神使与渡桥的双重身份。', catalog_star_id: 175, catalog_star_ids: [175, 142], origin: '跨文化' },
 
   // ③ 英仙座 · Algol：恶魔之星（英仙座 β大陵五）
   // Algol 是一颗著名的食变星，每 2.87 天亮度"眨眼"一次，
@@ -76,13 +77,13 @@ const seedData: SeedStory[] = [
   // 仙王刻甫斯是安德洛墨达的父亲 —— 仙后卡西奥佩娅的丈夫、
   // 海怪的岳父。一家四口（仙王、仙后、公主、英雄）都被宙斯升上天空，
   // 是为"皇室四星座"。
-  { title: '皇室四星座', content: '仙王座、仙后座、仙女座、英仙座与飞马座——夜空中相邻的这五颗星座讲述了同一则王室悲剧：仙王刻甫斯、仙后卡西奥佩娅、公主安德洛墨达、英雄珀尔修斯与飞马珀伽索斯。风暴、海怪、献祭、救赎……宙斯将这一家全部升上天空，让后人抬眼便能读到那场远古的苦难与团圆。他们是夜空中最著名的一幅"王室全家福"。', catalog_star_id: 49, origin: '古希腊' },
+  { title: '皇室四星座', content: '仙王座、仙后座、仙女座、英仙座与飞马座——夜空中相邻的这五颗星座讲述了同一则王室悲剧：仙王刻甫斯、仙后卡西奥佩娅、公主安德洛墨达、英雄珀尔修斯与飞马珀伽索斯。风暴、海怪、献祭、救赎……宙斯将这一家全部升上天空，让后人抬眼便能读到那场远古的苦难与团圆。他们是夜空中最著名的一幅"王室全家福"。', catalog_star_id: 49, catalog_star_ids: [49, 66, 409, 430], origin: '古希腊' },
 
   // ⑦ 大熊座 · 北斗的中国星官（天枢）
   // 在中国天文体系里，北斗并非"熊"，而是天帝的御车，
   // 《史记·天官书》载："斗为帝车，运于中央，临制四乡。"
   // 斗柄指向定四季：东-春、南-夏、西-秋、北-冬。
-  { title: '帝车与四乡', content: '在司马迁的《史记·天官书》中，北斗不是熊，而是"帝车"——天帝的御辇，运于中央、临制四乡。"斗柄东指，天下皆春；斗柄南指，天下皆夏；斗柄西指，天下皆秋；斗柄北指，天下皆冬。"从古埃及到中国，古人把北斗的斗柄视为天界时钟；而在西方天空里，它不过是巨熊的尾巴与小腿。同样的七盏灯，有人读作帝车，有人读作走兽。', catalog_star_id: 0,  origin: '中国' },
+  { title: '帝车与四乡', content: '在司马迁的《史记·天官书》中，北斗不是熊，而是"帝车"——天帝的御辇，运于中央、临制四乡。"斗柄东指，天下皆春；斗柄南指，天下皆夏；斗柄西指，天下皆秋；斗柄北指，天下皆冬。"从古埃及到中国，古人把北斗的斗柄视为天界时钟；而在西方天空里，它不过是巨熊的尾巴与小腿。同样的七盏灯，有人读作帝车，有人读作走兽。', catalog_star_id: 0, catalog_star_ids: [0, 1, 2, 3, 4, 5, 6, 7], origin: '中国' },
 
   // ⑧ 天鹰座 · 牛郎与河鼓（河鼓二 = 牛郎星 Altair）
   // 《诗经·小雅·大东》："维天有汉，监亦有光。跂彼织女，终日七襄。
@@ -358,7 +359,7 @@ const seedData: SeedStory[] = [
 
   { title: '仙后之座·Schedar', content: '仙后座的五颗主星排成一个"W"形——那是卡西奥佩娅呈坐姿或侧卧时的裙摆与手臂。Schedar（α，阿拉伯语"胸"）居胸口中央最前方；Caph（β，波斯-阿拉伯古名）与 Ruchbah（δ，"膝"）组成"W"下端两角；γ Navi（现代名，Roger Chaffee 倒写）是整条 W 的中心。一条由"胸、膝、W"之名组成的仙后，在北极上空永世侧倒旋转。', catalog_star_id: 66, origin: '阿拉伯语' },
 
-  { title: '飞马大四方形·Enif', content: '秋季大四方形由飞马座与仙女座的亮星共同组成。四角的阿拉伯名各有所指：Scheat 是"腿"（β），Markab 是"马鞍"（α），Algenib 是"马腹侧面"（γ），ε Enif 是"马的鼻子"。这四颗星组成横跨秋空的巨大方形，是秋夜最宏大的地标，自古为游牧与航海者指引方向。', catalog_star_id: 455, origin: '阿拉伯语' },
+  { title: '飞马大四方形·Enif', content: '秋季大四方形由飞马座与仙女座的亮星共同组成。四角的阿拉伯名各有所指：Scheat 是"腿"（β），Markab 是"马鞍"（α），Algenib 是"马腹侧面"（γ），ε Enif 是"马的鼻子"。这四颗星组成横跨秋空的巨大方形，是秋夜最宏大的地标，自古为游牧与航海者指引方向。', catalog_star_id: 455, catalog_star_ids: [452, 453, 454, 455, 409], origin: '阿拉伯语' },
 
   { title: '联星之美·Almach', content: '仙女座的脚边，一颗橙黄与蓝绿二星并排的绝美目视双星。阿拉伯语 Almach 释义为"獾或沙漠猫"——阿拉伯牧民放牧时熟悉的小型野兽。仙女座另一端是 Mirfak（"腰带"）。阿尔苏菲把它们分别归入两个星座：一颗是荒原的小兽，一颗是仙人的缰绳。', catalog_star_id: 411, origin: '阿拉伯语' },
 
@@ -811,6 +812,11 @@ function seed() {
   console.log('🌟 开始注入冷启动数据...');
 
   // 清空已有的 history 数据（避免重复）
+  // 先清理所有关联表（外键约束）
+  db.prepare("DELETE FROM story_catalog_stars WHERE story_id IN (SELECT id FROM stars WHERE type = 'history')").run();
+  db.prepare("DELETE FROM story_kernels WHERE story_id IN (SELECT id FROM stars WHERE type = 'history')").run();
+  db.prepare("DELETE FROM resonance_log WHERE story_id IN (SELECT id FROM stars WHERE type = 'history')").run();
+  db.prepare("DELETE FROM story_views WHERE story_id IN (SELECT id FROM stars WHERE type = 'history')").run();
   db.prepare("DELETE FROM stars WHERE type = 'history'").run();
   console.log('  已清除旧的历史星数据');
 
@@ -825,7 +831,17 @@ function seed() {
       ? item.content.substring(0, 297) + '...'
       : item.content;
     const pos = generatePosition();
-    insert.run(item.title, content, resonance, pos.x, pos.y, pos.z, item.catalog_star_id, item.origin);
+    const result = insert.run(item.title, content, resonance, pos.x, pos.y, pos.z, item.catalog_star_id, item.origin);
+    const storyId = result.lastInsertRowid as number;
+
+    // 写入连接表
+    const allIds = item.catalog_star_ids ?? [item.catalog_star_id];
+    const insertJunction = db.prepare(
+      'INSERT OR IGNORE INTO story_catalog_stars (story_id, catalog_star_id, is_primary) VALUES (?, ?, ?)'
+    );
+    for (const cid of allIds) {
+      insertJunction.run(storyId, cid, cid === item.catalog_star_id ? 1 : 0);
+    }
   }
 
   const count = db.prepare("SELECT COUNT(*) as count FROM stars WHERE type = 'history'").get() as { count: number };

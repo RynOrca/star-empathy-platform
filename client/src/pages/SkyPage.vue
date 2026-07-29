@@ -667,12 +667,12 @@ for (const s of catalogData.stars) {
 
 interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
-  catalogStarId: number; createdAt: string; locationLat: number | null
+  catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; userId: number | null
   imageUrl: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -685,20 +685,25 @@ function mergeStoriesIntoMap(
   statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
 ) {
   for (const s of items) {
-    const cid = s.catalogStarId
-    if (cid == null) continue
-    if (!map.has(cid)) map.set(cid, [])
-    map.get(cid)!.push({
+    // 获取故事关联的所有恒星 ID（兼容旧数据只有 catalogStarId）
+    const cids: number[] = (s.catalogStarIds?.length ? s.catalogStarIds : [s.catalogStarId]).filter((id: number) => id != null)
+    const storyData: StoryData = {
       id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount,
-      catalogStarId: cid, createdAt: s.createdAt || '',
+      catalogStarId: s.catalogStarId ?? cids[0] ?? 0, catalogStarIds: s.catalogStarIds ?? cids,
+      createdAt: s.createdAt || '',
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
-    })
-    const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
-    cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
-    statsMap.set(cid, cur)
+    }
+    for (const cid of cids) {
+      if (cid == null) continue
+      if (!map.has(cid)) map.set(cid, [])
+      map.get(cid)!.push(storyData)
+      const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
+      cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
+      statsMap.set(cid, cur)
+    }
   }
 }
 
