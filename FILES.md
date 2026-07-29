@@ -1,6 +1,8 @@
 # FILES.md — 星语穹庭 文件清单
 
 > 为 AI Agent 和开发者提供快速导航。每个文件标注用途，方便定位修改目标。
+>
+> **维护规则**：在创建、修改或删除文件后，必须同步更新本文件。如需了解项目文件作用，请先查阅本文件。
 
 ---
 
@@ -66,7 +68,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()` |
+| `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()`。<br>**含 `convertKeys` 函数**：自动将 snake_case 键转为 camelCase（如 `image_url` → `imageUrl`），SQL 查询中无需重复别名 |
 | `position.ts` | 位置计算工具 |
 
 ### 中间件 `src/middleware/`
@@ -134,7 +136,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染、Raycaster 点击检测、相机控制 |
+| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制 |
 | `useStars.ts` | 星星数据获取、过滤、本地更新 |
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
@@ -150,7 +152,7 @@
 | 文件 | 用途 |
 |---|---|
 | `stars.json` | **星表数据**。6142 颗恒星预计算 3D 坐标（由 `generateStarCatalog.ts` 离线生成） |
-| `planets.ts` | 行星数据。`BODY_MAP`（名称映射）、`getBodyPosition()`（实时 RA/Dec 计算）、`getMoonPhase()`、`getSolarTerm()`、视运动轨迹 |
+| `planets.ts` | 行星数据。`BODY_MAP`（名称映射）、`getBodyPosition()`（实时 RA/Dec 计算）、`getMoonPhase()`、`getSolarTerm()`、视运动轨迹。size 字段为物理直径比例（以太阳 1,392,700km=5.0 为基准） |
 | `constellations.json` | 星座连线数据 |
 | `starInfo.ts` | 恒星附加信息（星座中文名、距离） |
 | `asteroids.ts` | 小行星数据 |

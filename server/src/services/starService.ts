@@ -20,11 +20,11 @@ export interface Star {
 }
 
 // 获取所有星星（含用户名、用户 ID 和标签）
+// 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
 export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null })[] {
   return db.prepare(`
-    SELECT s.*, s.user_id as userId,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      s.tag, s.image_url as imageUrl
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
@@ -48,9 +48,8 @@ export function getAllStarsPaged(page: number, limit: number): {
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
-    SELECT s.*, s.user_id as userId,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      s.tag, s.image_url as imageUrl
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
@@ -91,9 +90,8 @@ export function createStar(
     imageUrl ?? null,
   );
   return db.prepare(`
-    SELECT s.*, s.user_id as userId,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      s.image_url as imageUrl
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
@@ -195,7 +193,7 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 // 单条故事详情
 export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
   const row = db.prepare(`
-    SELECT s.*, u.username, s.tag, s.image_url as imageUrl
+    SELECT s.*, u.username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
@@ -206,7 +204,7 @@ export function getStoryById(storyId: number): (Star & { username: string | null
 // 单星下的所有故事
 export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
-    SELECT s.*, u.username, s.tag, s.image_url as imageUrl
+    SELECT s.*, u.username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.catalog_star_id = ?
@@ -217,7 +215,7 @@ export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { user
 // 我的故事
 export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
-    SELECT s.*, u.username, s.tag, s.image_url as imageUrl
+    SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
@@ -239,7 +237,7 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
-    SELECT s.*, u.username, s.tag, s.image_url as imageUrl
+    SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
