@@ -1456,7 +1456,7 @@ watch(() => props.catalogStarId, () => {
 .panel-count {
   font-size: 0.75rem;
   color: var(--muted-light);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-04);
   padding: 2px 10px;
 }
 
@@ -1562,7 +1562,7 @@ watch(() => props.catalogStarId, () => {
   cursor: pointer;
   transition: background 0.1s;
 }
-.sort-option:hover { background: rgba(255, 255, 255, 0.04); }
+.sort-option:hover { background: var(--overlay-04); }
 .sort-option.active { color: var(--accent); }
 
 /* ─── Dropdown Transition ─── */
@@ -1631,7 +1631,7 @@ watch(() => props.catalogStarId, () => {
 }
 .story-card:hover {
   border-color: var(--rule);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-02);
 }
 .story-card:active {
   transform: scale(0.99);
@@ -1676,7 +1676,7 @@ watch(() => props.catalogStarId, () => {
   gap: 5px;
 }
 .resonate-btn:hover:not(:disabled) {
-  background: rgba(255, 217, 138, 0.15);
+  background: var(--accent-bg);
 }
 .resonate-btn:active:not(:disabled) {
   transform: scale(0.95);
@@ -1719,7 +1719,7 @@ watch(() => props.catalogStarId, () => {
   padding: 1px 7px;
   border-radius: 4px;
   background: rgba(202, 167, 255, 0.1);
-  border: 1px solid rgba(202, 167, 255, 0.15);
+  border: 1px solid var(--border-default);
   color: var(--star-purple);
 }
 
@@ -1835,7 +1835,7 @@ watch(() => props.catalogStarId, () => {
   transition: background 0.15s;
 }
 .empty-login-btn:hover {
-  background: rgba(255, 217, 138, 0.15);
+  background: var(--accent-bg);
 }
 
 /* ─── Right: Info Panel ─── */
@@ -2072,12 +2072,12 @@ watch(() => props.catalogStarId, () => {
 }
 .tag-emotion {
   border-color: rgba(255, 139, 125, 0.25);
-  background: rgba(255, 139, 125, 0.06);
+  background: var(--error-subtle);
   color: #ff8b7d;
 }
 .tag-theme {
   border-color: rgba(134, 168, 255, 0.25);
-  background: rgba(134, 168, 255, 0.06);
+  background: var(--info-subtle);
   color: #86a8ff;
 }
 .tag-count {
@@ -2100,7 +2100,7 @@ watch(() => props.catalogStarId, () => {
   font-size: 0.6rem;
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(255, 217, 138, 0.15);
+  background: var(--accent-bg);
   color: var(--accent);
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -2140,7 +2140,7 @@ watch(() => props.catalogStarId, () => {
   padding: 10px;
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-02);
 }
 .tag-editor-tags {
   display: flex;
@@ -2421,7 +2421,7 @@ watch(() => props.catalogStarId, () => {
 .story-tag {
   display: inline-block; padding: 2px 8px; border-radius: 10px;
   font-size: 0.7rem; font-weight: 500; margin-left: 4px;
-  background: rgba(255,255,255,0.08); color: #7a759c;
+  background: var(--overlay-08); color: var(--muted-light);
 }
 .story-tag.tag-思念 { color: #ff8b7d; }
 .story-tag.tag-等待 { color: #86a8ff; }
