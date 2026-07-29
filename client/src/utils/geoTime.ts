@@ -19,7 +19,8 @@ export function getBrowserLocation(): Promise<GeoLocation> {
       (err) => {
         reject(err)
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      // 天文观测不需要米级精度，用低精度（IP/WiFi）快速返回
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
     )
   })
 }

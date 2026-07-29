@@ -22,6 +22,7 @@ import { authRequired } from './middleware/auth';
 import { setApiKey, getApiKey } from './services/deepseek';
 import { setAmapKey, getAmapKey } from './services/amap';
 import { cleanExpiredTokens } from './services/userService';
+import { backfillMissingKernels } from './services/kernel';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -308,6 +309,11 @@ app.listen(PORT, () => {
   setInterval(() => {
     try { cleanExpiredTokens(); } catch { /* 静默 */ }
   }, 10 * 60 * 1000);
+
+  // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
+  setImmediate(() => {
+    try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+  });
 });
 
 export { upload };
