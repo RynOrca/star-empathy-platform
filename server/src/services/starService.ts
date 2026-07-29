@@ -19,21 +19,43 @@ export interface Star {
   image_url: string | null;
 }
 
+// 为故事附加 catalogStarIds（从 story_catalog_stars 连接表读取多对多绑定）
+function attachCatalogStarIds(stories: any[]): any[] {
+  if (stories.length === 0) return stories;
+  const ids = stories.map((s: any) => s.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const bindings = db.prepare(
+    `SELECT story_id, catalog_star_id FROM story_catalog_stars WHERE story_id IN (${placeholders})`
+  ).all(...ids) as { story_id: number; catalog_star_id: number }[];
+
+  const map = new Map<number, number[]>();
+  for (const b of bindings) {
+    if (!map.has(b.story_id)) map.set(b.story_id, []);
+    map.get(b.story_id)!.push(b.catalog_star_id);
+  }
+
+  return stories.map((s: any) => ({
+    ...s,
+    catalogStarIds: map.get(s.id) || (s.catalog_star_id != null ? [s.catalog_star_id] : []),
+  }));
+}
+
 // 获取所有星星（含用户名、用户 ID 和标签）
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null })[] {
-  return db.prepare(`
+export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[] })[] {
+  const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
   `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  return attachCatalogStarIds(rows);
 }
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[] })[];
   total: number;
   page: number;
   limit: number;
@@ -56,7 +78,7 @@ export function getAllStarsPaged(page: number, limit: number): {
     LIMIT ? OFFSET ?
   `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 
-  return { items, total, page: p, limit: l, totalPages };
+  return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
 }
 
 // 创建星星
@@ -239,16 +261,17 @@ export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { user
 }
 
 // 我的故事
-export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
-  return db.prepare(`
+export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null; catalogStarIds?: number[] })[] {
+  const rows = db.prepare(`
     SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
+  return attachCatalogStarIds(rows);
 }
 
 export function getUserStoriesPaged(userId: number, page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null })[];
+  items: (Star & { username: string | null; tag: string | null; catalogStarIds?: number[] })[];
   total: number;
   page: number;
   limit: number;
@@ -269,7 +292,7 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
     LIMIT ? OFFSET ?
   `).all(userId, l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
 
-  return { items, total, page: p, limit: l, totalPages };
+  return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
 }
 
 // 我的收藏（返回该用户收藏的 catalog_star_id 列表）
