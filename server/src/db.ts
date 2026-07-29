@@ -119,6 +119,15 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_tokens(email, expires_at);
+
+  CREATE TABLE IF NOT EXISTS moon_insights (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    phase_label  TEXT NOT NULL,
+    lunar_day    TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    generated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_moon_insights_day ON moon_insights(phase_label, lunar_day, date(generated_at));
 `);
 
 // 兼容旧数据库：添加新列

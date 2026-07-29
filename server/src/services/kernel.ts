@@ -413,3 +413,57 @@ export function getUserKernelLines(userId: number, limit = 20): KernelLine[] {
   // 按相似度降序，取前 limit
   return lines.sort((a, b) => b.score - a.score).slice(0, limit)
 }
+
+export interface UserPreferences {
+  emotionalTags: string[]
+  themes: string[]
+  storyCount: number
+}
+
+/**
+ * 聚合用户所有故事的内核标签（用于月相 AI 个性化与缓存校验）
+ *
+ * - 返回去重后的情绪标签（按出现次数降序，前 10）
+ * - 返回去重后的主题标签（按出现次数降序，前 10）
+ * - storyCount 为用户有内核的故事总数
+ *
+ * 失败时返回空标签集合（不抛错），让上层降级为 'empty' prefsHash
+ */
+export function getUserPreferences(userId: number): UserPreferences {
+  const rows = db.prepare(`
+    SELECT sk.emotional_tags, sk.themes
+    FROM story_kernels sk
+    JOIN stars s ON sk.story_id = s.id
+    WHERE s.user_id = ?
+  `).all(userId) as { emotional_tags: string; themes: string }[]
+
+  if (rows.length === 0) {
+    return { emotionalTags: [], themes: [], storyCount: 0 }
+  }
+
+  const emotionCounts = new Map<string, number>()
+  const themeCounts = new Map<string, number>()
+
+  for (const row of rows) {
+    try {
+      const tags: string[] = JSON.parse(row.emotional_tags)
+      tags.forEach(t => emotionCounts.set(t, (emotionCounts.get(t) || 0) + 1))
+    } catch { /* skip */ }
+    try {
+      const themes: string[] = JSON.parse(row.themes)
+      themes.forEach(t => themeCounts.set(t, (themeCounts.get(t) || 0) + 1))
+    } catch { /* skip */ }
+  }
+
+  const sortByCount = (map: Map<string, number>) =>
+    [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag]) => tag)
+
+  return {
+    emotionalTags: sortByCount(emotionCounts),
+    themes: sortByCount(themeCounts),
+    storyCount: rows.length,
+  }
+}

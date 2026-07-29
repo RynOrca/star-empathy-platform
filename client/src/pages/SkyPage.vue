@@ -26,10 +26,15 @@
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
         </span>
-        <span v-if="moonPhase" class="moon-phase" :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）`">
+        <button
+          v-if="moonPhase"
+          class="moon-phase"
+          :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）点击查看详情`"
+          @click="openMoonPanel"
+        >
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
-        </span>
+        </button>
         <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
           <component :is="showMyStoriesOnly ? Globe : Star" :size="14" />
           <span>{{ showMyStoriesOnly ? '全部' : '我的' }}</span>
@@ -159,6 +164,18 @@
         :visible="showSettings"
         @close="showSettings = false"
       />
+
+      <MoonPanel
+        :visible="showMoonPanel"
+        :data="moonPanelData"
+        :loading="moonPanelLoading"
+        :error="moonPanelError"
+        :insight="moonInsight"
+        :insight-loading="moonInsightLoading"
+        @close="showMoonPanel = false"
+        @regen-insight="regenMoonInsight"
+        @rotate-poem="rotateMoonPoem"
+      />
   </div>
 </template>
 
@@ -172,6 +189,8 @@ import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail.vue'
 import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
+import MoonPanel from '../components/MoonPanel.vue'
+import { useMoon } from '../composables/useMoon'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm } from '../data/planets'
@@ -204,16 +223,49 @@ const moonPhase = ref<{ phaseFraction: number; phaseName: string; illumination: 
 const moonIconStyle = computed(() => {
   if (!moonPhase.value) return ''
   const f = moonPhase.value.phaseFraction
-  // 0=新月（全黑），0.5=满月（全亮），0.25=上弦（右半亮），0.75=下弦（左半亮）
-  // 用 conic-gradient 或 linear-gradient 简化：左右半圆 + 中间过渡
   if (f < 0.5) {
-    // 上半月：从全黑到全亮，亮的部分在右
-    const lit = f * 2 * 100 // 0~100%
+    const lit = f * 2 * 100
     return `linear-gradient(90deg, #1a1a2e ${100 - lit}%, #f0e6c8 ${100 - lit}%)`
   } else {
-    // 下半月：从全亮到全黑，亮的部分在左
-    const lit = (1 - f) * 2 * 100 // 100~0%
+    const lit = (1 - f) * 2 * 100
     return `linear-gradient(90deg, #f0e6c8 ${100 - lit}%, #1a1a2e ${100 - lit}%)`
+  }
+})
+
+// ─── 月相居中预览窗（MoonPanel） ───
+const showMoonPanel = ref(false)
+const {
+  data: moonPanelData,
+  loading: moonPanelLoading,
+  error: moonPanelError,
+  insight: moonInsight,
+  insightLoading: moonInsightLoading,
+  refresh: refreshMoon,
+  loadInsight: loadMoonInsight,
+  rotatePoem: rotateMoonPoem,
+} = useMoon({
+  observerLat: () => userLat.value ?? null,
+  observerLon: () => userLng.value ?? null,
+})
+
+/** 打开月相预览窗 */
+function openMoonPanel() {
+  if (!locationReady.value) return
+  refreshMoon()
+  showMoonPanel.value = true
+  // 异步加载 AI 解读（不阻塞）
+  loadMoonInsight()
+}
+
+/** 重新生成 AI 解读 */
+function regenMoonInsight() {
+  loadMoonInsight()
+}
+
+// 月相面板与 StarDetail 互斥
+watch(showMoonPanel, (v) => {
+  if (v && selectedStarInfo.value) {
+    onCloseDetail()
   }
 })
 
@@ -975,10 +1027,17 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(16, 20, 43, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  cursor: default;
-  transition: border-color 0.2s;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
 }
-.moon-phase:hover { border-color: rgba(240, 230, 200, 0.35); }
+.moon-phase:hover {
+  border-color: rgba(240, 230, 200, 0.35);
+  background: rgba(24, 30, 60, 0.7);
+}
+.moon-phase:active { transform: scale(0.97); }
 .moon-icon {
   width: 14px; height: 14px; border-radius: 50%;
   box-shadow: 0 0 6px rgba(240, 230, 200, 0.3);

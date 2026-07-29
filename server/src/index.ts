@@ -13,6 +13,7 @@ import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
 import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
+import moonRouter from './routes/moon';
 import { ok, badRequest, serverError } from './utils/response';
 import { setApiKey, getApiKey } from './services/deepseek';
 import { cleanExpiredTokens } from './services/userService';
@@ -139,6 +140,9 @@ app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// 月相 AI 解读
+app.use('/api/moon', moonRouter);
 
 // 设置 API Key（运行时覆盖）
 app.get('/api/settings/api-key', (_req: Request, res: Response) => {

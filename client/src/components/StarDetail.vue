@@ -305,39 +305,6 @@
           </div>
         </div>
 
-        <!-- 月相 widget（全局，不依赖当前星星） -->
-        <div class="astro-events moon-widget" v-if="astroData?.moon">
-          <div class="astro-events-header">
-            <Moon :size="13" class="astro-icon" />
-            <span class="astro-events-title">今日月相</span>
-            <span
-              class="moon-phase-icon"
-              :style="{ '--moon-brightness': astroData.moon.phaseBrightness + '%' }"
-              :title="astroData.moon.phaseLabel"
-            ></span>
-          </div>
-          <div class="astro-events-grid">
-            <div class="astro-event-item">
-              <div class="astro-event-content">
-                <span class="astro-event-label">相位</span>
-                <span class="astro-event-value">{{ astroData.moon.phaseLabel }}</span>
-              </div>
-            </div>
-            <div class="astro-event-item">
-              <div class="astro-event-content">
-                <span class="astro-event-label">亮面</span>
-                <span class="astro-event-value">{{ (astroData.moon.illumination * 100).toFixed(0) }}%</span>
-              </div>
-            </div>
-            <div class="astro-event-item" v-if="astroData.moon.nextFullMoon">
-              <div class="astro-event-content">
-                <span class="astro-event-label">下次满月</span>
-                <span class="astro-event-value">{{ formatDateTime(astroData.moon.nextFullMoon) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- 标签 -->
         <div class="info-section">
           <div class="info-label">
@@ -531,7 +498,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
