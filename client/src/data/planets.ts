@@ -38,17 +38,20 @@ export type PlanetData = PlanetInfo
 export const planets: PlanetData[] = [
   {
     name: 'Sun', nameCN: '太阳', color: 0xffdd88, texture: '/textures/planets/2k_sun.jpg',
-    size: 5, planetId: -100, semiMajorAxis: 0, eccentricity: 0, inclination: 0, period: 0,
+    // 物理直径 1,392,700 km = 5.0 基准（太阳作为基准天体）
+    size: 5.0, planetId: -100, semiMajorAxis: 0, eccentricity: 0, inclination: 0, period: 0,
     rotationPeriod: 609.12, axialTilt: 7.25,
   },
   {
     name: 'Mercury', nameCN: '水星', color: 0x999999, texture: '/textures/planets/2k_mercury.jpg',
-    size: 1.0, planetId: -106, semiMajorAxis: 0.387, eccentricity: 0.206, inclination: 7.0, period: 0.241,
+    // 物理直径 4,879 km → 5.0 * 4879/1392700 = 0.018
+    size: 0.018, planetId: -106, semiMajorAxis: 0.387, eccentricity: 0.206, inclination: 7.0, period: 0.241,
     rotationPeriod: 1407.6, axialTilt: 0.03,
   },
   {
     name: 'Venus', nameCN: '金星', color: 0xe8cda0, texture: '/textures/planets/2k_venus_surface.jpg',
-    size: 1.8, planetId: -102, semiMajorAxis: 0.723, eccentricity: 0.007, inclination: 3.4, period: 0.615,
+    // 物理直径 12,104 km → 5.0 * 12104/1392700 = 0.043
+    size: 0.043, planetId: -102, semiMajorAxis: 0.723, eccentricity: 0.007, inclination: 3.4, period: 0.615,
     rotationPeriod: -5832.5, axialTilt: 177.36, // 逆向自转
     // 浓密黄色 CO2 大气：Rayleigh 偏暖黄（蓝光被吸收），Mie 高浑浊度
     atmosphere: {
@@ -58,12 +61,14 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Moon', nameCN: '月球', color: 0xcccccc, texture: '/textures/planets/2k_moon.jpg',
-    size: 1.2, planetId: -101, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
+    // 物理直径 3,474 km → 5.0 * 3474/1392700 = 0.012
+    size: 0.012, planetId: -101, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
     rotationPeriod: 655.7, axialTilt: 6.68,
   },
   {
     name: 'Mars', nameCN: '火星', color: 0xdd6644, texture: '/textures/planets/2k_mars.jpg',
-    size: 1.4, planetId: -103, semiMajorAxis: 1.524, eccentricity: 0.093, inclination: 1.85, period: 1.881,
+    // 物理直径 6,779 km → 5.0 * 6779/1392700 = 0.024
+    size: 0.024, planetId: -103, semiMajorAxis: 1.524, eccentricity: 0.093, inclination: 1.85, period: 1.881,
     rotationPeriod: 24.6, axialTilt: 25.19,
     // 稀薄红色 CO2 大气：Rayleigh 偏暖红，Mie 低浑浊度（大气薄）
     atmosphere: {
@@ -73,7 +78,8 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Jupiter', nameCN: '木星', color: 0xddaa77, texture: '/textures/planets/2k_jupiter.jpg',
-    size: 3.5, planetId: -104, semiMajorAxis: 5.203, eccentricity: 0.048, inclination: 1.3, period: 11.86,
+    // 物理直径 139,820 km → 5.0 * 139820/1392700 = 0.502
+    size: 0.502, planetId: -104, semiMajorAxis: 5.203, eccentricity: 0.048, inclination: 1.3, period: 11.86,
     rotationPeriod: 9.93, axialTilt: 3.13,
     // 厚 H2/He 大气：Rayleigh 偏冷蓝（气体巨星），Mie 中等浑浊度
     atmosphere: {
@@ -83,7 +89,8 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Saturn', nameCN: '土星', color: 0xddcc99, texture: '/textures/planets/2k_saturn.jpg',
-    size: 3.0, planetId: -105, ringColor: 0xccbb88, ringSize: 5.5, ringTexture: '/textures/planets/2k_saturn_ring_alpha.png',
+    // 物理直径 116,460 km → 5.0 * 116460/1392700 = 0.418
+    size: 0.418, planetId: -105, ringColor: 0xccbb88, ringSize: 5.5, ringTexture: '/textures/planets/2k_saturn_ring_alpha.png',
     ringInnerFactor: 1.4, ringOuterFactor: 2.3,
     semiMajorAxis: 9.537, eccentricity: 0.054, inclination: 2.49, period: 29.46,
     rotationPeriod: 10.7, axialTilt: 26.73,
@@ -94,7 +101,8 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Uranus', nameCN: '天王星', color: 0x88ccdd, texture: '/textures/planets/2k_uranus.jpg',
-    size: 2.2, planetId: -107, semiMajorAxis: 19.191, eccentricity: 0.047, inclination: 0.77, period: 84.01,
+    // 物理直径 50,724 km → 5.0 * 50724/1392700 = 0.182
+    size: 0.182, planetId: -107, semiMajorAxis: 19.191, eccentricity: 0.047, inclination: 0.77, period: 84.01,
     rotationPeriod: -17.24, axialTilt: 97.77, // 侧躺自转
     // 甲烷大气：Rayleigh 偏青蓝（CH4 吸收红光），Mie 低浑浊度
     atmosphere: {
@@ -104,7 +112,8 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Neptune', nameCN: '海王星', color: 0x3366cc, texture: '/textures/planets/2k_neptune.jpg',
-    size: 2.1, planetId: -108, semiMajorAxis: 30.069, eccentricity: 0.009, inclination: 1.77, period: 164.79,
+    // 物理直径 49,244 km → 5.0 * 49244/1392700 = 0.177
+    size: 0.177, planetId: -108, semiMajorAxis: 30.069, eccentricity: 0.009, inclination: 1.77, period: 164.79,
     rotationPeriod: 16.11, axialTilt: 28.32,
     // 甲烷大气深蓝：Rayleigh 偏深蓝，Mie 低浑浊度
     atmosphere: {
