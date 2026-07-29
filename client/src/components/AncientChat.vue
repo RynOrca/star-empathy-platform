@@ -3,6 +3,8 @@
     <Transition name="drawer-slide">
       <div v-if="visible" class="chat-drawer-overlay" @click.self="$emit('close')">
         <div class="chat-drawer">
+          <!-- 移动端拖拽手柄 -->
+          <div class="mobile-drag-handle" @click="$emit('close')"></div>
           <!-- 头部 -->
           <div class="chat-drawer-header">
             <span class="chat-drawer-title">与古人共赏</span>
@@ -116,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted } from 'vue'
 import { X, Send } from 'lucide-vue-next'
 import { marked } from 'marked'
 
@@ -160,7 +162,14 @@ const streamingContent = ref('')
 const errorMessage = ref('')
 const messagesRef = ref<HTMLElement | null>(null)
 
-// 监听 visible 变化，打开时加载古人列表
+// 打开时加载古人列表（组件挂载时若 visible 为 true 也需要加载）
+onMounted(() => {
+  if (props.visible) {
+    reset()
+    fetchFigures()
+  }
+})
+
 watch(() => props.visible, async (v) => {
   if (v) {
     reset()
@@ -717,4 +726,146 @@ function renderMarkdown(text: string): string {
 .drawer-slide-enter-from { opacity: 0; }
 .drawer-slide-leave-to .chat-drawer { transform: translateX(100%); }
 .drawer-slide-leave-to { opacity: 0; }
+
+/* ─── Mobile drag handle ─── */
+.mobile-drag-handle {
+  display: none;
+}
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .mobile-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .mobile-drag-handle::after {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 217, 138, 0.3);
+    transition: background 0.2s;
+  }
+
+  .mobile-drag-handle:active::after {
+    background: var(--accent);
+  }
+
+  .chat-drawer-overlay {
+    justify-content: center;
+    align-items: flex-end;
+    background: rgba(7, 8, 22, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .chat-drawer {
+    width: 100%;
+    height: 88vh;
+    border-left: none;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
+    animation: slideUpChat 0.28s ease-out;
+  }
+
+  @keyframes slideUpChat {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .drawer-slide-enter-from .chat-drawer { transform: translateY(100%); }
+  .drawer-slide-leave-to .chat-drawer { transform: translateY(100%); }
+
+  .chat-drawer-header {
+    padding: 16px 18px;
+  }
+
+  .chat-drawer-title {
+    font-size: 0.95rem;
+  }
+
+  .chat-drawer-close {
+    width: 32px;
+    height: 32px;
+  }
+
+  .chat-figure-select {
+    padding: 16px;
+  }
+
+  .chat-select-hint {
+    font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+
+  .chat-figure-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .chat-figure-avatar {
+    font-size: 1.5rem;
+    width: 36px;
+  }
+
+  .chat-figure-name {
+    font-size: 0.85rem;
+  }
+
+  .chat-figure-intro {
+    max-width: 90px;
+    font-size: 0.7rem;
+  }
+
+  .chat-role-bar {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+
+  .chat-messages {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+
+  .chat-bubble {
+    max-width: 90%;
+    gap: 6px;
+  }
+
+  .chat-bubble-text {
+    padding: 9px 12px;
+    font-size: 0.82rem;
+    line-height: 1.65;
+  }
+
+  .chat-input-area {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .chat-input {
+    padding: 10px 14px;
+    font-size: 0.84rem;
+  }
+
+  .chat-send-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .chat-drawer {
+    height: 92vh;
+  }
+  .chat-figure-intro {
+    display: none;
+  }
+}
 </style>

@@ -627,4 +627,184 @@ onUnmounted(() => {
 }
 .modal-save:hover:not(:disabled) { background: #ffe0a8; }
 .modal-save:disabled { opacity: 0.5; cursor: wait; }
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .profile-page {
+    padding-bottom: 80px;
+  }
+
+  .btn-back {
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+  }
+
+  .signature-area {
+    padding-top: 4vh;
+  }
+
+  .sig-text {
+    font-size: 1rem;
+  }
+
+  .sig-input {
+    width: 180px;
+    font-size: 0.95rem;
+  }
+
+  .username {
+    font-size: 1.3rem;
+  }
+
+  .join-days {
+    font-size: 0.7rem;
+  }
+
+  .stats-row {
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .stat strong {
+    font-size: 1.2rem;
+  }
+
+  .stat span {
+    font-size: 0.65rem;
+  }
+
+  .account-actions {
+    margin-top: 1rem;
+  }
+
+  .btn-change-pwd {
+    padding: 0.35rem 1.2rem;
+    font-size: 0.74rem;
+  }
+
+  /* Story star field - reduce size in mobile */
+  .story-star {
+    box-shadow: 0 0 4px rgba(255,217,138,0.5), 0 0 10px rgba(255,180,100,0.2);
+  }
+
+  .star-title {
+    font-size: 0.65rem;
+  }
+
+  .fav-section {
+    margin-top: 2rem;
+    padding: 0 16px 2rem;
+  }
+
+  .fav-list {
+    max-width: 100%;
+  }
+
+  .fav-card {
+    padding: 10px 12px;
+  }
+
+  .fav-name {
+    font-size: 0.85rem;
+  }
+
+  /* Modals: bottom sheet style */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.5rem;
+    animation: slideUpModal 0.28s ease-out;
+  }
+
+  @keyframes slideUpModal {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .modal-content {
+    font-size: 0.84rem;
+    line-height: 1.65;
+  }
+
+  .modal-meta {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .modal-actions {
+    gap: 0.6rem;
+  }
+
+  .modal-close {
+    padding: 0.5rem 1rem;
+    font-size: 0.78rem;
+    flex: 1;
+    margin-top: 0;
+  }
+
+  .modal-delete {
+    padding: 0.5rem 1rem;
+    font-size: 0.78rem;
+    flex: 1;
+  }
+
+  .pwd-modal {
+    max-width: 100%;
+  }
+
+  .pwd-modal .form-input {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+  }
+
+  .pwd-modal-actions {
+    gap: 0.6rem;
+  }
+
+  .modal-save {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .empty-hint {
+    margin-top: 3rem;
+    font-size: 0.8rem;
+    padding: 0 20px;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .stats-row {
+    gap: 1.2rem;
+  }
+
+  .stat strong {
+    font-size: 1.1rem;
+  }
+
+  .signature-area {
+    padding-top: 3vh;
+  }
+
+  .fav-section {
+    padding: 0 12px 2rem;
+  }
+}
 </style>
