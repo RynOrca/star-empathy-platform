@@ -264,6 +264,9 @@ export function useMoon(opts: UseMoonOptions) {
   // 防并发：同一时刻只允许一个 loadInsight 请求
   let insightPromise: Promise<void> | null = null
 
+  // 诗词轮换种子（递增，保证"换一首"每次不同）
+  const poemSeed = ref(0)
+
   /** 计算月相主数据（同步） */
   function refresh(): void {
     const lat = opts.observerLat()
@@ -329,8 +332,8 @@ export function useMoon(opts: UseMoonOptions) {
 
       // 7. 诗词匹配（基于日期种子，每日固定）
       const season = getSeason(now)
-      const seed = now.getDate()
-      const poem = selectMoonPoem(phaseLabel, season, seed)
+      poemSeed.value = now.getDate()
+      const poem = selectMoonPoem(phaseLabel, season, poemSeed.value)
 
       data.value = {
         phaseAngle,
@@ -466,15 +469,45 @@ export function useMoon(opts: UseMoonOptions) {
     }
   }
 
+  /** 重新生成 AI 解读（强制清除缓存重请求） */
+  async function regenInsight(): Promise<void> {
+    if (!data.value) return
+
+    const userId = getUserIdFromToken()
+    if (userId == null) {
+      // 未登录用户：无 AI 解读，直接切换诗词
+      rotatePoem(1)
+      return
+    }
+
+    // 清除当前 insight，强制显示 loading
+    insight.value = null
+    insightLoading.value = true
+
+    // 清除 localStorage 中该相位+农历日的缓存
+    const d = data.value
+    const prefs = await loadPreferences()
+    const prefsHash = computePrefsHash(prefs, true)
+    const cacheKey = getCacheKey(userId, d.phaseLabel, d.lunar.dayChinese)
+    try { localStorage.removeItem(cacheKey) } catch { /* 静默 */ }
+
+    // 重置防并发锁，强制发起新请求
+    insightPromise = null
+
+    // 清除后重新加载
+    await loadInsight()
+  }
+
   /** 切换诗词（"换一首"按钮） */
   function rotatePoem(offset: number = 1): void {
     if (!data.value?.poem) return
     const d = data.value
     const season = getSeason(d.observer.time)
-    const seed = new Date().getDate() + offset
+    // 用递增偏移量保证每次切换都不同
+    poemSeed.value += offset
     data.value = {
       ...d,
-      poem: selectMoonPoem(d.phaseLabel, season, seed),
+      poem: selectMoonPoem(d.phaseLabel, season, poemSeed.value),
     }
   }
 
@@ -494,6 +527,7 @@ export function useMoon(opts: UseMoonOptions) {
     insightLoading,
     refresh,
     loadInsight,
+    regenInsight,
     rotatePoem,
     reset,
   }
