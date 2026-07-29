@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getUserStories, getUserStoriesPaged, getUserFavorites } from '../services/starService';
-import { getUserKernelLines } from '../services/kernel';
+import { getUserKernelLines, getUserPreferences } from '../services/kernel';
 import { authRequired } from '../middleware/auth';
 import { ok, serverError } from '../utils/response';
 
@@ -45,6 +45,18 @@ router.get('/kernel-lines', authRequired, (req: Request, res: Response) => {
     ok(res, 'success', lines);
   } catch (error) {
     console.error('GET /api/profile/kernel-lines error:', error);
+    serverError(res);
+  }
+});
+
+// 用户喜好聚合（情绪/主题标签，用于月相个性化与缓存校验）
+router.get('/preferences', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const preferences = getUserPreferences(user.id);
+    ok(res, 'success', preferences);
+  } catch (error) {
+    console.error('GET /api/profile/preferences error:', error);
     serverError(res);
   }
 });

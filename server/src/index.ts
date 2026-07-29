@@ -15,6 +15,7 @@ import profileRouter from './routes/profile';
 import searchRouter from './routes/search';
 import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
+import moonRouter from './routes/moon';
 import locationRouter from './routes/location';
 import { ok, badRequest, serverError } from './utils/response';
 import { authRequired } from './middleware/auth';
@@ -194,6 +195,9 @@ app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// 月相解读
+app.use('/api/moon', moonRouter);
 
 // 定位（IP 定位 + 反向地理编码）
 app.use('/api/location', locationRouter);

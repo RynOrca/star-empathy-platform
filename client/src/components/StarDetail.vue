@@ -613,36 +613,79 @@
           </div>
         </div>
 
-        <!-- 月相 widget（全局，不依赖当前星星） -->
-        <div class="astro-events moon-widget" v-if="astroData?.moon">
-          <div class="astro-events-header">
-            <Moon :size="13" class="astro-icon" />
-            <span class="astro-events-title">今日月相</span>
-            <span
-              class="moon-phase-icon"
-              :style="{ '--moon-brightness': astroData.moon.phaseBrightness + '%' }"
-              :title="astroData.moon.phaseLabel"
-            ></span>
+        <!-- 标签 -->
+        <div class="info-section">
+          <div class="info-label">
+            标签
+            <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+            <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+            <button
+              v-if="!editingTags"
+              class="tag-edit-btn"
+              title="编辑标签"
+              @click="startEditTags"
+            >
+              <PenSquare :size="11" />
+            </button>
           </div>
-          <div class="astro-events-grid">
-            <div class="astro-event-item">
-              <div class="astro-event-content">
-                <span class="astro-event-label">相位</span>
-                <span class="astro-event-value">{{ astroData.moon.phaseLabel }}</span>
-              </div>
+
+          <!-- 编辑模式 -->
+          <div v-if="editingTags" class="tag-editor">
+            <div class="tag-editor-tags">
+              <span
+                v-for="(t, i) in customTags"
+                :key="i"
+                class="tag tag-editable"
+                @click="removeCustomTag(i)"
+              >
+                {{ t }}
+                <X :size="10" class="tag-remove-x" />
+              </span>
+              <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
             </div>
-            <div class="astro-event-item">
-              <div class="astro-event-content">
-                <span class="astro-event-label">亮面</span>
-                <span class="astro-event-value">{{ (astroData.moon.illumination * 100).toFixed(0) }}%</span>
-              </div>
+            <div class="tag-editor-input-row">
+              <input
+                v-model="newTagInput"
+                class="tag-editor-input"
+                placeholder="输入自定义标签..."
+                @keydown.enter="addCustomTag"
+              />
+              <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
             </div>
-            <div class="astro-event-item" v-if="astroData.moon.nextFullMoon">
-              <div class="astro-event-content">
-                <span class="astro-event-label">下次满月</span>
-                <span class="astro-event-value">{{ formatDateTime(astroData.moon.nextFullMoon) }}</span>
-              </div>
+            <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+              <span class="tag-editor-suggest-label">AI 建议：</span>
+              <span
+                v-for="t in displayTags"
+                :key="t.tag"
+                class="tag tag-suggestion"
+                :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                @click="addCustomTagFromSuggestion(t.tag)"
+              >
+                {{ t.tag }}
+              </span>
             </div>
+            <div class="tag-editor-actions">
+              <button class="tag-editor-save" @click="saveTags">保存</button>
+              <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+            </div>
+          </div>
+
+          <!-- 展示模式 -->
+          <div v-else class="info-tags">
+            <span
+              v-for="t in mergedTags"
+              :key="t.tag"
+              class="tag"
+              :class="{
+                'tag-emotion': t.type === 'emotion',
+                'tag-theme': t.type === 'theme',
+                'tag-custom': t.custom,
+              }"
+            >
+              {{ t.tag }}
+              <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
+            </span>
+            <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
           </div>
         </div>
 
@@ -708,7 +751,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, type Component } from 'vue'
-import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, Moon, List, User, AlertTriangle } from 'lucide-vue-next'
+import { Star, Sparkles, Check, PenSquare, X, ArrowLeft, Sun, Navigation, Thermometer, BookOpen, Heart, Eye, Search, ArrowUpDown, ChevronDown, MessagesSquare, Trash2, Compass, Sunrise, Sunset, Clock, List, User, AlertTriangle } from 'lucide-vue-next'
 import StarNarrative from './StarNarrative.vue'
 import AncientChat from './AncientChat.vue'
 import { useNarrative } from '../composables/useNarrative'
