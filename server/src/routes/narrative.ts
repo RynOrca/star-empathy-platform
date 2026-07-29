@@ -17,7 +17,9 @@ router.get('/:catalogStarId/narrative', async (req: Request, res: Response) => {
 
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined
-    const result = await getNarrative(catalogStarId, lat, lng)
+    const ra = req.query.ra ? parseFloat(req.query.ra as string) : undefined
+    const dec = req.query.dec ? parseFloat(req.query.dec as string) : undefined
+    const result = await getNarrative(catalogStarId, lat, lng, ra, dec)
     ok(res, 'success', result)
   } catch (error: any) {
     if (error?.statusCode === 404) {

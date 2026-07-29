@@ -366,6 +366,9 @@ export function useSky(
   const _reusedTailEnd = new Vector3()
   // OPT-26：标签距离 LOD 复用向量（避免每帧 new Vector3）
   const _lodVec = new Vector3()
+  // 星名标注：角度计算复用向量
+  const _camDir = new Vector3()
+  const _starDir = new Vector3()
   // OPT-30：旋转矩阵复用（避免用户拖拽时高频 new Matrix4 导致 GC 压力）
   // 用于 rotateX/Y/Z/rotate/setRotation 方法，makeRotation* 会重置矩阵为单位+旋转
   const _rotMat = new Matrix4()
@@ -499,16 +502,18 @@ for (const s of stars) starById.set(s.id, s)
   }
 
   // ═══ P0-5：亮星十字光芒（diffraction spikes） ═══
-  // 给前 3 层（mag <= 1.8）的亮星叠加十字光芒纹理
-  // - 1 等以上的星肉眼可见十字芒，是被相机/眼镜折射后形成的视觉现象
+  // 所有 6 层星星叠加十字光芒，按视星等分配强弱
+  // - 亮星 spike 大且亮，暗星 spike 小且淡，形成自然的亮度梯度
   // - 用独立的 Points 层 + spike 纹理 + AdditiveBlending，配合 Bloom 形成真实星芒
   // - 颜色继承自原星色（vertexColors 与白 spike 相乘）
-  // - issue #34：移除 P2 spike 闪烁 shader，星点与星芒保持稳定亮度
   const SPIKE_TEX = spikeTex(128)
   const spikeTiers = [
-    { tier: 0, size: 44, opacity: 0.95 },  // 天狼、老人等极亮星
-    { tier: 1, size: 32, opacity: 0.75 },  // 织女、五车二等亮星
-    { tier: 2, size: 22, opacity: 0.50 },  // 1 等左右星
+    { tier: 0, size: 48, opacity: 1.00 },  // mag <= -0.5  天狼、老人等极亮星
+    { tier: 1, size: 36, opacity: 0.85 },  // mag <=  0.5  织女、五车二等亮星
+    { tier: 2, size: 26, opacity: 0.65 },  // mag <=  1.8  1 等左右星
+    { tier: 3, size: 18, opacity: 0.45 },  // mag <=  3.0  2~3 等星
+    { tier: 4, size: 12, opacity: 0.28 },  // mag <=  4.5  3~4.5 等星
+    { tier: 5, size:  8, opacity: 0.14 },  // mag <=   99  暗星，微弱光晕
   ]
   for (const cfg of spikeTiers) {
     const b = bins[cfg.tier]; if (b.pos.length === 0) continue
@@ -523,6 +528,36 @@ for (const s of stars) starById.set(s.id, s)
     const pts = new Points(g, spikeMat)
     pts.renderOrder = 5  // 在普通星点之上、UI 元素之下
     skyGroup.add(pts)
+  }
+
+  // ═══ 星名标注：靠近视角中心时显示名称 ═══
+  const starNameLabels = new Map<number, CSS2DObject>()
+  const starNameOpacities = new Map<number, number>() // 当前 opacity（帧间 lerp）
+  {
+    const namedStars = stars.filter(s => s.name !== null)
+    for (const s of namedStars) {
+      const inner = document.createElement('div')
+      inner.textContent = s.name!.split(' ')[0]
+      inner.style.cssText = `
+        color: ${cfg.nameLabelColor};
+        font-size: ${cfg.nameLabelFontSize}px;
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+        text-shadow: 0 0 6px rgba(0,0,0,0.8);
+        pointer-events: none;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(calc(-100% + ${cfg.nameLabelOffsetPx}px));
+      `
+      const el = document.createElement('div')
+      el.style.cssText = 'display:flex;justify-content:center'
+      el.appendChild(inner)
+      const label = new CSS2DObject(el)
+      label.position.set(s.x, s.y, s.z)
+      label.visible = false
+      skyGroup.add(label)
+      starNameLabels.set(s.id, label)
+      starNameOpacities.set(s.id, 0)
+    }
   }
 
   // ═══ 悬浮高亮辉光（加到 scene，不随 skyGroup 旋转） ═══
@@ -879,7 +914,11 @@ for (const s of stars) starById.set(s.id, s)
 
   const tooltipEl = document.createElement('div')
   tooltipEl.className = 'star-tooltip'
-  tooltipEl.innerHTML = `
+  // 偏移在 inner 上，因为 CSS2DRenderer 会覆盖外层 transform
+  const tooltipInner = document.createElement('div')
+  tooltipInner.className = 'tt-inner'
+  tooltipInner.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
+  tooltipInner.innerHTML = `
     <div class="tt-name"></div>
     <div class="tt-row">
       <span class="tt-stat" title="故事"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><em class="tt-val">0</em></span>
@@ -890,22 +929,26 @@ for (const s of stars) starById.set(s.id, s)
       <span class="tt-stat" title="收藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><em class="tt-val">0</em></span>
     </div>
   `
+  tooltipEl.appendChild(tooltipInner)
   // 注入 tooltip 样式（issue #34：字体大小/颜色/背景通过 cfg 可定制）
-  // 关键修复：移除 CSS margin-top（与 tooltipLabel.position Y 偏移叠加会导致位置异常）
-  // 现在仅通过 cfg.tooltipYOffset 在 3D 空间控制位置，CSS2DObject 自动投影
+  // 屏幕空间偏移由 CSS transform: translate(-50%, -100%) 控制，缩放时保持稳定
   const ttStyle = document.createElement('style')
   ttStyle.textContent = `
     .star-tooltip {
+      pointer-events:none;
+      display:flex; justify-content:center;
+    }
+    .tt-inner {
       font-family:"Inter","Microsoft YaHei",system-ui,sans-serif;
       font-size:${cfg.tooltipFontSize}px; color:${cfg.tooltipTextColor};
       background:${cfg.tooltipBgColor};
       padding:8px 12px; border-radius:8px;
       border:1px solid rgba(255,255,255,0.06);
       backdrop-filter:blur(8px);
-      white-space:nowrap; pointer-events:none;
+      white-space:nowrap;
       opacity:0; transition:opacity 0.15s;
       line-height:1;
-      transform:translate(-50%, -100%);
+      transform:translateY(calc(-100% + var(--tt-offset, 0px)));
     }
     .star-tooltip .tt-name {
       font-size:${cfg.tooltipNameFontSize}px; font-weight:600;
@@ -977,14 +1020,14 @@ for (const s of stars) starById.set(s.id, s)
       vals[3].textContent = stats ? String(stats.favorites) : '0'
       _lastStatsKey = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
       // tooltip + hoverGlow 位置（通过 skyGroup.matrixWorld 变换到世界坐标）
-      // 修复：tooltip Y 偏移通过 cfg.tooltipYOffset 控制，不再用 CSS margin-top（避免双重偏移）
+      // 屏幕空间偏移由 CSS transform: translate(-50%, -100%) 控制，不依赖世界坐标
       const sn = starNormMap.get(starId)
       if (sn) {
         _w.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld)
-        tooltipLabel.position.set(_w.x, _w.y + cfg.tooltipYOffset, _w.z)
+        tooltipLabel.position.set(_w.x, _w.y, _w.z)
         hoverGlow.position.set(_w.x, _w.y, _w.z)
       }
-      tooltipEl.style.opacity = '1'
+      tooltipInner.style.opacity = '1'
       hoverGlow.visible = true
       hoverGlowTargetOpacity = 0.95
       options?.onStarHover?.(starId)
@@ -994,7 +1037,7 @@ for (const s of stars) starById.set(s.id, s)
       const sn = starNormMap.get(starId)
       if (!sn) return
       _w.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld)
-      tooltipLabel.position.set(_w.x, _w.y + cfg.tooltipYOffset, _w.z)
+      tooltipLabel.position.set(_w.x, _w.y, _w.z)
       hoverGlow.position.set(_w.x, _w.y, _w.z)
     }
     function refreshTooltipStats(starId: number) {
@@ -1104,7 +1147,7 @@ for (const s of stars) starById.set(s.id, s)
           applyConstellationVisibility(null)
         }
         hoveredStarId = -1
-        tooltipEl.style.opacity = '0'
+        tooltipInner.style.opacity = '0'
         hoverGlowTargetOpacity = 0
         options?.onStarHover?.(null)
       }
@@ -3051,6 +3094,32 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
     }
+    // 星名标注：靠近视角中心时显示名称（平滑淡入淡出）
+    if (starNameLabels.size > 0) {
+      camera.getWorldDirection(_camDir)
+      const thresholdRad = cfg.nameLabelFovDeg * D2R
+      const innerRad = thresholdRad * 0.55  // 完全可见区
+      const outerRad = thresholdRad          // 完全隐藏区
+      const fadeRange = outerRad - innerRad
+      for (const [starId, label] of starNameLabels) {
+        const star = starById.get(starId)
+        if (!star) continue
+        _starDir.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld).normalize()
+        const angle = Math.acos(Math.max(-1, Math.min(1, _camDir.dot(_starDir))))
+        // 平滑过渡：inner 以内 opacity=1，outer 以外 opacity=0，中间线性插值
+        const target = angle <= innerRad ? 1 : angle >= outerRad ? 0 : 1 - (angle - innerRad) / fadeRange
+        const cur = starNameOpacities.get(starId) ?? 0
+        const next = cur + (target - cur) * 0.12 // 帧间 lerp
+        starNameOpacities.set(starId, next)
+        if (next > 0.005) {
+          if (!label.visible) label.visible = true
+          ;(label.element.firstChild as HTMLElement).style.opacity = String(next)
+        } else if (label.visible) {
+          label.visible = false
+          ;(label.element.firstChild as HTMLElement).style.opacity = '0'
+        }
+      }
+    }
     // OPT-28：沉浸模式下跳过 labelRenderer.render()，节省 DOM 操作开销
     if (labelsVisible) {
       labelRenderer.render(scene, camera)
@@ -3170,6 +3239,23 @@ for (const s of stars) starById.set(s.id, s)
         for (const el of constellationLabelEls.values()) {
           el.style.color = cfg.constellationLabelColor
         }
+      }
+      // 星名标注颜色/字体/偏移变更
+      const nameLabelStyleChanged =
+        cfg.nameLabelColor !== patch.nameLabelColor ||
+        cfg.nameLabelFontSize !== patch.nameLabelFontSize ||
+        cfg.nameLabelOffsetPx !== patch.nameLabelOffsetPx
+      if (nameLabelStyleChanged) {
+        for (const label of starNameLabels.values()) {
+          const inner = label.element.firstChild as HTMLElement
+          inner.style.color = cfg.nameLabelColor
+          inner.style.fontSize = `${cfg.nameLabelFontSize}px`
+          inner.style.transform = `translateY(calc(-100% + ${cfg.nameLabelOffsetPx}px))`
+        }
+      }
+      // tooltip 偏移变更
+      if (cfg.tooltipOffsetPx !== patch.tooltipOffsetPx) {
+        tooltipInner.style.setProperty('--tt-offset', `${cfg.tooltipOffsetPx}px`)
       }
       // showAllConstellations 状态变更：立即应用可见性
       if (cfg.showAllConstellations !== oldShowAll) {

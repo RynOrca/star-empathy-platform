@@ -46,7 +46,8 @@ db.exec(`
     view_count      INTEGER NOT NULL DEFAULT 0,
     origin          TEXT,
     user_id         INTEGER REFERENCES users(id),
-    tag             TEXT
+    tag             TEXT,
+    image_url       TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
   CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
@@ -71,9 +72,10 @@ db.exec(`
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     catalog_star_id INTEGER NOT NULL,
     content         TEXT NOT NULL,
-    generated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    generated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    is_visible      INTEGER NOT NULL DEFAULT 1
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at));
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_narratives_day ON narratives(catalog_star_id, date(generated_at), is_visible);
 
   CREATE TABLE IF NOT EXISTS story_kernels (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,5 +158,7 @@ try { db.exec('ALTER TABLE catalog_visits ADD COLUMN user_id INTEGER REFERENCES 
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_visits(user_id)'); } catch {}
 // 兼容旧数据库：stars 加 is_anonymous 列
 try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
+// 兼容旧数据库：stars 加 image_url 列
+try { db.exec('ALTER TABLE stars ADD COLUMN image_url TEXT'); } catch {}
 
 export default db;

@@ -26,8 +26,6 @@ export interface StarDisplayConfig {
   /** 长悬浮触发延时（毫秒） */
   hoverLongDelayMs: number
 
-  /** tooltip 在世界坐标系下相对星位置的 Y 偏移（负数=下方，正数=上方） */
-  tooltipYOffset: number
   /** tooltip 字体大小（px） */
   tooltipFontSize: number
   /** tooltip 名称字体大小（px） */
@@ -60,6 +58,17 @@ export interface StarDisplayConfig {
   constellationGlowColor: number
   /** 星座标签色（CSS rgba） */
   constellationLabelColor: string
+
+  /** 星名标注：视角中心阈值（度），星星偏离视角中心小于此角度时显示名称 */
+  nameLabelFovDeg: number
+  /** 星名标注字体大小（px） */
+  nameLabelFontSize: number
+  /** 星名标注颜色（CSS rgba） */
+  nameLabelColor: string
+  /** 星名标注：相对星星锚点的屏幕像素偏移（负值=上方，正值=下方） */
+  nameLabelOffsetPx: number
+  /** tooltip：相对星星锚点的屏幕像素偏移（负值=上方，正值=下方） */
+  tooltipOffsetPx: number
 }
 
 export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
@@ -67,7 +76,6 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   hoverThrottleMs: 80,
   hoverLongDelayMs: 1000,
 
-  tooltipYOffset: -50,
   tooltipFontSize: 11,
   tooltipNameFontSize: 13,
   tooltipBgColor: 'rgba(12,12,28,0.92)',
@@ -85,4 +93,10 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   constellationLineColor: 0x6677aa,
   constellationGlowColor: 0xffd98a,
   constellationLabelColor: 'rgba(102,119,170,0.6)',
+
+  nameLabelFovDeg: 15,
+  nameLabelFontSize: 10,
+  nameLabelColor: 'rgba(255,217,138,0.7)',
+  nameLabelOffsetPx: -12,
+  tooltipOffsetPx: -8,
 }

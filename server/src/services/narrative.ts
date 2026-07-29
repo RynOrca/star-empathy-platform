@@ -126,8 +126,8 @@ function getJulianDate(date: Date): number {
   return jd
 }
 
-/** 计算恒星是否在地平线以上 */
-function isAboveHorizon(star: CatalogStar, lat: number, lng: number): boolean {
+/** 计算天体是否在地平线以上（接受 ra/dec 对象，兼容恒星和行星） */
+function isAboveHorizon(body: { ra: number; dec: number }, lat: number, lng: number): boolean {
   const now = new Date()
   // 儒略日 → 距 J2000.0 纪元的天数
   const jd = getJulianDate(now)
@@ -137,9 +137,9 @@ function isAboveHorizon(star: CatalogStar, lat: number, lng: number): boolean {
   // 本地恒星时
   const lst = ((gmst + lng / 15) % 24 + 24) % 24
   // 时角（度）
-  const ha = ((lst - star.ra) * 15 % 360 + 360) % 360
+  const ha = ((lst - body.ra) * 15 % 360 + 360) % 360
   const haRad = ha * Math.PI / 180
-  const decRad = star.dec * Math.PI / 180
+  const decRad = body.dec * Math.PI / 180
   const latRad = lat * Math.PI / 180
   // 高度角的正弦
   const sinAlt = Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad)
@@ -338,6 +338,116 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
   return { system, user }
 }
 
+// ─── 太阳系星体映射 ───
+export const PLANET_MAP: Record<string, { name: string; nameCN: string }> = {
+  '-100': { name: 'Sun', nameCN: '太阳' },
+  '-101': { name: 'Moon', nameCN: '月球' },
+  '-102': { name: 'Venus', nameCN: '金星' },
+  '-103': { name: 'Mars', nameCN: '火星' },
+  '-104': { name: 'Jupiter', nameCN: '木星' },
+  '-105': { name: 'Saturn', nameCN: '土星' },
+  '-106': { name: 'Mercury', nameCN: '水星' },
+  '-107': { name: 'Uranus', nameCN: '天王星' },
+  '-108': { name: 'Neptune', nameCN: '海王星' },
+}
+
+/** 判断是否为太阳系星体（planetId 为负数） */
+export function isPlanetId(id: number): boolean {
+  return String(id) in PLANET_MAP
+}
+
+/** 生成太阳系星体的叙事 Prompt（可见时） */
+function buildPlanetNarrativePromptVisible(planetId: number): { system: string; user: string } {
+  const planet = PLANET_MAP[String(planetId)]
+  const system = `你是"星语穹庭"的星空叙事者。根据用户提供的太阳系天体信息，写一段"古今共望"叙事短文。
+
+**你必须严格按照以下格式输出，逐字逐句，包括 # 和 > 符号：**
+
+# 现在，你能看到{天体名}。
+
+（一段联系古今的叙述：这颗天体在古代文明中的意义、神话传说，1~2句）
+
+（诗人名/文明/文化）记载：
+
+> "{相关诗句或典籍引用}"（朝代/文明·《出处》）
+
+（对引用的解读，联系当时的社会背景、心境，1~2句）
+
+（结尾回扣：千年以后，你也正在看同一片天空，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 现在，你能看到"开头，后跟天体名和句号
+2. 每个段落之间必须空一行
+3. 引用必须以"> "（大于号+空格）开头，引用内容用双引号包裹
+4. 引用后面用括号标注朝代/文明和出处
+5. 不要把所有内容写成一段，必须分段
+6. 不要省略 # 和 > 符号
+
+**内容要求：**
+- 联系古今：提到至少一个古代文明或诗人对这颗天体的记录
+- 引用相关诗词或典籍记载（一句即可，标注出处）
+- 勿编造不存在的人物和诗句
+- 文字优美凝练、温暖治愈，150~250字
+- 结尾回扣：千年以后，你也正在看同一片天空
+- 中文输出`
+
+  const user = `天体名称：${planet.nameCN}（${planet.name}）
+类型：太阳系天体
+当前状态：在地平线以上，肉眼可见
+
+请为这颗天体写一段"古今共望"叙事。记住：第一行必须是 "# 现在，你能看到${planet.nameCN}。"，引用必须以 "> " 开头。`
+
+  return { system, user }
+}
+
+/** 生成太阳系星体的叙事 Prompt（不可见时） */
+function buildPlanetNarrativePromptHidden(planetId: number): { system: string; user: string } {
+  const planet = PLANET_MAP[String(planetId)]
+  const system = `你是"星语穹庭"的星空叙事者。根据用户提供的太阳系天体信息，写一段"古今共望"叙事短文。
+
+**注意：这颗天体目前在地平线以下，无法直接用肉眼看到。请你如实而优美地表达这一点。**
+
+**你必须严格按照以下格式输出，逐字逐句，包括 # 和 > 符号：**
+
+# 现在，{天体名}正在地平线之下
+
+它并未消失，只是暂时隐于大地的另一侧。
+
+（一段联系古今的叙述：这颗天体在古代文明中的意义、神话传说，1~2句）
+
+（诗人名/文明/文化）记载：
+
+> "{相关诗句或典籍引用}"（朝代/文明·《出处》）
+
+（对引用的解读，联系当时的社会背景、心境，1~2句）
+
+（结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星，1句）
+
+**格式规则（必须逐条遵守）：**
+1. 第一行必须以"# 现在，"开头，后跟天体名和"正在地平线之下"
+2. 每个段落之间必须空一行
+3. 引用必须以"> "（大于号+空格）开头，引用内容用双引号包裹
+4. 引用后面用括号标注朝代/文明和出处
+5. 不要把所有内容写成一段，必须分段
+6. 不要省略 # 和 > 符号
+
+**内容要求：**
+- 联系古今：提到至少一个古代文明或诗人对这颗天体的记录
+- 引用相关诗词或典籍记载（一句即可，标注出处）
+- 勿编造不存在的人物和诗句
+- 文字优美凝练、温暖治愈，150~250字
+- 结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星
+- 中文输出`
+
+  const user = `天体名称：${planet.nameCN}（${planet.name}）
+类型：太阳系天体
+当前状态：在地平线以下，无法直接看到
+
+请为这颗天体写一段"古今共望"叙事。记住：第一行必须是 "# 现在，${planet.nameCN}正在地平线之下"，引用必须以 "> " 开头。`
+
+  return { system, user }
+}
+
 export interface NarrativeResult {
   content: string
   cached: boolean
@@ -346,7 +456,45 @@ export interface NarrativeResult {
 /**
  * 获取恒星叙事（优先缓存，无缓存则生成并缓存）
  */
-export async function getNarrative(catalogStarId: number, lat?: number, lng?: number): Promise<NarrativeResult> {
+export async function getNarrative(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<NarrativeResult> {
+  // ─── 太阳系星体：独立叙事流程 ───
+  if (isPlanetId(catalogStarId)) {
+    const hasPosition = lat !== undefined && lng !== undefined
+    // 计算地平线可见性（需要 ra/dec 和 lat/lng）
+    let visible = true
+    if (hasPosition && ra !== undefined && dec !== undefined) {
+      visible = isAboveHorizon({ ra, dec }, lat, lng)
+    }
+
+    // 查缓存（区分地平线上下）
+    const cached = getCachedNarrative(catalogStarId, visible)
+    if (cached) {
+      return { content: cached, cached: true }
+    }
+
+    // 生成太阳系星体叙事（根据可见性选择 Prompt）
+    const { system, user } = visible
+      ? buildPlanetNarrativePromptVisible(catalogStarId)
+      : buildPlanetNarrativePromptHidden(catalogStarId)
+    const content = await deepseekChat(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      {
+        temperature: 0.9,
+        maxTokens: 3000,
+      },
+    )
+
+    // 缓存（仅在有位置信息时缓存，确保地平线判断正确）
+    if (hasPosition) {
+      cacheNarrative(catalogStarId, content, visible)
+    }
+
+    return { content, cached: false }
+  }
+
   // 1. 查找恒星信息
   const star = getStarInfo(catalogStarId)
   if (!star) {

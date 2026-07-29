@@ -39,7 +39,7 @@
           <component :is="showMyStoriesOnly ? Globe : Star" :size="14" />
           <span>{{ showMyStoriesOnly ? '全部' : '我的' }}</span>
         </button>
-        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" title="更改定位">
+        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位（悬停 2 秒可选择城市）">
           <MapPin :size="14" />
           <span>定位</span>
         </button>
@@ -74,13 +74,84 @@
         <p class="fallback-title">无法获取你的位置</p>
         <p class="fallback-desc">请在浏览器地址栏允许位置权限，或手动选择一个城市：</p>
         <div class="city-grid">
-          <button v-for="c in cities" :key="c.name" class="city-btn" @click="selectCity(c)">
+          <button v-for="c in allCities" :key="c.name" class="city-btn" @click="selectCity(c)">
             {{ c.name }}
           </button>
         </div>
         <button class="refresh-loc-btn" @click="refreshLocation"><RefreshCw :size="14" /> 重新获取定位</button>
       </div>
     </div>
+
+    <!-- 城市选择浮动面板（悬停 2s 或未获取到城市名时弹出） -->
+    <Transition name="panel-fade">
+      <div v-if="showCityPanel" class="city-panel-backdrop" @click="showCityPanel = false">
+        <div class="city-panel" @click.stop>
+          <!-- 面板头部 -->
+          <div class="city-panel-header">
+            <div class="city-panel-title-row">
+              <span class="city-panel-dot"></span>
+              <h3 class="city-panel-title">选择观测城市</h3>
+            </div>
+            <button class="city-panel-close" @click="showCityPanel = false" title="关闭">
+              <X :size="16" />
+            </button>
+          </div>
+
+          <!-- 中国城市 -->
+          <div class="city-group">
+            <h4 class="city-group-title">
+              <span class="city-group-icon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </span>
+              中国
+            </h4>
+            <div class="city-grid">
+              <button
+                v-for="c in cities"
+                :key="c.name"
+                class="city-btn"
+                :class="{ active: selectedCity?.name === c.name }"
+                @click="handleCitySelect(c)"
+              >
+                {{ c.name }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 分隔线 -->
+          <div class="city-group-divider"></div>
+
+          <!-- 国际城市 -->
+          <div class="city-group">
+            <h4 class="city-group-title">
+              <span class="city-group-icon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><path d="M2 12h20"/></svg>
+              </span>
+              国际
+            </h4>
+            <div class="city-grid">
+              <button
+                v-for="c in intlCities"
+                :key="c.name"
+                class="city-btn"
+                :class="{ active: selectedCity?.name === c.name }"
+                @click="handleCitySelect(c)"
+              >
+                {{ c.name }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 底部操作 -->
+          <div class="city-panel-footer">
+            <button class="city-panel-locate-btn" @click="goToCurrentLocation">
+              <Crosshair :size="14" />
+              <span>回到当前定位</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 三张叙事引导牌 -->
     <div v-if="locationReady" class="guide-cards">
@@ -182,7 +253,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -193,7 +264,7 @@ import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
-import { getMoonPhase, getSolarTerm } from '../data/planets'
+import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 
 
 const router = useRouter()
@@ -215,6 +286,11 @@ const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
 const locationFailed = ref(false)
+
+// ─── 城市选择面板 ───
+const showCityPanel = ref(false)
+const selectedCity = ref<{ name: string; lat: number; lng: number } | null>(null)
+const hoverTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // ─── 阶段 3 P0-1：月相显示（14-C §1 地月系） ───
 const moonPhase = ref<{ phaseFraction: number; phaseName: string; illumination: number } | null>(null)
@@ -306,14 +382,63 @@ const cities = [
   { name: '重庆', lat: 29.6, lng: 106.5 },
   { name: '长沙', lat: 28.2, lng: 113.0 },
   { name: '哈尔滨', lat: 45.8, lng: 126.7 },
+  { name: '昆明', lat: 25.0, lng: 102.7 },
+  { name: '拉萨', lat: 29.7, lng: 91.1 },
+  { name: '乌鲁木齐', lat: 43.8, lng: 87.6 },
+  { name: '香港', lat: 22.3, lng: 114.2 },
+  { name: '台北', lat: 25.0, lng: 121.5 },
 ]
+
+const intlCities = [
+  { name: '东京', lat: 35.68, lng: 139.76 },
+  { name: '首尔', lat: 37.57, lng: 126.98 },
+  { name: '新加坡', lat: 1.35, lng: 103.82 },
+  { name: '曼谷', lat: 13.75, lng: 100.50 },
+  { name: '迪拜', lat: 25.20, lng: 55.27 },
+  { name: '莫斯科', lat: 55.75, lng: 37.62 },
+  { name: '伦敦', lat: 51.51, lng: -0.13 },
+  { name: '巴黎', lat: 48.86, lng: 2.35 },
+  { name: '纽约', lat: 40.71, lng: -74.01 },
+  { name: '洛杉矶', lat: 34.05, lng: -118.24 },
+  { name: '悉尼', lat: -33.87, lng: 151.21 },
+  { name: '开罗', lat: 30.04, lng: 31.24 },
+]
+
+const allCities = [...cities, ...intlCities]
 
 function selectCity(c: { name: string; lat: number; lng: number }) {
   userLat.value = c.lat
   userLng.value = c.lng
+  selectedCity.value = c
   locationFailed.value = false
   locationReady.value = true
   showLocationToast(c.name)
+}
+
+// ─── 城市选择面板：悬停触发 & 选择逻辑 ───
+function startHoverTimer() {
+  clearHoverTimer()
+  hoverTimer.value = setTimeout(() => {
+    showCityPanel.value = true
+  }, 2000)
+}
+
+function clearHoverTimer() {
+  if (hoverTimer.value) {
+    clearTimeout(hoverTimer.value)
+    hoverTimer.value = null
+  }
+}
+
+function handleCitySelect(c: { name: string; lat: number; lng: number }) {
+  selectCity(c)
+  showCityPanel.value = false
+}
+
+function goToCurrentLocation() {
+  selectedCity.value = null
+  showCityPanel.value = false
+  refreshLocation()
 }
 
 // 获取用户地理位置（带 2 小时缓存）
@@ -334,13 +459,15 @@ function setCachedLocation(lat: number, lng: number) {
   localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
 }
 
-// 反向地理编码：获取城市名称
+// 反向地理编码：通过后端代理获取城市名称（BigDataCloud 主 + Nominatim 备，5s 超时）
 async function fetchCityName(lat: number, lng: number): Promise<string> {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&accept-language=zh`)
-    const data = await res.json()
-    const addr = data.address || {}
-    const city = addr.city || addr.town || addr.county || addr.state || addr.province || ''
+    const ctrl = new AbortController()
+    const timeout = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`, { signal: ctrl.signal })
+    clearTimeout(timeout)
+    const json = await res.json()
+    const city = json?.data?.city || ''
     console.log('[SkyPage] fetchCityName result:', city, 'from', { lat, lng })
     return city
   } catch (e) {
@@ -353,7 +480,11 @@ function showLocationToast(city: string) {
   const text = city ? `当前定位：${city}` : '定位成功（未获取到城市名）'
   console.log('[SkyPage] showLocationToast:', text)
   locationCityToast.value = text
-  setTimeout(() => { locationCityToast.value = '' }, 10000)
+  setTimeout(() => { locationCityToast.value = '' }, 3000)
+  // 未获取到城市名时，自动弹出城市选择面板
+  if (!city) {
+    setTimeout(() => { showCityPanel.value = true }, 800)
+  }
 }
 
 function fetchLocation() {
@@ -378,7 +509,7 @@ function fetchLocation() {
       locationReady.value = true
       locationFailed.value = true
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 
@@ -388,6 +519,7 @@ function refreshLocation() {
     showLocationToast('')
     return
   }
+  locationCityToast.value = '正在获取定位...'
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
       userLat.value = pos.coords.latitude
@@ -400,7 +532,7 @@ function refreshLocation() {
     () => {
       showLocationToast('')
     },
-    { timeout: 5000, enableHighAccuracy: false },
+    { timeout: 5000, enableHighAccuracy: true },
   )
 }
 
@@ -578,8 +710,9 @@ interface StoryData {
   catalogStarId: number; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; userId: number | null
+  imageUrl: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -601,6 +734,7 @@ function mergeStoriesIntoMap(
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
+      imageUrl: s.imageUrl ?? null,
     })
     const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
     cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
@@ -625,8 +759,6 @@ async function fetchStories() {
   const signal = fetchAbort.signal
 
   try {
-    const res = await fetch('/api/stories')
-    const json = await res.json()
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
 
@@ -688,20 +820,14 @@ watch(showMyStoriesOnly, async () => {
     // 关闭"只看我的"：清除连线
     skyRef.value?.sky?.setKernelLines([])
   }
-  // 如果详情面板打开且当前星没有过滤后的故事，关闭面板
+  // 如果详情面板打开：仅当该星完全没有故事时关闭面板
+  // 注意：showMyStoriesOnly 只影响 3D 天空，不影响详情面板数据
   if (selectedStarInfo.value && selectedCatalogStarId.value) {
-    const filtered = getFilteredStories(selectedCatalogStarId.value)
-    if (filtered.length === 0) {
+    const allStories = storiesByStarId.value.get(selectedCatalogStarId.value)
+    if (!allStories || allStories.length === 0) {
       selectedStories.value = []
       selectedStarInfo.value = null
       catalogStats.value = null
-    } else {
-      selectedStories.value = filtered
-      catalogStats.value = {
-        storyCount: filtered.length,
-        totalResonance: filtered.reduce((s, x) => s + x.resonanceCount, 0),
-        totalViews: 0, starViews: 0, favoriteCount: 0,
-      }
     }
   }
 })
@@ -808,6 +934,7 @@ debugTimer = setInterval(() => {
 onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
+  clearHoverTimer()
 })
 const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
@@ -820,7 +947,9 @@ const showSettings = ref(false)
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
-  const stories = getFilteredStories(starId)
+  // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
+  // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
+  const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
@@ -854,19 +983,27 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   // 'HaleBopp': { color: '#d8e8f8', conName: '海尔-波普彗星' },
 }
 
-function onPlanetClick(name: string, nameCN: string, planetId: number) {
+async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   const info = PLANET_INFO[name]
-  const stories = getFilteredStories(planetId)
+  const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
   activeStoryIndex.value = 0
+
+  // 计算行星当前 RA/Dec（用于后端判断地平线可见性）
+  let ra = 0, dec = 0
+  if (userLat.value !== undefined && userLng.value !== undefined) {
+    const pos = await getBodyPosition(name, userLat.value, userLng.value)
+    if (pos) { ra = pos.ra; dec = pos.dec }
+  }
+
   selectedStarInfo.value = {
     displayName: nameCN,
     con: '',
     mag: 0,
     conName: nameCN,
     distance: null,
-    ra: 0,
-    dec: 0,
+    ra,
+    dec,
     color: info?.color || '#ffdd88',
   }
   selectedCatalogStarId.value = planetId
@@ -1341,9 +1478,221 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .nav-loc-btn:hover { color: #ffd98a; border-color: rgba(255, 217, 138, 0.3); }
 
+/* ─── 城市选择浮动面板 ─── */
+.city-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 8, 22, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.city-panel {
+  width: 420px;
+  max-height: 72vh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, rgba(18, 22, 48, 0.97) 0%, rgba(12, 15, 35, 0.98) 100%);
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  border-radius: 16px;
+  box-shadow:
+    0 0 60px rgba(255, 200, 80, 0.06),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.city-panel::-webkit-scrollbar { width: 4px; }
+.city-panel::-webkit-scrollbar-track { background: transparent; }
+.city-panel::-webkit-scrollbar-thumb { background: rgba(255, 217, 138, 0.15); border-radius: 4px; }
+.city-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 217, 138, 0.3); }
+
+/* 面板头部 */
+.city-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 217, 138, 0.08);
+}
+.city-panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.city-panel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd98a;
+  box-shadow: 0 0 10px rgba(255, 217, 138, 0.5);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+.city-panel-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f0e6c8;
+  letter-spacing: 0.03em;
+}
+.city-panel-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(48, 55, 87, 0.4);
+  background: rgba(255, 255, 255, 0.03);
+  color: #7a759c;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.city-panel-close:hover {
+  color: #f6f1ff;
+  border-color: rgba(255, 217, 138, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* 城市分组 */
+.city-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.city-group-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #8a84a0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.city-group-icon {
+  color: #ffd98a;
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+}
+.city-group-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 217, 138, 0.1), transparent);
+}
+
+/* 城市按钮网格 */
+.city-panel .city-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.city-panel .city-btn {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(48, 55, 87, 0.4);
+  background: rgba(16, 20, 43, 0.5);
+  color: #b9b4d6;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.city-panel .city-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 217, 138, 0.08) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.city-panel .city-btn:hover {
+  color: #ffd98a;
+  border-color: rgba(255, 217, 138, 0.4);
+  background: rgba(40, 35, 18, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.city-panel .city-btn:hover::before {
+  opacity: 1;
+}
+.city-panel .city-btn.active {
+  color: #1a1a2e;
+  background: linear-gradient(135deg, #ffd98a 0%, #e8c56d 100%);
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 0 16px rgba(255, 217, 138, 0.25);
+}
+.city-panel .city-btn.active::before {
+  display: none;
+}
+
+/* 底部操作 */
+.city-panel-footer {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 217, 138, 0.08);
+  display: flex;
+  justify-content: center;
+}
+.city-panel-locate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 217, 138, 0.25);
+  background: rgba(40, 35, 18, 0.4);
+  color: #ffd98a;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  letter-spacing: 0.02em;
+}
+.city-panel-locate-btn:hover {
+  background: rgba(40, 35, 18, 0.65);
+  border-color: rgba(255, 217, 138, 0.5);
+  box-shadow: 0 0 20px rgba(255, 217, 138, 0.12);
+  transform: translateY(-1px);
+}
+
+/* 面板过渡动画 */
+.panel-fade-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.panel-fade-leave-active {
+  transition: all 0.2s ease-in;
+}
+.panel-fade-enter-from {
+  opacity: 0;
+}
+.panel-fade-enter-from .city-panel {
+  transform: scale(0.92) translateY(12px);
+  opacity: 0;
+}
+.panel-fade-leave-to {
+  opacity: 0;
+}
+.panel-fade-leave-to .city-panel {
+  transform: scale(0.95);
+  opacity: 0;
+}
+
 @media (max-width: 640px) {
   .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }
   .guide-card { width: 180px; padding: 0.5rem 0.7rem 0.45rem; }
   .guide-card svg { width: 16px; height: 16px; }
+  .city-panel { width: 92vw; max-height: 65vh; padding: 1.2rem; border-radius: 14px; }
+  .city-panel .city-btn { padding: 0.35rem 0.6rem; font-size: 0.74rem; }
 }
 </style>

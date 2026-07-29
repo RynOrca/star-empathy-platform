@@ -16,14 +16,15 @@ export interface Star {
   created_at: string;
   view_count: number;
   origin: string | null;
+  image_url: string | null;
 }
 
 // 获取所有星星（含用户名、用户 ID 和标签）
+// 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
 export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null })[] {
   return db.prepare(`
-    SELECT s.*, s.user_id as userId,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      s.tag
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
@@ -47,9 +48,8 @@ export function getAllStarsPaged(page: number, limit: number): {
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
-    SELECT s.*, s.user_id as userId,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      s.tag
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     ORDER BY s.created_at DESC
@@ -68,13 +68,14 @@ export function createStar(
   userId?: number,
   tag?: string,
   isAnonymous?: boolean,
+  imageUrl?: string,
 ): Star & { username: string | null; userId: number | null } {
   const pos = generatePosition();
   const validTags = ['思念', '等待', '离别', '愿望', '孤独'];
   const safeTag = tag && validTags.includes(tag) ? tag : null;
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -86,9 +87,10 @@ export function createStar(
     userId ?? null,
     safeTag,
     isAnonymous ? 1 : 0,
+    imageUrl ?? null,
   );
   return db.prepare(`
-    SELECT s.*, s.user_id as userId,
+    SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
@@ -191,7 +193,7 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 // 单条故事详情
 export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
   const row = db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, u.username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
@@ -202,7 +204,7 @@ export function getStoryById(storyId: number): (Star & { username: string | null
 // 单星下的所有故事
 export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, u.username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.catalog_star_id = ?
@@ -213,7 +215,7 @@ export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { user
 // 我的故事
 export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null })[] {
   return db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
   `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
@@ -235,7 +237,7 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
   const totalPages = Math.ceil(total / l);
 
   const items = db.prepare(`
-    SELECT s.*, u.username, s.tag
+    SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
@@ -261,6 +263,10 @@ export function deleteStory(storyId: number, userId: number): {
   const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
   if (!existing) return { success: false, notFound: true };
   if (existing.user_id !== userId) return { success: false, notOwner: true };
+  // 先清理外键关联数据，再删除故事本身
+  db.prepare('DELETE FROM resonance_log WHERE story_id = ?').run(storyId);
+  db.prepare('DELETE FROM story_views WHERE story_id = ?').run(storyId);
+  db.prepare('DELETE FROM story_kernels WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
   return { success: true };
 }

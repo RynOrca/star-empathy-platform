@@ -79,9 +79,9 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
       locationData = { lat: location.lat, lng: location.lng };
     }
 
-    const esc = (s: string) => s.replace(/[<>&"]/g, (c) => {
+    const esc = (s: string) => s.replace(/[<&"]/g, (c) => {
       const map: Record<string, string> = {
-        '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;',
+        '<': '&lt;', '&': '&amp;', '"': '&quot;',
       };
       return map[c] || c;
     });

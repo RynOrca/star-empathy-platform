@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express'
 import { getPublicFigures, getFiguresForStar, getFigureById, generateOpening, getStarAssociation } from '../data/ancientFigures'
 import { streamChat } from '../services/chat'
+import { PLANET_MAP, isPlanetId } from '../services/narrative'
 import { ok, badRequest, notFound } from '../utils/response'
 import fs from 'fs'
 import path from 'path'
@@ -67,9 +68,20 @@ const CON_NAMES: Record<string, string> = {
 }
 
 /**
- * 根据 catalogStarId 查找星星信息
+ * 根据 catalogStarId 查找天体信息（恒星或太阳系星体）
+ * 太阳系星体（负 ID）返回合成对象，name 为中文名
  */
 function findStar(catalogStarId: number): CatalogStar | undefined {
+  // 太阳系星体：返回合成对象
+  if (isPlanetId(catalogStarId)) {
+    const planet = PLANET_MAP[String(catalogStarId)]
+    return {
+      id: catalogStarId,
+      name: planet.nameCN,
+      con: '',
+      mag: 0,
+    }
+  }
   return starsData.find((s) => s.id === catalogStarId)
 }
 
