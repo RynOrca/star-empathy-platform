@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted } from 'vue'
 import { X, Send } from 'lucide-vue-next'
 import { marked } from 'marked'
 
@@ -162,7 +162,14 @@ const streamingContent = ref('')
 const errorMessage = ref('')
 const messagesRef = ref<HTMLElement | null>(null)
 
-// 监听 visible 变化，打开时加载古人列表
+// 打开时加载古人列表（组件挂载时若 visible 为 true 也需要加载）
+onMounted(() => {
+  if (props.visible) {
+    reset()
+    fetchFigures()
+  }
+})
+
 watch(() => props.visible, async (v) => {
   if (v) {
     reset()
