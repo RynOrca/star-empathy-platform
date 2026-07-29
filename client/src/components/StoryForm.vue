@@ -119,11 +119,12 @@ import { useLocation } from '../composables/useLocation'
 const props = defineProps<{
   starName: string
   catalogStarId: number
+  catalogStarIds?: number[]
 }>()
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null; imageUrl: string | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null; imageUrl: string | null }]
 }>()
 
 const title = ref('')
@@ -229,6 +230,7 @@ async function onSubmit() {
     if (token) headers['Authorization'] = `Bearer ${token}`
     const body: Record<string, unknown> = {
       catalogStarId: props.catalogStarId,
+      catalogStarIds: props.catalogStarIds ?? [props.catalogStarId],
       title: trimmedTitle,
       content: trimmed,
       location: userLocation.value,
