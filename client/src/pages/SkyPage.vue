@@ -14,9 +14,45 @@
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </span>
       </div>
+      <!-- PC 端搜索框 -->
+      <div v-if="!isMobile" class="nav-center">
+        <div class="search-box">
+          <Search :size="14" class="search-box-icon" />
+          <input
+            v-model="searchQuery"
+            placeholder="搜索星星..."
+            class="search-box-input"
+            @input="onSearchInput"
+            @focus="searchOpen = true"
+            @blur="closeSearchDropdown"
+          />
+          <div v-if="searchOpen && searchResults.length" class="search-dropdown">
+            <div
+              v-for="r in searchResults"
+              :key="r.id"
+              class="search-item"
+              @click="onSearchSelect(r.id)"
+            >
+              <div class="sr-info">
+                <span class="sr-name">{{ r.name || r.conName }}</span>
+                <span class="sr-con">{{ r.conName }}</span>
+              </div>
+              <div class="sr-meta">
+                <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+                <button class="sr-locate" title="定位但不打开" @click.stop="locateStar(r.id); searchOpen = false">
+                  <Crosshair :size="14" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
+            <div class="search-item search-item-empty">未找到匹配的星星</div>
+          </div>
+        </div>
+      </div>
       <div class="nav-right">
-        <!-- 搜索按钮 -->
-        <button class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+        <!-- 搜索按钮（移动端） -->
+        <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
           <Search :size="18" />
         </button>
         <!-- 我的/全部切换 -->
@@ -282,7 +318,9 @@ import SettingsModal from '../components/SettingsModal.vue'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
+import { useMediaQuery } from '../composables/useMediaQuery'
 
+const { isMobile } = useMediaQuery()
 
 const router = useRouter()
 const route = useRoute()
@@ -608,6 +646,7 @@ function goLogin() {
 
 // ─── 搜索星星 ───
 const showSearch = ref(false)
+const searchOpen = ref(false)
 const searchQuery = ref('')
 const searching = ref(false)
 const searchResults = ref<any[]>([])
@@ -633,7 +672,13 @@ function clearSearch() {
 
 function onSearchSelect(starId: number) {
   showSearch.value = false
+  searchOpen.value = false
+  searchQuery.value = ''
   flyToStar(starId)
+}
+
+function closeSearchDropdown() {
+  setTimeout(() => { searchOpen.value = false }, 150)
 }
 
 async function onSearchInput() {
@@ -1149,6 +1194,102 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
 .nav-left { display: flex; align-items: center; gap: 0.5rem; }
 .nav-right { display: flex; align-items: center; gap: 0.4rem; }
+
+/* ─── PC 端搜索框 ─── */
+.nav-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.search-box {
+  position: relative;
+  width: 260px;
+}
+.search-box-icon {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-light);
+  pointer-events: none;
+  z-index: 1;
+}
+.search-box-input {
+  width: 100%;
+  padding: 0.45rem 0.9rem 0.45rem 2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
+  background: rgba(255,255,255,0.05);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.search-box-input:focus {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-glow);
+  background: rgba(255,255,255,0.08);
+}
+.search-box-input::placeholder {
+  color: var(--muted-light);
+}
+.search-dropdown {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  right: 0;
+  background: rgba(16,20,43,0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(48,55,87,0.5);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 30;
+}
+.search-dropdown::-webkit-scrollbar { width: 4px; }
+.search-dropdown::-webkit-scrollbar-track { background: transparent; }
+.search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255,217,138,0.2);
+  border-radius: 4px;
+}
+.search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.search-item:hover {
+  background: rgba(255,217,138,0.08);
+}
+.search-item .sr-name { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+.search-item .sr-con { color: var(--muted); font-size: 0.75rem; margin-left: 8px; }
+.search-item .sr-mag { color: var(--muted-light); font-size: 0.72rem; }
+.search-item .sr-locate {
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+}
+.search-item .sr-locate:hover {
+  color: var(--accent);
+  border-color: rgba(255,217,138,0.3);
+}
+.search-item-empty {
+  color: var(--muted-light);
+  font-size: 0.8rem;
+  cursor: default;
+  padding: 12px 14px;
+}
 
 /* ─── Icon-only nav buttons (modern glassmorphism) ─── */
 .nav-icon-btn {
