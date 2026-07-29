@@ -318,6 +318,7 @@ const {
   insightLoading: moonInsightLoading,
   refresh: refreshMoon,
   loadInsight: loadMoonInsight,
+  regenInsight: regenMoonInsight,
   rotatePoem: rotateMoonPoem,
 } = useMoon({
   observerLat: () => userLat.value ?? null,
@@ -330,11 +331,6 @@ function openMoonPanel() {
   refreshMoon()
   showMoonPanel.value = true
   // 异步加载 AI 解读（不阻塞）
-  loadMoonInsight()
-}
-
-/** 重新生成 AI 解读 */
-function regenMoonInsight() {
   loadMoonInsight()
 }
 

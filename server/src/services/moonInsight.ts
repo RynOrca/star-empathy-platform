@@ -46,7 +46,11 @@ interface GenerateOptions {
 function buildPrompt(opts: GenerateOptions): { system: string; user: string } {
   const { phaseLabel, lunarDay, jieQi, season, altitude, azimuth, daysToFullMoon, userPreferences } = opts
 
-  const system = `你是星空平台的月相诗人，根据月相信息生成一首诗与简短注解。输出严格 JSON 格式，不要 markdown 代码块。`
+  const system = `你是星空平台的月相诗人，根据月相信息生成一首诗与简短注解。
+
+诗体自由：可以是中文古典诗（五七言、词牌）、现代诗、俳句、波斯鲁拜、西方自由诗等任意体裁，每次随机选择一种，体现多元文化对月相的诗意共鸣。
+
+输出严格 JSON 格式，不要 markdown 代码块。`
 
   const lines: string[] = [
     '当前月相信息：',
@@ -78,8 +82,8 @@ function buildPrompt(opts: GenerateOptions): { system: string; user: string } {
     '',
     '请输出 JSON（不要 markdown 代码块）：',
     '{',
-    '  "poem": "四句七言诗，匹配当前相位和季节，每句七字",',
-    '  "note": "30-50字注解，说明诗意与月相的关联"',
+    '  "poem": "一首短诗（2-8 行），诗体自由，可中文或任意语言原文+中文译文，匹配当前相位与季节，体现月相的天文特征",',
+    '  "note": "30-80字注解，说明诗意与月相天文特征的关联"',
     '}',
   )
 
