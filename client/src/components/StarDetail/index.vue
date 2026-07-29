@@ -413,7 +413,7 @@
 
           <!-- 滚动内容区 -->
           <div class="mobile-content">
-                        <!-- 古人共赏内联模式 -->
+            <!-- 古人共赏内联模式 -->
             <template v-if="showChat">
               <div class="mobile-chat-inline">
                 <button class="mobile-chat-back" @click="showChat = false">
@@ -616,6 +616,7 @@
                 </div>
               </template>
             </template>
+          </div>
 
           <!-- 底部操作栏 -->
           <div class="mobile-bottom-bar">
