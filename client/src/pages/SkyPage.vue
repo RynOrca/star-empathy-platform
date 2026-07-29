@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -262,6 +262,7 @@ import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
+import { useLocation } from '../composables/useLocation'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
@@ -282,10 +283,41 @@ function toggleMyStories() {
   setTimeout(() => { myToggleFeedback.value = '' }, 2000)
 }
 const favoriteStarIds = ref<number[]>([])
+
+// ─── 统一位置管理（快速缓存+低精度优先+后台高精度更新） ───
+const location = useLocation()
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
 const locationFailed = ref(false)
+
+// 双向同步：useLocation → 本地ref
+watch([() => location.lat.value, () => location.lng.value, () => location.ready.value, () => location.failed.value],
+  ([la, ln, rd, fl]) => {
+    const wasReady = locationReady.value
+    userLat.value = la ?? undefined
+    userLng.value = ln ?? undefined
+    locationReady.value = rd
+    locationFailed.value = fl
+    // 定位成功后显示简短提示（不调用反向地理编码，省去额外网络请求）
+    if (rd && !wasReady && la != null && ln != null) {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
+    }
+  }, { immediate: true }
+)
+
+// 反向地理编码已禁用：获取城市名需要额外网络请求，对核心功能无影响
+// 如需恢复，取消下面注释即可
+// let lastCityFetchKey = ''
+// watch([() => location.lat.value, () => location.lng.value], async ([la, ln]) => {
+//   if (la == null || ln == null) return
+//   const key = `${la.toFixed(2)},${ln.toFixed(2)}`
+//   if (key === lastCityFetchKey) return
+//   lastCityFetchKey = key
+//   const city = await fetchCityName(la, ln)
+//   if (!locationCityToast.value) showLocationToast(city)
+// }, { immediate: true })
 
 // ─── 城市选择面板 ───
 const showCityPanel = ref(false)
@@ -403,11 +435,8 @@ const intlCities = [
 const allCities = [...cities, ...intlCities]
 
 function selectCity(c: { name: string; lat: number; lng: number }) {
-  userLat.value = c.lat
-  userLng.value = c.lng
+  location.setManual(c.lat, c.lng)
   selectedCity.value = c
-  locationFailed.value = false
-  locationReady.value = true
   showLocationToast(c.name)
 }
 
@@ -434,25 +463,22 @@ function handleCitySelect(c: { name: string; lat: number; lng: number }) {
 function goToCurrentLocation() {
   selectedCity.value = null
   showCityPanel.value = false
-  refreshLocation()
+  locationCityToast.value = '正在获取定位...'
+  location.refresh().then(() => {
+    if (location.failed.value) {
+      locationCityToast.value = ''
+    }
+  })
 }
 
-// 获取用户地理位置（带 2 小时缓存）
-const LOCATION_CACHE_KEY = 'star_location_cache'
-const LOCATION_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 小时
-
-function getCachedLocation(): { lat: number; lng: number } | null {
-  try {
-    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
-    if (!raw) return null
-    const { lat, lng, ts } = JSON.parse(raw)
-    if (Date.now() - ts > LOCATION_CACHE_TTL) return null
-    return { lat, lng }
-  } catch { return null }
-}
-
-function setCachedLocation(lat: number, lng: number) {
-  localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
+// 模板中使用的 refreshLocation（重新获取定位按钮）
+function refreshLocation() {
+  locationCityToast.value = '正在获取定位...'
+  location.refresh().then(() => {
+    if (location.failed.value) {
+      locationCityToast.value = ''
+    }
+  })
 }
 
 // 反向地理编码：通过后端代理获取城市名称（BigDataCloud 主 + Nominatim 备，5s 超时）
@@ -481,68 +507,6 @@ function showLocationToast(city: string) {
   if (!city) {
     setTimeout(() => { showCityPanel.value = true }, 800)
   }
-}
-
-function fetchLocation() {
-  if (!navigator.geolocation) {
-    locationReady.value = true
-    locationFailed.value = true
-    return
-  }
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      userLat.value = pos.coords.latitude
-      userLng.value = pos.coords.longitude
-      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
-      locationReady.value = true
-      locationFailed.value = false
-      // 获取城市名并显示 2 秒
-      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
-      showLocationToast(city)
-    },
-    (err) => {
-      console.warn('Geolocation failed:', err.message)
-      locationReady.value = true
-      locationFailed.value = true
-    },
-    { timeout: 5000, enableHighAccuracy: true },
-  )
-}
-
-// 手动刷新定位（不隐藏天空，静默更新）
-function refreshLocation() {
-  if (!navigator.geolocation) {
-    showLocationToast('')
-    return
-  }
-  locationCityToast.value = '正在获取定位...'
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      userLat.value = pos.coords.latitude
-      userLng.value = pos.coords.longitude
-      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
-      locationFailed.value = false
-      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
-      showLocationToast(city)
-    },
-    () => {
-      showLocationToast('')
-    },
-    { timeout: 5000, enableHighAccuracy: true },
-  )
-}
-
-// 优先使用缓存定位
-const cached = getCachedLocation()
-if (cached) {
-  userLat.value = cached.lat
-  userLng.value = cached.lng
-  locationReady.value = true
-  locationFailed.value = false
-  // 异步获取城市名并显示 toast
-  fetchCityName(cached.lat, cached.lng).then(city => showLocationToast(city))
-} else {
-  fetchLocation()
 }
 
 onMounted(async () => {

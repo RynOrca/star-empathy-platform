@@ -613,82 +613,6 @@
           </div>
         </div>
 
-        <!-- 标签 -->
-        <div class="info-section">
-          <div class="info-label">
-            标签
-            <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
-            <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
-            <button
-              v-if="!editingTags"
-              class="tag-edit-btn"
-              title="编辑标签"
-              @click="startEditTags"
-            >
-              <PenSquare :size="11" />
-            </button>
-          </div>
-
-          <!-- 编辑模式 -->
-          <div v-if="editingTags" class="tag-editor">
-            <div class="tag-editor-tags">
-              <span
-                v-for="(t, i) in customTags"
-                :key="i"
-                class="tag tag-editable"
-                @click="removeCustomTag(i)"
-              >
-                {{ t }}
-                <X :size="10" class="tag-remove-x" />
-              </span>
-              <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
-            </div>
-            <div class="tag-editor-input-row">
-              <input
-                v-model="newTagInput"
-                class="tag-editor-input"
-                placeholder="输入自定义标签..."
-                @keydown.enter="addCustomTag"
-              />
-              <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
-            </div>
-            <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
-              <span class="tag-editor-suggest-label">AI 建议：</span>
-              <span
-                v-for="t in displayTags"
-                :key="t.tag"
-                class="tag tag-suggestion"
-                :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
-                @click="addCustomTagFromSuggestion(t.tag)"
-              >
-                {{ t.tag }}
-              </span>
-            </div>
-            <div class="tag-editor-actions">
-              <button class="tag-editor-save" @click="saveTags">保存</button>
-              <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
-            </div>
-          </div>
-
-          <!-- 展示模式 -->
-          <div v-else class="info-tags">
-            <span
-              v-for="t in mergedTags"
-              :key="t.tag"
-              class="tag"
-              :class="{
-                'tag-emotion': t.type === 'emotion',
-                'tag-theme': t.type === 'theme',
-                'tag-custom': t.custom,
-              }"
-            >
-              {{ t.tag }}
-              <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
-            </span>
-            <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
-          </div>
-        </div>
-
         <!-- ─── P1-2：北极星岁差变迁科普（14-B §2 岁差） ─── -->
         <div v-if="catalogStarId === 4" class="info-section precession-lore">
           <div class="info-label">北极星不是永恒的</div>
@@ -759,6 +683,7 @@ import { useKernel } from '../composables/useKernel'
 import { useSimilarStars } from '../composables/useSimilarStars'
 import { useAreaHighlights } from '../composables/useAreaHighlights'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../composables/useAstroEvents'
+import { useLocation } from '../composables/useLocation'
 import catalogData from '../data/stars.json'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -963,9 +888,15 @@ watch(() => props.stories, () => {
   resonanceOverrides.clear()
 })
 
-// ─── 用户当前位置（用于计算距离 + 传入叙事 API） ───
-const userPosition = ref<{ lat: number; lng: number } | null>(null)
-const positionReady = ref(false)
+// ─── 用户当前位置（统一从 useLocation 获取，不重复请求浏览器） ───
+const loc = useLocation()
+const userPosition = computed(() => {
+  // 优先使用 SkyPage 传入的观测者位置，回退到全局位置
+  const la = props.observerLat ?? loc.lat.value
+  const ln = props.observerLng ?? loc.lng.value
+  return la != null && ln != null ? { lat: la, lng: ln } : null
+})
+const positionReady = computed(() => props.observerLat != null || loc.ready.value)
 
 // ─── 古今共望叙事 ───
 const narrative = useNarrative()
@@ -986,14 +917,22 @@ function fetchNarrativeWithPosition() {
   )
 }
 
+// 切换星星时重置状态
 watch(() => props.catalogStarId, (id) => {
-  activeTab.value = 'narrative' // 切换星星时回到默认 Tab
-  searchQuery.value = ''        // 清空搜索
-  detailStoryId.value = null    // 关闭故事详情
-  if (id && (positionReady.value || props.observerLat != null)) {
+  activeTab.value = 'narrative'
+  searchQuery.value = ''
+  detailStoryId.value = null
+  if (id && positionReady.value) {
     fetchNarrativeWithPosition()
   }
 }, { immediate: true })
+
+// 位置就绪后如果还没触发叙事，触发一次
+watch(positionReady, (ready) => {
+  if (ready && props.catalogStarId) {
+    fetchNarrativeWithPosition()
+  }
+})
 
 // 切换 Tab 时关闭故事详情，避免详情视图跨 Tab 残留
 watch(activeTab, () => {
@@ -1037,25 +976,6 @@ function onSimilarStarClick(catalogStarId: number) {
 }
 
 onMounted(() => {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        userPosition.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        positionReady.value = true
-        fetchNarrativeWithPosition()
-      },
-      () => {
-        // 获取位置失败，仍标记为就绪（不带位置参数，后端默认 visible=true）
-        positionReady.value = true
-        fetchNarrativeWithPosition()
-      },
-      { timeout: 5000 },
-    )
-  } else {
-    // 不支持地理位置，直接标记就绪
-    positionReady.value = true
-  }
-
   // 点击外部关闭排序下拉
   document.addEventListener('click', onDocumentClick)
 })
