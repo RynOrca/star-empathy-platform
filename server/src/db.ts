@@ -87,6 +87,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_story_kernels_story ON story_kernels(story_id);
 
+  CREATE TABLE IF NOT EXISTS story_catalog_stars (
+    story_id        INTEGER NOT NULL REFERENCES stars(id),
+    catalog_star_id INTEGER NOT NULL,
+    is_primary      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (story_id, catalog_star_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_scs_story ON story_catalog_stars(story_id);
+  CREATE INDEX IF NOT EXISTS idx_scs_catalog ON story_catalog_stars(catalog_star_id);
+
   CREATE TABLE IF NOT EXISTS token_blacklist (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     token_hash TEXT NOT NULL UNIQUE,
@@ -160,5 +169,15 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_vis
 try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 // 兼容旧数据库：stars 加 image_url 列
 try { db.exec('ALTER TABLE stars ADD COLUMN image_url TEXT'); } catch {}
+
+// 兼容旧数据库：迁移 story_catalog_stars 连接表（幂等）
+try {
+  db.exec(`
+    INSERT OR IGNORE INTO story_catalog_stars (story_id, catalog_star_id, is_primary)
+    SELECT id, catalog_star_id, 1
+    FROM stars
+    WHERE catalog_star_id IS NOT NULL
+  `);
+} catch {}
 
 export default db;

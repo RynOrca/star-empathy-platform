@@ -11,6 +11,7 @@ interface StarData {
   posZ: number
   createdAt: string
   catalogStarId: number | null
+  catalogStarIds?: number[]
   viewCount: number
   origin: string | null
   username: string | null

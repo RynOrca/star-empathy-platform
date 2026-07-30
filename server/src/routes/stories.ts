@@ -41,7 +41,7 @@ router.get('/:storyId', (req: Request, res: Response) => {
 // 投递故事（需登录）
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, location, tag, isAnonymous, imageUrl } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, isAnonymous, imageUrl } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -54,6 +54,9 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     }
 
     const catalogStarId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
+    const catalogStarIds: number[] | undefined = Array.isArray(catalog_star_ids)
+      ? catalog_star_ids.filter((id: unknown) => typeof id === 'number')
+      : undefined;
 
     let locationData: { lat: number; lng: number } | undefined;
     if (
@@ -77,7 +80,7 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {
