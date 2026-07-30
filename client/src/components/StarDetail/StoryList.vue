@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="story-list-container">
     <!-- 搜索 + 排序 -->
     <div v-if="showToolbar && stories.length > 0" class="list-toolbar">
       <div class="search-box">
@@ -146,6 +146,15 @@ if (typeof document !== 'undefined') {
 </script>
 
 <style scoped>
+/* ─── Story List Container ─── */
+.story-list-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* ─── List Toolbar (Search + Sort) ─── */
 .list-toolbar {
   display: flex;

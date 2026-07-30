@@ -116,12 +116,14 @@
 | 文件 | 用途 |
 |---|---|
 | `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停事件 |
-| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、4 个 Tab（AI 叙事/历史故事/所有故事/我的故事）、标签编辑、删除确认 |
+| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、PC端 4 个 Tab（AI 叙事/历史故事/用户故事/我的故事）+ 移动端 5 个 Tab（含星信息）、标签编辑、删除确认 |
 | `StarDetail/StoryCard.vue` | 故事卡片子组件（4 个 Tab 复用） |
 | `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除） |
-| `StarDetail/StoryList.vue` | 故事列表子组件（搜索、排序、卡片列表） |
+| `StarDetail/StoryList.vue` | 故事列表子组件（搜索、排序、卡片列表、空状态） |
 | `StarDetail/StarHeader.vue` | 星星概要子组件（名称、星座、颜色） |
-| `StarDetail/StarInfoPanel.vue` | 桌面端右侧信息面板子组件（天文数据、相似星星、天区故事） |
+| `StarDetail/StarInfoPanel.vue` | 信息面板子组件（视星等/距离/色温/亮度、统计、天文事件、月相、北极星岁差科普） |
+| `StarDetail/SimilarStarsPanel.vue` | **内核相似的星星面板**（PC端 AI 叙事 Tab 下方左栏 + 移动端 info tab） |
+| `StarDetail/AreaHighlightsPanel.vue` | **天区故事精选面板**（PC端 AI 叙事 Tab 下方右栏 + 移动端 info tab） |
 | `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
 | `StarDetail/MobileTabSelect.vue` | 移动端下拉 Tab 选择器（替代 PC 端 Tab 栏） |
 | `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
