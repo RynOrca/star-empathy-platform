@@ -159,61 +159,6 @@
       </ul>
       <p class="lore-footnote">—— 这就是岁差，星空在千年的尺度上悄悄改写人间的方向。</p>
     </div>
-
-    <!-- 相似星星 -->
-    <div class="info-section" v-if="similarStars.length > 0">
-      <div class="info-label">内核相似的星星</div>
-      <div class="similar-list">
-        <div
-          v-for="s in similarStars.slice(0, 5)"
-          :key="s.catalogStarId"
-          class="similar-item"
-          @click="onSimilarStarClick(s.catalogStarId)"
-        >
-          <div class="similar-info">
-            <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
-            <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
-          </div>
-          <div class="similar-tags">
-            <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 天区故事精选 -->
-    <div class="info-section" v-if="areaHighlights.length > 0">
-      <div class="info-label">
-        天区故事精选
-        <span v-if="areaLoading" class="tag-loading">凝练中...</span>
-      </div>
-      <div class="highlight-list">
-        <div
-          v-for="(h, hi) in areaHighlights"
-          :key="h.catalogStarId"
-          class="highlight-card"
-          :class="{ 'is-target': hi === 0 && h.score === 0 }"
-          @click="h.catalogStarId !== catalogStarId && onSimilarStarClick(h.catalogStarId)"
-        >
-          <div class="highlight-head">
-            <span class="highlight-star-name">
-              <span class="highlight-dot" :class="{ 'dot-target': hi === 0 && h.score === 0 }"></span>
-              {{ getStarName(h.catalogStarId) }}
-            </span>
-            <span v-if="h.score > 0" class="highlight-score">{{ Math.round(h.score * 100) }}%</span>
-            <span v-else class="highlight-badge-target">当前</span>
-          </div>
-          <div class="highlight-emotions" v-if="h.sharedEmotions.length > 0">
-            <span v-for="tag in h.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
-          </div>
-          <div class="highlight-essences">
-            <p v-for="(essence, ei) in h.essences" :key="ei" class="highlight-essence">
-              "{{ essence }}"
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -243,17 +188,12 @@ defineProps<{
   } | null
   isFavorited: boolean
   catalogStarId: number
-  similarStars: Array<{ catalogStarId: number; score: number; sharedEmotions: string[] }>
-  areaHighlights: Array<{ catalogStarId: number; score: number; sharedEmotions: string[]; essences: string[] }>
-  areaLoading: boolean
-  getStarName: (id: number) => string
   getStarTemperature: (color: string) => string
   getBrightnessLabel: (mag: number) => string
   formatAltitude: (deg: number) => string
   azimuthToDirection: (deg: number) => string
   formatClockTime: (t: Date | null) => string
   formatDateTime: (t: Date | null) => string
-  onSimilarStarClick: (id: number) => void
 }>()
 </script>
 
@@ -478,138 +418,5 @@ defineProps<{
   font-style: italic;
   color: var(--muted);
   line-height: 1.6;
-}
-
-/* ─── Similar Stars ─── */
-.similar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.similar-item {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.similar-item:hover {
-  border-color: var(--accent-border);
-  background: rgba(255, 217, 138, 0.04);
-}
-.similar-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.similar-name {
-  font-size: 0.8rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-.similar-score {
-  font-size: 0.72rem;
-  color: var(--accent);
-  font-weight: 600;
-}
-.similar-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.similar-tag-emotion {
-  font-size: 0.65rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(255, 139, 125, 0.1);
-  color: #ff8b7d;
-  border: 1px solid rgba(255, 139, 125, 0.15);
-}
-
-/* ─── 天区故事精选 ─── */
-.highlight-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.highlight-card {
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--rule);
-  background: rgba(255, 255, 255, 0.015);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.highlight-card:hover {
-  border-color: var(--accent-border);
-  background: rgba(255, 217, 138, 0.03);
-}
-.highlight-card.is-target {
-  border-color: rgba(255, 217, 138, 0.2);
-  background: rgba(255, 217, 138, 0.04);
-}
-.highlight-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.highlight-star-name {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.highlight-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-  opacity: 0.5;
-}
-.highlight-dot.dot-target {
-  opacity: 1;
-  box-shadow: 0 0 4px var(--accent);
-}
-.highlight-score {
-  font-size: 0.7rem;
-  color: var(--accent);
-  font-weight: 600;
-}
-.highlight-badge-target {
-  font-size: 0.6rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(255, 217, 138, 0.12);
-  color: var(--accent);
-  font-weight: 500;
-}
-.highlight-emotions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-bottom: 6px;
-}
-.highlight-essences {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.highlight-essence {
-  margin: 0;
-  font-size: 0.73rem;
-  color: var(--ink-secondary);
-  line-height: 1.6;
-  font-style: italic;
-  opacity: 0.75;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 </style>

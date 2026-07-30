@@ -5,9 +5,9 @@
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
-        <div class="tab-bar">
+          <div class="tab-bar">
           <button
-            v-for="tab in tabs"
+            v-for="tab in pcTabs"
             :key="tab.id"
             class="tab-btn"
             :class="{ active: activeTab === tab.id }"
@@ -20,109 +20,33 @@
 
         <!-- Tab 内容区 -->
         <div class="tab-content">
-          <!-- Tab: 星信息 -->
-          <template v-if="activeTab === 'info'">
-            <StarHeader :starInfo="starInfo" />
-            <StarInfoPanel
-              :starInfo="starInfo"
-              :catalogStats="catalogStats"
-              :astroData="astroData"
-              :isFavorited="isFavorited"
-              :catalogStarId="catalogStarId"
-              :similarStars="similarStars.similarStars.value"
-              :areaHighlights="areaHighlightsData"
-              :areaLoading="areaLoading"
-              :getStarName="getStarName"
-              :getStarTemperature="getStarTemperature"
-              :getBrightnessLabel="getBrightnessLabel"
-              :formatAltitude="formatAltitude"
-              :azimuthToDirection="azimuthToDirection"
-              :formatClockTime="formatClockTime"
-              :formatDateTime="formatDateTime"
-              :onSimilarStarClick="onSimilarStarClick"
-            />
-            <!-- 标签 -->
-            <div class="info-section">
-              <div class="info-label">
-                标签
-                <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
-                <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
-                <button
-                  v-if="!editingTags"
-                  class="tag-edit-btn"
-                  title="编辑标签"
-                  @click="startEditTags"
-                >
-                  <PenSquare :size="11" />
-                </button>
+          <!-- Tab: AI 叙事 -->
+          <template v-if="activeTab === 'narrative'">
+            <div class="narrative-layout">
+              <div class="narrative-top">
+                <StarNarrative
+                  :content="narrative.content.value"
+                  :loading="narrative.loading.value"
+                  :error="narrative.error.value"
+                  :cached="narrative.cached.value"
+                  @retry="narrative.fetchNarrative(catalogStarId)"
+                />
               </div>
-              <div v-if="editingTags" class="tag-editor">
-                <div class="tag-editor-tags">
-                  <span
-                    v-for="(t, i) in customTags"
-                    :key="i"
-                    class="tag tag-editable"
-                    @click="removeCustomTag(i)"
-                  >
-                    {{ t }}
-                    <X :size="10" class="tag-remove-x" />
-                  </span>
-                  <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
-                </div>
-                <div class="tag-editor-input-row">
-                  <input
-                    v-model="newTagInput"
-                    class="tag-editor-input"
-                    placeholder="输入自定义标签..."
-                    @keydown.enter="addCustomTag"
-                  />
-                  <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
-                </div>
-                <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
-                  <span class="tag-editor-suggest-label">AI 建议：</span>
-                  <span
-                    v-for="t in displayTags"
-                    :key="t.tag"
-                    class="tag tag-suggestion"
-                    :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
-                    @click="addCustomTagFromSuggestion(t.tag)"
-                  >
-                    {{ t.tag }}
-                  </span>
-                </div>
-                <div class="tag-editor-actions">
-                  <button class="tag-editor-save" @click="saveTags">保存</button>
-                  <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
-                </div>
-              </div>
-              <div v-else class="info-tags">
-                <span
-                  v-for="t in mergedTags"
-                  :key="t.tag"
-                  class="tag"
-                  :class="{
-                    'tag-emotion': t.type === 'emotion',
-                    'tag-theme': t.type === 'theme',
-                    'tag-custom': t.custom,
-                  }"
-                >
-                  {{ t.tag }}
-                  <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
-                </span>
-                <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
+              <div class="narrative-bottom">
+                <SimilarStarsPanel
+                  :similarStars="similarStars.similarStars.value"
+                  :getStarName="getStarName"
+                  :onSimilarStarClick="onSimilarStarClick"
+                />
+                <AreaHighlightsPanel
+                  :highlights="areaHighlightsData"
+                  :loading="areaLoading"
+                  :currentStarId="catalogStarId"
+                  :getStarName="getStarName"
+                  :onSimilarStarClick="onSimilarStarClick"
+                />
               </div>
             </div>
-          </template>
-
-          <!-- Tab: AI 叙事 -->
-          <template v-else-if="activeTab === 'narrative'">
-            <StarNarrative
-              :content="narrative.content.value"
-              :loading="narrative.loading.value"
-              :error="narrative.error.value"
-              :cached="narrative.cached.value"
-              @retry="narrative.fetchNarrative(catalogStarId)"
-            />
           </template>
 
           <!-- Tab: 历史故事 -->
@@ -255,111 +179,114 @@
 
       <!-- 右：恒星信息 -->
       <div class="panel panel-info">
-        <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
+        <!-- 顶部固定：关闭按钮 + 星星名字 -->
+        <div class="info-header">
+          <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
+          <StarHeader :starInfo="starInfo" />
+        </div>
 
-        <StarHeader :starInfo="starInfo" />
+        <!-- 中间滚动：星信息 + 标签 -->
+        <div class="info-body">
+          <StarInfoPanel
+            :starInfo="starInfo"
+            :catalogStats="catalogStats"
+            :astroData="astroData"
+            :isFavorited="isFavorited"
+            :catalogStarId="catalogStarId"
+            :getStarTemperature="getStarTemperature"
+            :getBrightnessLabel="getBrightnessLabel"
+            :formatAltitude="formatAltitude"
+            :azimuthToDirection="azimuthToDirection"
+            :formatClockTime="formatClockTime"
+            :formatDateTime="formatDateTime"
+          />
 
-        <StarInfoPanel
-          :starInfo="starInfo"
-          :catalogStats="catalogStats"
-          :astroData="astroData"
-          :isFavorited="isFavorited"
-          :catalogStarId="catalogStarId"
-          :similarStars="similarStars.similarStars.value"
-          :areaHighlights="areaHighlightsData"
-          :areaLoading="areaLoading"
-          :getStarName="getStarName"
-          :getStarTemperature="getStarTemperature"
-          :getBrightnessLabel="getBrightnessLabel"
-          :formatAltitude="formatAltitude"
-          :azimuthToDirection="azimuthToDirection"
-          :formatClockTime="formatClockTime"
-          :formatDateTime="formatDateTime"
-          :onSimilarStarClick="onSimilarStarClick"
-        />
-
-        <!-- 标签 -->
-        <div class="info-section">
-          <div class="info-label">
-            标签
-            <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
-            <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
-            <button
-              v-if="!editingTags"
-              class="tag-edit-btn"
-              title="编辑标签"
-              @click="startEditTags"
-            >
-              <PenSquare :size="11" />
-            </button>
-          </div>
-
-          <!-- 编辑模式 -->
-          <div v-if="editingTags" class="tag-editor">
-            <div class="tag-editor-tags">
-              <span
-                v-for="(t, i) in customTags"
-                :key="i"
-                class="tag tag-editable"
-                @click="removeCustomTag(i)"
+          <!-- 标签 -->
+          <div class="info-section">
+            <div class="info-label">
+              标签
+              <span v-if="kernel.loading.value" class="tag-loading">AI 分析中...</span>
+              <span v-else-if="hasAiTags" class="tag-badge-ai">AI</span>
+              <button
+                v-if="!editingTags"
+                class="tag-edit-btn"
+                title="编辑标签"
+                @click="startEditTags"
               >
-                {{ t }}
-                <X :size="10" class="tag-remove-x" />
-              </span>
-              <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+                <PenSquare :size="11" />
+              </button>
             </div>
-            <div class="tag-editor-input-row">
-              <input
-                v-model="newTagInput"
-                class="tag-editor-input"
-                placeholder="输入自定义标签..."
-                @keydown.enter="addCustomTag"
-              />
-              <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+
+            <!-- 编辑模式 -->
+            <div v-if="editingTags" class="tag-editor">
+              <div class="tag-editor-tags">
+                <span
+                  v-for="(t, i) in customTags"
+                  :key="i"
+                  class="tag tag-editable"
+                  @click="removeCustomTag(i)"
+                >
+                  {{ t }}
+                  <X :size="10" class="tag-remove-x" />
+                </span>
+                <span v-if="customTags.length === 0" class="tag-editor-hint">点击下方标签添加，或输入自定义标签</span>
+              </div>
+              <div class="tag-editor-input-row">
+                <input
+                  v-model="newTagInput"
+                  class="tag-editor-input"
+                  placeholder="输入自定义标签..."
+                  @keydown.enter="addCustomTag"
+                />
+                <button class="tag-editor-add" @click="addCustomTag" :disabled="!newTagInput.trim()">添加</button>
+              </div>
+              <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
+                <span class="tag-editor-suggest-label">AI 建议：</span>
+                <span
+                  v-for="t in displayTags"
+                  :key="t.tag"
+                  class="tag tag-suggestion"
+                  :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
+                  @click="addCustomTagFromSuggestion(t.tag)"
+                >
+                  {{ t.tag }}
+                </span>
+              </div>
+              <div class="tag-editor-actions">
+                <button class="tag-editor-save" @click="saveTags">保存</button>
+                <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
+              </div>
             </div>
-            <div class="tag-editor-suggestions" v-if="displayTags.length > 0">
-              <span class="tag-editor-suggest-label">AI 建议：</span>
+
+            <!-- 展示模式 -->
+            <div v-else class="info-tags">
               <span
-                v-for="t in displayTags"
+                v-for="t in mergedTags"
                 :key="t.tag"
-                class="tag tag-suggestion"
-                :class="{ 'tag-emotion': t.type === 'emotion', 'tag-theme': t.type === 'theme' }"
-                @click="addCustomTagFromSuggestion(t.tag)"
+                class="tag"
+                :class="{
+                  'tag-emotion': t.type === 'emotion',
+                  'tag-theme': t.type === 'theme',
+                  'tag-custom': t.custom,
+                }"
               >
                 {{ t.tag }}
+                <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
               </span>
+              <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
             </div>
-            <div class="tag-editor-actions">
-              <button class="tag-editor-save" @click="saveTags">保存</button>
-              <button class="tag-editor-cancel" @click="cancelEditTags">取消</button>
-            </div>
-          </div>
-
-          <!-- 展示模式 -->
-          <div v-else class="info-tags">
-            <span
-              v-for="t in mergedTags"
-              :key="t.tag"
-              class="tag"
-              :class="{
-                'tag-emotion': t.type === 'emotion',
-                'tag-theme': t.type === 'theme',
-                'tag-custom': t.custom,
-              }"
-            >
-              {{ t.tag }}
-              <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
-            </span>
-            <span v-if="mergedTags.length === 0 && !kernel.loading.value" class="tag is-empty">暂无标签</span>
           </div>
         </div>
 
-        <BottomBar
-          :isFavorited="isFavorited"
-          @write-story="onWriteStory"
-          @toggle-favorite="toggleFavorite"
-          @open-chat="openChat"
-        />
+        <!-- 底部固定：操作按钮 -->
+        <div class="info-footer">
+          <BottomBar
+            :isFavorited="isFavorited"
+            @write-story="onWriteStory"
+            @toggle-favorite="toggleFavorite"
+            @open-chat="openChat"
+          />
+        </div>
       </div>
     </div>
 
@@ -407,7 +334,7 @@
               <X :size="18" />
             </button>
             <div class="mobile-tab-select-wrap">
-              <MobileTabSelect v-model="activeTab" :tabs="tabs" />
+              <MobileTabSelect v-model="activeTab" :tabs="mobileTabs" />
             </div>
           </div>
 
@@ -442,18 +369,29 @@
                   :astroData="astroData"
                   :isFavorited="isFavorited"
                   :catalogStarId="catalogStarId"
-                  :similarStars="similarStars.similarStars.value"
-                  :areaHighlights="areaHighlightsData"
-                  :areaLoading="areaLoading"
-                  :getStarName="getStarName"
                   :getStarTemperature="getStarTemperature"
                   :getBrightnessLabel="getBrightnessLabel"
                   :formatAltitude="formatAltitude"
                   :azimuthToDirection="azimuthToDirection"
                   :formatClockTime="formatClockTime"
                   :formatDateTime="formatDateTime"
-                  :onSimilarStarClick="onSimilarStarClick"
                 />
+
+                <!-- 相似星星 + 天区故事精选（移动端纵向堆叠） -->
+                <div class="mobile-side-panels">
+                  <SimilarStarsPanel
+                    :similarStars="similarStars.similarStars.value"
+                    :getStarName="getStarName"
+                    :onSimilarStarClick="onSimilarStarClick"
+                  />
+                  <AreaHighlightsPanel
+                    :highlights="areaHighlightsData"
+                    :loading="areaLoading"
+                    :currentStarId="catalogStarId"
+                    :getStarName="getStarName"
+                    :onSimilarStarClick="onSimilarStarClick"
+                  />
+                </div>
 
                 <!-- 标签（内联编辑） -->
                 <div class="info-section-mobile">
@@ -683,6 +621,8 @@ import StarInfoPanel from './StarInfoPanel.vue'
 import BottomBar from './BottomBar.vue'
 import MobileTabSelect from './MobileTabSelect.vue'
 import MobileActionSheet from './MobileActionSheet.vue'
+import SimilarStarsPanel from './SimilarStarsPanel.vue'
+import AreaHighlightsPanel from './AreaHighlightsPanel.vue'
 import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
 import { useSimilarStars } from '../../composables/useSimilarStars'
@@ -871,20 +811,26 @@ const detailStory = computed(() => {
 })
 const justResonatedId = ref<number | null>(null)
 type TabId = 'info' | 'narrative' | 'history' | 'all' | 'mine'
-const tabs: { id: TabId; label: string; icon: Component }[] = [
-  { id: 'info', label: '星信息', icon: Star },
+// PC 端：不含「星信息」（与右栏重复）
+const pcTabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
   { id: 'history', label: '历史故事', icon: BookOpen },
-  { id: 'all', label: '所有故事', icon: List },
+  { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-const activeTab = ref<TabId>('info')
+// 移动端：包含「星信息」
+const mobileTabs: { id: TabId; label: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', icon: Star },
+  ...pcTabs,
+]
+// 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
+const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
+const activeTab = ref<TabId>(isMobileInit ? 'info' : 'narrative')
 
 const detailBackLabel = computed(() => {
   switch (activeTab.value) {
-    case 'info': return '星信息'
     case 'history': return '历史故事'
-    case 'all': return '所有故事'
+    case 'all': return '用户故事'
     case 'mine': return '我的故事'
     default: return '返回'
   }
@@ -914,8 +860,13 @@ function fetchNarrativeWithPosition() {
   narrative.fetchNarrative(props.catalogStarId, lat, lng, props.starInfo?.ra, props.starInfo?.dec)
 }
 
+let isFirstStarChange = true
 watch(() => props.catalogStarId, (id) => {
-  activeTab.value = 'info'
+  // 首次由初始化值决定，后续切换星星时根据平台重置
+  if (!isFirstStarChange) {
+    activeTab.value = isMobile.value ? 'info' : 'narrative'
+  }
+  isFirstStarChange = false
   searchQuery.value = ''
   detailStoryId.value = null
   if (id && (positionReady.value || props.observerLat != null)) {
@@ -1388,19 +1339,99 @@ watch(() => props.catalogStarId, () => {
 .panel-info {
   width: 340px;
   flex-shrink: 0;
-  padding: 24px;
   position: relative;
   height: 70vh;
   max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 顶部固定：星星名字 */
+.info-header {
+  flex-shrink: 0;
+  padding: 24px 24px 16px;
+  position: relative;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* 中间滚动：星信息 + 标签 */
+.info-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+/* PC 右栏：StarHeader 已在固定顶部，去掉 StarInfoPanel 顶部间距 */
+.info-body :deep(.info-rows) {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.info-body::-webkit-scrollbar { width: 5px; }
+.info-body::-webkit-scrollbar-track { background: transparent; }
+.info-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+/* 底部固定：操作按钮 */
+.info-footer {
+  flex-shrink: 0;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+/* ─── AI 叙事 Tab 布局：上部叙事 + 下部两栏面板 ─── */
+.narrative-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  min-height: 0;
+}
+.narrative-top {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
-.panel-info::-webkit-scrollbar { width: 5px; }
-.panel-info::-webkit-scrollbar-track { background: transparent; }
-.panel-info::-webkit-scrollbar-thumb {
+.narrative-top::-webkit-scrollbar { width: 5px; }
+.narrative-top::-webkit-scrollbar-track { background: transparent; }
+.narrative-top::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
+}
+.narrative-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  height: 220px;
+  flex-shrink: 0;
+  padding: 0 28px;
+}
+/* 左栏宽度不足时，双面板收为上下排列 */
+@media (max-width: 1050px) {
+  .narrative-bottom {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 300px;
+  }
+}
+
+/* ─── 移动端：相似星星 + 天区故事纵向堆叠 ─── */
+.mobile-side-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+.mobile-side-panels > * {
+  min-height: 200px;
 }
 
 /* ─── Close Button ─── */
