@@ -36,6 +36,18 @@ export const HIGH_RESONANCE_THRESHOLD = 50
 // Raycaster
 export const RAYCASTER_THRESHOLD = 8
 
+// ═══ 行星特写模式（closeup） ═══
+// 物理直径比例下小天体（水星/月球等）盘面亚像素，通过相机距离补偿让用户能"不断放大"看表面
+// 状态机：IDLE → TWEENING → CLOSEUP → EXITING → IDLE
+// 安全不变式：near 平面、Halo 可见性、wheel 语义必须与状态严格一致
+export const CLOSEUP_FOV = 30              // 特写模式固定 FOV（视觉舒适、不畸变）
+export const CLOSEUP_INIT_RATIO = 50       // 初始距离 = size × 50（盘面占比 ~7.5%，舒服观察）
+export const CLOSEUP_MIN_RATIO = 3         // 最近距离 = size × 3（盘面占比 ~124%，沉浸表面）
+export const CLOSEUP_MAX_RATIO = 80        // 最远距离 = size × 80（超过则退出特写回天球）
+export const CLOSEUP_NEAR = 0.001          // 特写模式 near 平面（小天体 dist < 0.5 需要）
+export const DEFAULT_NEAR = 0.5            // 默认 near 平面（IDLE 恢复用）
+export const CLOSEUP_WHEEL_FACTOR = 0.88   // 滚轮每步拉近系数（向上 = ×0.88，约 12% 步进）
+
 // 邻星连线
 export const NEARBY_LINE_COUNT = 4
 export const NEARBY_LINE_THRESHOLD = 80 // 距离阈值
