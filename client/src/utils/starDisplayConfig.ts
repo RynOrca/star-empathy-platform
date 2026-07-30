@@ -56,6 +56,10 @@ export interface StarDisplayConfig {
   constellationLineColor: number
   /** 星座连线 glow 色（hex，暖金） */
   constellationGlowColor: number
+  /** 星座连线宽度（像素，仅 LineMaterial 支持） */
+  constellationLineWidth: number
+  /** 星座连线 glow 宽度（像素） */
+  constellationGlowWidth: number
   /** 星座标签色（CSS rgba） */
   constellationLabelColor: string
 
@@ -90,8 +94,10 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   showAllConstellations: false,
   constellationIdleOpacity: 0.12,
 
-  constellationLineColor: 0x6677aa,
+  constellationLineColor: 0x4a5a88,
   constellationGlowColor: 0xffd98a,
+  constellationLineWidth: 2.0,
+  constellationGlowWidth: 1,
   constellationLabelColor: 'rgba(102,119,170,0.6)',
 
   nameLabelFovDeg: 15,
