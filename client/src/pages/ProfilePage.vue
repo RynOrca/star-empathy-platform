@@ -106,11 +106,19 @@
       <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
         <div class="modal-card">
           <h3>{{ activeStory.title || '未命名故事' }}</h3>
+          <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="modal-image" alt="故事图片" />
           <p class="modal-content">{{ activeStory.content }}</p>
           <div class="modal-meta">
             <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
             <span>{{ formatDate(activeStory.createdAt) }}</span>
             <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
+          </div>
+          <!-- 关联的星星 -->
+          <div v-if="getStoryStarNames(activeStory).length" class="modal-stars">
+            <span class="modal-stars-label">挂在</span>
+            <button v-for="cid in getStoryStarIds(activeStory)" :key="cid" class="modal-star-link" @click="goToStar(cid)">
+              {{ getStarName(cid) }}
+            </button>
           </div>
           <div class="modal-actions">
             <button class="modal-close" @click="activeStory = null">关闭</button>
@@ -365,6 +373,16 @@ async function saveSig() {
 function openStory(s: any) { activeStory.value = s }
 function goBack() { router.push('/sky') }
 
+// 获取故事关联的星名列表
+function getStoryStarIds(story: any): number[] {
+  if (story.catalogStarIds?.length) return story.catalogStarIds
+  if (story.catalogStarId) return [story.catalogStarId]
+  return []
+}
+function getStoryStarNames(story: any): string[] {
+  return getStoryStarIds(story).map(id => getStarName(id))
+}
+
 // ─── 删除故事 ───
 const showDeleteConfirm = ref(false)
 const pendingDeleteStory = ref<any>(null)
@@ -573,6 +591,11 @@ onUnmounted(() => {
 .modal-card h3 { color: #ffd98a; font-size: 1.1rem; margin: 0 0 1rem; }
 .modal-content { font-size: 0.9rem; color: #b9b4d6; line-height: 1.7; white-space: pre-wrap; }
 .modal-meta { display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: #5a5580; align-items: center; }
+.modal-image { width: 100%; max-height: 200px; object-fit: cover; border-radius: 10px; margin-bottom: 1rem; }
+.modal-stars { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 0.75rem; font-size: 0.75rem; }
+.modal-stars-label { color: #5a5580; }
+.modal-star-link { background: none; border: 1px solid rgba(255,217,138,0.2); border-radius: 6px; padding: 2px 8px; color: #ffd98a; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: var(--font,"Microsoft YaHei",sans-serif); }
+.modal-star-link:hover { background: rgba(255,217,138,0.08); border-color: rgba(255,217,138,0.4); }
 .tag { padding: 1px 8px; border-radius: 8px; font-size: 0.7rem; background: rgba(255,255,255,0.06); }
 .tag-思念 { color: #ff8b7d; } .tag-等待 { color: #86a8ff; } .tag-离别 { color: #caa7ff; } .tag-愿望 { color: #ffd98a; } .tag-孤独 { color: #95f0c0; }
 .modal-close { margin-top: 1rem; padding: 0.4rem 1.2rem; border-radius: 10px; border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05); color: #7a759c; cursor: pointer; font-size: 0.8rem; }
