@@ -90,7 +90,7 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   constellationOpacity: 0.28,
   constellationGlowRatio: 0.43,
   constellationLerpFactor: 0.15,
-  constellationLabelOpacity: 0.6,
+  constellationLabelOpacity: 0.8,
   showAllConstellations: false,
   constellationIdleOpacity: 0.12,
 
@@ -98,7 +98,7 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   constellationGlowColor: 0xffd98a,
   constellationLineWidth: 2.0,
   constellationGlowWidth: 1,
-  constellationLabelColor: 'rgba(102,119,170,0.6)',
+  constellationLabelColor: 'rgba(140,160,220,0.85)',
 
   nameLabelFovDeg: 15,
   nameLabelFontSize: 10,

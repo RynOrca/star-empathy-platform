@@ -917,9 +917,9 @@ for (const s of stars) starById.set(s.id, s)
       el.style.cssText = [
         `color:${cfg.constellationLabelColor}`,
         'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
-        'font-size:10px',
-        'font-weight:300',
-        'letter-spacing:0.12em',
+        'font-size:12px',
+        'font-weight:500',
+        'letter-spacing:0.15em',
         'white-space:nowrap',
         'pointer-events:none',
         'opacity:0',
@@ -1152,9 +1152,6 @@ for (const s of stars) starById.set(s.id, s)
             options?.onStarHoverLong?.(currentStarId)
           }, cfg.hoverLongDelayMs)
           updateTooltipContent(bestId)
-          // 星座连线联动：通过 applyConstellationVisibility 统一处理
-          const con = stars[bestId]?.con ?? null
-          applyConstellationVisibility(con)
         } else {
           // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
           updateTooltipPosition(bestId)
@@ -1165,7 +1162,6 @@ for (const s of stars) starById.set(s.id, s)
         // 拖拽旋转时不触发离开逻辑，保持连线可见
         if (!dragging) {
           options?.onStarHoverLong?.(null)
-          applyConstellationVisibility(null)
         }
         hoveredStarId = -1
         tooltipInner.style.opacity = '0'
@@ -3168,14 +3164,17 @@ for (const s of stars) starById.set(s.id, s)
           ;(label.element.firstChild as HTMLElement).style.opacity = '0'
         }
       }
-      // 靠近视角中心时自动显示星座连线（非鼠标 hover 时生效）
-      if (hoveredStarId === -1) {
-        for (const [abbr, grp] of constellationLineGroups) {
-          grp.targetOpacity = centerCons.has(abbr) ? cfg.constellationOpacity : 0
-        }
-        for (const [abbr, el] of constellationLabelEls) {
-          el.style.opacity = centerCons.has(abbr) ? String(cfg.constellationLabelOpacity) : '0'
-        }
+      // 靠近视角中心时自动显示星座连线
+      // 同时包含 hover 星星的星座，确保 hover 时其他连线不消失
+      if (hoveredStarId !== -1) {
+        const hoveredStar = starById.get(hoveredStarId)
+        if (hoveredStar?.con) centerCons.add(hoveredStar.con)
+      }
+      for (const [abbr, grp] of constellationLineGroups) {
+        grp.targetOpacity = centerCons.has(abbr) ? cfg.constellationOpacity : 0
+      }
+      for (const [abbr, el] of constellationLabelEls) {
+        el.style.opacity = centerCons.has(abbr) ? String(cfg.constellationLabelOpacity) : '0'
       }
     }
     // OPT-28：沉浸模式下跳过 labelRenderer.render()，节省 DOM 操作开销
