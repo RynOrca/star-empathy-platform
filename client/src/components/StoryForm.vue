@@ -252,6 +252,7 @@ async function onSubmit() {
         content: json.data.content,
         resonanceCount: json.data.resonanceCount,
         catalogStarId: json.data.catalogStarId,
+        catalogStarIds: json.data.catalogStarIds ?? (props.catalogStarIds ?? [props.catalogStarId]).filter((id: number) => id != null),
         createdAt: json.data.createdAt || '',
         locationLat: json.data.locationLat ?? null,
         locationLng: json.data.locationLng ?? null,

@@ -351,6 +351,12 @@ const myToggleFeedback = ref('')
 const locationCityToast = ref('')
 
 function toggleMyStories() {
+  // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
+  if (!currentUserId.value) {
+    myToggleFeedback.value = '请先登录'
+    setTimeout(() => { myToggleFeedback.value = '' }, 2000)
+    return
+  }
   showMyStoriesOnly.value = !showMyStoriesOnly.value
   myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
   setTimeout(() => { myToggleFeedback.value = '' }, 2000)
@@ -1098,17 +1104,21 @@ function onUpdateSimilarStars(ids: number[]) {
   skyRef.value?.sky?.setKernelLines(lines)
 }
 function onStorySubmitted(story: StoryData) {
-  const cid = story.catalogStarId
+  // 获取故事绑定的所有恒星 ID（兼容旧数据只有 catalogStarId）
+  const cids: number[] = (story.catalogStarIds?.length ? story.catalogStarIds : [story.catalogStarId]).filter((id: number) => id != null)
   const map = new Map(storiesByStarId.value)
-  const existing = [...(map.get(cid) ?? []), story]
-  map.set(cid, existing)
+  for (const cid of cids) {
+    const existing = [...(map.get(cid) ?? []), story]
+    map.set(cid, existing)
+  }
   storiesByStarId.value = map
   // 更新天空统计（无论是否"只看我的"模式）
   recalcFilteredStats()
-  if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
-    selectedStories.value = existing
+  // 更新当前选中星的故事列表（如果故事绑定到当前星）
+  if (cids.includes(selectedCatalogStarId.value) && selectedStarInfo.value) {
+    selectedStories.value = map.get(selectedCatalogStarId.value) ?? []
     // 从后端拉取权威统计数据，确保数据准确
-    fetchCatalogStats(cid)
+    fetchCatalogStats(selectedCatalogStarId.value)
   }
   showForm.value = false
 }
@@ -1152,8 +1162,10 @@ async function onResonate(storyId: number) {
     const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST', headers })
     const json = await res.json()
     if (res.ok) {
-      // 如果已共鸣，不更新计数
+      // 如果已共鸣，不更新计数，但需触发 StarDetail 清除乐观覆盖
       if (json.data?.already) {
+        // 赋值新数组引用触发 StarDetail 的 watch(() => props.stories) 清除 resonanceOverrides
+        selectedStories.value = [...selectedStories.value]
         resonating.value = false
         return
       }
