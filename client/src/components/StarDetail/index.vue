@@ -687,7 +687,7 @@ const props = defineProps<{
     imageUrl: string | null
   }>
   activeIndex: number
-  starInfo: { displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
+  starInfo: { id: number; displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
   catalogStats: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null
   catalogStarId: number
   resonating: boolean

@@ -9,6 +9,11 @@ import {
   Quaternion, Euler,
   ACESFilmicToneMapping,
   InstancedMesh, Object3D,
+} from 'three'
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
+import {
   IcosahedronGeometry,
 } from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
@@ -37,7 +42,7 @@ interface ConstellationData {
   name: string         // 中文名（如"大熊座"）
   nameEn: string       // 英文名（如"Ursa Major"）
   labelPos: number[] | null  // 标签 3D 位置 [x,y,z]，南天部分星座无标签
-  lines: [string, string][]  // 基于星名的连线对，与 stars.json 索引解耦
+  lines: [number, number][]  // 基于星体ID的连线对
 }
 import rawCatalog from '../data/stars.json'
 import constellationsDataRaw from '../data/constellations.json'
@@ -679,44 +684,96 @@ for (const s of stars) starById.set(s.id, s)
   //   - cfg.showAllConstellations=true 时所有连线常驻显示（constellationIdleOpacity）
   //   - cfg.showAllConstellations=false 时仅 hover 显示
   // 性能：仅渲染有连线的星座，opacity lerp 通过 cfg.constellationLerpFactor 配置
-  // 设计：使用星名而非索引，与 stars.json 索引顺序解耦，数据更健康
+  // 设计：使用星体ID进行连线匹配，与 stars.json 索引直接对应，O(1) 查找
   // issue #34：颜色通过 cfg.constellationLineColor / constellationGlowColor 可定制
-  const constellationLineGroups = new Map<string, { main: LineSegments; glow: LineSegments; targetOpacity: number }>()
+  const constellationLineGroups = new Map<string, { main: LineSegments2; glow: LineSegments2; targetOpacity: number }>()
   const constellationLabelEls = new Map<string, HTMLDivElement>()
   {
-    // 建立 星名 → 索引 映射（从 stars 数组构建，O(n) 一次）
-    const starNameToIdx = new Map<string, number>()
-    for (let i = 0; i < stars.length; i++) {
-      if (stars[i].name) starNameToIdx.set(stars[i].name!, i)
+    // 直接通过 ID 获取星星的 3D 位置，无需 name→idx 映射
+    function getLineVertex(id: number): { x: number; y: number; z: number } | null {
+      if (id == null || id < 0 || id >= n) return null
+      const s = stars[id]
+      if (!s) return null
+      return { x: s.x, y: s.y, z: s.z }
     }
-    // 为每个星座创建独立的 LineSegments（main + glow）
-    // 初始 targetOpacity 根据 cfg.showAllConstellations 决定
+
+    // 为每个星座创建独立的 LineSegments2（main + glow）
+    // LineSegments2 + LineMaterial 支持 lineWidth（像素），解决 WebGL lineWidth=1 限制
     const initialOpacity = cfg.showAllConstellations ? cfg.constellationIdleOpacity : 0
     for (const [abbr, con] of Object.entries(constellationsData)) {
       if (!con.lines.length) continue
       const v: number[] = []
       for (const [a, b] of con.lines) {
-        const ia = starNameToIdx.get(a), ib = starNameToIdx.get(b)
-        if (ia !== undefined && ib !== undefined && ia < n && ib < n) {
-          const sa = stars[ia], sb = stars[ib]
-          v.push(sa.x, sa.y, sa.z, sb.x, sb.y, sb.z)
+        const va = getLineVertex(a), vb = getLineVertex(b)
+        if (va && vb) {
+          v.push(va.x, va.y, va.z, vb.x, vb.y, vb.z)
         }
       }
       if (!v.length) continue
-      // main — muted slate（颜色通过 cfg 配置）
-      const lg = new BufferGeometry(); lg.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      const main = new LineSegments(lg, new LineBasicMaterial({
-        color: cfg.constellationLineColor, transparent: true, opacity: 0, depthTest: true, depthWrite: false,
-      }))
+      // main — 使用 LineSegments2 + LineMaterial（支持像素级 lineWidth）
+      const lg = new LineSegmentsGeometry()
+      lg.setPositions(v)
+      const mainMat = new LineMaterial({
+        color: cfg.constellationLineColor,
+        linewidth: cfg.constellationLineWidth,
+        transparent: true,
+        opacity: 0,
+        depthTest: true,
+        depthWrite: false,
+        worldUnits: false,
+        alphaToCoverage: true,
+        resolution: new Vector2(canvas.clientWidth, canvas.clientHeight),
+      })
+      const main = new LineSegments2(lg, mainMat)
       skyGroup.add(main)
-      // warm-gold glow pass underneath（颜色通过 cfg 配置）
-      const lg2 = new BufferGeometry(); lg2.setAttribute('position', new BufferAttribute(new Float32Array(v.slice()), 3))
-      const glow = new LineSegments(lg2, new LineBasicMaterial({
-        color: cfg.constellationGlowColor, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, depthTest: false,
-      }))
-      glow.scale.setScalar(1.003)
+      // glow — 更宽的金色辉光层
+      const lg2 = new LineSegmentsGeometry()
+      lg2.setPositions(v.slice())
+      const glowMat = new LineMaterial({
+        color: cfg.constellationGlowColor,
+        linewidth: cfg.constellationGlowWidth,
+        transparent: true,
+        opacity: 0,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        worldUnits: false,
+        alphaToCoverage: true,
+        resolution: new Vector2(canvas.clientWidth, canvas.clientHeight),
+      })
+      const glow = new LineSegments2(lg2, glowMat)
       skyGroup.add(glow)
       constellationLineGroups.set(abbr, { main, glow, targetOpacity: initialOpacity })
+    }
+  }
+
+  /**
+   * 应用星座连线可见性（根据 showAllConstellations 状态和当前 hover/中心近距星座）
+   */
+  function applyConstellationVisibility(hoveredCon: string | null) {
+    if (cfg.showAllConstellations) {
+      for (const [abbr, grp] of constellationLineGroups) {
+        grp.targetOpacity = abbr === hoveredCon
+          ? cfg.constellationOpacity
+          : cfg.constellationIdleOpacity
+      }
+      for (const [abbr, el] of constellationLabelEls) {
+        el.style.opacity = abbr === hoveredCon
+          ? String(cfg.constellationLabelOpacity)
+          : '0'
+      }
+    } else {
+      if (hoveredCon) {
+        for (const [abbr, grp] of constellationLineGroups) {
+          grp.targetOpacity = abbr === hoveredCon ? cfg.constellationOpacity : 0
+        }
+        for (const [abbr, el] of constellationLabelEls) {
+          el.style.opacity = abbr === hoveredCon ? String(cfg.constellationLabelOpacity) : '0'
+        }
+      } else {
+        for (const grp of constellationLineGroups.values()) grp.targetOpacity = 0
+        for (const el of constellationLabelEls.values()) el.style.opacity = '0'
+      }
     }
   }
 
@@ -912,9 +969,9 @@ for (const s of stars) starById.set(s.id, s)
       el.style.cssText = [
         `color:${cfg.constellationLabelColor}`,
         'font-family:"Inter","Microsoft YaHei",system-ui,sans-serif',
-        'font-size:10px',
-        'font-weight:300',
-        'letter-spacing:0.12em',
+        'font-size:12px',
+        'font-weight:500',
+        'letter-spacing:0.15em',
         'white-space:nowrap',
         'pointer-events:none',
         'opacity:0',
@@ -1027,13 +1084,13 @@ for (const s of stars) starById.set(s.id, s)
   // ═══ 点击检测 + 悬浮检测 ═══
   // hoverLongTimer 提升到外层作用域，以便 dispose 能清除未触发的长悬浮回调
   let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
+  let hoveredStarId = -1  // 提升到外层作用域，供 animate 中中心近距检测使用
   {
     const mouse = new Vector2()
     const _v = new Vector3()
     const _w = new Vector3()
     const DRAG_THRESHOLD = 5
     let clickDrag = false
-    let hoveredStarId = -1
     let hoverCheckTimer = 0
 
     // 预计算所有星的归一化位置（用于屏幕投影）
@@ -1100,40 +1157,6 @@ for (const s of stars) starById.set(s.id, s)
       vals[2].textContent = stats ? String(stats.views) : '0'
       vals[3].textContent = stats ? String(stats.favorites) : '0'
       _lastStatsKey = key
-    }
-
-    /**
-     * 应用星座连线可见性（issue #34：根据 showAllConstellations 状态和当前 hover 星座）
-     * - showAll=true：所有连线显示 idle opacity，hover 的星座高亮
-     * - showAll=false：仅 hover 的星座连线显示，其他隐藏
-     */
-    function applyConstellationVisibility(hoveredCon: string | null) {
-      if (cfg.showAllConstellations) {
-        // 全部常驻显示：hover 的星座高亮，其他保持 idle opacity
-        for (const [abbr, grp] of constellationLineGroups) {
-          grp.targetOpacity = abbr === hoveredCon
-            ? cfg.constellationOpacity
-            : cfg.constellationIdleOpacity
-        }
-        for (const [abbr, el] of constellationLabelEls) {
-          el.style.opacity = abbr === hoveredCon
-            ? String(cfg.constellationLabelOpacity)
-            : '0'
-        }
-      } else {
-        // 仅 hover 显示
-        if (hoveredCon) {
-          for (const [abbr, grp] of constellationLineGroups) {
-            grp.targetOpacity = abbr === hoveredCon ? cfg.constellationOpacity : 0
-          }
-          for (const [abbr, el] of constellationLabelEls) {
-            el.style.opacity = abbr === hoveredCon ? String(cfg.constellationLabelOpacity) : '0'
-          }
-        } else {
-          for (const grp of constellationLineGroups.values()) grp.targetOpacity = 0
-          for (const el of constellationLabelEls.values()) el.style.opacity = '0'
-        }
-      }
     }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false }, { signal: abortController.signal })
@@ -1210,9 +1233,6 @@ for (const s of stars) starById.set(s.id, s)
             options?.onStarHoverLong?.(currentStarId)
           }, cfg.hoverLongDelayMs)
           updateTooltipContent(bestId)
-          // 星座连线联动：通过 applyConstellationVisibility 统一处理
-          const con = stars[bestId]?.con ?? null
-          applyConstellationVisibility(con)
         } else {
           // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
           updateTooltipPosition(bestId)
@@ -1223,7 +1243,6 @@ for (const s of stars) starById.set(s.id, s)
         // 拖拽旋转时不触发离开逻辑，保持连线可见
         if (!dragging) {
           options?.onStarHoverLong?.(null)
-          applyConstellationVisibility(null)
         }
         hoveredStarId = -1
         tooltipInner.style.opacity = '0'
@@ -1466,6 +1485,12 @@ for (const s of stars) starById.set(s.id, s)
     // 同步更新 composer 尺寸，避免 Bloom 模糊错位
     composer.setSize(canvas.clientWidth, canvas.clientHeight)
     if (bloomPass) bloomPass.setSize(canvas.clientWidth, canvas.clientHeight)
+    // 更新 LineMaterial resolution（LineSegments2 需要像素级分辨率）
+    const res = new Vector2(canvas.clientWidth, canvas.clientHeight)
+    for (const grp of constellationLineGroups.values()) {
+      ;(grp.main.material as LineMaterial).resolution.copy(res)
+      ;(grp.glow.material as LineMaterial).resolution.copy(res)
+    }
   }, { signal: abortController.signal })
 
   // WebGL 上下文丢失处理（Safari GPU 进程崩溃 / GPU 显存耗尽 / GPU 切换）
@@ -2849,8 +2874,8 @@ for (const s of stars) starById.set(s.id, s)
     // 星座连线 opacity lerp（淡入淡出系数与 glow 比例通过 cfg 配置）
     // issue #34：原硬编码 0.15 / 0.43 → cfg.constellationLerpFactor / cfg.constellationGlowRatio
     for (const grp of constellationLineGroups.values()) {
-      const mainMat = grp.main.material as LineBasicMaterial
-      const glowMat = grp.glow.material as LineBasicMaterial
+      const mainMat = grp.main.material as LineMaterial
+      const glowMat = grp.glow.material as LineMaterial
       mainMat.opacity += (grp.targetOpacity - mainMat.opacity) * cfg.constellationLerpFactor
       glowMat.opacity += (grp.targetOpacity * cfg.constellationGlowRatio - glowMat.opacity) * cfg.constellationLerpFactor
       if (grp.targetOpacity === 0 && mainMat.opacity < 0.005) {
@@ -3267,11 +3292,14 @@ for (const s of stars) starById.set(s.id, s)
       const innerRad = thresholdRad * 0.55  // 完全可见区
       const outerRad = thresholdRad          // 完全隐藏区
       const fadeRange = outerRad - innerRad
+      const centerCons = new Set<string>()  // 靠近中心的星星所属星座
       for (const [starId, label] of starNameLabels) {
         const star = starById.get(starId)
         if (!star) continue
         _starDir.set(star.x, star.y, star.z).applyMatrix4(skyGroup.matrixWorld).normalize()
         const angle = Math.acos(Math.max(-1, Math.min(1, _camDir.dot(_starDir))))
+        // 与星名显示相同条件：在 thresholdRad 内就收集星座
+        if (angle < thresholdRad && star.con) centerCons.add(star.con)
         // 平滑过渡：inner 以内 opacity=1，outer 以外 opacity=0，中间线性插值
         const target = angle <= innerRad ? 1 : angle >= outerRad ? 0 : 1 - (angle - innerRad) / fadeRange
         const cur = starNameOpacities.get(starId) ?? 0
@@ -3284,6 +3312,18 @@ for (const s of stars) starById.set(s.id, s)
           label.visible = false
           ;(label.element.firstChild as HTMLElement).style.opacity = '0'
         }
+      }
+      // 靠近视角中心时自动显示星座连线
+      // 同时包含 hover 星星的星座，确保 hover 时其他连线不消失
+      if (hoveredStarId !== -1) {
+        const hoveredStar = starById.get(hoveredStarId)
+        if (hoveredStar?.con) centerCons.add(hoveredStar.con)
+      }
+      for (const [abbr, grp] of constellationLineGroups) {
+        grp.targetOpacity = centerCons.has(abbr) ? cfg.constellationOpacity : 0
+      }
+      for (const [abbr, el] of constellationLabelEls) {
+        el.style.opacity = centerCons.has(abbr) ? String(cfg.constellationLabelOpacity) : '0'
       }
     }
     // OPT-28：沉浸模式下跳过 labelRenderer.render()，节省 DOM 操作开销
@@ -3392,12 +3432,23 @@ for (const s of stars) starById.set(s.id, s)
       // 连线颜色变更：立即更新所有材质 color
       if (cfg.constellationLineColor !== oldLineColor) {
         for (const grp of constellationLineGroups.values()) {
-          ;(grp.main.material as LineBasicMaterial).color.setHex(cfg.constellationLineColor)
+          ;(grp.main.material as LineMaterial).color.setHex(cfg.constellationLineColor)
         }
       }
       if (cfg.constellationGlowColor !== oldGlowColor) {
         for (const grp of constellationLineGroups.values()) {
-          ;(grp.glow.material as LineBasicMaterial).color.setHex(cfg.constellationGlowColor)
+          ;(grp.glow.material as LineMaterial).color.setHex(cfg.constellationGlowColor)
+        }
+      }
+      // 线宽变更
+      if (cfg.constellationLineWidth !== undefined) {
+        for (const grp of constellationLineGroups.values()) {
+          ;(grp.main.material as LineMaterial).linewidth = cfg.constellationLineWidth
+        }
+      }
+      if (cfg.constellationGlowWidth !== undefined) {
+        for (const grp of constellationLineGroups.values()) {
+          ;(grp.glow.material as LineMaterial).linewidth = cfg.constellationGlowWidth
         }
       }
       // 标签颜色变更：立即更新所有 el color
