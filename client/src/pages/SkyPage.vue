@@ -1,4 +1,4 @@
-<template>
+﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1007,7 +1007,7 @@ onBeforeUnmount(() => {
 })
 const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
-const selectedStarInfo = ref<{ displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
+const selectedStarInfo = ref<{ id: number; displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null>(null)
 const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
@@ -1020,7 +1020,7 @@ function onStarClick(starId: number) {
   // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
-  selectedStarInfo.value = { displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
+  selectedStarInfo.value = { id: star.id, displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
   selectedCatalogStarId.value = starId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
@@ -1066,6 +1066,7 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   }
 
   selectedStarInfo.value = {
+    id: -1,
     displayName: nameCN,
     con: '',
     mag: 0,

@@ -41,7 +41,7 @@ interface ConstellationData {
   name: string         // 中文名（如"大熊座"）
   nameEn: string       // 英文名（如"Ursa Major"）
   labelPos: number[] | null  // 标签 3D 位置 [x,y,z]，南天部分星座无标签
-  lines: [string, string][]  // 基于星名的连线对，与 stars.json 索引解耦
+  lines: [number, number][]  // 基于星体ID的连线对
 }
 import rawCatalog from '../data/stars.json'
 import constellationsDataRaw from '../data/constellations.json'
@@ -634,48 +634,17 @@ for (const s of stars) starById.set(s.id, s)
   //   - cfg.showAllConstellations=true 时所有连线常驻显示（constellationIdleOpacity）
   //   - cfg.showAllConstellations=false 时仅 hover 显示
   // 性能：仅渲染有连线的星座，opacity lerp 通过 cfg.constellationLerpFactor 配置
-  // 设计：使用星名而非索引，与 stars.json 索引顺序解耦，数据更健康
+  // 设计：使用星体ID进行连线匹配，与 stars.json 索引直接对应，O(1) 查找
   // issue #34：颜色通过 cfg.constellationLineColor / constellationGlowColor 可定制
   const constellationLineGroups = new Map<string, { main: LineSegments2; glow: LineSegments2; targetOpacity: number }>()
   const constellationLabelEls = new Map<string, HTMLDivElement>()
   {
-    // 建立 星名 → 索引 映射（从 stars 数组构建，O(n) 一次）
-    const starNameToIdx = new Map<string, number>()
-    for (let i = 0; i < stars.length; i++) {
-      if (stars[i].name) starNameToIdx.set(stars[i].name!, i)
-    }
-
-    // 解析赤经赤纬坐标字符串（如 "11h49m · +45°19′"）→ 3D 位置
-    const R_SPHERE = 500
-    function parseCoordTo3D(raw: string): { x: number; y: number; z: number } | null {
-      const m = raw.match(/(\d+)h\s*(\d+)m\s*·?\s*([+-]?\d+)°\s*(\d+)[′']/)
-      if (!m) return null
-      const raH = parseInt(m[1]) + parseInt(m[2]) / 60
-      const decDeg = (m[3].startsWith('-') ? -1 : 1) * (Math.abs(parseInt(m[3])) + parseInt(m[4]) / 60)
-      const ra = (raH / 24) * Math.PI * 2
-      const dec = (decDeg / 180) * Math.PI
-      const cosD = Math.cos(dec)
-      return {
-        x: Math.round(R_SPHERE * cosD * Math.cos(ra) * 100) / 100,
-        y: Math.round(R_SPHERE * Math.sin(dec) * 100) / 100,
-        z: Math.round(R_SPHERE * cosD * Math.sin(-ra) * 100) / 100,
-      }
-    }
-
-    // 解析坐标缓存，避免重复计算
-    const coordCache = new Map<string, { x: number; y: number; z: number } | null>()
-
-    function getLineVertex(name: string): { x: number; y: number; z: number } | null {
-      const idx = starNameToIdx.get(name)
-      if (idx !== undefined && idx < n) {
-        const s = stars[idx]
-        return { x: s.x, y: s.y, z: s.z }
-      }
-      // 尝试解析为坐标字符串
-      if (!coordCache.has(name)) {
-        coordCache.set(name, parseCoordTo3D(name))
-      }
-      return coordCache.get(name) ?? null
+    // 直接通过 ID 获取星星的 3D 位置，无需 name→idx 映射
+    function getLineVertex(id: number): { x: number; y: number; z: number } | null {
+      if (id == null || id < 0 || id >= n) return null
+      const s = stars[id]
+      if (!s) return null
+      return { x: s.x, y: s.y, z: s.z }
     }
 
     // 为每个星座创建独立的 LineSegments2（main + glow）
