@@ -25,7 +25,8 @@
       <!-- 统计 -->
       <div class="stats-row">
         <div class="stat"><strong>{{ stats.storyCount }}</strong><span>故事</span></div>
-        <div class="stat"><strong>{{ stats.totalResonance }}</strong><span>共鸣</span></div>
+        <div class="stat"><strong>{{ stats.totalResonance }}</strong><span>收到共鸣</span></div>
+        <div class="stat"><strong>{{ stats.resonanceGivenCount }}</strong><span>发出共鸣</span></div>
         <div class="stat"><strong>{{ stats.favoriteCount }}</strong><span>收藏</span></div>
       </div>
 
@@ -136,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, computed, nextTick, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
@@ -153,7 +154,7 @@ const loaded = ref(false)
 const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<number[]>([])
-const stats = ref({ storyCount: 0, totalResonance: 0, favoriteCount: 0 })
+const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
 const hoverIdx = ref(-1)
 const activeStory = ref<any>(null)
 
@@ -325,11 +326,7 @@ async function loadNextPage() {
       currentPage.value = json.data.page ?? nextPage
       hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
       appendPositions(items.length)
-      // 用 total 更新 storyCount（首次）
-      if (json.data.total != null && stats.value.storyCount === 0) {
-        stats.value.storyCount = json.data.total
-      }
-      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      // 统计数据由 /api/profile/stats 提供，这里不再客户端累加
     }
   } catch (e) { console.error('加载故事页失败:', e) }
   finally { loadingMore.value = false }
@@ -392,7 +389,7 @@ async function doDeleteStory() {
       // 从本地列表中移除
       stories.value = stories.value.filter(s => s.id !== pendingDeleteStory.value.id)
       stats.value.storyCount = Math.max(0, stats.value.storyCount - 1)
-      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      stats.value.totalResonance = Math.max(0, stats.value.totalResonance - (pendingDeleteStory.value.resonanceCount || 0))
       showDeleteConfirm.value = false
       activeStory.value = null
       pendingDeleteStory.value = null
@@ -414,7 +411,7 @@ async function loadProfileData() {
   user.value = null
   stories.value = []
   favorites.value = []
-  stats.value = { storyCount: 0, totalResonance: 0, favoriteCount: 0 }
+  stats.value = { storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 }
   currentPage.value = 0
   hasMore.value = true
   loadingMore.value = false
@@ -425,11 +422,12 @@ async function loadProfileData() {
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
-    const [meRes, firstPageRes, favRes, linesRes] = await Promise.all([
+    const [meRes, firstPageRes, favRes, linesRes, statsRes] = await Promise.all([
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
@@ -439,14 +437,22 @@ async function loadProfileData() {
       stories.value = items
       currentPage.value = firstJson.data.page ?? 1
       hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
-      stats.value.storyCount = firstJson.data.total ?? items.length
-      stats.value.totalResonance = items.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
       appendPositions(items.length)
       // 计算内核连线坐标
       computeKernelLines(linesRes, items)
     }
     const favJson = await favRes.json()
-    if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
+    if (favRes.ok) { favorites.value = favJson.data }
+    // 使用后端聚合统计（准确计数，不受分页影响）
+    const statsJson = await statsRes.json()
+    if (statsJson.ok && statsJson.data) {
+      stats.value.storyCount = statsJson.data.storyCount ?? 0
+      stats.value.totalResonance = statsJson.data.totalResonance ?? 0
+      stats.value.resonanceGivenCount = statsJson.data.resonanceGivenCount ?? 0
+      stats.value.favoriteCount = statsJson.data.favoriteCount ?? favJson.data?.length ?? 0
+    } else if (favJson.data) {
+      stats.value.favoriteCount = favJson.data.length
+    }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
 }
@@ -454,11 +460,6 @@ async function loadProfileData() {
 onMounted(() => {
   loadProfileData()
   window.addEventListener('scroll', onScroll, { passive: true })
-})
-
-// 兼容 keep-alive 场景：组件被缓存后再次激活时重新加载
-onActivated(() => {
-  loadProfileData()
 })
 
 onUnmounted(() => {
@@ -496,7 +497,7 @@ onUnmounted(() => {
 .join-days { font-size: 0.75rem; color: #5a5580; margin-top: 0.2rem; }
 
 /* ═══ 统计 ═══ */
-.stats-row { position: relative; z-index: 10; display: flex; justify-content: center; gap: 2.5rem; margin-top: 2rem; }
+.stats-row { position: relative; z-index: 10; display: flex; justify-content: center; gap: 2rem; margin-top: 2rem; }
 .stat { text-align: center; }
 .stat strong { display: block; font-size: 1.4rem; color: #ffd98a; text-shadow: 0 0 12px rgba(255,217,138,0.3); }
 .stat span { font-size: 0.7rem; color: #5a5580; }
@@ -663,7 +664,7 @@ onUnmounted(() => {
   }
 
   .stats-row {
-    gap: 1.5rem;
+    gap: 1.2rem;
     margin-top: 1.5rem;
   }
 
@@ -792,7 +793,7 @@ onUnmounted(() => {
 /* ─── Very small screens (<=380px) ─── */
 @media (max-width: 380px) {
   .stats-row {
-    gap: 1.2rem;
+    gap: 0.8rem;
   }
 
   .stat strong {
