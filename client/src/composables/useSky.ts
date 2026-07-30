@@ -69,6 +69,22 @@ function bloomTex(color: string, sz: number): CanvasTexture {
   return new CanvasTexture(c)
 }
 
+// 纯白径向渐变纹理：供行星 hover 光晕使用
+// 与恒星 bloomTex（暖金底色）不同，纯白底色让 SpriteMaterial.color tint 完全决定最终颜色
+// 灰色系行星（水星 0x999999 / 月球 0xcccccc）在暖金纹理上会变暗淡，纯白纹理保持本色
+function whiteBloomTex(sz: number): CanvasTexture {
+  const c = document.createElement('canvas'); c.width = c.height = sz
+  const ctx = c.getContext('2d')!, h = sz/2
+  const g = ctx.createRadialGradient(h,h,0, h,h,h)
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.15, 'rgba(255,255,255,0.9)')
+  g.addColorStop(0.4, 'rgba(255,255,255,0.3)')
+  g.addColorStop(0.7, 'rgba(255,255,255,0.08)')
+  g.addColorStop(1, 'transparent')
+  ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz)
+  return new CanvasTexture(c)
+}
+
 // P0-5：亮星十字光芒纹理（diffraction spikes）
 // 中心一个亮点 + 水平/垂直两条渐变细线，模拟折射光斑
 // 配合 AdditiveBlending + BloomPass 形成真实的"星芒"
@@ -591,16 +607,18 @@ for (const s of stars) starById.set(s.id, s)
 
   // ═══ 行星悬浮辉光（issue #82 补充：行星 hover 淡光晕，与恒星 hoverGlow 对等） ═══
   // 太阳系行星（含日月）悬浮时显示淡光晕表示被选中，色温随行星颜色变化
-  // 复用 bloomTex 生成径向渐变纹理，scale 按行星视觉大小动态调整
+  // 使用纯白径向渐变纹理（whiteBloomTex），让 SpriteMaterial.color tint 完全决定颜色
+  // 暖金纹理 + 灰色 tint 会变暗淡（0x999999 × 暖金 = 暗棕灰），纯白纹理保持行星本色
+  const planetHoverBloomTex = whiteBloomTex(128)
   const planetHoverGlow = new Sprite(new SpriteMaterial({
-    map: hoverBloomTex, // 复用恒星 hover 纹理（暖金色），运行时按行星色 tint
+    map: planetHoverBloomTex,
     blending: AdditiveBlending,
     depthWrite: false,
     depthTest: false,
     transparent: true,
     opacity: 0,
   }))
-  planetHoverGlow.scale.set(8, 8, 1)
+  planetHoverGlow.scale.set(4.5, 4.5, 1)
   planetHoverGlow.renderOrder = 99
   planetHoverGlow.visible = false
   scene.add(planetHoverGlow)
@@ -1166,7 +1184,11 @@ for (const s of stars) starById.set(s.id, s)
             const pos = updater.tiltGroup.position
             _v.set(pos.x, pos.y, pos.z).applyMatrix4(skyGroup.matrixWorld)
             planetHoverGlow.position.copy(_v)
-            planetHoverGlow.scale.set(8, 8, 1)
+            // scale 基于 hitbox 大小动态调整：hitbox = max(size*2.5, 3.0)，光晕 = hitbox × 1.5
+            // 水星(0.018)→4.5，木星(0.502)→4.5，太阳(5.0)→18.75
+            // 保证小天体光晕可见但不糊屏，大天体光晕足够明显
+            const glowSize = Math.max(updater.size * 2.5, 3.0) * 1.5
+            planetHoverGlow.scale.set(glowSize, glowSize, 1)
             planetHoverColor.setHex(updater.color)
             planetHoverTargetOpacity = 0.8
             planetHoverGlow.visible = true
@@ -2819,6 +2841,10 @@ for (const s of stars) starById.set(s.id, s)
       // 相机沿当前朝向反方向 dist 处，保持盘面在视野中心
       _closeupDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
       camera.position.copy(_closeupWorld).sub(_closeupDir.multiplyScalar(closeupTarget.dist))
+      // 每帧重新朝向行星：行星在持续运动（timeScale 加速下尤甚），
+      // 若只跟位置不跟朝向，行星会逐渐飞出视野中心
+      // counterexample: 月球公转周期 27 天，timeScale=100 时 6.5 小时一圈，不跟朝向会丢失
+      camera.lookAt(_closeupWorld)
     }
     // 星座连线 opacity lerp（淡入淡出系数与 glow 比例通过 cfg 配置）
     // issue #34：原硬编码 0.15 / 0.43 → cfg.constellationLerpFactor / cfg.constellationGlowRatio
