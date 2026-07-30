@@ -5,9 +5,9 @@
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
-        <div class="tab-bar">
+          <div class="tab-bar">
           <button
-            v-for="tab in tabs"
+            v-for="tab in pcTabs"
             :key="tab.id"
             class="tab-btn"
             :class="{ active: activeTab === tab.id }"
@@ -334,7 +334,7 @@
               <X :size="18" />
             </button>
             <div class="mobile-tab-select-wrap">
-              <MobileTabSelect v-model="activeTab" :tabs="tabs" />
+              <MobileTabSelect v-model="activeTab" :tabs="mobileTabs" />
             </div>
           </div>
 
@@ -811,13 +811,21 @@ const detailStory = computed(() => {
 })
 const justResonatedId = ref<number | null>(null)
 type TabId = 'info' | 'narrative' | 'history' | 'all' | 'mine'
-const tabs: { id: TabId; label: string; icon: Component }[] = [
+// PC 端：不含「星信息」（与右栏重复）
+const pcTabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
   { id: 'history', label: '历史故事', icon: BookOpen },
   { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-const activeTab = ref<TabId>('narrative')
+// 移动端：包含「星信息」
+const mobileTabs: { id: TabId; label: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', icon: Star },
+  ...pcTabs,
+]
+// 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
+const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
+const activeTab = ref<TabId>(isMobileInit ? 'info' : 'narrative')
 
 const detailBackLabel = computed(() => {
   switch (activeTab.value) {
@@ -852,8 +860,13 @@ function fetchNarrativeWithPosition() {
   narrative.fetchNarrative(props.catalogStarId, lat, lng, props.starInfo?.ra, props.starInfo?.dec)
 }
 
+let isFirstStarChange = true
 watch(() => props.catalogStarId, (id) => {
-  activeTab.value = isMobile.value ? 'info' : 'narrative'
+  // 首次由初始化值决定，后续切换星星时根据平台重置
+  if (!isFirstStarChange) {
+    activeTab.value = isMobile.value ? 'info' : 'narrative'
+  }
+  isFirstStarChange = false
   searchQuery.value = ''
   detailStoryId.value = null
   if (id && (positionReady.value || props.observerLat != null)) {
@@ -1350,6 +1363,12 @@ watch(() => props.catalogStarId, () => {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
+/* PC 右栏：StarHeader 已在固定顶部，去掉 StarInfoPanel 顶部间距 */
+.info-body :deep(.info-rows) {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
 .info-body::-webkit-scrollbar { width: 5px; }
 .info-body::-webkit-scrollbar-track { background: transparent; }
 .info-body::-webkit-scrollbar-thumb {
@@ -1393,6 +1412,15 @@ watch(() => props.catalogStarId, () => {
   gap: 10px;
   height: 220px;
   flex-shrink: 0;
+  padding: 0 28px;
+}
+/* 左栏宽度不足时，双面板收为上下排列 */
+@media (max-width: 1050px) {
+  .narrative-bottom {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 300px;
+  }
 }
 
 /* ─── 移动端：相似星星 + 天区故事纵向堆叠 ─── */
