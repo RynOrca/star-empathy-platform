@@ -280,7 +280,7 @@ function appendPositions(count: number) {
 async function computeKernelLines(linesRes: Response, stories: any[]) {
   try {
     const linesJson = await linesRes.json()
-    if (!linesJson.ok || !linesJson.data?.length) return
+    if (!linesRes.ok || !linesJson.data?.length) return
     const apiLines = linesJson.data as {
       from: { catalogStarId: number }
       to: { catalogStarId: number }
@@ -450,7 +450,7 @@ async function loadProfileData() {
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
     const firstJson = await firstPageRes.json()
-    if (firstJson.ok && firstJson.data) {
+    if (firstPageRes.ok && firstJson.data) {
       const items = firstJson.data.items ?? firstJson.data ?? []
       stories.value = items
       currentPage.value = firstJson.data.page ?? 1
@@ -463,7 +463,7 @@ async function loadProfileData() {
     if (favRes.ok) { favorites.value = favJson.data }
     // 使用后端聚合统计（准确计数，不受分页影响）
     const statsJson = await statsRes.json()
-    if (statsJson.ok && statsJson.data) {
+    if (statsRes.ok && statsJson.data) {
       stats.value.storyCount = statsJson.data.storyCount ?? 0
       stats.value.totalResonance = statsJson.data.totalResonance ?? 0
       stats.value.resonanceGivenCount = statsJson.data.resonanceGivenCount ?? 0
