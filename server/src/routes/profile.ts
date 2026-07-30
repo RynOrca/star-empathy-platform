@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getUserStories, getUserStoriesPaged, getUserFavorites } from '../services/starService';
+import { getUserStories, getUserStoriesPaged, getUserFavorites, getUserStats } from '../services/starService';
 import { getUserKernelLines, getUserPreferences } from '../services/kernel';
 import { authRequired } from '../middleware/auth';
 import { ok, serverError } from '../utils/response';
@@ -45,6 +45,18 @@ router.get('/kernel-lines', authRequired, (req: Request, res: Response) => {
     ok(res, 'success', lines);
   } catch (error) {
     console.error('GET /api/profile/kernel-lines error:', error);
+    serverError(res);
+  }
+});
+
+// 个人空间聚合统计（故事数、收到共鸣数、发出共鸣数、收藏数）
+router.get('/stats', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const stats = getUserStats(user.id);
+    ok(res, 'success', stats);
+  } catch (error) {
+    console.error('GET /api/profile/stats error:', error);
     serverError(res);
   }
 });

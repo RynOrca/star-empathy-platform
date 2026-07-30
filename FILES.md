@@ -40,7 +40,7 @@
 | `narrative.ts` | **AI 叙事路由**（`/api/catalog/stars/:id/narrative`）。含 `ra`/`dec` 参数用于地平线判断 |
 | `chat.ts` | **古人陪看聊天路由**（`/api/catalog/stars/:id/chat/*`）。古人列表、开场白、SSE 流式聊天 |
 | `auth.ts` | 用户认证路由（注册、登录、token 刷新） |
-| `profile.ts` | 用户资料路由（昵称、签名、邮箱修改） |
+| `profile.ts` | **个人空间路由**（`/api/profile/*`）。我的故事（分页）、我的收藏、私有内核连线、聚合统计（`/stats`）、用户喜好 |
 | `location.ts` | 反向地理编码路由（`/api/location/reverse`）。高德 → BigDataCloud → Nominatim 三级回退 |
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
@@ -52,7 +52,7 @@
 | `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
 | `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
-| `starService.ts` | 星星 CRUD 业务逻辑 |
+| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合） |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务 |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
