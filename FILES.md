@@ -40,7 +40,7 @@
 | `narrative.ts` | **AI 叙事路由**（`/api/catalog/stars/:id/narrative`）。含 `ra`/`dec` 参数用于地平线判断 |
 | `chat.ts` | **古人陪看聊天路由**（`/api/catalog/stars/:id/chat/*`）。古人列表、开场白、SSE 流式聊天 |
 | `auth.ts` | 用户认证路由（注册、登录、token 刷新） |
-| `profile.ts` | 用户资料路由（昵称、签名、邮箱修改） |
+| `profile.ts` | **个人空间路由**（`/api/profile/*`）。我的故事（分页）、我的收藏、私有内核连线、聚合统计（`/stats`）、用户喜好 |
 | `location.ts` | 反向地理编码路由（`/api/location/reverse`）。高德 → BigDataCloud → Nominatim 三级回退 |
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
@@ -52,7 +52,7 @@
 | `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
 | `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
-| `starService.ts` | 星星 CRUD 业务逻辑 |
+| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合） |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务 |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
@@ -116,7 +116,17 @@
 | 文件 | 用途 |
 |---|---|
 | `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停事件 |
-| `StarDetail.vue` | **星星详情面板**。4 个 Tab（AI 叙事/历史故事/所有故事/我的故事）、收藏、共鸣、叙事请求（含 `ra`/`dec` 传递）、天文事件面板 |
+| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、PC端 4 个 Tab（AI 叙事/历史故事/用户故事/我的故事）+ 移动端 5 个 Tab（含星信息）、标签编辑、删除确认 |
+| `StarDetail/StoryCard.vue` | 故事卡片子组件（4 个 Tab 复用） |
+| `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除） |
+| `StarDetail/StoryList.vue` | 故事列表子组件（搜索、排序、卡片列表、空状态） |
+| `StarDetail/StarHeader.vue` | 星星概要子组件（名称、星座、颜色） |
+| `StarDetail/StarInfoPanel.vue` | 信息面板子组件（视星等/距离/色温/亮度、统计、天文事件、月相、北极星岁差科普） |
+| `StarDetail/SimilarStarsPanel.vue` | **内核相似的星星面板**（PC端 AI 叙事 Tab 下方左栏 + 移动端 info tab） |
+| `StarDetail/AreaHighlightsPanel.vue` | **天区故事精选面板**（PC端 AI 叙事 Tab 下方右栏 + 移动端 info tab） |
+| `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
+| `StarDetail/MobileTabSelect.vue` | 移动端下拉 Tab 选择器（替代 PC 端 Tab 栏） |
+| `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
 | `StoryForm.vue` | 投递心事表单 |
@@ -137,6 +147,7 @@
 | `useAreaHighlights.ts` | 天区故事精选 |
 | `useAstroEvents.ts` | 天文事件计算（日月出没、行星可见性） |
 | `useParticleSky.ts` | 粒子背景动画 |
+| `useMediaQuery.ts` | 响应式断点检测（768px PC/移动端分界） |
 
 ### 数据 `src/data/`
 
@@ -220,7 +231,7 @@
 | 添加新 API 路由 | `server/src/routes/` 下新建，在 `server/src/index.ts` 注册 |
 | 修改数据库表结构 | `server/src/db.ts` |
 | 修改 3D 星空渲染 | `client/src/composables/useSky.ts` |
-| 修改星星详情面板 | `client/src/components/StarDetail.vue` |
+| 修改星星详情面板 | `client/src/components/StarDetail/index.vue` |
 | 修改古人聊天 UI | `client/src/components/AncientChat.vue` |
 | 修改行星数据/位置计算 | `client/src/data/planets.ts` |
 | 修改星空显示配置 | `client/src/utils/starDisplayConfig.ts` |

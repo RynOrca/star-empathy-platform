@@ -112,17 +112,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { PenSquare, X, Send, Image as ImageIcon, ChevronRight, ArrowLeft } from 'lucide-vue-next'
+import { useLocation } from '../composables/useLocation'
 
 const props = defineProps<{
   starName: string
   catalogStarId: number
+  catalogStarIds?: number[]
 }>()
 
 const emit = defineEmits<{
   close: []
-  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null; imageUrl: string | null }]
+  submitted: [story: { id: number; title: string | null; content: string; resonanceCount: number; catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null; locationLng: number | null; type: string; viewCount: number; origin: string | null; username: string | null; tag: string | null; userId: number | null; imageUrl: string | null }]
 }>()
 
 const title = ref('')
@@ -131,7 +133,12 @@ const step = ref<1 | 2>(1)
 const submitting = ref(false)
 const error = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const userLocation = ref<{ lat: number; lng: number } | null>(null)
+// 使用全局统一位置，不再独立请求浏览器
+const loc = useLocation()
+const userLocation = computed(() => {
+  const la = loc.lat.value, ln = loc.lng.value
+  return la != null && ln != null ? { lat: la, lng: ln } : null
+})
 const selectedTag = ref<string | null>(null)
 const isAnonymous = ref(false)
 const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
@@ -186,16 +193,6 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   textareaRef.value?.focus()
-  // 尝试获取用户位置
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        userLocation.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-      },
-      () => { /* 用户拒绝或不可用，静默忽略 */ },
-      { timeout: 5000 },
-    )
-  }
 })
 
 async function onSubmit() {
@@ -233,6 +230,7 @@ async function onSubmit() {
     if (token) headers['Authorization'] = `Bearer ${token}`
     const body: Record<string, unknown> = {
       catalogStarId: props.catalogStarId,
+      catalogStarIds: props.catalogStarIds ?? [props.catalogStarId],
       title: trimmedTitle,
       content: trimmed,
       location: userLocation.value,
@@ -254,6 +252,7 @@ async function onSubmit() {
         content: json.data.content,
         resonanceCount: json.data.resonanceCount,
         catalogStarId: json.data.catalogStarId,
+        catalogStarIds: json.data.catalogStarIds ?? (props.catalogStarIds ?? [props.catalogStarId]).filter((id: number) => id != null),
         createdAt: json.data.createdAt || '',
         locationLat: json.data.locationLat ?? null,
         locationLng: json.data.locationLng ?? null,

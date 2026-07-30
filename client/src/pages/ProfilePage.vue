@@ -25,7 +25,8 @@
       <!-- 统计 -->
       <div class="stats-row">
         <div class="stat"><strong>{{ stats.storyCount }}</strong><span>故事</span></div>
-        <div class="stat"><strong>{{ stats.totalResonance }}</strong><span>共鸣</span></div>
+        <div class="stat"><strong>{{ stats.totalResonance }}</strong><span>收到共鸣</span></div>
+        <div class="stat"><strong>{{ stats.resonanceGivenCount }}</strong><span>发出共鸣</span></div>
         <div class="stat"><strong>{{ stats.favoriteCount }}</strong><span>收藏</span></div>
       </div>
 
@@ -105,11 +106,19 @@
       <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
         <div class="modal-card">
           <h3>{{ activeStory.title || '未命名故事' }}</h3>
+          <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="modal-image" alt="故事图片" />
           <p class="modal-content">{{ activeStory.content }}</p>
           <div class="modal-meta">
             <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
             <span>{{ formatDate(activeStory.createdAt) }}</span>
             <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
+          </div>
+          <!-- 关联的星星 -->
+          <div v-if="getStoryStarNames(activeStory).length" class="modal-stars">
+            <span class="modal-stars-label">挂在</span>
+            <button v-for="cid in getStoryStarIds(activeStory)" :key="cid" class="modal-star-link" @click="goToStar(cid)">
+              {{ getStarName(cid) }}
+            </button>
           </div>
           <div class="modal-actions">
             <button class="modal-close" @click="activeStory = null">关闭</button>
@@ -136,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, computed, nextTick, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
@@ -153,7 +162,7 @@ const loaded = ref(false)
 const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<number[]>([])
-const stats = ref({ storyCount: 0, totalResonance: 0, favoriteCount: 0 })
+const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
 const hoverIdx = ref(-1)
 const activeStory = ref<any>(null)
 
@@ -271,7 +280,7 @@ function appendPositions(count: number) {
 async function computeKernelLines(linesRes: Response, stories: any[]) {
   try {
     const linesJson = await linesRes.json()
-    if (!linesJson.ok || !linesJson.data?.length) return
+    if (!linesRes.ok || !linesJson.data?.length) return
     const apiLines = linesJson.data as {
       from: { catalogStarId: number }
       to: { catalogStarId: number }
@@ -325,11 +334,7 @@ async function loadNextPage() {
       currentPage.value = json.data.page ?? nextPage
       hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
       appendPositions(items.length)
-      // 用 total 更新 storyCount（首次）
-      if (json.data.total != null && stats.value.storyCount === 0) {
-        stats.value.storyCount = json.data.total
-      }
-      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      // 统计数据由 /api/profile/stats 提供，这里不再客户端累加
     }
   } catch (e) { console.error('加载故事页失败:', e) }
   finally { loadingMore.value = false }
@@ -368,6 +373,16 @@ async function saveSig() {
 function openStory(s: any) { activeStory.value = s }
 function goBack() { router.push('/sky') }
 
+// 获取故事关联的星名列表
+function getStoryStarIds(story: any): number[] {
+  if (story.catalogStarIds?.length) return story.catalogStarIds
+  if (story.catalogStarId) return [story.catalogStarId]
+  return []
+}
+function getStoryStarNames(story: any): string[] {
+  return getStoryStarIds(story).map(id => getStarName(id))
+}
+
 // ─── 删除故事 ───
 const showDeleteConfirm = ref(false)
 const pendingDeleteStory = ref<any>(null)
@@ -392,7 +407,7 @@ async function doDeleteStory() {
       // 从本地列表中移除
       stories.value = stories.value.filter(s => s.id !== pendingDeleteStory.value.id)
       stats.value.storyCount = Math.max(0, stats.value.storyCount - 1)
-      stats.value.totalResonance = stories.value.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
+      stats.value.totalResonance = Math.max(0, stats.value.totalResonance - (pendingDeleteStory.value.resonanceCount || 0))
       showDeleteConfirm.value = false
       activeStory.value = null
       pendingDeleteStory.value = null
@@ -414,7 +429,7 @@ async function loadProfileData() {
   user.value = null
   stories.value = []
   favorites.value = []
-  stats.value = { storyCount: 0, totalResonance: 0, favoriteCount: 0 }
+  stats.value = { storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 }
   currentPage.value = 0
   hasMore.value = true
   loadingMore.value = false
@@ -425,28 +440,37 @@ async function loadProfileData() {
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
-    const [meRes, firstPageRes, favRes, linesRes] = await Promise.all([
+    const [meRes, firstPageRes, favRes, linesRes, statsRes] = await Promise.all([
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
     const firstJson = await firstPageRes.json()
-    if (firstJson.ok && firstJson.data) {
+    if (firstPageRes.ok && firstJson.data) {
       const items = firstJson.data.items ?? firstJson.data ?? []
       stories.value = items
       currentPage.value = firstJson.data.page ?? 1
       hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
-      stats.value.storyCount = firstJson.data.total ?? items.length
-      stats.value.totalResonance = items.reduce((s: number, x: any) => s + (x.resonanceCount || 0), 0)
       appendPositions(items.length)
       // 计算内核连线坐标
       computeKernelLines(linesRes, items)
     }
     const favJson = await favRes.json()
-    if (favRes.ok) { favorites.value = favJson.data; stats.value.favoriteCount = favJson.data.length }
+    if (favRes.ok) { favorites.value = favJson.data }
+    // 使用后端聚合统计（准确计数，不受分页影响）
+    const statsJson = await statsRes.json()
+    if (statsRes.ok && statsJson.data) {
+      stats.value.storyCount = statsJson.data.storyCount ?? 0
+      stats.value.totalResonance = statsJson.data.totalResonance ?? 0
+      stats.value.resonanceGivenCount = statsJson.data.resonanceGivenCount ?? 0
+      stats.value.favoriteCount = statsJson.data.favoriteCount ?? favJson.data?.length ?? 0
+    } else if (favJson.data) {
+      stats.value.favoriteCount = favJson.data.length
+    }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
 }
@@ -454,11 +478,6 @@ async function loadProfileData() {
 onMounted(() => {
   loadProfileData()
   window.addEventListener('scroll', onScroll, { passive: true })
-})
-
-// 兼容 keep-alive 场景：组件被缓存后再次激活时重新加载
-onActivated(() => {
-  loadProfileData()
 })
 
 onUnmounted(() => {
@@ -496,7 +515,7 @@ onUnmounted(() => {
 .join-days { font-size: 0.75rem; color: #5a5580; margin-top: 0.2rem; }
 
 /* ═══ 统计 ═══ */
-.stats-row { position: relative; z-index: 10; display: flex; justify-content: center; gap: 2.5rem; margin-top: 2rem; }
+.stats-row { position: relative; z-index: 10; display: flex; justify-content: center; gap: 2rem; margin-top: 2rem; }
 .stat { text-align: center; }
 .stat strong { display: block; font-size: 1.4rem; color: #ffd98a; text-shadow: 0 0 12px rgba(255,217,138,0.3); }
 .stat span { font-size: 0.7rem; color: #5a5580; }
@@ -572,6 +591,11 @@ onUnmounted(() => {
 .modal-card h3 { color: #ffd98a; font-size: 1.1rem; margin: 0 0 1rem; }
 .modal-content { font-size: 0.9rem; color: #b9b4d6; line-height: 1.7; white-space: pre-wrap; }
 .modal-meta { display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: #5a5580; align-items: center; }
+.modal-image { width: 100%; max-height: 200px; object-fit: cover; border-radius: 10px; margin-bottom: 1rem; }
+.modal-stars { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 0.75rem; font-size: 0.75rem; }
+.modal-stars-label { color: #5a5580; }
+.modal-star-link { background: none; border: 1px solid rgba(255,217,138,0.2); border-radius: 6px; padding: 2px 8px; color: #ffd98a; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: var(--font,"Microsoft YaHei",sans-serif); }
+.modal-star-link:hover { background: rgba(255,217,138,0.08); border-color: rgba(255,217,138,0.4); }
 .tag { padding: 1px 8px; border-radius: 8px; font-size: 0.7rem; background: rgba(255,255,255,0.06); }
 .tag-思念 { color: #ff8b7d; } .tag-等待 { color: #86a8ff; } .tag-离别 { color: #caa7ff; } .tag-愿望 { color: #ffd98a; } .tag-孤独 { color: #95f0c0; }
 .modal-close { margin-top: 1rem; padding: 0.4rem 1.2rem; border-radius: 10px; border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05); color: #7a759c; cursor: pointer; font-size: 0.8rem; }
@@ -627,4 +651,199 @@ onUnmounted(() => {
 }
 .modal-save:hover:not(:disabled) { background: #ffe0a8; }
 .modal-save:disabled { opacity: 0.5; cursor: wait; }
+
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  .profile-page {
+    padding-bottom: 80px;
+  }
+
+  .btn-back {
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+  }
+
+  .signature-area {
+    padding-top: 4vh;
+  }
+
+  .sig-text {
+    font-size: 1rem;
+  }
+
+  .sig-input {
+    width: 180px;
+    font-size: 0.95rem;
+  }
+
+  .username {
+    font-size: 1.3rem;
+  }
+
+  .join-days {
+    font-size: 0.7rem;
+  }
+
+  .stats-row {
+    gap: 1.2rem;
+    margin-top: 1.5rem;
+  }
+
+  .stat strong {
+    font-size: 1.2rem;
+  }
+
+  .stat span {
+    font-size: 0.65rem;
+  }
+
+  .account-actions {
+    margin-top: 1rem;
+  }
+
+  .btn-change-pwd {
+    padding: 0.35rem 1.2rem;
+    font-size: 0.74rem;
+  }
+
+  /* Story star field - reduce size in mobile */
+  .story-star {
+    box-shadow: 0 0 4px rgba(255,217,138,0.5), 0 0 10px rgba(255,180,100,0.2);
+  }
+
+  .star-title {
+    font-size: 0.65rem;
+  }
+
+  .fav-section {
+    margin-top: 2rem;
+    padding: 0 16px 2rem;
+  }
+
+  .fav-list {
+    max-width: 100%;
+  }
+
+  .fav-card {
+    padding: 10px 12px;
+  }
+
+  .fav-name {
+    font-size: 0.85rem;
+  }
+
+  /* Modals: bottom sheet style */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.5rem;
+    animation: slideUpModal 0.28s ease-out;
+  }
+
+  @keyframes slideUpModal {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .modal-content {
+    font-size: 0.84rem;
+    line-height: 1.65;
+  }
+
+  .modal-meta {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .modal-image {
+    max-height: 160px;
+    border-radius: 8px;
+  }
+
+  .modal-stars {
+    gap: 4px;
+  }
+
+  .modal-star-link {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+  }
+
+  .modal-actions {
+    gap: 0.6rem;
+  }
+
+  .modal-close {
+    padding: 0.5rem 1rem;
+    font-size: 0.78rem;
+    flex: 1;
+    margin-top: 0;
+  }
+
+  .modal-delete {
+    padding: 0.5rem 1rem;
+    font-size: 0.78rem;
+    flex: 1;
+  }
+
+  .pwd-modal {
+    max-width: 100%;
+  }
+
+  .pwd-modal .form-input {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+  }
+
+  .pwd-modal-actions {
+    gap: 0.6rem;
+  }
+
+  .modal-save {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .empty-hint {
+    margin-top: 3rem;
+    font-size: 0.8rem;
+    padding: 0 20px;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .stats-row {
+    gap: 0.8rem;
+    flex-wrap: wrap;
+  }
+
+  .stat strong {
+    font-size: 1.1rem;
+  }
+
+  .signature-area {
+    padding-top: 3vh;
+  }
+
+  .fav-section {
+    padding: 0 12px 2rem;
+  }
+}
 </style>

@@ -1,27 +1,9 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
-      <div class="nav-center">
-        <div class="search-box">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input v-model="searchQuery" placeholder="搜索星星..." class="search-input" @input="onSearchInput" @focus="searchOpen = true" style="padding-left: 2rem" />
-          <div v-if="searchOpen && searchResults.length" class="search-dropdown">
-            <div v-for="r in searchResults" :key="r.id" class="search-item" @click="flyToStar(r.id); searchOpen = false; searchQuery = ''">
-              <span class="sr-name">{{ r.name || r.conName }}</span>
-              <span class="sr-con">{{ r.conName }}</span>
-              <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
-              <button class="sr-locate" title="定位到这颗星" @click.stop="locateStar(r.id); searchOpen = false; searchQuery = ''">
-                <Crosshair :size="14" />
-              </button>
-            </div>
-          </div>
-          <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
-            <div class="search-item muted">未找到匹配的星星</div>
-          </div>
-        </div>
-      </div>
-      <div class="nav-right">
+      <div class="nav-left">
+        <!-- 节气（桌面端） -->
         <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
@@ -35,22 +17,115 @@
           <span class="moon-icon" :style="{ background: moonIconStyle }"></span>
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </button>
-        <button v-if="username" class="nav-btn nav-my-toggle" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" title="只看我的故事">
-          <component :is="showMyStoriesOnly ? Globe : Star" :size="14" />
-          <span>{{ showMyStoriesOnly ? '全部' : '我的' }}</span>
+      </div>
+      <!-- PC 端搜索框 -->
+      <div v-if="!isMobile" class="nav-center">
+        <div class="search-box">
+          <Search :size="14" class="search-box-icon" />
+          <input
+            v-model="searchQuery"
+            placeholder="搜索星星..."
+            class="search-box-input"
+            @input="onSearchInput"
+            @focus="searchOpen = true"
+            @blur="closeSearchDropdown"
+          />
+          <div v-if="searchOpen && searchResults.length" class="search-dropdown">
+            <div
+              v-for="r in searchResults"
+              :key="r.id"
+              class="search-item"
+              @click="onSearchSelect(r.id)"
+            >
+              <div class="sr-info">
+                <span class="sr-name">{{ r.name || r.conName }}</span>
+                <span class="sr-con">{{ r.conName }}</span>
+              </div>
+              <div class="sr-meta">
+                <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+                <button class="sr-locate" title="定位但不打开" @click.stop="locateStar(r.id); searchOpen = false">
+                  <Crosshair :size="14" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="searchOpen && searchQuery && !searching && searchResults.length === 0" class="search-dropdown">
+            <div class="search-item search-item-empty">未找到匹配的星星</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-right">
+        <!-- 搜索按钮（移动端） -->
+        <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+          <Search :size="18" />
         </button>
-        <button v-if="locationReady" class="nav-btn nav-loc-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位（悬停 2 秒可选择城市）">
-          <MapPin :size="14" />
-          <span>定位</span>
+        <!-- 我的/全部切换 -->
+        <button v-if="username" class="nav-icon-btn" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" :title="showMyStoriesOnly ? '查看全部故事' : '只看我的故事'">
+          <component :is="showMyStoriesOnly ? Globe : Star" :size="18" />
         </button>
-        <span v-if="username" class="nav-user" @click.stop.prevent="$router.push('/profile')">
-          <User :size="14" />
-          <span>{{ username }}</span>
-        </span>
-        <button v-if="username" class="nav-btn" @click="doLogout">退出</button>
-        <button v-if="!username" class="nav-btn nav-login-btn" @click="goLogin">登录</button>
+        <!-- 定位 -->
+        <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
+          <MapPin :size="18" />
+        </button>
+        <!-- 设置 -->
+        <button v-if="locationReady" class="nav-icon-btn" @click="showSettings = true" title="设置">
+          <Settings :size="18" />
+        </button>
+        <!-- 用户 -->
+        <button v-if="username" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+          <User :size="18" />
+        </button>
+        <button v-if="!username" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+          <User :size="18" />
+        </button>
       </div>
     </nav>
+
+    <!-- 搜索底部弹窗 -->
+    <Transition name="sheet-fade">
+      <div v-if="showSearch" class="search-sheet-overlay" @click.self="showSearch = false">
+        <div class="search-sheet">
+          <div class="sheet-handle" @click="showSearch = false"></div>
+          <div class="search-sheet-header">
+            <h3 class="search-sheet-title">搜索星星</h3>
+            <button class="search-sheet-close" @click="showSearch = false"><X :size="18" /></button>
+          </div>
+          <div class="search-sheet-input-wrap">
+            <Search :size="18" class="search-sheet-icon" />
+            <input
+              ref="searchInputRef"
+              v-model="searchQuery"
+              placeholder="输入星名、星座..."
+              class="search-sheet-input"
+              @input="onSearchInput"
+              @keydown.escape="showSearch = false"
+            />
+            <button v-if="searchQuery" class="search-sheet-clear" @click="clearSearch"><X :size="16" /></button>
+          </div>
+          <div v-if="searching" class="search-loading">搜索中...</div>
+          <div v-else-if="searchQuery && searchResults.length === 0" class="search-empty">未找到匹配的星星</div>
+          <div v-else-if="searchResults.length > 0" class="search-results">
+            <div
+              v-for="r in searchResults"
+              :key="r.id"
+              class="search-result-item"
+              @click="onSearchSelect(r.id)"
+            >
+              <div class="sr-info">
+                <span class="sr-name">{{ r.name || r.conName }}</span>
+                <span class="sr-con">{{ r.conName }}</span>
+              </div>
+              <div class="sr-meta">
+                <span class="sr-mag">{{ r.mag.toFixed(1) }} mag</span>
+                <button class="sr-locate" title="定位但不打开" @click.stop="locateStar(r.id); showSearch = false">
+                  <Crosshair :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 切换反馈提示 -->
     <Transition name="toast-fade">
@@ -188,10 +263,6 @@
     <div v-if="locationReady" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
-      <div class="zoom-divider"></div>
-      <button class="zoom-btn settings-entry" @click="showSettings = true" title="设置">
-        <Settings :size="16" />
-      </button>
     </div>
     <div v-if="locationReady" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
@@ -251,21 +322,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
-import StarDetail from '../components/StarDetail.vue'
+import StarDetail from '../components/StarDetail/index.vue'
 import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
+import { useLocation } from '../composables/useLocation'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
+import { useMediaQuery } from '../composables/useMediaQuery'
 
+const { isMobile } = useMediaQuery()
 
 const router = useRouter()
 const route = useRoute()
@@ -277,15 +351,52 @@ const myToggleFeedback = ref('')
 const locationCityToast = ref('')
 
 function toggleMyStories() {
+  // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
+  if (!currentUserId.value) {
+    myToggleFeedback.value = '请先登录'
+    setTimeout(() => { myToggleFeedback.value = '' }, 2000)
+    return
+  }
   showMyStoriesOnly.value = !showMyStoriesOnly.value
   myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
   setTimeout(() => { myToggleFeedback.value = '' }, 2000)
 }
 const favoriteStarIds = ref<number[]>([])
+
+// ─── 统一位置管理（快速缓存+低精度优先+后台高精度更新） ───
+const location = useLocation()
 const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
 const locationFailed = ref(false)
+
+// 双向同步：useLocation → 本地ref
+watch([() => location.lat.value, () => location.lng.value, () => location.ready.value, () => location.failed.value],
+  ([la, ln, rd, fl]) => {
+    const wasReady = locationReady.value
+    userLat.value = la ?? undefined
+    userLng.value = ln ?? undefined
+    locationReady.value = rd
+    locationFailed.value = fl
+    // 定位成功后显示简短提示（不调用反向地理编码，省去额外网络请求）
+    if (rd && !wasReady && la != null && ln != null) {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
+    }
+  }, { immediate: true }
+)
+
+// 反向地理编码已禁用：获取城市名需要额外网络请求，对核心功能无影响
+// 如需恢复，取消下面注释即可
+// let lastCityFetchKey = ''
+// watch([() => location.lat.value, () => location.lng.value], async ([la, ln]) => {
+//   if (la == null || ln == null) return
+//   const key = `${la.toFixed(2)},${ln.toFixed(2)}`
+//   if (key === lastCityFetchKey) return
+//   lastCityFetchKey = key
+//   const city = await fetchCityName(la, ln)
+//   if (!locationCityToast.value) showLocationToast(city)
+// }, { immediate: true })
 
 // ─── 城市选择面板 ───
 const showCityPanel = ref(false)
@@ -318,6 +429,7 @@ const {
   insightLoading: moonInsightLoading,
   refresh: refreshMoon,
   loadInsight: loadMoonInsight,
+  regenInsight: regenMoonInsight,
   rotatePoem: rotateMoonPoem,
 } = useMoon({
   observerLat: () => userLat.value ?? null,
@@ -330,11 +442,6 @@ function openMoonPanel() {
   refreshMoon()
   showMoonPanel.value = true
   // 异步加载 AI 解读（不阻塞）
-  loadMoonInsight()
-}
-
-/** 重新生成 AI 解读 */
-function regenMoonInsight() {
   loadMoonInsight()
 }
 
@@ -407,11 +514,8 @@ const intlCities = [
 const allCities = [...cities, ...intlCities]
 
 function selectCity(c: { name: string; lat: number; lng: number }) {
-  userLat.value = c.lat
-  userLng.value = c.lng
+  location.setManual(c.lat, c.lng)
   selectedCity.value = c
-  locationFailed.value = false
-  locationReady.value = true
   showLocationToast(c.name)
 }
 
@@ -438,25 +542,22 @@ function handleCitySelect(c: { name: string; lat: number; lng: number }) {
 function goToCurrentLocation() {
   selectedCity.value = null
   showCityPanel.value = false
-  refreshLocation()
+  locationCityToast.value = '正在获取定位...'
+  location.refresh().then(() => {
+    if (location.failed.value) {
+      locationCityToast.value = ''
+    }
+  })
 }
 
-// 获取用户地理位置（带 2 小时缓存）
-const LOCATION_CACHE_KEY = 'star_location_cache'
-const LOCATION_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 小时
-
-function getCachedLocation(): { lat: number; lng: number } | null {
-  try {
-    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
-    if (!raw) return null
-    const { lat, lng, ts } = JSON.parse(raw)
-    if (Date.now() - ts > LOCATION_CACHE_TTL) return null
-    return { lat, lng }
-  } catch { return null }
-}
-
-function setCachedLocation(lat: number, lng: number) {
-  localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }))
+// 模板中使用的 refreshLocation（重新获取定位按钮）
+function refreshLocation() {
+  locationCityToast.value = '正在获取定位...'
+  location.refresh().then(() => {
+    if (location.failed.value) {
+      locationCityToast.value = ''
+    }
+  })
 }
 
 // 反向地理编码：通过后端代理获取城市名称（BigDataCloud 主 + Nominatim 备，5s 超时）
@@ -485,68 +586,6 @@ function showLocationToast(city: string) {
   if (!city) {
     setTimeout(() => { showCityPanel.value = true }, 800)
   }
-}
-
-function fetchLocation() {
-  if (!navigator.geolocation) {
-    locationReady.value = true
-    locationFailed.value = true
-    return
-  }
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      userLat.value = pos.coords.latitude
-      userLng.value = pos.coords.longitude
-      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
-      locationReady.value = true
-      locationFailed.value = false
-      // 获取城市名并显示 2 秒
-      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
-      showLocationToast(city)
-    },
-    (err) => {
-      console.warn('Geolocation failed:', err.message)
-      locationReady.value = true
-      locationFailed.value = true
-    },
-    { timeout: 5000, enableHighAccuracy: true },
-  )
-}
-
-// 手动刷新定位（不隐藏天空，静默更新）
-function refreshLocation() {
-  if (!navigator.geolocation) {
-    showLocationToast('')
-    return
-  }
-  locationCityToast.value = '正在获取定位...'
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      userLat.value = pos.coords.latitude
-      userLng.value = pos.coords.longitude
-      setCachedLocation(pos.coords.latitude, pos.coords.longitude)
-      locationFailed.value = false
-      const city = await fetchCityName(pos.coords.latitude, pos.coords.longitude)
-      showLocationToast(city)
-    },
-    () => {
-      showLocationToast('')
-    },
-    { timeout: 5000, enableHighAccuracy: true },
-  )
-}
-
-// 优先使用缓存定位
-const cached = getCachedLocation()
-if (cached) {
-  userLat.value = cached.lat
-  userLng.value = cached.lng
-  locationReady.value = true
-  locationFailed.value = false
-  // 异步获取城市名并显示 toast
-  fetchCityName(cached.lat, cached.lng).then(city => showLocationToast(city))
-} else {
-  fetchLocation()
 }
 
 onMounted(async () => {
@@ -623,10 +662,41 @@ function goLogin() {
 }
 
 // ─── 搜索星星 ───
-const searchQuery = ref('')
+const showSearch = ref(false)
 const searchOpen = ref(false)
+const searchQuery = ref('')
 const searching = ref(false)
 const searchResults = ref<any[]>([])
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+// 打开搜索弹窗时自动聚焦
+watch(showSearch, async (val) => {
+  if (val) {
+    await nextTick()
+    searchInputRef.value?.focus()
+  } else {
+    // 关闭时清空
+    searchQuery.value = ''
+    searchResults.value = []
+  }
+})
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  searchInputRef.value?.focus()
+}
+
+function onSearchSelect(starId: number) {
+  showSearch.value = false
+  searchOpen.value = false
+  searchQuery.value = ''
+  flyToStar(starId)
+}
+
+function closeSearchDropdown() {
+  setTimeout(() => { searchOpen.value = false }, 150)
+}
 
 async function onSearchInput() {
   const q = searchQuery.value.trim()
@@ -707,12 +777,12 @@ for (const s of catalogData.stars) {
 
 interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
-  catalogStarId: number; createdAt: string; locationLat: number | null
+  catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; userId: number | null
   imageUrl: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -725,20 +795,25 @@ function mergeStoriesIntoMap(
   statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
 ) {
   for (const s of items) {
-    const cid = s.catalogStarId
-    if (cid == null) continue
-    if (!map.has(cid)) map.set(cid, [])
-    map.get(cid)!.push({
+    // 获取故事关联的所有恒星 ID（兼容旧数据只有 catalogStarId）
+    const cids: number[] = (s.catalogStarIds?.length ? s.catalogStarIds : [s.catalogStarId]).filter((id: number) => id != null)
+    const storyData: StoryData = {
       id: s.id, title: s.title, content: s.content, resonanceCount: s.resonanceCount,
-      catalogStarId: cid, createdAt: s.createdAt || '',
+      catalogStarId: s.catalogStarId ?? cids[0] ?? 0, catalogStarIds: s.catalogStarIds ?? cids,
+      createdAt: s.createdAt || '',
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
-    })
-    const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
-    cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
-    statsMap.set(cid, cur)
+    }
+    for (const cid of cids) {
+      if (cid == null) continue
+      if (!map.has(cid)) map.set(cid, [])
+      map.get(cid)!.push(storyData)
+      const cur = statsMap.get(cid) || { stories: 0, resonance: 0, views: 0, favorites: 0 }
+      cur.stories++; cur.resonance += s.resonanceCount || 0; cur.views += s.viewCount || 0
+      statsMap.set(cid, cur)
+    }
   }
 }
 
@@ -1031,17 +1106,21 @@ function onUpdateSimilarStars(ids: number[]) {
   skyRef.value?.sky?.setKernelLines(lines)
 }
 function onStorySubmitted(story: StoryData) {
-  const cid = story.catalogStarId
+  // 获取故事绑定的所有恒星 ID（兼容旧数据只有 catalogStarId）
+  const cids: number[] = (story.catalogStarIds?.length ? story.catalogStarIds : [story.catalogStarId]).filter((id: number) => id != null)
   const map = new Map(storiesByStarId.value)
-  const existing = [...(map.get(cid) ?? []), story]
-  map.set(cid, existing)
+  for (const cid of cids) {
+    const existing = [...(map.get(cid) ?? []), story]
+    map.set(cid, existing)
+  }
   storiesByStarId.value = map
   // 更新天空统计（无论是否"只看我的"模式）
   recalcFilteredStats()
-  if (cid === selectedCatalogStarId.value && selectedStarInfo.value) {
-    selectedStories.value = existing
+  // 更新当前选中星的故事列表（如果故事绑定到当前星）
+  if (cids.includes(selectedCatalogStarId.value) && selectedStarInfo.value) {
+    selectedStories.value = map.get(selectedCatalogStarId.value) ?? []
     // 从后端拉取权威统计数据，确保数据准确
-    fetchCatalogStats(cid)
+    fetchCatalogStats(selectedCatalogStarId.value)
   }
   showForm.value = false
 }
@@ -1085,8 +1164,10 @@ async function onResonate(storyId: number) {
     const res = await fetch(`/api/stories/${storyId}/resonate`, { method: 'POST', headers })
     const json = await res.json()
     if (res.ok) {
-      // 如果已共鸣，不更新计数
+      // 如果已共鸣，不更新计数，但需触发 StarDetail 清除乐观覆盖
       if (json.data?.already) {
+        // 赋值新数组引用触发 StarDetail 的 watch(() => props.stories) 清除 resonanceOverrides
+        selectedStories.value = [...selectedStories.value]
         resonating.value = false
         return
       }
@@ -1134,30 +1215,44 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .sky-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0.6rem 1.5rem;
+  padding: 0.6rem 1rem;
   background: transparent;
   border-bottom: none;
 }
 .nav-logo { color: #ffd98a; font-weight: 600; font-size: 0.95rem; }
-.nav-right { display: flex; align-items: center; gap: 0.75rem; }
-.solar-term {
-  display: inline-flex; align-items: baseline; gap: 0.4rem;
-  padding: 0.3rem 0.7rem; border-radius: 14px;
-  border: 1px solid rgba(255, 217, 138, 0.18);
-  background: rgba(40, 35, 18, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  cursor: default;
-  transition: border-color 0.2s;
+.nav-left { display: flex; align-items: center; gap: 0.5rem; }
+.nav-right { display: flex; align-items: center; gap: 0.4rem; }
+
+/* ─── PC 端搜索框 ─── */
+.nav-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
 }
-.solar-term:hover { border-color: rgba(255, 217, 138, 0.35); }
-.term-text {
-  font-size: 0.82rem; color: #ffd98a;
-  font-weight: 500; letter-spacing: 0.04em;
+.search-box {
+  position: relative;
+  width: 260px;
 }
-.term-next {
-  font-size: 0.68rem; color: #8a849e;
-  letter-spacing: 0.02em;
+.search-box-icon {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-light);
+  pointer-events: none;
+  z-index: 1;
+}
+.search-box-input {
+  width: 100%;
+  padding: 0.45rem 0.9rem 0.45rem 2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
+  background: rgba(255,255,255,0.05);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .moon-phase {
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -1186,87 +1281,285 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   font-size: 0.78rem; color: #c8c2d8;
   letter-spacing: 0.04em;
 }
-.nav-user { color: #b9b4d6; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-.nav-user:hover { color: #f6f1ff; }
-.nav-btn {
-  padding: 0.3rem 0.8rem; border-radius: 8px;
-  border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05);
-  color: #7a759c; font-size: 0.8rem; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.nav-btn:hover { color: #b9b4d6; border-color: rgba(48,55,87,0.8); }
-.nav-login-btn {
-  color: #ffd98a; border-color: rgba(255, 217, 138, 0.3);
-  background: rgba(40, 35, 18, 0.35);
-}
-.nav-login-btn:hover { color: #ffe6b0; border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
-.nav-my-toggle {
-  color: #ffd98a; border-color: rgba(255, 217, 138, 0.25);
-  background: rgba(40, 35, 18, 0.3); transition: all 0.25s;
-}
-.nav-my-toggle:hover { border-color: rgba(255, 217, 138, 0.5); background: rgba(40, 35, 18, 0.5); }
-.nav-my-toggle.active {
-  color: #7a759c; border-color: rgba(48, 55, 87, 0.5);
-  background: rgba(255, 255, 255, 0.05);
-}
-.nav-my-toggle.active:hover { color: #b9b4d6; }
-.nav-center { flex: 1; display: flex; justify-content: center; }
-.search-box { position: relative; width: 260px; }
-.search-icon {
-  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-  color: var(--muted-light); pointer-events: none; z-index: 1;
-}
-.search-input {
-  width: 100%; padding: 0.45rem 0.9rem; border-radius: var(--radius-lg);
-  border: 1px solid var(--rule); background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: var(--ink); font-size: 0.82rem; outline: none;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-.search-input:focus {
+.search-box-input:focus {
   border-color: var(--accent-border);
   box-shadow: var(--shadow-glow);
   background: rgba(255,255,255,0.08);
 }
-.search-input::placeholder { color: var(--muted-light); }
+.search-box-input::placeholder {
+  color: var(--muted-light);
+}
 .search-dropdown {
-  position: absolute; top: 110%; left: 0; right: 0;
-  background: rgba(16,20,43,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--rule); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto; z-index: 30;
+  position: absolute;
+  top: 110%;
+  left: 0;
+  right: 0;
+  background: rgba(16,20,43,0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(48,55,87,0.5);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 30;
 }
 .search-dropdown::-webkit-scrollbar { width: 4px; }
 .search-dropdown::-webkit-scrollbar-track { background: transparent; }
-.search-dropdown::-webkit-scrollbar-thumb { background: rgba(255,217,138,0.2); border-radius: 4px; }
-.search-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(255,217,138,0.4); }
+.search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255,217,138,0.2);
+  border-radius: 4px;
+}
 .search-item {
-  padding: 0.5rem 0.8rem 0.5rem 1.6rem; display: flex; justify-content: space-between;
-  align-items: center; cursor: pointer; font-size: 0.8rem;
-  border-bottom: 1px solid rgba(48,55,87,0.2);
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-.search-item::before {
-  content: ''; position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--muted-light); transition: background 0.15s ease;
+.search-item:hover {
+  background: rgba(255,217,138,0.08);
 }
-.search-item:last-child { border-bottom: none; }
-.search-item:hover { background: var(--accent-subtle); }
-.search-item:hover::before { background: var(--accent); }
-.search-item.muted { color: var(--muted-light); cursor: default; padding: 0.6rem 0.8rem 0.6rem 1.6rem; }
-.search-item.muted::before { display: none; }
-.sr-name { color: var(--accent); font-weight: 500; }
-.sr-con { color: var(--ink-secondary); }
-.sr-mag { color: var(--muted-light); font-size: 0.7rem; }
+.search-item .sr-name { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+.search-item .sr-con { color: var(--muted); font-size: 0.75rem; margin-left: 8px; }
+.search-item .sr-mag { color: var(--muted-light); font-size: 0.72rem; }
+.search-item .sr-locate {
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+}
+.search-item .sr-locate:hover {
+  color: var(--accent);
+  border-color: rgba(255,217,138,0.3);
+}
+.search-item-empty {
+  color: var(--muted-light);
+  font-size: 0.8rem;
+  cursor: default;
+  padding: 12px 14px;
+}
+
+/* ─── Icon-only nav buttons (modern glassmorphism) ─── */
+.nav-icon-btn {
+  width: 42px; height: 42px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: #b8b2cc; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  transition: all 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.nav-icon-btn:hover {
+  color: #ffd98a;
+  border-color: rgba(255,217,138,0.3);
+  background: rgba(255,217,138,0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,217,138,0.1);
+}
+.nav-icon-btn:active {
+  transform: scale(0.94) translateY(0);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.nav-icon-btn.active {
+  color: #ffd98a;
+  border-color: rgba(255,217,138,0.35);
+  background: rgba(255,217,138,0.12);
+  box-shadow: 0 2px 10px rgba(255,217,138,0.1);
+}
+.nav-icon-btn.nav-login-btn {
+  color: #ffd98a;
+  border-color: rgba(255,217,138,0.25);
+  background: linear-gradient(135deg, rgba(255,217,138,0.15), rgba(255,180,100,0.08));
+  box-shadow: 0 2px 10px rgba(255,217,138,0.08);
+}
+.nav-icon-btn.nav-login-btn:hover {
+  background: linear-gradient(135deg, rgba(255,217,138,0.25), rgba(255,180,100,0.15));
+  box-shadow: 0 4px 15px rgba(255,217,138,0.15);
+}
+
+.solar-term {
+  display: inline-flex; align-items: baseline; gap: 0.4rem;
+  padding: 0.4rem 0.85rem; border-radius: 100px;
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  background: rgba(40, 35, 18, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: default;
+  transition: border-color 0.2s, background 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.solar-term:hover { border-color: rgba(255, 217, 138, 0.3); background: rgba(40, 35, 18, 0.6); }
+.term-text {
+  font-size: 0.82rem; color: #ffd98a;
+  font-weight: 600; letter-spacing: 0.04em;
+}
+.term-next {
+  font-size: 0.68rem; color: #9994ad;
+  letter-spacing: 0.02em;
+}
+.moon-phase {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.85rem; border-radius: 100px;
+  border: 1px solid rgba(240, 230, 200, 0.15);
+  background: rgba(16, 20, 43, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: default;
+  transition: border-color 0.2s, background 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.moon-phase:hover { border-color: rgba(240, 230, 200, 0.3); background: rgba(16, 20, 43, 0.65); }
+.moon-icon {
+  width: 14px; height: 14px; border-radius: 50%;
+  box-shadow: 0 0 8px rgba(240, 230, 200, 0.35);
+  display: inline-block;
+}
+.moon-text {
+  font-size: 0.78rem; color: #c8c2d8;
+  letter-spacing: 0.04em; font-weight: 500;
+}
+
+/* ─── Search bottom sheet (modern) ─── */
+.search-sheet-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(7,8,22,0.4);
+  display: flex; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.search-sheet {
+  width: 100%; max-height: 85vh;
+  background: linear-gradient(180deg, rgba(26,30,53,0.98) 0%, rgba(18,20,40,0.995) 100%);
+  border-radius: 24px 24px 0 0;
+  border-top: 0.5px solid rgba(255,255,255,0.1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5), 0 -1px 0 rgba(255,255,255,0.05) inset;
+}
+.sheet-handle {
+  width: 38px; height: 4px; border-radius: 4px;
+  background: rgba(255,255,255,0.15);
+  margin: 10px auto 6px;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.2s, width 0.2s;
+}
+.sheet-handle:hover, .sheet-handle:active { background: rgba(255,217,138,0.5); width: 44px; }
+.search-sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 20px 14px;
+}
+.search-sheet-title {
+  font-size: 1.1rem; font-weight: 600; color: var(--ink, #f0ecf6);
+  margin: 0; letter-spacing: 0.2px;
+}
+.search-sheet-close {
+  width: 36px; height: 36px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.06);
+  color: var(--muted, #9994ad); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.search-sheet-close:hover { color: var(--ink); background: rgba(255,255,255,0.1); }
+.search-sheet-close:active { transform: scale(0.92); }
+.search-sheet-input-wrap {
+  position: relative; margin: 0 20px 16px; flex-shrink: 0;
+}
+.search-sheet-icon {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  color: var(--muted, #9994ad);
+}
+.search-sheet-input {
+  width: 100%; padding: 14px 48px 14px 46px;
+  border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: var(--ink); font-size: 16px; outline: none;
+  transition: all 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  font-weight: 500;
+}
+.search-sheet-input:focus {
+  border-color: rgba(255,217,138,0.4);
+  background: rgba(255,255,255,0.09);
+  box-shadow: 0 0 0 3px rgba(255,217,138,0.1);
+}
+.search-sheet-input::placeholder { color: var(--muted, #9994ad); font-weight: 400; }
+.search-sheet-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: rgba(255,255,255,0.08);
+  color: var(--muted, #9994ad); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.search-sheet-clear:hover { color: var(--ink); background: rgba(255,255,255,0.15); }
+.search-sheet-clear:active { transform: scale(0.9); }
+.search-loading, .search-empty {
+  padding: 40px 20px; text-align: center;
+  color: var(--muted, #9994ad); font-size: 0.88rem;
+}
+.search-results {
+  flex: 1; overflow-y: auto; padding: 0 12px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.search-results::-webkit-scrollbar { width: 4px; }
+.search-results::-webkit-scrollbar-track { background: transparent; }
+.search-results::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.search-result-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-radius: 14px;
+  cursor: pointer; transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  border-bottom: none;
+  margin-bottom: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.search-result-item:last-child { margin-bottom: 0; }
+.search-result-item:hover { background: rgba(255,255,255,0.06); }
+.search-result-item:active { background: rgba(255,217,138,0.08); transform: scale(0.985); }
+.sr-info { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.sr-info .sr-name { color: var(--accent, #ffd98a); font-weight: 600; font-size: 0.95rem; }
+.sr-info .sr-con { color: var(--muted, #9994ad); font-size: 0.8rem; }
+.sr-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.sr-meta .sr-mag { color: var(--muted, #9994ad); font-size: 0.75rem; font-weight: 500; }
 .sr-locate {
-  background: none; border: 1px solid transparent; border-radius: 4px;
-  color: var(--muted-light); cursor: pointer; padding: 3px 5px;
-  display: flex; align-items: center; transition: color 0.15s, border-color 0.15s, background 0.15s;
-  flex-shrink: 0; margin-left: 4px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  color: var(--muted, #9994ad); cursor: pointer; padding: 8px;
+  display: flex; align-items: center; transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .sr-locate:hover {
-  color: var(--accent); border-color: var(--accent-border);
-  background: rgba(255, 217, 138, 0.08);
+  color: var(--accent, #ffd98a); border-color: rgba(255,217,138,0.3);
+  background: rgba(255,217,138,0.1);
+}
+.sr-locate:active { transform: scale(0.92); }
+
+/* Sheet transition (modern easing) */
+.sheet-fade-enter-active { transition: opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-fade-leave-active { transition: opacity 0.2s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-fade-enter-from, .sheet-fade-leave-to { opacity: 0; }
+.sheet-fade-enter-active .search-sheet { animation: slideUpSheet 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-fade-leave-active .search-sheet { animation: slideDownSheet 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); opacity: 0.8; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes slideDownSheet {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100%); opacity: 0.7; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .zoom-controls {
   position: fixed; right: 1.25rem; bottom: 4.5rem; display: flex;
@@ -1690,11 +1983,189 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   opacity: 0;
 }
 
-@media (max-width: 640px) {
-  .guide-cards { flex-direction: column; bottom: 3rem; left: auto; right: 0.75rem; transform: none; gap: 0.4rem; }
-  .guide-card { width: 180px; padding: 0.5rem 0.7rem 0.45rem; }
-  .guide-card svg { width: 16px; height: 16px; }
-  .city-panel { width: 92vw; max-height: 65vh; padding: 1.2rem; border-radius: 14px; }
-  .city-panel .city-btn { padding: 0.35rem 0.6rem; font-size: 0.74rem; }
+/* ─── Mobile Responsive (<=768px) ─── */
+@media (max-width: 768px) {
+  /* Navigation bar */
+  .sky-nav {
+    padding: 0.6rem 0.85rem;
+    padding-top: max(0.6rem, env(safe-area-inset-top, 0.6rem));
+  }
+
+  .nav-left {
+    display: none;
+  }
+
+  .nav-right {
+    gap: 0.45rem;
+    margin-left: auto;
+  }
+
+  .nav-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  /* Search sheet */
+  .search-sheet {
+    max-height: 90vh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .search-sheet-header {
+    padding: 6px 20px 12px;
+  }
+
+  .search-sheet-input-wrap {
+    margin: 0 20px 14px;
+  }
+
+  .search-sheet-input {
+    padding: 13px 46px 13px 44px;
+    font-size: 16px;
+  }
+
+  /* Guide cards */
+  .guide-cards {
+    display: none;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    right: 0.85rem;
+    bottom: 6rem;
+  }
+
+  .zoom-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+  }
+
+  /* Hint text */
+  .hint {
+    display: none;
+  }
+
+  /* Toasts */
+  .toggle-toast {
+    top: auto;
+    bottom: 1rem;
+    font-size: 0.78rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .location-toast {
+    top: auto;
+    bottom: 4rem;
+    font-size: 0.8rem;
+    padding: 0.55rem 1.2rem;
+  }
+
+  /* City selection panel - bottom sheet */
+  .city-panel-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .city-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.2rem 1rem 1.5rem;
+    animation: slideUpCityPanel 0.28s ease-out;
+    box-sizing: border-box;
+  }
+
+  @keyframes slideUpCityPanel {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .panel-fade-enter-from .city-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
+
+  .panel-fade-leave-to .city-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
+
+  .panel-fade-enter-from {
+    opacity: 1;
+  }
+
+  .panel-fade-leave-to {
+    opacity: 1;
+  }
+
+  /* Location fallback panel */
+  .location-fallback-backdrop {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .location-fallback-panel {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.2rem 1.2rem 1.5rem;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+    margin-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    border: none;
+    border-top: 1px solid rgba(255, 217, 138, 0.15);
+    animation: slideUpCityPanel 0.28s ease-out;
+    box-sizing: border-box;
+  }
+
+  .fallback-title {
+    font-size: 0.95rem;
+  }
+
+  .fallback-desc {
+    font-size: 0.78rem;
+    text-align: center;
+  }
+
+  .city-grid {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .refresh-loc-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    font-size: 0.78rem;
+  }
+}
+
+/* ─── Very small screens (<=380px) ─── */
+@media (max-width: 380px) {
+  .sky-nav {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .nav-left {
+    display: none;
+  }
+
+  .nav-right {
+    gap: 0.3rem;
+  }
+
+  .nav-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .zoom-controls {
+    right: 0.5rem;
+    bottom: 5rem;
+  }
 }
 </style>

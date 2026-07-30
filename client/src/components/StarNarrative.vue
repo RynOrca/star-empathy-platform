@@ -169,4 +169,31 @@ const renderedContent = computed(() => {
   color: var(--muted-light);
   opacity: 0.5;
 }
+
+/* ─── Mobile Responsive ─── */
+@media (max-width: 768px) {
+  .narrative-section {
+    padding: 16px 18px 12px;
+  }
+
+  .narrative-body :deep(h1) {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+
+  .narrative-body :deep(p) {
+    font-size: 0.8rem;
+    line-height: 1.75;
+    margin-bottom: 10px;
+  }
+
+  .narrative-body :deep(blockquote) {
+    margin: 10px 0;
+    padding: 8px 12px;
+  }
+
+  .narrative-body :deep(blockquote p) {
+    font-size: 0.82rem;
+  }
+}
 </style>

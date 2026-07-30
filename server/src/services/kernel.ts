@@ -171,8 +171,8 @@ export function getAggregatedTags(catalogStarId: number): {
   const rows = db.prepare(`
     SELECT sk.emotional_tags, sk.themes, sk.essence
     FROM story_kernels sk
-    JOIN stars s ON sk.story_id = s.id
-    WHERE s.catalog_star_id = ?
+    JOIN story_catalog_stars scs ON sk.story_id = scs.story_id
+    WHERE scs.catalog_star_id = ?
   `).all(catalogStarId) as {
     emotional_tags: string
     themes: string
@@ -212,10 +212,10 @@ export function getAggregatedTags(catalogStarId: number): {
 /** 获取所有有内核的恒星及其标签集合 */
 function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: Set<string> }> {
   const rows = db.prepare(`
-    SELECT DISTINCT s.catalog_star_id, sk.emotional_tags, sk.themes
+    SELECT DISTINCT scs.catalog_star_id, sk.emotional_tags, sk.themes
     FROM story_kernels sk
-    JOIN stars s ON sk.story_id = s.id
-    WHERE s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
+    JOIN story_catalog_stars scs ON sk.story_id = scs.story_id
+    WHERE scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id > 0
   `).all() as { catalog_star_id: number; emotional_tags: string; themes: string }[]
 
   const map = new Map<number, { emotionalTags: Set<string>; themes: Set<string> }>()
@@ -268,7 +268,7 @@ export function getSimilarStars(catalogStarId: number, limit = 8): SimilarStar[]
     const sharedThemes = [...target.themes].filter(t => tags.themes.has(t))
 
     const storyCount = (db.prepare(
-      'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+      'SELECT COUNT(*) as cnt FROM story_catalog_stars WHERE catalog_star_id = ?'
     ).get(cid) as { cnt: number }).cnt
 
     results.push({ catalogStarId: cid, score: Math.round(score * 100) / 100, sharedEmotions, sharedThemes, storyCount })
@@ -293,7 +293,7 @@ export function getAreaHighlights(catalogStarId: number, limit = 6): AreaHighlig
   // 目标恒星自己的内核
   const targetEssences = getAggregatedTags(catalogStarId).essences
   const targetStoryCount = (db.prepare(
-    'SELECT COUNT(*) as cnt FROM stars WHERE catalog_star_id = ?'
+    'SELECT COUNT(*) as cnt FROM story_catalog_stars WHERE catalog_star_id = ?'
   ).get(catalogStarId) as { cnt: number }).cnt
 
   const result: AreaHighlight[] = []
@@ -324,15 +324,67 @@ export function getAreaHighlights(catalogStarId: number, limit = 6): AreaHighlig
   return result
 }
 
-/** 异步触发内核生成（不阻塞，失败静默） */
-export function triggerKernelGeneration(storyId: number, content: string, title?: string | null): void {
-  setImmediate(async () => {
+// ─── 异步内核生成：重试 + 并发控制 ───
+const MAX_RETRIES = 3
+const RETRY_DELAYS = [1000, 3000, 8000] // ms，指数退避
+let activeKernelJobs = 0
+const MAX_CONCURRENT = 3
+const kernelQueue: Array<() => Promise<void>> = []
+
+function runNextKernelJob(): void {
+  if (activeKernelJobs >= MAX_CONCURRENT || kernelQueue.length === 0) return
+  activeKernelJobs++
+  const job = kernelQueue.shift()!
+  job().finally(() => {
+    activeKernelJobs--
+    runNextKernelJob()
+  })
+}
+
+async function generateWithRetry(storyId: number, content: string, title?: string | null): Promise<void> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       await ensureKernel(storyId, content, title)
+      return
     } catch (err) {
-      console.error(`故事 ${storyId} 内核生成失败:`, err)
+      if (attempt === MAX_RETRIES) {
+        console.error(`[kernel] 故事 ${storyId} 内核生成最终失败（已重试${MAX_RETRIES}次）:`, err)
+        return
+      }
+      const delay = RETRY_DELAYS[attempt]
+      console.warn(`[kernel] 故事 ${storyId} 内核生成失败（第${attempt + 1}次），${delay}ms后重试...`)
+      await new Promise(r => setTimeout(r, delay))
     }
-  })
+  }
+}
+
+/** 异步触发内核生成（不阻塞用户响应，自动重试+并发控制） */
+export function triggerKernelGeneration(storyId: number, content: string, title?: string | null): void {
+  // 先检查是否已有缓存，避免重复生成
+  if (getKernel(storyId)) return
+  kernelQueue.push(() => generateWithRetry(storyId, content, title))
+  runNextKernelJob()
+}
+
+/** 启动时补全所有缺失的内核（批量，不阻塞服务启动） */
+export function backfillMissingKernels(): void {
+  const rows = db.prepare(`
+    SELECT s.id, s.title, s.content
+    FROM stars s
+    LEFT JOIN story_kernels sk ON s.id = sk.story_id
+    WHERE sk.story_id IS NULL
+    ORDER BY s.id
+  `).all() as Array<{ id: number; title: string | null; content: string }>
+
+  if (rows.length === 0) {
+    console.log('[kernel] 所有故事内核已就绪')
+    return
+  }
+  console.log(`[kernel] 发现 ${rows.length} 条故事缺少内核，开始后台补全...`)
+  for (const row of rows) {
+    kernelQueue.push(() => generateWithRetry(row.id, row.content, row.title))
+  }
+  runNextKernelJob()
 }
 
 export interface KernelLine {
@@ -345,13 +397,14 @@ export interface KernelLine {
 
 /** 获取用户自己的故事之间的内核连线（跨星） */
 export function getUserKernelLines(userId: number, limit = 20): KernelLine[] {
-  // 获取用户所有有内核的故事
+  // 获取用户所有有内核的故事（通过连接表获取主星）
   const rows = db.prepare(`
-    SELECT s.id as story_id, s.catalog_star_id, s.pos_x, s.pos_y, s.pos_z,
+    SELECT s.id as story_id, scs.catalog_star_id, s.pos_x, s.pos_y, s.pos_z,
            sk.emotional_tags, sk.themes
     FROM stars s
     JOIN story_kernels sk ON s.id = sk.story_id
-    WHERE s.user_id = ? AND s.catalog_star_id IS NOT NULL AND s.catalog_star_id > 0
+    JOIN story_catalog_stars scs ON s.id = scs.story_id AND scs.is_primary = 1
+    WHERE s.user_id = ? AND scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id > 0
   `).all(userId) as {
     story_id: number
     catalog_star_id: number

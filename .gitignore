@@ -52,6 +52,8 @@ research/
 screenshots/
 
 # ─── 项目文档（不上传） ───
+UI_HANDOVER.md
+docs/
 CHANGELOG.md
 PLAN.md
 CODE_WIKI.md
@@ -60,3 +62,7 @@ toA.md
 登录页模板.html
 star-empathy-platform.html
 CLAUDE.md   
+
+# ─── 临时工作文件（不上传） ───
+/tasks/
+temp_committed.vue
