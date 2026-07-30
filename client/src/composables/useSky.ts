@@ -644,6 +644,40 @@ for (const s of stars) starById.set(s.id, s)
     for (let i = 0; i < stars.length; i++) {
       if (stars[i].name) starNameToIdx.set(stars[i].name!, i)
     }
+
+    // 解析赤经赤纬坐标字符串（如 "11h49m · +45°19′"）→ 3D 位置
+    const R_SPHERE = 500
+    function parseCoordTo3D(raw: string): { x: number; y: number; z: number } | null {
+      const m = raw.match(/(\d+)h\s*(\d+)m\s*·?\s*([+-]?\d+)°\s*(\d+)[′']/)
+      if (!m) return null
+      const raH = parseInt(m[1]) + parseInt(m[2]) / 60
+      const decDeg = (m[3].startsWith('-') ? -1 : 1) * (Math.abs(parseInt(m[3])) + parseInt(m[4]) / 60)
+      const ra = (raH / 24) * Math.PI * 2
+      const dec = (decDeg / 180) * Math.PI
+      const cosD = Math.cos(dec)
+      return {
+        x: Math.round(R_SPHERE * cosD * Math.cos(ra) * 100) / 100,
+        y: Math.round(R_SPHERE * Math.sin(dec) * 100) / 100,
+        z: Math.round(R_SPHERE * cosD * Math.sin(-ra) * 100) / 100,
+      }
+    }
+
+    // 解析坐标缓存，避免重复计算
+    const coordCache = new Map<string, { x: number; y: number; z: number } | null>()
+
+    function getLineVertex(name: string): { x: number; y: number; z: number } | null {
+      const idx = starNameToIdx.get(name)
+      if (idx !== undefined && idx < n) {
+        const s = stars[idx]
+        return { x: s.x, y: s.y, z: s.z }
+      }
+      // 尝试解析为坐标字符串
+      if (!coordCache.has(name)) {
+        coordCache.set(name, parseCoordTo3D(name))
+      }
+      return coordCache.get(name) ?? null
+    }
+
     // 为每个星座创建独立的 LineSegments2（main + glow）
     // LineSegments2 + LineMaterial 支持 lineWidth（像素），解决 WebGL lineWidth=1 限制
     const initialOpacity = cfg.showAllConstellations ? cfg.constellationIdleOpacity : 0
@@ -651,10 +685,9 @@ for (const s of stars) starById.set(s.id, s)
       if (!con.lines.length) continue
       const v: number[] = []
       for (const [a, b] of con.lines) {
-        const ia = starNameToIdx.get(a), ib = starNameToIdx.get(b)
-        if (ia !== undefined && ib !== undefined && ia < n && ib < n) {
-          const sa = stars[ia], sb = stars[ib]
-          v.push(sa.x, sa.y, sa.z, sb.x, sb.y, sb.z)
+        const va = getLineVertex(a), vb = getLineVertex(b)
+        if (va && vb) {
+          v.push(va.x, va.y, va.z, vb.x, vb.y, vb.z)
         }
       }
       if (!v.length) continue
