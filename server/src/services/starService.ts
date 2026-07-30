@@ -229,6 +229,34 @@ export function removeFavorite(catalogStarId: number, userId: number): void {
   ).run(catalogStarId, userId);
 }
 
+// 用户个人空间聚合统计（准确计数，不受分页影响）
+export function getUserStats(userId: number): {
+  storyCount: number;
+  totalResonance: number;
+  resonanceGivenCount: number;
+  favoriteCount: number;
+} {
+  const storyRow = db.prepare(`
+    SELECT COUNT(*) as cnt, COALESCE(SUM(resonance_count), 0) as res
+    FROM stars WHERE user_id = ?
+  `).get(userId) as unknown as { cnt: number; res: number };
+
+  const resonanceGivenRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM resonance_log WHERE user_id = ?
+  `).get(userId) as unknown as { cnt: number };
+
+  const favRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM favorites WHERE user_id = ?
+  `).get(userId) as unknown as { cnt: number };
+
+  return {
+    storyCount: storyRow.cnt,
+    totalResonance: storyRow.res,
+    resonanceGivenCount: resonanceGivenRow.cnt,
+    favoriteCount: favRow.cnt,
+  };
+}
+
 // 全局统计
 export function getGlobalStats(): { starCount: number; userCount: number; totalResonance: number } {
   const starRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as unknown as { cnt: number };
