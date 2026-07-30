@@ -770,6 +770,20 @@ onUnmounted(() => {
     font-size: 0.7rem;
   }
 
+  .modal-image {
+    max-height: 160px;
+    border-radius: 8px;
+  }
+
+  .modal-stars {
+    gap: 4px;
+  }
+
+  .modal-star-link {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+  }
+
   .modal-actions {
     gap: 0.6rem;
   }
@@ -817,6 +831,7 @@ onUnmounted(() => {
 @media (max-width: 380px) {
   .stats-row {
     gap: 0.8rem;
+    flex-wrap: wrap;
   }
 
   .stat strong {
