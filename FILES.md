@@ -107,7 +107,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`）、故事表单、设置面板 |
+| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板 |
 | `HomePage.vue` | 首页/登录页 |
 | `ProfilePage.vue` | 个人资料页 |
 
@@ -138,7 +138,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制 |
+| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint） |
 | `useStars.ts` | 星星数据获取、过滤、本地更新 |
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
@@ -167,7 +167,7 @@
 |---|---|
 | `astro.ts` | 天文计算工具 |
 | `geoTime.ts` | 地理位置时区工具 |
-| `constants.ts` | 全局常量 |
+| `constants.ts` | 全局常量（含行星特写模式参数：CLOSEUP_FOV/CLOSEUP_INIT_RATIO/CLOSEUP_MIN_RATIO/CLOSEUP_MAX_RATIO/CLOSEUP_NEAR/DEFAULT_NEAR/CLOSEUP_WHEEL_FACTOR） |
 | `gpuDetect.ts` | GPU 性能检测 |
 | `sphereMapping.ts` | 球面坐标映射 |
 | `starDisplayConfig.ts` | 星空显示配置（星座线、标签、彗星等开关） |

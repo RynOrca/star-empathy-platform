@@ -1084,11 +1084,13 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   selectedCatalogStarId.value = planetId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
+  // 进入行星特写模式（物理直径比例下小天体需相机距离补偿）
+  skyRef.value?.sky?.focusOnPlanet(name)
 }
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]) }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
 function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
