@@ -1,6 +1,7 @@
 <template>
   <div class="profile-page">
-    <canvas ref="canvasRef" class="sky-bg"></canvas>
+    <!-- 保留 canvas 不删除 -->
+    <canvas ref="canvasRef" class="sky-bg pd-sky-canvas"></canvas>
     <div v-if="!loaded" class="loading">...</div>
     <template v-else>
       <button class="btn-back" @click="goBack">← 星空</button>
@@ -145,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, nextTick, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
@@ -486,364 +487,144 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.profile-page { width: 100vw; min-height: 100vh; position: relative; overflow-x: hidden; font-family: var(--font,"Microsoft YaHei",sans-serif); color: #f6f1ff; padding-bottom: 120px; }
-.sky-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
-.loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #7a759c; z-index: 10; }
+.profile-page {
+  --pd-bg-0: #05060f;
+  --pd-bg-1: rgba(16, 18, 40, 0.6);
+  --pd-bg-2: rgba(26, 28, 54, 0.8);
+  --pd-gold: #ffd98a;
+  --pd-gold-soft: rgba(255, 217, 138, 0.45);
+  --pd-gold-line: rgba(255, 217, 138, 0.18);
+  --pd-text-pri: #e8e4ff;
+  --pd-text-sec: #a9a3c7;
+  --pd-text-dim: rgba(255, 217, 138, 0.5);
+  --pd-border: rgba(255, 217, 138, 0.18);
+  --pd-border-hot: rgba(255, 217, 138, 0.5);
+  --pd-font-deco: Cinzel, Noto Serif SC, Songti SC, Microsoft YaHei, serif;
+  --pd-font-serif: Noto Serif SC, Songti SC, Cinzel, Microsoft YaHei, serif;
+}
 
-.btn-back { position: fixed; top: 1rem; left: 1rem; z-index: 20; padding: 0.35rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(10,10,30,0.5); color: #7a759c; cursor: pointer; font-size: 0.8rem; backdrop-filter: blur(6px); transition: color 0.3s; }
-.btn-back:hover { color: #ffd98a; }
+.profile-page {
+  width: 100vw;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  font-family: var(--pd-font-serif);
+  color: var(--pd-text-pri);
+  padding-bottom: 160px;
+  background: var(--pd-bg-0);
+}
 
-/* ═══ 星云签名 ═══ */
-.signature-area { position: relative; z-index: 10; text-align: center; padding-top: 6vh; }
-.signature-wrap { display: inline-block; cursor: pointer; }
-.sig-display { position: relative; }
-.sig-text {
-  font-size: 1.15rem; font-style: italic; color: #d4caff;
-  text-shadow: 0 0 20px rgba(180,160,255,0.5), 0 0 40px rgba(140,120,220,0.25);
-  margin: 0; line-height: 1.6;
-}
-.sig-hint { font-size: 0.65rem; color: rgba(255,255,255,0.15); display: block; margin-top: 2px; transition: color 0.3s; }
-.signature-wrap:hover .sig-hint { color: rgba(255,255,255,0.35); }
-.sig-edit { display: flex; justify-content: center; }
-.sig-input {
-  background: rgba(16,20,43,0.7); border: 1px solid rgba(255,217,138,0.3); border-radius: 10px;
-  color: #ffd98a; font-size: 1.05rem; font-style: italic; padding: 0.3rem 0.8rem; outline: none;
-  text-align: center; width: 220px; backdrop-filter: blur(8px);
-}
-.sig-input::placeholder { color: rgba(255,217,138,0.2); }
-.username { font-size: 1.6rem; font-weight: 600; margin: 0.5rem 0 0; color: #ffd98a; }
-.join-days { font-size: 0.75rem; color: #5a5580; margin-top: 0.2rem; }
-
-/* ═══ 统计 ═══ */
-.stats-row { position: relative; z-index: 10; display: flex; justify-content: center; gap: 2rem; margin-top: 2rem; }
-.stat { text-align: center; }
-.stat strong { display: block; font-size: 1.4rem; color: #ffd98a; text-shadow: 0 0 12px rgba(255,217,138,0.3); }
-.stat span { font-size: 0.7rem; color: #5a5580; }
-
-/* ═══ 故事星节点 ═══ */
-.story-field { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
-.kernel-lines-svg {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 4;
-}
-.kernel-line {
-  stroke: rgba(255, 217, 138, 0.15);
-  stroke-width: 1;
-  stroke-dasharray: 4 6;
-  animation: lineGlow 4s ease-in-out infinite;
-}
-@keyframes lineGlow {
-  0%, 100% { stroke: rgba(255, 217, 138, 0.1); }
-  50% { stroke: rgba(255, 217, 138, 0.3); }
-}
-.story-star {
-  position: absolute; border-radius: 50%; cursor: pointer; pointer-events: auto;
-  background: radial-gradient(circle, rgba(255,217,138,0.9) 0%, rgba(255,217,138,0) 70%);
-  box-shadow: 0 0 6px rgba(255,217,138,0.6), 0 0 14px rgba(255,180,100,0.3);
-  animation: starPulse 3s ease-in-out infinite;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-.story-star:hover { transform: scale(1.8); box-shadow: 0 0 12px rgba(255,217,138,0.9), 0 0 24px rgba(255,180,100,0.5); z-index: 15; }
-.star-title {
-  position: absolute; top: -1.6rem; left: 50%; transform: translateX(-50%);
-  font-size: 0.7rem; color: #ffd98a; white-space: nowrap;
-  text-shadow: 0 0 8px rgba(255,217,138,0.5);
+.profile-page::before,
+.profile-page::after {
+  content: "";
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  right: -50%;
+  bottom: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 0;
   pointer-events: none;
-}
-@keyframes starPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  background-repeat: repeat;
 }
 
-.empty-hint { position: relative; z-index: 10; text-align: center; margin-top: 4rem; font-size: 0.85rem; color: #5a5580; line-height: 1.8; }
-
-/* ═══ 收藏 ═══ */
-.fav-section { position: relative; z-index: 10; text-align: center; margin-top: 3rem; padding-bottom: 3rem; }
-.fav-title { font-size: 0.75rem; color: #5a5580; margin-bottom: 0.75rem; }
-.fav-list { display: flex; flex-direction: column; gap: 0.5rem; max-width: 400px; margin: 0 auto; }
-.fav-card {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-radius: 10px;
-  background: rgba(255,217,138,0.04); border: 1px solid rgba(255,217,138,0.12);
-  backdrop-filter: blur(4px); text-align: left;
+.profile-page::before {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 80px 120px, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 160px 60px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 240px 200px, rgba(255, 217, 138, 0.3), transparent),
+    radial-gradient(1px 1px at 300px 90px, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 360px 280px, rgba(255, 255, 255, 0.3), transparent);
+  background-size: 400px 400px;
+  opacity: 0.7;
+  animation: pd-sky-drift-1 120s linear infinite;
 }
-.fav-card-main { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; }
-.fav-star { font-size: 1.2rem; }
-.fav-info { flex: 1; }
-.fav-name { color: #f6f1ff; font-size: 0.9rem; }
-.fav-meta { color: #8a84a0; font-size: 0.7rem; display: flex; gap: 8px; margin-top: 2px; }
-.fav-remove {
-  background: none; border: none; color: #8a84a0; font-size: 1.2rem;
-  cursor: pointer; padding: 2px 8px; border-radius: 6px;
+
+.profile-page::after {
+  background-image:
+    radial-gradient(1px 1px at 50px 80px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 130px 40px, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 200px 170px, rgba(255, 217, 138, 0.4), transparent),
+    radial-gradient(1px 1px at 270px 100px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 10px 230px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 90px 290px, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 170px 20px, rgba(255, 217, 138, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 250px 260px, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 300px 300px;
+  opacity: 0.7;
+  animation: pd-sky-drift-2 80s linear infinite;
 }
-.fav-remove:hover { color: #ff6b8a; background: rgba(255,107,138,0.08); }
 
-/* ═══ 弹窗 ═══ */
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 30;
-  background: rgba(4,4,18,0.7); backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
+@keyframes pd-sky-drift-1 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(400px, 400px); }
 }
-.modal-card {
-  background: rgba(16,20,43,0.92); border: 1px solid rgba(48,55,87,0.5); border-radius: 20px;
-  padding: 2rem; max-width: 440px; width: 90%; max-height: 70vh; overflow-y: auto;
+
+@keyframes pd-sky-drift-2 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-300px, 300px); }
 }
-.modal-card h3 { color: #ffd98a; font-size: 1.1rem; margin: 0 0 1rem; }
-.modal-content { font-size: 0.9rem; color: #b9b4d6; line-height: 1.7; white-space: pre-wrap; }
-.modal-meta { display: flex; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: #5a5580; align-items: center; }
-.modal-image { width: 100%; max-height: 200px; object-fit: cover; border-radius: 10px; margin-bottom: 1rem; }
-.modal-stars { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 0.75rem; font-size: 0.75rem; }
-.modal-stars-label { color: #5a5580; }
-.modal-star-link { background: none; border: 1px solid rgba(255,217,138,0.2); border-radius: 6px; padding: 2px 8px; color: #ffd98a; font-size: 0.72rem; cursor: pointer; transition: all 0.2s; font-family: var(--font,"Microsoft YaHei",sans-serif); }
-.modal-star-link:hover { background: rgba(255,217,138,0.08); border-color: rgba(255,217,138,0.4); }
-.tag { padding: 1px 8px; border-radius: 8px; font-size: 0.7rem; background: rgba(255,255,255,0.06); }
-.tag-思念 { color: #ff8b7d; } .tag-等待 { color: #86a8ff; } .tag-离别 { color: #caa7ff; } .tag-愿望 { color: #ffd98a; } .tag-孤独 { color: #95f0c0; }
-.modal-close { margin-top: 1rem; padding: 0.4rem 1.2rem; border-radius: 10px; border: 1px solid rgba(48,55,87,0.5); background: rgba(255,255,255,0.05); color: #7a759c; cursor: pointer; font-size: 0.8rem; }
-.modal-close:hover { color: #ffd98a; border-color: rgba(255,217,138,0.3); }
-.modal-close:disabled { opacity: 0.5; cursor: wait; }
 
-.modal-actions { display: flex; gap: 0.8rem; margin-top: 1rem; justify-content: flex-end; }
-.modal-delete {
-  padding: 0.4rem 1.2rem; border-radius: 10px;
-  border: 1px solid rgba(255,107,138,0.25); background: transparent;
-  color: #ff6b8a; font-family: var(--font,"Microsoft YaHei",sans-serif); font-size: 0.8rem;
-  cursor: pointer; transition: all 0.15s;
+.sky-bg.pd-sky-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.6;
 }
-.modal-delete:hover { background: rgba(255,107,138,0.08); border-color: rgba(255,107,138,0.4); }
-.modal-delete:disabled { opacity: 0.5; cursor: wait; }
-.modal-delete.confirm {
-  border: none; background: #ff6b8a; color: #1a1438; font-weight: 600;
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  font-size: 1.2rem;
+  color: var(--pd-text-sec);
 }
-.modal-delete.confirm:hover:not(:disabled) { background: #ff8a9e; }
 
-.delete-modal h3 { color: #ff6b8a; }
-.delete-modal p { color: #b9b4d6; font-size: 0.85rem; margin: 0 0 0.5rem; line-height: 1.6; }
-
-/* ═══ 修改密码 ═══ */
-.account-actions { position: relative; z-index: 10; text-align: center; margin-top: 1.5rem; }
-.btn-change-pwd {
-  padding: 0.4rem 1.5rem; border-radius: 10px;
-  border: 1px solid rgba(255,217,138,0.2); background: rgba(255,217,138,0.06);
-  color: #c8a86b; font-family: var(--font,"Microsoft YaHei",sans-serif); font-size: 0.78rem;
-  cursor: pointer; transition: all 0.3s;
+@keyframes pd-node-pulse {
+  0%, 100% { transform: scale(0.92); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
 }
-.btn-change-pwd:hover { border-color: rgba(255,217,138,0.4); color: #ffd98a; background: rgba(255,217,138,0.1); }
 
-.pwd-modal { max-width: 380px; }
-.pwd-modal h3 { color: #ffd98a; font-size: 1.1rem; margin: 0 0 1.2rem; text-align: center; }
-.pwd-modal .form-group { margin-bottom: 1rem; }
-.pwd-modal .form-group label { display: block; font-size: 0.75rem; color: #7a759c; margin-bottom: 0.3rem; }
-.pwd-modal .form-input {
-  width: 100%; padding: 0.5rem 0.8rem; border-radius: 8px;
-  border: 1px solid rgba(48,55,87,0.5); background: rgba(16,20,43,0.6);
-  color: #f6f1ff; font-family: var(--font,"Microsoft YaHei",sans-serif); font-size: 0.85rem;
-  outline: none; box-sizing: border-box;
+@keyframes pd-line-breath {
+  0%, 100% { stroke-opacity: 0.2; }
+  50% { stroke-opacity: 0.6; }
 }
-.pwd-modal .form-input:focus { border-color: rgba(255,217,138,0.4); }
-.pwd-modal .form-input::placeholder { color: #5a5580; }
-.pwd-modal .error { color: #ff6b8a; font-size: 0.78rem; margin: 0.5rem 0; }
-.pwd-modal .success { color: #95f0c0; font-size: 0.78rem; margin: 0.5rem 0; }
-.pwd-modal-actions { display: flex; gap: 0.8rem; margin-top: 1.2rem; justify-content: flex-end; }
-.modal-save {
-  padding: 0.5rem 1.5rem; border-radius: 10px; border: none;
-  background: #ffd98a; color: #1a1438; font-family: var(--font,"Microsoft YaHei",sans-serif);
-  font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: background 0.3s;
+
+@keyframes pd-fade-up {
+  0% { transform: translateY(24px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
-.modal-save:hover:not(:disabled) { background: #ffe0a8; }
-.modal-save:disabled { opacity: 0.5; cursor: wait; }
 
-/* ─── Mobile Responsive (<=768px) ─── */
-@media (max-width: 768px) {
-  .profile-page {
-    padding-bottom: 80px;
-  }
+@keyframes pd-scroll-hint {
+  0% { transform: translateY(-6px); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(12px); opacity: 0; }
+}
 
-  .btn-back {
-    top: 0.75rem;
-    left: 0.75rem;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.75rem;
-  }
+@keyframes pd-moon-glow {
+  0%, 100% { box-shadow: 0 0 40px 8px rgba(255, 217, 138, 0.2), 0 0 80px 16px rgba(255, 217, 138, 0.08); }
+  50% { box-shadow: 0 0 60px 14px rgba(255, 217, 138, 0.32), 0 0 120px 28px rgba(255, 217, 138, 0.14); }
+}
 
-  .signature-area {
-    padding-top: 4vh;
-  }
-
-  .sig-text {
-    font-size: 1rem;
-  }
-
-  .sig-input {
-    width: 180px;
-    font-size: 0.95rem;
-  }
-
-  .username {
-    font-size: 1.3rem;
-  }
-
-  .join-days {
-    font-size: 0.7rem;
-  }
-
-  .stats-row {
-    gap: 1.2rem;
-    margin-top: 1.5rem;
-  }
-
-  .stat strong {
-    font-size: 1.2rem;
-  }
-
-  .stat span {
-    font-size: 0.65rem;
-  }
-
-  .account-actions {
-    margin-top: 1rem;
-  }
-
-  .btn-change-pwd {
-    padding: 0.35rem 1.2rem;
-    font-size: 0.74rem;
-  }
-
-  /* Story star field - reduce size in mobile */
-  .story-star {
-    box-shadow: 0 0 4px rgba(255,217,138,0.5), 0 0 10px rgba(255,180,100,0.2);
-  }
-
-  .star-title {
-    font-size: 0.65rem;
-  }
-
-  .fav-section {
-    margin-top: 2rem;
-    padding: 0 16px 2rem;
-  }
-
-  .fav-list {
-    max-width: 100%;
-  }
-
-  .fav-card {
-    padding: 10px 12px;
-  }
-
-  .fav-name {
-    font-size: 0.85rem;
-  }
-
-  /* Modals: bottom sheet style */
-  .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .modal-card {
-    width: 100%;
-    max-width: 100%;
-    max-height: 80vh;
-    border-radius: 20px 20px 0 0;
-    padding: 1.5rem;
-    animation: slideUpModal 0.28s ease-out;
-  }
-
-  @keyframes slideUpModal {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  .modal-card h3 {
-    font-size: 1rem;
-    margin-bottom: 0.8rem;
-  }
-
-  .modal-content {
-    font-size: 0.84rem;
-    line-height: 1.65;
-  }
-
-  .modal-meta {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: 0.7rem;
-  }
-
-  .modal-image {
-    max-height: 160px;
-    border-radius: 8px;
-  }
-
-  .modal-stars {
-    gap: 4px;
-  }
-
-  .modal-star-link {
-    font-size: 0.68rem;
-    padding: 2px 6px;
-  }
-
-  .modal-actions {
-    gap: 0.6rem;
-  }
-
-  .modal-close {
-    padding: 0.5rem 1rem;
-    font-size: 0.78rem;
-    flex: 1;
-    margin-top: 0;
-  }
-
-  .modal-delete {
-    padding: 0.5rem 1rem;
-    font-size: 0.78rem;
-    flex: 1;
-  }
-
-  .pwd-modal {
-    max-width: 100%;
-  }
-
-  .pwd-modal .form-input {
-    padding: 0.6rem 0.8rem;
-    font-size: 0.82rem;
-  }
-
-  .pwd-modal-actions {
-    gap: 0.6rem;
-  }
-
-  .modal-save {
-    flex: 1;
-    padding: 0.6rem 1rem;
-    font-size: 0.8rem;
-  }
-
-  .empty-hint {
-    margin-top: 3rem;
-    font-size: 0.8rem;
-    padding: 0 20px;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
-/* ─── Very small screens (<=380px) ─── */
-@media (max-width: 380px) {
-  .stats-row {
-    gap: 0.8rem;
-    flex-wrap: wrap;
-  }
-
-  .stat strong {
-    font-size: 1.1rem;
-  }
-
-  .signature-area {
-    padding-top: 3vh;
-  }
-
-  .fav-section {
-    padding: 0 12px 2rem;
-  }
+.profile-page > * {
+  z-index: 1;
+  position: relative;
 }
 </style>
