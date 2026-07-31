@@ -168,9 +168,64 @@
         </div>
       </section>
 
-      <!-- 收藏区（Task6 占位） -->
-      <section class="pd-section" id="pd-favorites">
-        <!-- Task6: 收藏内容将在此实现 -->
+      <section id="pd-favorites" class="pd-section pd-favorites" aria-label="我的收藏星空">
+        <h2 class="pd-section-head">· 典藏星空 · CURATED · FAVORITES ·</h2>
+        <p class="pd-section-sub">—— 那些收藏过的星，随时取出来读 ——</p>
+        <template v-if="favorites.length === 0">
+          <div class="pd-empty" style="max-width: 520px;">
+            <div class="pd-empty-orb" aria-hidden="true">♡</div>
+            <h4 class="pd-empty-title">还没有收藏的恒星，</h4>
+            <p class="pd-empty-sub">在时间轴上点 ❤ 收藏一颗星，它会出现在这里。</p>
+          </div>
+        </template>
+        <template v-else>
+          <div class="pd-fav-grid" role="list">
+            <article
+              v-for="(f, i) in favorites"
+              :key="f.id"
+              class="pd-fav-card"
+              :class="'shift-' + (i % 4)"
+              role="listitem"
+              tabindex="0"
+              :aria-label="`恒星收藏卡：${f.title || '未命名收藏'}，恒星 ${f.starName || ''}，共鸣 ${f.resonanceCount || 0}，按 Enter 详情，按 Delete 取消收藏`"
+              @click="goToStarWithCheck(f.starCatalogId, f.id)"
+              @keyup.enter="goToStarWithCheck(f.starCatalogId, f.id)"
+              @keyup.delete.prevent="unfavorite(f.id)"
+            >
+              <!-- 收藏卡渐变背景图 (CSS radial 层叠模拟星尘) -->
+              <div class="pd-fav-card-bg" aria-hidden="true"></div>
+              <!-- 右上角取消收藏按钮 -->
+              <button
+                type="button"
+                class="pd-fav-close"
+                aria-label="取消收藏：{{ f.starName || '星' }}"
+                @click.stop="unfavorite(f.id)"
+                @keyup.enter.stop.prevent="unfavorite(f.id)"
+              >×</button>
+              <!-- 恒星编号 & Tag -->
+              <div class="pd-fav-head">
+                <span class="pd-fav-cat">
+                  {{ f.starName?.slice(0, 3) || 'HD' + (f.starCatalogId || 0).toString().slice(0, 4) }}
+                </span>
+                <span v-if="f.starConstellation" class="pd-fav-con">{{ f.starConstellation }}</span>
+              </div>
+              <!-- 主内容：标题/作者/摘录（如果有 story） -->
+              <div class="pd-fav-body">
+                <h3 class="pd-fav-title">{{ f.title || f.starName || '一颗无名星' }}</h3>
+                <p v-if="f.content" class="pd-fav-excerpt">{{ f.content }}</p>
+                <p v-else class="pd-fav-excerpt pd-fav-no-story">—— 此处空，是一颗纯净的恒星球面坐标 ——</p>
+              </div>
+              <!-- 底部：共鸣/作者/日期 -->
+              <footer class="pd-fav-foot">
+                <div class="pd-fav-meta">
+                  <span class="pd-fav-res">♡ {{ f.resonanceCount || 0 }}</span>
+                  <span v-if="f.createdAt" class="pd-fav-date">{{ formatMD(f.createdAt) }}</span>
+                </div>
+                <div class="pd-fav-cta" aria-hidden="true">→ 前往星空</div>
+              </footer>
+            </article>
+          </div>
+        </template>
       </section>
 
       <!-- 签名编辑（保留原有 inline 编辑） -->
@@ -266,10 +321,20 @@ const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 useParticleSky(canvasRef)
 
+interface FavoriteItem {
+  id: number
+  starCatalogId?: number
+  starName?: string
+  starConstellation?: string
+  title?: string
+  content?: string
+  resonanceCount?: number
+  createdAt?: string
+}
 const loaded = ref(false)
 const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
-const favorites = ref<number[]>([])
+const favorites = ref<FavoriteItem[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
 const hoverIdx = ref(-1)
 const activeStory = ref<any>(null)
@@ -325,7 +390,6 @@ async function doChangePassword() {
 const currentPage = ref(0)
 const hasMore = ref(true)
 const loadingMore = ref(false)
-const kernelLines = ref<{ x1: string; y1: string; x2: string; y2: string }[]>([])
 
 // ─── Task3 预留引用 ───
 const visibleCount = ref(VISIBLE_STEP)
@@ -361,6 +425,15 @@ function scrollToStory(i: number) {
   })
 }
 
+// ─── Favorites helpers (Task5) ───
+async function goToStarWithCheck(starCatalogId: number | undefined, favId: number) {
+  if (!starCatalogId) {
+    console.warn('[Profile] 收藏记录缺少 catalog_star_id:', favId)
+    return
+  }
+  router.push({ path: '/sky', query: { star: String(starCatalogId) } })
+}
+
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
   if (!user.value) return 0
@@ -379,18 +452,21 @@ function getStarColor(id: number) { return starLookup.get(id)?.color || '#ffffff
 
 function goToStar(starId: number) { router.push({ path: '/sky', query: { star: String(starId) } }) }
 
-async function removeFavorite(starId: number) {
+async function unfavorite(favoriteId: number) {
   const token = getToken()
   if (!token) return
+  const f = favorites.value.find(x => x.id === favoriteId)
+  const starId = f?.starCatalogId
   try {
-    const res = await fetch(`/api/catalog/stars/${starId}/favorite`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok) {
-      favorites.value = favorites.value.filter(fid => fid !== starId)
-      stats.value.favoriteCount = favorites.value.length
+    if (starId != null) {
+      const res = await fetch(`/api/catalog/stars/${starId}/favorite`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
     }
+    favorites.value = favorites.value.filter(x => x.id !== favoriteId)
+    stats.value.favoriteCount = favorites.value.length
   } catch {}
 }
 
@@ -427,9 +503,9 @@ function constellationNodes() {
   }))
 }
 function constellationLines() {
-  const storyIds = stories.value.slice(0, 12)
+  const limitedStories = stories.value.slice(0, 12)
   const starToIdx = new Map<number, number>()
-  storyIds.forEach((s, i) => {
+  limitedStories.forEach((s, i) => {
     const ids = getStoryStarIds(s)
     if (ids[0] != null && !starToIdx.has(ids[0])) starToIdx.set(ids[0], i)
   })
@@ -556,7 +632,6 @@ async function loadProfileData() {
   hasMore.value = true
   loadingMore.value = false
   activeStory.value = null
-  kernelLines.value = []
   kernelLinesRaw.value = []
   visibleCount.value = VISIBLE_STEP
 
@@ -1481,5 +1556,212 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
 .pd-story-flash {
   animation: pd-story-flash-kf 1.4s ease-out forwards;
   border-left-color: var(--pd-gold);
+}
+
+/* Favorites Section */
+.pd-favorites {
+  padding-top: 120px;
+}
+
+.pd-fav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 40px 36px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* Card stacking shifts 0 1 2 3 index % 4 transforms */
+.pd-fav-card.shift-0 { transform: translateY(0) rotate(-0.6deg); }
+.pd-fav-card.shift-1 { transform: translateY(-10px) rotate(0.4deg); }
+.pd-fav-card.shift-2 { transform: translateY(5px) rotate(0.8deg); }
+.pd-fav-card.shift-3 { transform: translateY(-7px) rotate(-0.5deg); }
+
+.pd-fav-card {
+  transition: transform 0.4s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s;
+}
+
+/* pd-fav-card main */
+.pd-fav-card {
+  position: relative;
+  padding: 22px 22px 16px;
+  background: var(--pd-bg-1);
+  border: 1px dashed var(--pd-gold);
+  border-radius: 4px;
+  min-height: 260px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+
+.pd-fav-card:hover,
+.pd-fav-card:focus-visible {
+  transform: translateY(-4px) rotate(0deg);
+  border-style: solid;
+  border-color: var(--pd-gold);
+  box-shadow: 0 16px 48px -12px rgba(255, 217, 138, 0.3);
+}
+
+.pd-fav-card:hover .pd-fav-card-bg,
+.pd-fav-card:focus-visible .pd-fav-card-bg {
+  opacity: 0.55;
+}
+
+/* card-bg radial gradient */
+.pd-fav-card-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  border-radius: 4px;
+  background:
+    radial-gradient(140px 140px at 20% 20%, rgba(255, 217, 138, 0.22), transparent 60%),
+    radial-gradient(90px 90px at 80% 15%, rgba(255, 217, 138, 0.18), transparent 65%),
+    radial-gradient(110px 110px at 60% 80%, rgba(255, 217, 138, 0.2), transparent 60%),
+    radial-gradient(90px 90px at 90% 90%, rgba(255, 217, 138, 0.16), transparent 65%);
+}
+
+/* close button */
+.pd-fav-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pd-text-dim);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--pd-text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.pd-fav-close:hover {
+  opacity: 1;
+  color: #ff6b8a;
+  border-color: #ff6b8a;
+}
+
+.pd-fav-close:focus-visible {
+  outline: 2px solid var(--pd-gold);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* card head */
+.pd-fav-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.pd-fav-cat {
+  font-family: var(--pd-font-deco);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--pd-gold);
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.pd-fav-con {
+  font-size: 0.7rem;
+  color: var(--pd-gold);
+  opacity: 0.6;
+}
+
+/* card body */
+.pd-fav-body {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.pd-fav-title {
+  font-family: var(--pd-font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--pd-text-pri);
+  line-height: 1.25;
+  margin: 0 0 10px;
+}
+
+.pd-fav-excerpt {
+  font-family: var(--pd-font-serif);
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.8;
+  color: var(--pd-text-sec);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.pd-fav-no-story {
+  opacity: 0.5;
+  letter-spacing: 0.05em;
+}
+
+/* card foot */
+.pd-fav-foot {
+  padding-top: 12px;
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed var(--pd-gold-line);
+  position: relative;
+  z-index: 1;
+}
+
+.pd-fav-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.pd-fav-res {
+  color: var(--pd-gold);
+  font-size: 0.75rem;
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.pd-fav-date {
+  font-family: var(--pd-font-deco);
+  font-size: 0.65rem;
+  color: var(--pd-text-dim);
+  letter-spacing: 0.05em;
+}
+
+.pd-fav-cta {
+  font-family: var(--pd-font-deco);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  color: var(--pd-gold);
+  opacity: 0.5;
+  transition: opacity 0.25s;
+}
+
+.pd-fav-card:hover .pd-fav-cta,
+.pd-fav-card:focus-visible .pd-fav-cta {
+  opacity: 1;
 }
 </style>
