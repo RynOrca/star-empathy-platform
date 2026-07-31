@@ -78,13 +78,10 @@
               role="article"
               :style="{ animationDelay: Math.min(i * 30, 200) + 'ms' }"
             >
-              <div class="pd-t-node" aria-hidden="true"><div class="pd-t-star"></div></div>
-              <div class="pd-t-date" :class="i % 2 === 0 ? 'left' : 'right'">
-                <span class="pd-t-date-single">{{ formatMD(s.createdAt) }}</span>
-                <span class="pd-t-date-stacked" v-if="formatMDParts(s.createdAt).month">
-                  <span class="md-month">{{ formatMDParts(s.createdAt).month }}</span>
-                  <span class="md-day">{{ formatMDParts(s.createdAt).day }}</span>
-                </span>
+              <div class="pd-t-node" aria-hidden="true">
+                <span class="pd-t-date-month">{{ formatMDParts(s.createdAt).month }}</span>
+                <div class="pd-t-star"></div>
+                <span class="pd-t-date-day">{{ formatMDParts(s.createdAt).day }}</span>
               </div>
               <button class="pd-t-card" type="button" @click="openStory(s)">
                 <div class="pd-t-head">
@@ -1232,6 +1229,20 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
+  /* 月-星-日 沿同一垂直中心线对齐 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-t-date-month,
+.pd-t-date-day {
+  font-family: var(--pd-font-deco);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: rgba(255,217,138,0.7);
+  line-height: 1;
 }
 
 .pd-t-star {
@@ -1260,32 +1271,6 @@ onBeforeUnmount(() => {
   z-index: 2;
 }
 
-/* Timeline date */
-.pd-t-date {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--pd-font-deco);
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  color: rgba(255,217,138,0.7);
-  white-space: nowrap;
-  z-index: 3;
-}
-
-.pd-t-date.left, .pd-t-date.right {
-  /* 与 style-d 一致：都在中线 */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-/* PC 端：单行 MM / DD；移动端在 @media 断点切换为竖排 */
-.pd-t-date-single { display: inline; }
-.pd-t-date-stacked { display: none; flex-direction: column; align-items: center; line-height: 1.15; }
-.pd-t-date-stacked .md-month { font-size: 0.92em; letter-spacing: 0.15em; }
-.pd-t-date-stacked .md-day { font-size: 0.92em; letter-spacing: 0.15em; margin-top: 3px; opacity: 0.85; }
-
 /* Timeline card */
 .pd-t-card {
   width: 44%;
@@ -1296,8 +1281,14 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  /* 严格按用户规范：all 0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性过渡 */
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  /* 严格按用户规范：0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性
+     注意：不能用 all，因为 all 会包含 backdrop-filter 等极昂贵属性，
+     浏览器主线程被抢占会让 0.5s 被压缩成"一瞬间"。改为只过渡规范提到的属性 */
+  transition:
+    transform 0.5s cubic-bezier(.2,.9,.3,1),
+    box-shadow 0.5s cubic-bezier(.2,.9,.3,1),
+    border-color 0.5s cubic-bezier(.2,.9,.3,1),
+    background-color 0.5s cubic-bezier(.2,.9,.3,1);
   font-family: inherit;
   text-align: left;
   color: inherit;
@@ -1696,8 +1687,13 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  /* 严格按用户规范：all 0.5s cubic-bezier(.2,.9,.3,1) 平滑且有弹性 */
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  /* 严格按用户规范：0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性
+     不能用 all：会包含 backdrop-filter 极昂贵属性，主线程被抢占让 0.5s 被压缩成"一瞬间" */
+  transition:
+    transform 0.5s cubic-bezier(.2,.9,.3,1),
+    box-shadow 0.5s cubic-bezier(.2,.9,.3,1),
+    border-color 0.5s cubic-bezier(.2,.9,.3,1),
+    background-color 0.5s cubic-bezier(.2,.9,.3,1);
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
@@ -2236,23 +2232,15 @@ onBeforeUnmount(() => {
     border-radius: 14px !important;
     padding: 20px 18px;
   }
-  /* 星星节点：固定在轴线中心 (left: 20px)，用 translateX(-50%) 居中 */
+  /* 月-星-日 节点：固定在轴线中心 (left: 20px)，用 translateX(-50%) 居中
+     结构与 PC 端一致：月份在上、星星中间、日期在下，沿同一垂直中心线 */
   .pd-t-node {
-    left: 20px;
-    top: 60px;
-    transform: translateX(-50%);
-  }
-  /* 日期放在星星上方（同 PC 端位置关系），月份在上日期在下竖排 */
-  .pd-t-date {
     left: 20px;
     top: 26px;
     transform: translateX(-50%);
-    text-align: center;
-    font-size: 0.62rem;
-    white-space: nowrap;
   }
-  .pd-t-date-single { display: none; }
-  .pd-t-date-stacked { display: flex; }
+  .pd-t-date-month,
+  .pd-t-date-day { font-size: 0.62rem; }
   .pd-t-title { font-size: 1rem; }
   .pd-t-body { font-size: 0.8rem; line-height: 1.8; -webkit-line-clamp: 3; }
   .pd-t-foot { font-size: 0.66rem; }
