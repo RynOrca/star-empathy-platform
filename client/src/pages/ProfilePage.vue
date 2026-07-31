@@ -10,7 +10,7 @@
         <span class="pd-brand">STARRY · DOME</span>
         <div class="pd-actions">
           <button class="pd-btn-ghost" @click="startEditSig">✎ 编辑签名</button>
-          <button class="pd-btn-ghost" @click="showPwdModal = true">⚙ 修改密码</button>
+          <button class="pd-btn-ghost" @click="clearAndClosePwdModal(); showPwdModal = true">⚙ 修改密码</button>
         </div>
       </header>
 
@@ -228,86 +228,117 @@
         </template>
       </section>
 
-      <!-- 签名编辑（保留原有 inline 编辑） -->
-      <div v-if="editingSig" class="sig-edit">
+      <!-- 签名 inline 编辑器 -->
+      <div v-if="editingSig" class="pd-sign-inline">
+        <label class="pd-sign-label">✦ 编辑你的个性签名 ✦</label>
         <input ref="sigInputRef" v-model="sigDraft" maxlength="30"
-          @blur="saveSig" @keydown.enter="saveSig" @keydown.escape="editingSig = false"
-          class="sig-input" placeholder="写一行签名..." />
+          @keydown.enter="saveSig" @keydown.escape="editingSig = false"
+          class="pd-sign-input" placeholder="写一行签名..." />
+        <button class="pd-btn-primary" @click="saveSig">保存</button>
+        <button class="pd-btn-ghost" @click="editingSig = false">取消</button>
       </div>
 
       <!-- 修改密码弹窗 -->
-      <div v-if="showPwdModal" class="modal-overlay" @click.self="showPwdModal = false">
-        <div class="modal-card pwd-modal">
-          <h3>修改密码</h3>
-          <form @submit.prevent="doChangePassword">
-            <div class="form-group">
-              <label>旧密码</label>
-              <input v-model="pwdForm.oldPassword" type="password" class="form-input" required placeholder="输入旧密码" />
+      <div v-if="showPwdModal" class="pd-modal-mask" @click.self="clearAndClosePwdModal">
+        <div class="pd-modal-panel">
+          <header class="pd-modal-head">
+            <h3>· STELLAR · VAULT · 修改星穹之钥 ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="clearAndClosePwdModal">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <div class="pd-modal-form-row">
+              <label class="pd-modal-label">旧 密 码</label>
+              <input v-model="oldPwd" type="password" class="pd-modal-input" placeholder="输入旧密码" />
             </div>
-            <div class="form-group">
-              <label>新密码</label>
-              <input v-model="pwdForm.newPassword" type="password" class="form-input" required placeholder="6~50 个字符" minlength="6" maxlength="50" />
+            <div class="pd-modal-form-row">
+              <label class="pd-modal-label">新 密 码</label>
+              <input v-model="newPwd" type="password" class="pd-modal-input" placeholder="6~50 个字符" minlength="6" maxlength="50" />
             </div>
-            <div class="form-group">
-              <label>确认新密码</label>
-              <input v-model="pwdForm.confirmPassword" type="password" class="form-input" required placeholder="再次输入新密码" />
+            <div class="pd-modal-form-row">
+              <label class="pd-modal-label">确 认 新 密 码</label>
+              <input v-model="confirmPwd" type="password" class="pd-modal-input" placeholder="再次输入新密码" />
             </div>
-            <p v-if="pwdError" class="error">{{ pwdError }}</p>
-            <p v-if="pwdSuccess" class="success">{{ pwdSuccess }}</p>
-            <div class="pwd-modal-actions">
-              <button type="button" class="modal-close" @click="showPwdModal = false">取消</button>
-              <button type="submit" class="modal-save" :disabled="pwdLoading">
-                {{ pwdLoading ? '修改中...' : '确认修改' }}
-              </button>
-            </div>
-          </form>
+            <p v-if="pwdError" class="pwd-error">{{ pwdError }}</p>
+          </main>
+          <footer class="pd-modal-foot">
+            <button class="pd-btn-ghost" @click="clearAndClosePwdModal">取消</button>
+            <button class="pd-btn-primary" @click="updatePassword" :disabled="pwdLoading">
+              {{ pwdLoading ? '修改中...' : '确认修改' }}
+            </button>
+          </footer>
         </div>
       </div>
 
       <!-- 故事详情弹窗 -->
-      <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
-        <div class="modal-card">
-          <h3>{{ activeStory.title || '未命名故事' }}</h3>
-          <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="modal-image" alt="故事图片" />
-          <p class="modal-content">{{ activeStory.content }}</p>
-          <div class="modal-meta">
-            <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
-            <span>{{ formatDate(activeStory.createdAt) }}</span>
-            <span>共鸣 {{ activeStory.resonanceCount || 0 }}</span>
-          </div>
-          <!-- 关联的星星 -->
-          <div v-if="getStoryStarNames(activeStory).length" class="modal-stars">
-            <span class="modal-stars-label">挂在</span>
-            <button v-for="cid in getStoryStarIds(activeStory)" :key="cid" class="modal-star-link" @click="goToStar(cid)">
-              {{ getStarName(cid) }}
-            </button>
-          </div>
-          <div class="modal-actions">
-            <button class="modal-close" @click="activeStory = null">关闭</button>
-            <button class="modal-delete" @click="confirmDeleteStory(activeStory)">删除</button>
-          </div>
+      <div v-if="activeStory" class="pd-modal-mask" @click.self="activeStory = null">
+        <div class="pd-modal-panel pd-story-panel">
+          <header class="pd-modal-head">
+            <div class="pd-story-head-title">
+              <h3>{{ activeStory.title || '未命名故事' }}</h3>
+              <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
+            </div>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <div class="pd-story-meta-row">
+              <template v-if="getStoryStarIds(activeStory).length">
+                <button
+                  v-for="cid in getStoryStarIds(activeStory)"
+                  :key="cid"
+                  class="pd-story-meta-star"
+                  @click="goToStar(cid)"
+                >
+                  ✦ {{ getStarName(cid) }}
+                </button>
+              </template>
+              <span class="pd-story-meta-date">{{ formatDate(activeStory.createdAt) }}</span>
+              <span class="pd-story-meta-res">♡ {{ activeStory.resonanceCount || 0 }}</span>
+              <span v-if="activeStory.location" class="pd-story-meta-loc">◎ {{ activeStory.location }}</span>
+            </div>
+            <div class="pd-modal-divider"></div>
+            <div class="pd-story-content">
+              <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
+              {{ activeStory.content }}
+            </div>
+          </main>
+          <footer class="pd-modal-foot">
+            <button class="pd-btn-ghost" @click="resonateStory">共鸣 +1</button>
+            <button class="pd-btn-danger" @click="activeStoryId = activeStory?.id ?? null; showDeleteConfirm = true">删除此故事</button>
+          </footer>
         </div>
       </div>
 
       <!-- 删除确认弹窗 -->
-      <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
-        <div class="modal-card delete-modal">
-          <h3>确认删除</h3>
-          <p>删除后不可恢复，确定要删除这个故事吗？</p>
-          <div class="modal-actions">
-            <button class="modal-close" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
-            <button class="modal-delete confirm" @click="doDeleteStory" :disabled="deletingStory">
-              {{ deletingStory ? '删除中...' : '确认删除' }}
+      <div v-if="showDeleteConfirm" class="pd-modal-mask" @click.self="showDeleteConfirm = false">
+        <div class="pd-modal-panel" style="width: 400px;">
+          <header class="pd-modal-head">
+            <h3>· 摘取故事 · REMOVE ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="取消" @click="showDeleteConfirm = false">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <p class="pd-delete-text">要把「{{ activeStory?.title || '这则故事' }}」送回星穹吗？此操作不可撤销。</p>
+          </main>
+          <footer class="pd-modal-foot">
+            <button class="pd-btn-ghost" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
+            <button class="pd-btn-danger" @click="confirmDelete" :disabled="deletingStory">
+              {{ deletingStory ? '删除中...' : '确认摘取' }}
             </button>
-          </div>
+          </footer>
         </div>
       </div>
+
+      <!-- Gold flash banner -->
+      <Transition name="pd-flash">
+        <div v-if="flash" class="pd-flash-banner" :class="flash.tone" role="status" aria-live="polite">
+          <span>{{ flash.text }}</span>
+        </div>
+      </Transition>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, nextTick, reactive } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
@@ -348,16 +379,18 @@ const showPwdModal = ref(false)
 const pwdLoading = ref(false)
 const pwdError = ref('')
 const pwdSuccess = ref('')
-const pwdForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const oldPwd = ref('')
+const newPwd = ref('')
+const confirmPwd = ref('')
 
-async function doChangePassword() {
+async function updatePassword() {
   pwdError.value = ''
   pwdSuccess.value = ''
-  if (!pwdForm.oldPassword || !pwdForm.newPassword || !pwdForm.confirmPassword) {
+  if (!oldPwd.value || !newPwd.value || !confirmPwd.value) {
     pwdError.value = '请填写所有字段'
     return
   }
-  if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+  if (newPwd.value !== confirmPwd.value) {
     pwdError.value = '两次输入的新密码不一致'
     return
   }
@@ -368,15 +401,15 @@ async function doChangePassword() {
     const res = await fetch('/api/auth/password', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ oldPassword: pwdForm.oldPassword, newPassword: pwdForm.newPassword }),
+      body: JSON.stringify({ oldPassword: oldPwd.value, newPassword: newPwd.value }),
     })
     const json = await res.json()
     if (res.ok) {
-      pwdSuccess.value = '密码修改成功'
-      pwdForm.oldPassword = ''
-      pwdForm.newPassword = ''
-      pwdForm.confirmPassword = ''
-      setTimeout(() => { showPwdModal.value = false; pwdSuccess.value = '' }, 1500)
+      showFlash('✦ 密码已更换 · 星穹之锁已重铸 ✦', 'success')
+      newPwd.value = ''
+      confirmPwd.value = ''
+      oldPwd.value = ''
+      showPwdModal.value = false
     } else {
       pwdError.value = json.message || '修改失败'
     }
@@ -385,6 +418,11 @@ async function doChangePassword() {
   } finally {
     pwdLoading.value = false
   }
+}
+
+function clearAndClosePwdModal() {
+  showPwdModal.value = false
+  oldPwd.value = ''; newPwd.value = ''; confirmPwd.value = ''; pwdError.value = ''
 }
 
 const currentPage = ref(0)
@@ -432,6 +470,34 @@ async function goToStarWithCheck(starCatalogId: number | undefined, favId: numbe
     return
   }
   router.push({ path: '/sky', query: { star: String(starCatalogId) } })
+}
+
+// ─── Gold Flash feedback (Task6) ───
+const flash = ref<{ text: string; tone: 'success' | 'error' | 'info' } | null>(null)
+let flashTimer: ReturnType<typeof setTimeout> | null = null
+function showFlash(text: string, tone: 'success' | 'error' | 'info' = 'success') {
+  flash.value = { text, tone }
+  if (flashTimer) clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => {
+    flash.value = null
+    flashTimer = null
+  }, 2600)
+}
+
+async function resonateStory() {
+  if (!activeStory.value) return
+  try {
+    const res = await fetch(`/api/stars/${activeStory.value.id}/resonate`, { method: 'POST' })
+    if (res.ok) {
+      const j = await res.json()
+      if (j.data) {
+        activeStory.value = { ...activeStory.value, resonanceCount: (activeStory.value.resonanceCount || 0) + 1 }
+        const idx = stories.value.findIndex(s => s.id === activeStory.value!.id)
+        if (idx >= 0) stories.value[idx].resonanceCount = (stories.value[idx].resonanceCount || 0) + 1
+      }
+      showFlash('✦ 共鸣已传向那颗星 ✦', 'success')
+    }
+  } catch { showFlash('共鸣失败，稍后再试', 'error') }
 }
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
@@ -564,7 +630,10 @@ async function saveSig() {
       body: JSON.stringify({ signature: v }),
     })
     const j = await r.json()
-    if (r.ok && user.value) user.value.signature = j.data.signature
+    if (r.ok && user.value) {
+      user.value.signature = j.data.signature
+      showFlash('✦ 签名已更新 · 织进了月面 ✦', 'success')
+    }
   } catch {}
 }
 
@@ -583,32 +652,27 @@ function getStoryStarNames(story: any): string[] {
 
 // ─── 删除故事 ───
 const showDeleteConfirm = ref(false)
-const pendingDeleteStory = ref<any>(null)
+const activeStoryId = ref<number | null>(null)
 const deletingStory = ref(false)
 
-function confirmDeleteStory(story: any) {
-  pendingDeleteStory.value = story
-  showDeleteConfirm.value = true
-}
-
-async function doDeleteStory() {
-  if (!pendingDeleteStory.value) return
+async function confirmDelete() {
+  if (activeStoryId.value == null) return
   const token = getToken()
   if (!token) return
   deletingStory.value = true
   try {
-    const res = await fetch(`/api/stories/${pendingDeleteStory.value.id}`, {
+    const res = await fetch(`/api/stories/${activeStoryId.value}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
     if (res.ok) {
-      // 从本地列表中移除
-      stories.value = stories.value.filter(s => s.id !== pendingDeleteStory.value.id)
+      stories.value = stories.value.filter(x => x.id !== activeStoryId.value)
+      const removedCount = activeStory.value?.resonanceCount || 0
       stats.value.storyCount = Math.max(0, stats.value.storyCount - 1)
-      stats.value.totalResonance = Math.max(0, stats.value.totalResonance - (pendingDeleteStory.value.resonanceCount || 0))
-      showDeleteConfirm.value = false
+      stats.value.totalResonance = Math.max(0, stats.value.totalResonance - removedCount)
       activeStory.value = null
-      pendingDeleteStory.value = null
+      showDeleteConfirm.value = false
+      showFlash('✦ 故事已摘取，回到了星海 ✦', 'info')
     } else {
       const json = await res.json()
       alert(json.message || '删除失败')
@@ -678,7 +742,9 @@ onMounted(() => {
   loadProfileData()
 })
 
-onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
+onBeforeUnmount(() => {
+  if (flashTimer) clearTimeout(flashTimer)
+})
 </script>
 
 <style scoped>
@@ -1760,5 +1826,428 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
 .pd-fav-card:hover .pd-fav-cta,
 .pd-fav-card:focus-visible .pd-fav-cta {
   opacity: 1;
+}
+
+/* ===== Task6: Modal Base ===== */
+.pd-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(5, 6, 15, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pd-modal-fade-in 300ms ease-out both;
+}
+
+@keyframes pd-modal-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ===== Task6: Modal Panel ===== */
+.pd-modal-panel {
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 32px 28px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 3px;
+  background: var(--pd-bg-1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 24px 80px -20px rgba(255, 217, 138, 0.25);
+}
+
+.pd-modal-panel.pd-story-panel {
+  width: min(680px, 92vw);
+}
+
+/* ===== Task6: Modal Head (× close) ===== */
+.pd-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.pd-modal-head h3 {
+  font-family: var(--pd-font-deco);
+  font-size: 18px;
+  line-height: 28px;
+  color: var(--pd-gold);
+  letter-spacing: 0.15em;
+  margin: 0;
+  font-weight: 600;
+}
+
+.pd-story-head-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pd-modal-close {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pd-gold);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--pd-text-dim);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: all 220ms ease;
+  padding: 0;
+}
+
+.pd-modal-close:hover {
+  color: #ff6b8a;
+  border-color: #ff6b8a;
+  opacity: 1;
+}
+
+.pd-modal-close:focus-visible {
+  outline: 2px solid var(--pd-gold);
+  outline-offset: 3px;
+  opacity: 1;
+}
+
+/* ===== Task6: Modal Body / Foot ===== */
+.pd-modal-body {
+  padding: 8px 0 12px;
+}
+
+.pd-modal-form-row {
+  margin-bottom: 16px;
+}
+
+.pd-story-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pd-modal-divider {
+  border-top: 1px dashed var(--pd-gold-line);
+  border-bottom: 1px dashed var(--pd-gold-line);
+  height: 0;
+  margin: 20px 0;
+  opacity: 0.7;
+}
+
+.pd-story-content {
+  font-family: var(--pd-font-serif);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.9;
+  color: var(--pd-text-pri);
+  white-space: pre-wrap;
+}
+
+.pd-story-image {
+  display: block;
+  max-width: 100%;
+  border-radius: 3px;
+  margin: 0 0 20px;
+  border: 1px solid var(--pd-gold-line);
+}
+
+.pd-delete-text {
+  font-family: var(--pd-font-serif);
+  color: var(--pd-text-pri);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  margin: 0;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.pd-modal-foot {
+  border-top: 1px dashed var(--pd-gold-line);
+  padding-top: 20px;
+  margin-top: 24px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ===== Task6: Modal inputs + buttons ===== */
+.pd-modal-input {
+  width: 100%;
+  border: 1px solid var(--pd-gold);
+  padding: 10px 14px;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--pd-text-pri);
+  font-family: var(--pd-font-serif);
+  font-size: 0.92rem;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  box-sizing: border-box;
+}
+
+.pd-modal-input:focus {
+  outline: none;
+  border-color: var(--pd-gold);
+  box-shadow: 0 0 0 2px var(--pd-gold-soft);
+}
+
+.pd-modal-input::placeholder {
+  color: var(--pd-text-dim);
+  opacity: 0.6;
+}
+
+.pd-modal-label {
+  display: block;
+  font-family: var(--pd-font-deco);
+  font-size: 0.65em;
+  letter-spacing: 0.2em;
+  color: var(--pd-gold);
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+
+.pwd-error {
+  color: #ff6b8a;
+  font-size: 0.82rem;
+  margin: 8px 0 0;
+  font-style: italic;
+}
+
+/* ===== Task6: Primary/Ghost/Danger buttons (reusable) ===== */
+.pd-btn-primary,
+.pd-btn-ghost,
+.pd-btn-danger {
+  border-radius: 2px;
+  padding: 9px 20px;
+  font-family: var(--pd-font-deco);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 220ms ease;
+  border: 1px solid;
+}
+
+.pd-btn-primary {
+  background: var(--pd-gold);
+  color: #130d00;
+  border-color: var(--pd-gold);
+  font-weight: 600;
+}
+
+.pd-btn-primary:hover:not(:disabled) {
+  background: #e8c374;
+  border-color: #e8c374;
+  box-shadow: 0 8px 24px -8px rgba(255, 217, 138, 0.5);
+}
+
+.pd-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pd-btn-ghost {
+  background: transparent;
+  color: var(--pd-gold);
+  border-color: var(--pd-gold);
+}
+
+.pd-btn-ghost:hover:not(:disabled) {
+  background: var(--pd-gold);
+  color: #130d00;
+}
+
+.pd-btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pd-btn-danger {
+  background: rgba(255, 107, 138, 0.08);
+  color: #ff6b8a;
+  border-color: rgba(255, 107, 138, 0.5);
+}
+
+.pd-btn-danger:hover:not(:disabled) {
+  background: #ff6b8a;
+  color: #130d00;
+  border-color: #ff6b8a;
+  box-shadow: 0 8px 24px -8px rgba(255, 107, 138, 0.5);
+}
+
+.pd-btn-danger:focus-visible {
+  outline: 2px solid #ff6b8a;
+  outline-offset: 3px;
+}
+
+.pd-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Task6: Signature inline editor ===== */
+.pd-sign-inline {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 10px 14px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 2px;
+  background: var(--pd-bg-1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 12px 40px -12px rgba(255, 217, 138, 0.3);
+}
+
+.pd-sign-label {
+  font-family: var(--pd-font-deco);
+  color: var(--pd-gold);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.pd-sign-input {
+  flex: 1;
+  min-width: 220px;
+  background: transparent;
+  border: 1px solid var(--pd-gold);
+  border-radius: 2px;
+  padding: 8px 12px;
+  color: var(--pd-text-pri);
+  font-family: var(--pd-font-serif);
+  font-size: 0.9rem;
+}
+
+.pd-sign-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--pd-gold-soft);
+}
+
+.pd-sign-input::placeholder {
+  color: var(--pd-text-dim);
+  opacity: 0.6;
+}
+
+/* ===== Task6: Story meta pills ===== */
+.pd-story-meta-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  background: rgba(255, 217, 138, 0.06);
+  color: var(--pd-gold);
+  font-size: 0.72rem;
+  font-family: var(--pd-font-deco);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 220ms ease;
+}
+
+.pd-story-meta-star:hover {
+  background: var(--pd-gold);
+  color: #130d00;
+}
+
+.pd-story-meta-res {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 107, 138, 0.1);
+  color: #ff9eb8;
+  border: 1px solid rgba(255, 107, 138, 0.3);
+  font-size: 0.75rem;
+}
+
+.pd-story-meta-date {
+  font-family: var(--pd-font-deco);
+  font-size: 0.68em;
+  letter-spacing: 0.15em;
+  color: var(--pd-text-dim);
+}
+
+.pd-story-meta-loc {
+  font-size: 0.75rem;
+  color: var(--pd-text-sec);
+  opacity: 0.75;
+}
+
+/* ===== Task6: Flash banner top center ===== */
+.pd-flash-banner {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 14px 28px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  background: var(--pd-bg-1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: var(--pd-font-deco);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: var(--pd-gold);
+  box-shadow: 0 12px 40px -8px rgba(255, 217, 138, 0.35);
+}
+
+.pd-flash-banner.success {
+  border-color: var(--pd-gold);
+  background: linear-gradient(90deg, rgba(255, 217, 138, 0.12) 0%, rgba(255, 217, 138, 0.04) 50%, rgba(255, 217, 138, 0.12) 100%);
+}
+
+.pd-flash-banner.error {
+  border-color: #ff6b8a;
+  color: #ff9eb8;
+  background: linear-gradient(90deg, rgba(255, 107, 138, 0.12) 0%, rgba(255, 107, 138, 0.04) 50%, rgba(255, 107, 138, 0.12) 100%);
+  box-shadow: 0 12px 40px -8px rgba(255, 107, 138, 0.3);
+}
+
+.pd-flash-banner.info {
+  border-color: #c49eff;
+  color: #d9bfff;
+  background: linear-gradient(90deg, rgba(196, 158, 255, 0.12) 0%, rgba(128, 191, 255, 0.04) 50%, rgba(196, 158, 255, 0.12) 100%);
+  box-shadow: 0 12px 40px -8px rgba(196, 158, 255, 0.3);
+}
+
+/* ===== Task6: pd-flash transition ===== */
+.pd-flash-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.pd-flash-enter-active {
+  transition: opacity 240ms ease-out, transform 240ms ease-out;
+}
+
+.pd-flash-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+
+.pd-flash-leave-active {
+  transition: opacity 240ms ease-in, transform 240ms ease-in;
 }
 </style>
