@@ -105,9 +105,67 @@
         </div>
       </section>
 
-      <!-- 星座联结区（Task5 占位） -->
-      <section class="pd-section" id="pd-constellation">
-        <!-- Task5: 星座联结内容将在此实现 -->
+      <section id="pd-constellation" class="pd-section pd-constellation" aria-label="我的私人星座">
+        <h2 class="pd-section-head">· 私人星座 · THE · CONSTELLATION ·</h2>
+        <p class="pd-section-sub">—— 那些共鸣过的星，在你头顶连成了图 ——</p>
+        <div class="pd-const-wrap">
+          <template v-if="stories.length === 0">
+            <div class="pd-empty" style="max-width: 480px;">
+              <div class="pd-empty-orb" aria-hidden="true">✧</div>
+              <h4 class="pd-empty-title">还没有编织出星座，</h4>
+              <p class="pd-empty-sub">先去时间轴投递一些故事，再来看看它们的连接。</p>
+            </div>
+          </template>
+          <template v-else>
+            <div class="pd-const-chart" role="img" :aria-label="`私人星座图，包含 ${Math.min(stories.length, 12)} 颗恒星，${constellationLines().length} 条内核连线`">
+              <!-- SVG 椭圆星座图 -->
+              <svg class="pd-const-svg" viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet">
+                <!-- 椭圆轨道 guides (虚线，不抢戏) -->
+                <ellipse class="pd-const-guide" cx="250" cy="180" rx="180" ry="130" />
+                <ellipse class="pd-const-guide" cx="250" cy="180" rx="220" ry="160" />
+                <ellipse class="pd-const-guide" cx="250" cy="180" rx="140" ry="100" />
+                <!-- 内核连线 kernel dashed -->
+                <g class="pd-const-lines">
+                  <line
+                    v-for="(l, i) in constellationLines()"
+                    :key="'cl-' + i"
+                    class="pd-const-line"
+                    :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+                  />
+                </g>
+                <!-- 椭圆故事节点 -->
+                <g class="pd-const-nodes">
+                  <g
+                    v-for="(n, i) in constellationNodes()"
+                    :key="'cn-' + n.index"
+                    class="pd-const-node"
+                    tabindex="0"
+                    role="button"
+                    :aria-label="`跳转至第 ${n.index + 1} 则故事：${stories[n.index]?.title || '未命名故事'}`"
+                    @click="scrollToStory(n.index)"
+                    @keyup.enter="scrollToStory(n.index)"
+                    @keyup.space.prevent="scrollToStory(n.index)"
+                  >
+                    <ellipse class="pd-const-node-shape" :cx="n.x" :cy="n.y" rx="22" ry="12" />
+                    <text class="pd-const-node-idx" :x="n.x" :y="n.y + 3.5">{{ String(n.index + 1).padStart(2, '0') }}</text>
+                    <!-- 选中提示 -->
+                    <circle class="pd-const-node-halo" :cx="n.x" :cy="n.y" r="34" />
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <!-- Legend -->
+            <div class="pd-const-legend" role="list">
+              <div v-for="(s, i) in stories.slice(0, 12)" :key="'clg-' + s.id" class="pd-const-legend-item" role="listitem">
+                <span class="pd-const-legend-idx">{{ String(i + 1).padStart(2, '0') }}</span>
+                <a href="javascript:void(0)" class="pd-const-legend-name" @click.prevent="scrollToStory(i)" :title="s.content?.slice(0,30)">
+                  {{ s.title || '未命名故事' }}
+                  <em>{{ getStoryStarNames(s).join(' · ') }}</em>
+                </a>
+              </div>
+            </div>
+          </template>
+        </div>
       </section>
 
       <!-- 收藏区（Task6 占位） -->
@@ -283,6 +341,24 @@ function expandStories() {
 async function loadAndExpandNext5() {
   await loadNextPage()
   visibleCount.value = Math.min(visibleCount.value + VISIBLE_STEP, stories.value.length)
+}
+
+// ─── Constellation scroll helper (Task4) ───
+function scrollToStory(i: number) {
+  if (i < 0 || i >= stories.value.length) return
+  // 点击节点时：若目标故事当前不在 visibleCount 范围内，先扩展到包含它
+  if (visibleCount.value <= i) {
+    visibleCount.value = Math.min(Math.ceil((i + 1) / VISIBLE_STEP) * VISIBLE_STEP, stories.value.length)
+  }
+  nextTick(() => {
+    const el = document.querySelector(`.pd-t-item:nth-child(${i + 1})`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // gold flash focus
+      el.classList.add('pd-story-flash')
+      setTimeout(() => el.classList.remove('pd-story-flash'), 1400)
+    }
+  })
 }
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
@@ -1223,5 +1299,187 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
   color: var(--pd-text-sec);
   font-size: 0.88rem;
   margin: 0 0 28px;
+}
+
+/* Constellation Section */
+.pd-constellation {
+  padding-top: 120px;
+}
+
+.pd-const-wrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 56px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* SVG chart */
+.pd-const-chart {
+  width: min(520px, 90vw);
+  height: 380px;
+  aspect-ratio: 500 / 360;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px dashed var(--pd-gold);
+  border-radius: 4px;
+  padding: 40px;
+  background: var(--pd-bg-1);
+}
+
+.pd-const-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pd-const-guide {
+  fill: none;
+  stroke: var(--pd-gold);
+  opacity: 0.07;
+  stroke-dasharray: 3 6;
+}
+
+/* kernel lines — dashed breath */
+.pd-const-line {
+  stroke: var(--pd-gold);
+  opacity: 0.42;
+  stroke-dasharray: 4 6;
+  stroke-width: 1;
+  animation: pd-line-breath 4s ease-in-out infinite;
+}
+
+/* Nodes */
+.pd-const-node {
+  cursor: pointer;
+}
+
+.pd-const-node-shape {
+  fill: rgba(255, 217, 138, 0.15);
+  stroke: rgba(255, 217, 138, 0.55);
+  stroke-width: 1.5;
+  transition: fill 0.25s ease;
+}
+
+.pd-const-node-halo {
+  fill: none;
+  stroke: var(--pd-gold);
+  stroke-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, stroke-width 0.3s ease;
+}
+
+.pd-const-node:hover .pd-const-node-shape {
+  fill: var(--pd-gold);
+}
+
+.pd-const-node:hover .pd-const-node-idx {
+  fill: #130d00;
+}
+
+.pd-const-node:focus-visible .pd-const-node-halo {
+  opacity: 0.5;
+  stroke-width: 1;
+}
+
+.pd-const-node-idx {
+  font-family: var(--pd-font-deco);
+  font-size: 0.6rem;
+  fill: var(--pd-gold);
+  letter-spacing: 0.05em;
+  text-anchor: middle;
+  alignment-baseline: middle;
+  dominant-baseline: middle;
+  transition: fill 0.25s ease;
+}
+
+/* Legend */
+.pd-const-legend {
+  flex: 1;
+  max-width: 420px;
+  padding: 28px;
+  border: 1px dashed var(--pd-gold);
+  border-radius: 4px;
+  background: var(--pd-bg-1);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.pd-const-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed rgba(255, 217, 138, 0.15);
+}
+
+.pd-const-legend-item:last-child {
+  border-bottom: none;
+}
+
+.pd-const-legend-idx {
+  font-family: var(--pd-font-deco);
+  font-size: 0.65rem;
+  color: var(--pd-gold);
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pd-const-legend-name {
+  display: block;
+  flex: 1;
+  color: var(--pd-text-pri);
+  font-size: 0.88rem;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.pd-const-legend-name:hover {
+  color: var(--pd-gold);
+  text-shadow: 0 0 8px var(--pd-gold-soft);
+}
+
+.pd-const-legend-name em {
+  display: block;
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.6;
+  margin-top: 2px;
+  color: var(--pd-gold);
+}
+
+/* Gold flash for scrollToStory */
+@keyframes pd-story-flash-kf {
+  0% {
+    outline: 2px solid transparent;
+    box-shadow: none;
+    border-left-color: var(--pd-border);
+  }
+  15% {
+    outline: 2px solid var(--pd-gold);
+    box-shadow: 0 0 20px -4px var(--pd-gold-soft), 0 0 40px -8px var(--pd-gold-soft);
+    border-left-color: var(--pd-gold);
+  }
+  100% {
+    outline: 2px solid transparent;
+    box-shadow: none;
+    border-left-color: var(--pd-border);
+  }
+}
+
+.pd-story-flash {
+  animation: pd-story-flash-kf 1.4s ease-out forwards;
+  border-left-color: var(--pd-gold);
 }
 </style>
