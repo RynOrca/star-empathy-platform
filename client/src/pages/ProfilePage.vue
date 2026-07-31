@@ -204,26 +204,17 @@
                     :x="constellationNodes()[m.index].x"
                     :y="constellationNodes()[m.index].y - 14"
                   >{{ String(m.index + 1).padStart(2, '0') }}</text>
-                  <!-- 驻足星（isCore）：下方写星名 + 星座 → 视觉上更"织物" -->
+                  <!-- 所有挂在星表星上的故事，下方都标注星名 + 星座（核心驻足星用紫，普通用金） -->
                   <text
-                    v-if="m.isCore && m.starName"
+                    v-if="m.starName"
                     class="pd-const-node-sname"
+                    :class="{ 'is-core': m.isCore }"
                     :x="constellationNodes()[m.index].x"
                     :y="constellationNodes()[m.index].y + 22"
                   >{{ m.starName }}<tspan class="pd-const-node-scon" v-if="m.starConstellation"> · {{ m.starConstellation }}</tspan></text>
                 </g>
               </g>
             </svg>
-            <!-- Legend（产品增强：保留作为辅助导航） -->
-            <div class="pd-const-legend" role="list">
-              <div v-for="(s, i) in stories.slice(0, 12)" :key="'clg-' + s.id" class="pd-const-legend-item" role="listitem">
-                <span class="pd-const-legend-idx">{{ String(i + 1).padStart(2, '0') }}</span>
-                <a href="javascript:void(0)" class="pd-const-legend-name" @click.prevent="scrollToStory(i)" :title="s.content?.slice(0,30)">
-                  {{ s.title || '未命名故事' }}
-                  <em>{{ getStoryStarNames(s).join(' · ') }}</em>
-                </a>
-              </div>
-            </div>
           </template>
         </div>
       </section>
@@ -1711,83 +1702,24 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* 驻足星：节点下方的星名标签 */
+/* 节点下方的星名标签：默认金色，驻足重复点用紫色强调 */
 .pd-const-node-sname {
   font-family: var(--pd-font-deco);
   font-size: 0.5rem;
-  fill: rgba(202,167,255,0.95);
+  fill: rgba(255,217,138,0.82);
   letter-spacing: 0.08em;
   text-anchor: middle;
   pointer-events: none;
+}
+.pd-const-node-sname.is-core {
+  fill: rgba(202,167,255,0.95);
+  font-weight: 600;
 }
 .pd-const-node-scon {
   font-size: 0.42rem;
   fill: rgba(255,255,255,0.55);
   font-family: var(--pd-font-body);
   font-style: italic;
-}
-
-/* Legend（产品增强：辅助导航，单列居中） */
-.pd-const-legend {
-  max-width: 560px;
-  margin: 50px auto 0;
-  padding: 24px 28px;
-  border: 1px dashed var(--pd-gold-line);
-  background: rgba(16,18,40,0.4);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  text-align: left;
-}
-
-.pd-const-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--pd-gold-line);
-}
-
-.pd-const-legend-item:last-child { border-bottom: none; }
-
-.pd-const-legend-idx {
-  font-family: var(--pd-font-deco);
-  font-size: 0.65rem;
-  color: var(--pd-gold);
-  border: 1px solid var(--pd-gold);
-  border-radius: 999px;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.pd-const-legend-name {
-  display: block;
-  flex: 1;
-  color: var(--pd-text-pri);
-  font-size: 0.88rem;
-  text-decoration: none;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color 0.3s, text-shadow 0.3s;
-}
-
-.pd-const-legend-name:hover {
-  color: var(--pd-gold);
-  text-shadow: 0 0 8px var(--pd-gold-soft);
-}
-
-.pd-const-legend-name em {
-  display: block;
-  font-style: normal;
-  font-size: 0.72rem;
-  opacity: 0.6;
-  margin-top: 2px;
-  color: var(--pd-gold);
 }
 
 .pd-story-flash {
