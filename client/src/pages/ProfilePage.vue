@@ -234,8 +234,8 @@
         <input ref="sigInputRef" v-model="sigDraft" maxlength="30"
           @keydown.enter="saveSig" @keydown.escape="editingSig = false"
           class="pd-sign-input" placeholder="写一行签名..." />
-        <button class="pd-btn-primary" @click="saveSig">保存</button>
-        <button class="pd-btn-ghost" @click="editingSig = false">取消</button>
+        <button type="button" class="pd-btn-primary" @click="saveSig">保存</button>
+        <button type="button" class="pd-btn-ghost" @click="editingSig = false">取消</button>
       </div>
 
       <!-- 修改密码弹窗 -->
@@ -261,8 +261,8 @@
             <p v-if="pwdError" class="pwd-error">{{ pwdError }}</p>
           </main>
           <footer class="pd-modal-foot">
-            <button class="pd-btn-ghost" @click="clearAndClosePwdModal">取消</button>
-            <button class="pd-btn-primary" @click="updatePassword" :disabled="pwdLoading">
+            <button type="button" class="pd-btn-ghost" @click="clearAndClosePwdModal">取消</button>
+            <button type="button" class="pd-btn-primary" @click="updatePassword" :disabled="pwdLoading">
               {{ pwdLoading ? '修改中...' : '确认修改' }}
             </button>
           </footer>
@@ -302,8 +302,8 @@
             </div>
           </main>
           <footer class="pd-modal-foot">
-            <button class="pd-btn-ghost" @click="resonateStory">共鸣 +1</button>
-            <button class="pd-btn-danger" @click="activeStoryId = activeStory?.id ?? null; showDeleteConfirm = true">删除此故事</button>
+            <button type="button" class="pd-btn-ghost" @click="resonateStory">共鸣 +1</button>
+            <button type="button" class="pd-btn-danger" @click="activeStoryId = activeStory?.id ?? null; showDeleteConfirm = true">删除此故事</button>
           </footer>
         </div>
       </div>
@@ -313,14 +313,14 @@
         <div class="pd-modal-panel" style="width: 400px;">
           <header class="pd-modal-head">
             <h3>· 摘取故事 · REMOVE ·</h3>
-            <button type="button" class="pd-modal-close" aria-label="取消" @click="showDeleteConfirm = false">×</button>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="showDeleteConfirm = false">×</button>
           </header>
           <main class="pd-modal-body">
             <p class="pd-delete-text">要把「{{ activeStory?.title || '这则故事' }}」送回星穹吗？此操作不可撤销。</p>
           </main>
           <footer class="pd-modal-foot">
-            <button class="pd-btn-ghost" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
-            <button class="pd-btn-danger" @click="confirmDelete" :disabled="deletingStory">
+            <button type="button" class="pd-btn-ghost" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
+            <button type="button" class="pd-btn-danger" @click="confirmDelete" :disabled="deletingStory">
               {{ deletingStory ? '删除中...' : '确认摘取' }}
             </button>
           </footer>
@@ -367,7 +367,6 @@ const user = ref<{ id: number; username: string; signature: string; createdAt: s
 const stories = ref<any[]>([])
 const favorites = ref<FavoriteItem[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
-const hoverIdx = ref(-1)
 const activeStory = ref<any>(null)
 
 const editingSig = ref(false)
@@ -378,14 +377,12 @@ const sigInputRef = ref<HTMLInputElement | null>(null)
 const showPwdModal = ref(false)
 const pwdLoading = ref(false)
 const pwdError = ref('')
-const pwdSuccess = ref('')
 const oldPwd = ref('')
 const newPwd = ref('')
 const confirmPwd = ref('')
 
 async function updatePassword() {
   pwdError.value = ''
-  pwdSuccess.value = ''
   if (!oldPwd.value || !newPwd.value || !confirmPwd.value) {
     pwdError.value = '请填写所有字段'
     return
@@ -394,6 +391,8 @@ async function updatePassword() {
     pwdError.value = '两次输入的新密码不一致'
     return
   }
+  if (newPwd.value.length < 6) { pwdError.value = '新密码至少 6 个字符'; return }
+  if (newPwd.value.length > 50) { pwdError.value = '新密码不能超过 50 个字符'; return }
   const token = getToken()
   if (!token) return
   pwdLoading.value = true
@@ -422,7 +421,10 @@ async function updatePassword() {
 
 function clearAndClosePwdModal() {
   showPwdModal.value = false
-  oldPwd.value = ''; newPwd.value = ''; confirmPwd.value = ''; pwdError.value = ''
+  oldPwd.value = ''
+  newPwd.value = ''
+  confirmPwd.value = ''
+  pwdError.value = ''
 }
 
 const currentPage = ref(0)
@@ -485,19 +487,17 @@ function showFlash(text: string, tone: 'success' | 'error' | 'info' = 'success')
 }
 
 async function resonateStory() {
-  if (!activeStory.value) return
+  const id = activeStory.value?.id
+  if (id == null) return
   try {
-    const res = await fetch(`/api/stars/${activeStory.value.id}/resonate`, { method: 'POST' })
+    const res = await fetch(`/api/stars/${id}/resonate`, { method: 'POST' })
     if (res.ok) {
-      const j = await res.json()
-      if (j.data) {
-        activeStory.value = { ...activeStory.value, resonanceCount: (activeStory.value.resonanceCount || 0) + 1 }
-        const idx = stories.value.findIndex(s => s.id === activeStory.value!.id)
-        if (idx >= 0) stories.value[idx].resonanceCount = (stories.value[idx].resonanceCount || 0) + 1
-      }
+      activeStory.value = { ...activeStory.value!, resonanceCount: (activeStory.value!.resonanceCount || 0) + 1 }
+      const idx = stories.value.findIndex(s => s.id === id)
+      if (idx >= 0) stories.value[idx].resonanceCount = (stories.value[idx].resonanceCount || 0) + 1
       showFlash('✦ 共鸣已传向那颗星 ✦', 'success')
     }
-  } catch { showFlash('共鸣失败，稍后再试', 'error') }
+  } catch { showFlash('共鸣失败', 'error') }
 }
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
@@ -618,14 +618,13 @@ async function startEditSig() {
 }
 
 async function saveSig() {
-  editingSig.value = false
   const v = sigDraft.value.trim()
   if (!v || v === user.value?.signature) return
   const token = getToken()
   if (!token) return
   try {
     const r = await fetch('/api/auth/signature', {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ signature: v }),
     })
@@ -633,6 +632,10 @@ async function saveSig() {
     if (r.ok && user.value) {
       user.value.signature = j.data.signature
       showFlash('✦ 签名已更新 · 织进了月面 ✦', 'success')
+      editingSig.value = false
+      sigDraft.value = sigText.value
+    } else {
+      showFlash('签名更新失败', 'error')
     }
   } catch {}
 }
@@ -675,10 +678,10 @@ async function confirmDelete() {
       showFlash('✦ 故事已摘取，回到了星海 ✦', 'info')
     } else {
       const json = await res.json()
-      alert(json.message || '删除失败')
+      showFlash(json.message || '删除失败', 'error')
     }
   } catch {
-    alert('网络错误，请重试')
+    showFlash('网络错误，请重试', 'error')
   } finally {
     deletingStory.value = false
   }
@@ -1552,7 +1555,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px dashed rgba(255, 217, 138, 0.15);
+  border-bottom: 1px dashed var(--pd-gold-line);
 }
 
 .pd-const-legend-item:last-child {
