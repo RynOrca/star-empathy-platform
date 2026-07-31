@@ -4,36 +4,85 @@
     <canvas ref="canvasRef" class="sky-bg pd-sky-canvas"></canvas>
     <div v-if="!loaded" class="loading">...</div>
     <template v-else>
-      <button class="btn-back" @click="goBack">← 星空</button>
+      <!-- 1. Topbar 固定导航 -->
+      <header class="pd-topbar">
+        <button class="pd-btn-back pd-btn-ghost" @click="goBack">← 星空</button>
+        <span class="pd-brand">STARRY · DOME</span>
+        <div class="pd-actions">
+          <button class="pd-btn-ghost" @click="startEditSig">✎ 编辑签名</button>
+          <button class="pd-btn-ghost" @click="showPwdModal = true">⚙ 修改密码</button>
+        </div>
+      </header>
 
-      <!-- 星云签名 -->
-      <div class="signature-area">
-        <div class="signature-wrap" @click="startEditSig">
-          <div v-if="editingSig" class="sig-edit">
-            <input ref="sigInputRef" v-model="sigDraft" maxlength="30"
-              @blur="saveSig" @keydown.enter="saveSig" @keydown.escape="editingSig = false"
-              class="sig-input" placeholder="写一行签名..." />
-          </div>
-          <div v-else class="sig-display">
-            <p class="sig-text">{{ sigText }}</p>
-            <span class="sig-hint">点击编辑签名</span>
+      <!-- 2. Hero 区 100vh -->
+      <section class="pd-hero">
+        <div class="pd-hero-moon">
+          <div class="pd-moon-disk">
+            <div class="moon-mare moon-mare-a"></div>
+            <div class="moon-mare moon-mare-b"></div>
+            <div class="moon-mare moon-mare-c"></div>
           </div>
         </div>
-        <h2 class="username">{{ user?.username }}</h2>
-        <p class="join-days" v-if="user">加入星空 {{ daysAgo }} 天</p>
-      </div>
+        <div class="pd-hero-content">
+          <div class="hero-tag">✦ WEAVER · OF · NIGHT · STORIES ✦</div>
+          <h1 class="hero-name">{{ user?.username }}</h1>
+          <div class="hero-banner">
+            <span class="hero-line hero-line-left"></span>
+            <span class="banner-text">{{ sigText }}</span>
+            <span class="hero-line hero-line-right"></span>
+          </div>
+          <div class="hero-joined">
+            <span class="pd-gold-sep">◆</span>
+            <span>星穹纺织者</span>
+            <span class="pd-gold-sep">◆</span>
+            <span>加入星空 {{ daysAgo }} 天</span>
+            <span class="pd-gold-sep">◆</span>
+          </div>
+        </div>
+        <div class="scroll-hint">
+          <span>Scroll · 向下滚动开启回忆</span>
+          <span class="pd-scroll-line"></span>
+        </div>
+      </section>
 
-      <!-- 统计 -->
-      <div class="stats-row">
-        <div class="stat"><strong>{{ stats.storyCount }}</strong><span>故事</span></div>
-        <div class="stat"><strong>{{ stats.totalResonance }}</strong><span>收到共鸣</span></div>
-        <div class="stat"><strong>{{ stats.resonanceGivenCount }}</strong><span>发出共鸣</span></div>
-        <div class="stat"><strong>{{ stats.favoriteCount }}</strong><span>收藏</span></div>
-      </div>
+      <!-- 3. Timeline Section -->
+      <section class="pd-section" id="pd-timeline">
+        <h2 class="pd-section-head">· 我的回忆 · THE · TIMELINE ·</h2>
+        <p class="pd-section-sub">—— 挂在星上的，慢慢读 ——</p>
 
-      <!-- 账号操作 -->
-      <div class="account-actions">
-        <button class="btn-change-pwd" @click="showPwdModal = true">修改密码</button>
+        <div class="pd-stats-pills">
+          <span class="pd-stats-pill">✦ {{ stats.storyCount }} 故事</span>
+          <span class="pd-stats-pill">❁ {{ stats.totalResonance }} 收到共鸣</span>
+          <span class="pd-stats-pill">☾ {{ stats.resonanceGivenCount }} 发出共鸣</span>
+          <span class="pd-stats-pill">♡ {{ stats.favoriteCount }} 收藏</span>
+        </div>
+
+        <nav class="pd-timeline" aria-label="个人故事时间轴"></nav>
+
+        <div v-if="loadingMore" class="pd-bottom-hint">加载中...</div>
+        <div v-else-if="!hasMore && stories.length>0 && visibleCount>=stories.length" class="pd-bottom-hint">✦ ✦ ✦ 已经到底了</div>
+
+        <div class="pd-expand-wrap">
+          <button v-if="visibleCount < stories.length" class="pd-btn-expand" @click="expandStories">展开更多故事</button>
+          <button v-else-if="hasMore" class="pd-btn-expand" @click="loadAndExpandNext5">加载并展开下一组</button>
+        </div>
+      </section>
+
+      <!-- 星座联结区（Task5 占位） -->
+      <section class="pd-section" id="pd-constellation">
+        <!-- Task5: 星座联结内容将在此实现 -->
+      </section>
+
+      <!-- 收藏区（Task6 占位） -->
+      <section class="pd-section" id="pd-favorites">
+        <!-- Task6: 收藏内容将在此实现 -->
+      </section>
+
+      <!-- 签名编辑（保留原有 inline 编辑） -->
+      <div v-if="editingSig" class="sig-edit">
+        <input ref="sigInputRef" v-model="sigDraft" maxlength="30"
+          @blur="saveSig" @keydown.enter="saveSig" @keydown.escape="editingSig = false"
+          class="sig-input" placeholder="写一行签名..." />
       </div>
 
       <!-- 修改密码弹窗 -->
@@ -64,44 +113,6 @@
           </form>
         </div>
       </div>
-
-      <!-- 故事星节点 -->
-      <div class="story-field" v-if="stories.length > 0">
-        <svg class="kernel-lines-svg" v-if="kernelLines.length > 0">
-          <line v-for="(l, i) in kernelLines" :key="i"
-            :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
-            class="kernel-line" />
-        </svg>
-        <div v-for="(s, i) in stories" :key="s.id"
-          class="story-star" :style="starStyle(i)"
-          @click="openStory(s)"
-          @mouseenter="hoverIdx = i" @mouseleave="hoverIdx = -1">
-          <span class="star-glow"></span>
-          <span v-if="hoverIdx === i" class="star-title">{{ s.title || '未命名' }}</span>
-        </div>
-      </div>
-      <div v-else class="empty-hint">还没有故事<br>去星空投递一颗吧</div>
-
-      <!-- 收藏的星星 -->
-      <div class="fav-section" v-if="favorites.length > 0">
-        <div class="fav-title">收藏的星星 ({{ favorites.length }})</div>
-        <div class="fav-list">
-          <div v-for="fid in favorites" :key="fid" class="fav-card">
-            <div class="fav-card-main" @click="goToStar(fid)">
-              <span class="fav-star" :style="{ color: getStarColor(fid) }"><Star :size="16" :fill="getStarColor(fid)" /></span>
-              <div class="fav-info">
-                <div class="fav-name">{{ getStarName(fid) }}</div>
-                <div class="fav-meta">
-                  <span v-if="getStarCon(fid)">{{ getStarCon(fid) }}</span>
-                  <span v-if="getStarMag(fid) != null">{{ getStarMag(fid)!.toFixed(1) }} mag</span>
-                </div>
-              </div>
-            </div>
-            <button class="fav-remove" title="取消收藏" @click="removeFavorite(fid)">×</button>
-          </div>
-        </div>
-      </div>
-      <div v-else class="empty-hint">还没有收藏的星星<br>去星空点亮一颗吧</div>
 
       <!-- 故事详情弹窗 -->
       <div v-if="activeStory" class="modal-overlay" @click.self="activeStory = null">
@@ -219,6 +230,16 @@ const currentPage = ref(0)
 const hasMore = ref(true)
 const loadingMore = ref(false)
 const kernelLines = ref<{ x1: string; y1: string; x2: string; y2: string }[]>([])
+
+// ─── Task3 预留引用 ───
+const visibleCount = ref(0)
+function expandStories() {
+  visibleCount.value = Math.min(visibleCount.value + 5, stories.value.length)
+}
+async function loadAndExpandNext5() {
+  await loadNextPage()
+  visibleCount.value = Math.min(visibleCount.value + 5, stories.value.length)
+}
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
 const daysAgo = computed(() => {
@@ -437,6 +458,7 @@ async function loadProfileData() {
   precomputedPositions.value = []
   activeStory.value = null
   kernelLines.value = []
+  visibleCount.value = 0
 
   const token = getToken()
   if (!token) { router.push('/'); return }
@@ -626,5 +648,284 @@ onUnmounted(() => {
 .profile-page > * {
   z-index: 1;
   position: relative;
+}
+
+/* ===== (a) Topbar ===== */
+.pd-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(5, 6, 15, 0.92) 0%, rgba(5, 6, 15, 0.6) 70%, rgba(5, 6, 15, 0) 100%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.pd-btn-back,
+.pd-btn-ghost {
+  border: 1px solid var(--pd-gold);
+  border-radius: 2px;
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--pd-gold);
+  font-family: var(--pd-font-serif);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.pd-btn-back:hover,
+.pd-btn-ghost:hover {
+  background: var(--pd-gold);
+  color: #130d00;
+}
+
+.pd-brand {
+  font-family: var(--pd-font-deco);
+  letter-spacing: 0.3em;
+  color: var(--pd-gold);
+  font-size: 0.78rem;
+}
+
+.pd-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ===== (b) Hero 100vh ===== */
+.pd-hero {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pd-hero-moon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.pd-moon-disk {
+  position: relative;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 42%, #fff8e1 0%, #e9dcbf 35%, #b8ae95 68%, #7d725e 100%);
+  box-shadow:
+    inset -20px -30px 60px rgba(80, 68, 48, 0.35),
+    inset 15px 20px 40px rgba(255, 248, 225, 0.4),
+    0 0 40px 8px rgba(255, 217, 138, 0.2),
+    0 0 80px 16px rgba(255, 217, 138, 0.08);
+  animation: pd-moon-glow 6s ease-in-out infinite;
+}
+
+.moon-mare {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(14px);
+  background: rgba(135, 120, 95, 0.28);
+}
+
+.moon-mare-a {
+  top: 20%;
+  left: 28%;
+  width: 130px;
+  height: 92px;
+}
+
+.moon-mare-b {
+  top: 55%;
+  left: 55%;
+  width: 80px;
+  height: 60px;
+}
+
+.moon-mare-c {
+  top: 70%;
+  left: 25%;
+  width: 100px;
+  height: 50px;
+}
+
+.pd-hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 900px;
+}
+
+.hero-tag {
+  font-family: var(--pd-font-deco);
+  letter-spacing: 0.4em;
+  color: var(--pd-gold);
+  font-size: 0.78rem;
+  margin-bottom: 28px;
+  opacity: 0.85;
+}
+
+.hero-name {
+  font-family: var(--pd-font-deco);
+  font-size: clamp(28px, 5vw, 54px);
+  color: #fff9ea;
+  margin: 0 0 32px 0;
+  font-weight: 700;
+  text-shadow:
+    0 0 20px rgba(255, 217, 138, 0.4),
+    0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.hero-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 36px;
+}
+
+.hero-line {
+  display: inline-block;
+  width: 70px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--pd-gold) 50%, transparent 100%);
+}
+
+.banner-text {
+  font-family: var(--pd-font-serif);
+  font-style: italic;
+  color: var(--pd-gold);
+  font-size: 1.05rem;
+  max-width: 480px;
+  text-shadow: 0 0 10px rgba(255, 217, 138, 0.3);
+}
+
+.hero-joined {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--pd-text-sec);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.pd-gold-sep {
+  color: var(--pd-gold);
+  opacity: 0.75;
+}
+
+.scroll-hint {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--pd-gold);
+  opacity: 0.7;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+}
+
+.pd-scroll-line {
+  display: block;
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(180deg, var(--pd-gold) 0%, transparent 100%);
+  animation: pd-scroll-hint 2.4s ease-in-out infinite;
+}
+
+/* ===== (c) Section 通用 ===== */
+.pd-section {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 140px 24px 60px;
+  position: relative;
+}
+
+.pd-section-head {
+  font-family: var(--pd-font-deco);
+  font-size: 22px;
+  line-height: 32px;
+  color: var(--pd-gold);
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin: 0 0 16px 0;
+}
+
+.pd-section-sub {
+  font-style: italic;
+  color: #a9a3c7;
+  font-size: 0.88rem;
+  text-align: center;
+  margin: 0 0 48px 0;
+}
+
+/* ===== (d) Stats 胶囊 ===== */
+.pd-stats-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 16px;
+  margin-bottom: 72px;
+}
+
+.pd-stats-pill {
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  padding: 6px 16px;
+  color: var(--pd-gold);
+  font-size: 0.76rem;
+  opacity: 0.85;
+  letter-spacing: 0.05em;
+  background: rgba(255, 217, 138, 0.04);
+}
+
+/* ===== (e) Bottom 提示 + 展开按钮 ===== */
+.pd-bottom-hint {
+  text-align: center;
+  color: var(--pd-gold);
+  letter-spacing: 0.2em;
+  font-size: 0.72rem;
+  padding: 24px 0;
+  opacity: 0.7;
+}
+
+.pd-expand-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.pd-btn-expand {
+  padding: 12px 28px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--pd-gold);
+  font-family: var(--pd-font-serif);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.pd-btn-expand:hover {
+  background: var(--pd-gold);
+  color: #130d00;
 }
 </style>
