@@ -2253,4 +2253,71 @@ onBeforeUnmount(() => {
 .pd-flash-leave-active {
   transition: opacity 240ms ease-in, transform 240ms ease-in;
 }
+
+/* =============================================================
+   Responsive: Tablet 768px boundary (switch from alt→single col)
+   ============================================================= */
+@media (max-width: 768px) {
+  /* Topbar: brand hidden; actions full; back btn compact */
+  .pd-topbar { padding: 10px 14px; }
+  .pd-brand { display: none; }
+  .pd-actions { gap: 6px; }
+  .pd-btn-ghost, .pd-btn-back { padding: 5px 9px; font-size: 0.72rem; }
+
+  /* Hero: moon shrinks 480→300, name clamp smaller, scroll hint move lower */
+  .pd-hero-moon { transform: scale(0.625); }
+  .pd-moon-disk { width: 300px; height: 300px; }
+  .hero-name { font-size: clamp(22px, 8vw, 36px); }
+  .hero-tag { font-size: 0.52rem; letter-spacing: 0.2em; }
+  .hero-banner { width: 88vw; }
+  .scroll-hint { bottom: 36px; font-size: 0.7rem; }
+
+  /* Section: tighter vertical padding 80→60 / top 100→64 */
+  .pd-section { max-width: 100%; padding: 64px 18px 48px; }
+  .pd-constellation, .pd-favorites { padding-top: 80px; }
+  .pd-section-head { font-size: 1rem; letter-spacing: 0.1em; }
+  .pd-stats-pills { margin-bottom: 40px; }
+  .pd-stats-pill { padding: 4px 10px; font-size: 0.68rem; }
+
+  /* TIMELINE SWITCH TO SINGLE COLUMN */
+  .pd-t-axis { left: 22px; right: auto; transform: none; }
+  .pd-t-item {
+    width: calc(100% - 30px) !important;
+    padding-left: 48px !important;
+    padding-right: 0 !important;
+    align-self: flex-start;
+  }
+  .pd-t-item.left, .pd-t-item.right { padding-right: 0 !important; }
+  .pd-t-node { left: 4px !important; right: auto !important; top: 18px; }
+  .pd-t-date.left, .pd-t-date.right { text-align: left; left: 48px; right: auto; top: -20px; }
+  .pd-t-item .pd-t-date { position: static; margin-bottom: 6px; }
+
+  /* Constellation: row wrap → single column, SVG smaller */
+  .pd-const-wrap { flex-direction: column; gap: 24px; }
+  .pd-const-chart { padding: 28px 16px; }
+  .pd-const-legend { max-width: 100%; }
+
+  /* Favorites grid: minmax 240 → minmax 180 */
+  .pd-fav-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 28px 20px; }
+
+  /* Flash banner: max width 88vw centered */
+  .pd-flash-banner { left: 6vw; right: 6vw; transform: none; width: 88vw; text-align: center; }
+}
+
+/* =============================================================
+   Responsive: Tiny phones 380px
+   ============================================================= */
+@media (max-width: 380px) {
+  .pd-hero-moon { transform: scale(0.5); margin-top: -30px; }
+  .hero-banner .banner-line { width: 40px; }
+  .pd-stats-pills { gap: 6px 8px; }
+  .pd-stats-pill { font-size: 0.62rem; padding: 3px 8px; }
+  .pd-t-card { padding: 16px 14px; }
+  .pd-tc-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pd-tc-excerpt { font-size: 0.8rem; line-height: 1.7; }
+  .pd-fav-grid { grid-template-columns: 1fr; }
+  .pd-modal-panel { padding: 22px 18px; }
+  .pd-modal-head h3 { font-size: 0.95rem; }
+  .pd-btn-primary, .pd-btn-ghost, .pd-btn-danger { padding: 7px 14px; font-size: 0.7rem; }
+}
 </style>
