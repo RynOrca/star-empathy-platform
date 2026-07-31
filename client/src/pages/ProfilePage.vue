@@ -79,7 +79,13 @@
               :style="{ animationDelay: Math.min(i * 30, 200) + 'ms' }"
             >
               <div class="pd-t-node" aria-hidden="true"><div class="pd-t-star"></div></div>
-              <div class="pd-t-date" :class="i % 2 === 0 ? 'left' : 'right'">{{ formatMD(s.createdAt) }}</div>
+              <div class="pd-t-date" :class="i % 2 === 0 ? 'left' : 'right'">
+                <span class="pd-t-date-single">{{ formatMD(s.createdAt) }}</span>
+                <span class="pd-t-date-stacked" v-if="formatMDParts(s.createdAt).month">
+                  <span class="md-month">{{ formatMDParts(s.createdAt).month }}</span>
+                  <span class="md-day">{{ formatMDParts(s.createdAt).day }}</span>
+                </span>
+              </div>
               <button class="pd-t-card" type="button" @click="openStory(s)">
                 <div class="pd-t-head">
                   <h3 class="pd-t-title">{{ s.title || '未命名故事' }}</h3>
@@ -545,6 +551,19 @@ function formatMD(d: string) {
   const dt = new Date(d)
   if (Number.isNaN(dt.getTime())) return d.slice(5,10).replace('-',' / ')
   return `${String(dt.getMonth()+1).padStart(2,'0')} / ${String(dt.getDate()).padStart(2,'0')}`
+}
+// 移动端专用：拆分为月/日两行，月份在上，日期在下
+function formatMDParts(d: string): { month: string; day: string } {
+  if (!d) return { month: '', day: '' }
+  const dt = new Date(d)
+  if (Number.isNaN(dt.getTime())) {
+    const [m, dd] = d.slice(5, 10).split('-')
+    return { month: m || '', day: dd || '' }
+  }
+  return {
+    month: String(dt.getMonth() + 1).padStart(2, '0'),
+    day: String(dt.getDate()).padStart(2, '0'),
+  }
 }
 function storyAriaLabel(s: any, i: number) {
   const when = formatDate(s.createdAt)
@@ -1261,28 +1280,29 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
+/* PC 端：单行 MM / DD；移动端在 @media 断点切换为竖排 */
+.pd-t-date-single { display: inline; }
+.pd-t-date-stacked { display: none; flex-direction: column; align-items: center; line-height: 1.15; }
+.pd-t-date-stacked .md-month { font-size: 0.92em; letter-spacing: 0.15em; }
+.pd-t-date-stacked .md-day { font-size: 0.92em; letter-spacing: 0.15em; margin-top: 3px; opacity: 0.85; }
+
 /* Timeline card */
 .pd-t-card {
   width: 44%;
   position: relative;
   padding: 32px 32px 28px;
-  background: var(--pd-bg-card);
-  border: 1px solid var(--pd-border);
+  background: rgba(16,18,40,0.6);
+  border: 1px solid rgba(255,217,138,0.18);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  /* 只过渡合成友好属性，避免 all 触发 layout/paint 重绘
-     ease-out-expo: 起始缓慢→中段加速→结束丝滑收尾，避免"瞬间跳出"感 */
-  transition:
-    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 严格按用户规范：all 0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性过渡 */
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
   font-family: inherit;
   text-align: left;
   color: inherit;
   display: block;
-  /* 强制独立 GPU 合成层，让 transform 走 compositor 不走 main thread */
+  /* GPU 合成层：让 transform 走 compositor 避免主线程抢占 */
   will-change: transform;
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -1299,9 +1319,10 @@ onBeforeUnmount(() => {
 }
 
 .pd-t-card:hover {
-  border-color: rgba(255,217,138,0.5);
-  background: var(--pd-bg-card-hot);
+  /* 严格按用户规范：上浮 6px + 金色边框 + 不透明背景 + 立体投影+金色光晕 */
   transform: translateZ(0) translateY(-6px);
+  border-color: rgba(255,217,138,0.5);
+  background: rgba(26,28,54,0.8);
   box-shadow:
     0 20px 60px rgba(0,0,0,0.4),
     0 0 40px rgba(255,217,138,0.1);
@@ -1675,19 +1696,17 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  /* 只过渡合成友好属性 — ease-out-expo 丝滑曲线 */
-  transition:
-    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 严格按用户规范：all 0.5s cubic-bezier(.2,.9,.3,1) 平滑且有弹性 */
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
-  /* 强制 GPU 合成层 */
+  /* GPU 合成层，避免主线程抢占造成跳帧 */
   will-change: transform;
   backface-visibility: hidden;
 }
 
+/* 初始状态：随机旋转 + 垂直位移，营造随意堆叠感 */
 .pd-gal-card.gal-1 { transform: translateZ(0) rotate(-6deg) translateY(16px); z-index: 1; }
 .pd-gal-card.gal-2 { transform: translateZ(0) rotate(3deg) translateY(-8px); z-index: 3; }
 .pd-gal-card.gal-3 { transform: translateZ(0) rotate(-2deg) translateY(10px); z-index: 2; }
@@ -2220,17 +2239,20 @@ onBeforeUnmount(() => {
   /* 星星节点：固定在轴线中心 (left: 20px)，用 translateX(-50%) 居中 */
   .pd-t-node {
     left: 20px;
-    top: 22px;
+    top: 60px;
     transform: translateX(-50%);
   }
+  /* 日期放在星星上方（同 PC 端位置关系），月份在上日期在下竖排 */
   .pd-t-date {
     left: 20px;
-    top: 56px;
+    top: 26px;
     transform: translateX(-50%);
     text-align: center;
     font-size: 0.62rem;
     white-space: nowrap;
   }
+  .pd-t-date-single { display: none; }
+  .pd-t-date-stacked { display: flex; }
   .pd-t-title { font-size: 1rem; }
   .pd-t-body { font-size: 0.8rem; line-height: 1.8; -webkit-line-clamp: 3; }
   .pd-t-foot { font-size: 0.66rem; }
