@@ -1271,11 +1271,20 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  /* 只过渡合成友好属性，避免 all 触发 layout/paint 重绘 */
+  transition:
+    transform 0.55s cubic-bezier(.2,.9,.3,1),
+    box-shadow 0.55s cubic-bezier(.2,.9,.3,1),
+    border-color 0.4s ease,
+    background-color 0.4s ease;
   font-family: inherit;
   text-align: left;
   color: inherit;
   display: block;
+  /* 强制独立 GPU 合成层，让 transform 走 compositor 不走 main thread */
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .pd-t-item.left .pd-t-card {
@@ -1291,7 +1300,7 @@ onBeforeUnmount(() => {
 .pd-t-card:hover {
   border-color: rgba(255,217,138,0.5);
   background: var(--pd-bg-card-hot);
-  transform: translateY(-6px);
+  transform: translateZ(0) translateY(-6px);
   box-shadow:
     0 20px 60px rgba(0,0,0,0.4),
     0 0 40px rgba(255,217,138,0.1);
@@ -1665,20 +1674,27 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  /* 只过渡合成友好属性 */
+  transition:
+    transform 0.55s cubic-bezier(.2,.9,.3,1),
+    box-shadow 0.55s cubic-bezier(.2,.9,.3,1),
+    border-color 0.4s ease;
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
+  /* 强制 GPU 合成层 */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
-.pd-gal-card.gal-1 { transform: rotate(-6deg) translateY(16px); z-index: 1; }
-.pd-gal-card.gal-2 { transform: rotate(3deg) translateY(-8px); z-index: 3; }
-.pd-gal-card.gal-3 { transform: rotate(-2deg) translateY(10px); z-index: 2; }
-.pd-gal-card.gal-4 { transform: rotate(5deg) translateY(4px); z-index: 1; }
+.pd-gal-card.gal-1 { transform: translateZ(0) rotate(-6deg) translateY(16px); z-index: 1; }
+.pd-gal-card.gal-2 { transform: translateZ(0) rotate(3deg) translateY(-8px); z-index: 3; }
+.pd-gal-card.gal-3 { transform: translateZ(0) rotate(-2deg) translateY(10px); z-index: 2; }
+.pd-gal-card.gal-4 { transform: translateZ(0) rotate(5deg) translateY(4px); z-index: 1; }
 
 .pd-gal-card:hover,
 .pd-gal-card:focus-visible {
-  transform: translateY(-24px) rotate(0deg) scale(1.08) !important;
+  transform: translateZ(0) translateY(-24px) rotate(0deg) scale(1.08) !important;
   z-index: 10 !important;
   border-color: rgba(255,217,138,0.5);
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,217,138,0.15);
