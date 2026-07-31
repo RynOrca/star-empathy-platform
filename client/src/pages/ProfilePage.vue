@@ -2289,7 +2289,7 @@ onBeforeUnmount(() => {
   }
   .pd-t-item.left, .pd-t-item.right { padding-right: 0 !important; }
   .pd-t-node { left: 4px !important; right: auto !important; top: 18px; }
-  .pd-t-date.left, .pd-t-date.right { text-align: left; left: 48px; right: auto; top: -20px; }
+  .pd-t-date.left, .pd-t-date.right { text-align: left; }
   .pd-t-item .pd-t-date { position: static; margin-bottom: 6px; }
 
   /* Constellation: row wrap → single column, SVG smaller */
@@ -2309,7 +2309,7 @@ onBeforeUnmount(() => {
    ============================================================= */
 @media (max-width: 380px) {
   .pd-hero-moon { transform: scale(0.5); margin-top: -30px; }
-  .hero-banner .banner-line { width: 40px; }
+  .hero-banner .hero-line { width: 40px; }
   .pd-stats-pills { gap: 6px 8px; }
   .pd-stats-pill { font-size: 0.62rem; padding: 3px 8px; }
   .pd-t-card { padding: 16px 14px; }
