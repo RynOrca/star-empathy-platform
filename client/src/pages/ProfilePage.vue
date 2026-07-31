@@ -1675,21 +1675,23 @@ onBeforeUnmount(() => {
 .pd-favorites-title::before { content: "✦ "; color: #95f0c0; }
 .pd-favorites-title::after { content: " ✦"; color: #caa7ff; }
 
+/* —— PC 端：一行最多 5 张。之前 3 张 170px max-width:720px 太疏松 —— */
 .pd-gallery {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 18px;
   flex-wrap: wrap;
-  max-width: 720px;
+  /* 5 张 150px 宽 + 4 个 gap 18px = 750 + 72 = 822px。放宽到 960px 为大屏幕留空 */
+  max-width: 960px;
   margin: 0 auto;
   perspective: 1200px;
 }
 
-/* Gallery card — 严格 1:1 复刻 style-d.html .gal-card */
+/* Gallery card — PC 端 5 列，每张收窄到 150px，高 216px 保持 5:7 比例 */
 .pd-gal-card {
-  width: 170px;
-  height: 240px;
-  padding: 20px 18px;
+  width: 150px;
+  height: 216px;
+  padding: 16px 14px;
   background: rgba(16,18,40,0.7);
   border: 1px solid rgba(255,217,138,0.2);
   backdrop-filter: blur(10px);
@@ -1699,12 +1701,15 @@ onBeforeUnmount(() => {
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
+  flex-shrink: 0;
 }
 
-.pd-gal-card.gal-1 { transform: rotate(-6deg) translateY(16px); z-index: 1; }
-.pd-gal-card.gal-2 { transform: rotate(3deg) translateY(-8px); z-index: 3; }
-.pd-gal-card.gal-3 { transform: rotate(-2deg) translateY(10px); z-index: 2; }
-.pd-gal-card.gal-4 { transform: rotate(5deg) translateY(4px); z-index: 1; }
+/* 扩展到 gal-5：5 张卡片都有不同的初始旋转+位移，形成"随手摆放"的堆叠感 */
+.pd-gal-card.gal-1 { transform: rotate(-6deg) translateY(14px); z-index: 1; }
+.pd-gal-card.gal-2 { transform: rotate(3deg)  translateY(-7px); z-index: 3; }
+.pd-gal-card.gal-3 { transform: rotate(-2deg) translateY(9px);  z-index: 2; }
+.pd-gal-card.gal-4 { transform: rotate(5deg)  translateY(3px);  z-index: 1; }
+.pd-gal-card.gal-5 { transform: rotate(-4deg) translateY(12px); z-index: 2; }
 
 .pd-gal-card:hover {
   transform: translateY(-24px) rotate(0deg) scale(1.08) !important;
@@ -1720,25 +1725,25 @@ onBeforeUnmount(() => {
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,217,138,0.15);
 }
 
-/* gal-img 区 */
+/* gal-img 区 — 与 150x216 卡片同比缩放：原 170x240 → 现在 88% 左右 */
 .pd-gal-img {
-  height: 120px;
-  margin-bottom: 16px;
+  height: 100px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
+  font-size: 2.6rem;
   color: var(--pd-gold);
   background: radial-gradient(circle, rgba(255,217,138,0.12), transparent 70%);
-  text-shadow: 0 0 24px rgba(255,217,138,0.6);
+  text-shadow: 0 0 20px rgba(255,217,138,0.6);
 }
 
 .pd-gal-name {
   font-family: var(--pd-font-serif);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: #f6f1ff;
-  margin-bottom: 6px;
-  transition: color 0.3s;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 
 .pd-gal-card:hover .pd-gal-name,
@@ -2256,30 +2261,34 @@ onBeforeUnmount(() => {
   .pd-const-sub { font-size: 0.7rem; margin-bottom: 32px; }
   .pd-const-legend { padding: 18px 16px; }
 
-  /* Favorites — 移动端改为 grid 2 列竖直排布 */
+  /* Favorites — 移动端严格保持 grid 2 列竖直排布，不被 PC 5 列影响 */
   .pd-favorites-section { padding: 60px 18px 120px; }
   .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
   .pd-gallery {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    max-width: 100%;
-    margin: 0;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    perspective: none;
   }
   .pd-gal-card {
-    width: 100%;
-    height: 200px;
-    padding: 16px 12px;
-    margin: 0;
+    width: 100% !important;
+    height: 200px !important;
+    padding: 16px 12px !important;
+    margin: 0 !important;
+    flex: none;
   }
   .pd-gal-img { height: 80px; font-size: 2.2rem; margin-bottom: 10px; }
   .pd-gal-name { font-size: 0.82rem; }
   .pd-gal-sub { font-size: 0.62rem; }
   /* 移动端：严格复刻 style-d .gal-card:nth-child(n) { transform: none !important; margin: 10px }
      hover 动画走桌面端全局规则，保持与 style-d 完全一致 */
-  .pd-gal-card.gal-1, .pd-gal-card.gal-2, .pd-gal-card.gal-3, .pd-gal-card.gal-4 {
+  .pd-gal-card.gal-1, .pd-gal-card.gal-2, .pd-gal-card.gal-3, .pd-gal-card.gal-4,
+  .pd-gal-card.gal-5, .pd-gal-card.gal-6, .pd-gal-card.gal-7, .pd-gal-card.gal-8,
+  .pd-gal-card.gal-9, .pd-gal-card.gal-10 {
     transform: none !important;
-    margin: 10px;
+    margin: 10px !important;
     z-index: 1;
   }
 
