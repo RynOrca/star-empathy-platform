@@ -1271,7 +1271,7 @@ onBeforeUnmount(() => {
   z-index: 2;
 }
 
-/* Timeline card */
+/* Timeline card — 严格 1:1 复刻 style-d.html .t-card */
 .pd-t-card {
   width: 44%;
   position: relative;
@@ -1281,22 +1281,7 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  /* 严格按用户规范：0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性
-     注意：不能用 all，因为 all 会包含 backdrop-filter 等极昂贵属性，
-     浏览器主线程被抢占会让 0.5s 被压缩成"一瞬间"。改为只过渡规范提到的属性 */
-  transition:
-    transform 0.5s cubic-bezier(.2,.9,.3,1),
-    box-shadow 0.5s cubic-bezier(.2,.9,.3,1),
-    border-color 0.5s cubic-bezier(.2,.9,.3,1),
-    background-color 0.5s cubic-bezier(.2,.9,.3,1);
-  font-family: inherit;
-  text-align: left;
-  color: inherit;
-  display: block;
-  /* GPU 合成层：让 transform 走 compositor 避免主线程抢占 */
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
 }
 
 .pd-t-item.left .pd-t-card {
@@ -1310,10 +1295,9 @@ onBeforeUnmount(() => {
 }
 
 .pd-t-card:hover {
-  /* 严格按用户规范：上浮 6px + 金色边框 + 不透明背景 + 立体投影+金色光晕 */
-  transform: translateZ(0) translateY(-6px);
   border-color: rgba(255,217,138,0.5);
   background: rgba(26,28,54,0.8);
+  transform: translateY(-6px);
   box-shadow:
     0 20px 60px rgba(0,0,0,0.4),
     0 0 40px rgba(255,217,138,0.1);
@@ -1329,16 +1313,14 @@ onBeforeUnmount(() => {
 }
 
 .pd-t-title {
-  font-family: var(--pd-font-serif);
+  font-family: "Noto Serif SC", serif;
   font-size: 1.12rem;
   font-weight: 500;
   color: #f6f1ff;
   line-height: 1.6;
-  margin: 0;
-  transition: color 0.3s;
 }
 
-.pd-t-card:hover .pd-t-title { color: var(--pd-gold); }
+.pd-t-card:hover .pd-t-title { color: #ffd98a; }
 
 .pd-t-star-tag {
   flex-shrink: 0;
@@ -1678,6 +1660,7 @@ onBeforeUnmount(() => {
   perspective: 1200px;
 }
 
+/* Gallery card — 严格 1:1 复刻 style-d.html .gal-card */
 .pd-gal-card {
   width: 170px;
   height: 240px;
@@ -1687,30 +1670,26 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  /* 严格按用户规范：0.5s cubic-bezier(.2,.9,.3,1) 平滑弹性
-     不能用 all：会包含 backdrop-filter 极昂贵属性，主线程被抢占让 0.5s 被压缩成"一瞬间" */
-  transition:
-    transform 0.5s cubic-bezier(.2,.9,.3,1),
-    box-shadow 0.5s cubic-bezier(.2,.9,.3,1),
-    border-color 0.5s cubic-bezier(.2,.9,.3,1),
-    background-color 0.5s cubic-bezier(.2,.9,.3,1);
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
-  /* GPU 合成层，避免主线程抢占造成跳帧 */
-  will-change: transform;
-  backface-visibility: hidden;
 }
 
-/* 初始状态：随机旋转 + 垂直位移，营造随意堆叠感 */
-.pd-gal-card.gal-1 { transform: translateZ(0) rotate(-6deg) translateY(16px); z-index: 1; }
-.pd-gal-card.gal-2 { transform: translateZ(0) rotate(3deg) translateY(-8px); z-index: 3; }
-.pd-gal-card.gal-3 { transform: translateZ(0) rotate(-2deg) translateY(10px); z-index: 2; }
-.pd-gal-card.gal-4 { transform: translateZ(0) rotate(5deg) translateY(4px); z-index: 1; }
+.pd-gal-card.gal-1 { transform: rotate(-6deg) translateY(16px); z-index: 1; }
+.pd-gal-card.gal-2 { transform: rotate(3deg) translateY(-8px); z-index: 3; }
+.pd-gal-card.gal-3 { transform: rotate(-2deg) translateY(10px); z-index: 2; }
+.pd-gal-card.gal-4 { transform: rotate(5deg) translateY(4px); z-index: 1; }
 
-.pd-gal-card:hover,
+.pd-gal-card:hover {
+  transform: translateY(-24px) rotate(0deg) scale(1.08) !important;
+  z-index: 10 !important;
+  border-color: rgba(255,217,138,0.5);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,217,138,0.15);
+}
+
 .pd-gal-card:focus-visible {
-  transform: translateZ(0) translateY(-24px) rotate(0deg) scale(1.08) !important;
+  transform: translateY(-24px) rotate(0deg) scale(1.08) !important;
   z-index: 10 !important;
   border-color: rgba(255,217,138,0.5);
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,217,138,0.15);
@@ -2271,13 +2250,12 @@ onBeforeUnmount(() => {
   .pd-gal-img { height: 80px; font-size: 2.2rem; margin-bottom: 10px; }
   .pd-gal-name { font-size: 0.82rem; }
   .pd-gal-sub { font-size: 0.62rem; }
-  /* 移动端取消桌面端旋转，保留 GPU 合成层避免动画跳帧 */
+  /* 移动端：严格复刻 style-d .gal-card:nth-child(n) { transform: none !important; margin: 10px }
+     hover 动画走桌面端全局规则，保持与 style-d 完全一致 */
   .pd-gal-card.gal-1, .pd-gal-card.gal-2, .pd-gal-card.gal-3, .pd-gal-card.gal-4 {
-    transform: translateZ(0);
+    transform: none !important;
+    margin: 10px;
     z-index: 1;
-  }
-  .pd-gal-card:hover, .pd-gal-card:focus-visible {
-    transform: translateZ(0) translateY(-6px) scale(1.03) !important;
   }
 
   /* Modal */
