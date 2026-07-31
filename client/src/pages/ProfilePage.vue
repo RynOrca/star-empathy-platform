@@ -83,7 +83,8 @@
                 <div class="pd-t-star"></div>
                 <span class="pd-t-date-day">{{ formatMDParts(s.createdAt).day }}</span>
               </div>
-              <button class="pd-t-card" type="button" @click="openStory(s)">
+              <button class="pd-t-card" type="button" @click="openStory(s)"
+                @mouseenter="onCardEnter" @mouseleave="onCardLeave">
                 <div class="pd-t-head">
                   <h3 class="pd-t-title">{{ s.title || '未命名故事' }}</h3>
                   <span v-if="getStoryPrimaryStar(s)" class="pd-t-star-tag" @click.stop="goToStar(getStoryPrimaryStar(s)!.id)">
@@ -207,6 +208,7 @@
               :aria-label="`恒星收藏卡：${f.title || '未命名收藏'}，恒星 ${f.starName || ''}，共鸣 ${f.resonanceCount || 0}，按 Enter 详情，按 Delete 取消收藏`"
               @click="goToStarWithCheck(f.starCatalogId, f.id)"
               @keyup.enter="goToStarWithCheck(f.starCatalogId, f.id)"
+              @mouseenter="onCardEnter" @mouseleave="onCardLeave"
               @keyup.delete.prevent="unfavorite(f.id)"
             >
               <button
@@ -350,7 +352,12 @@ const VISIBLE_STEP = 5
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-useParticleSky(canvasRef)
+// 解构出 pause/resume：卡片 hover 时暂停 canvas，把主线程完整让给 CSS transition 跑 0.5s
+const { pause: pauseSky, resume: resumeSky } = useParticleSky(canvasRef)
+// hover 计数器（防止鼠标在多张卡片间快速移动时 canvas 被反复 pause/resume）
+let hoverCount = 0
+function onCardEnter() { if (hoverCount++ === 0) pauseSky() }
+function onCardLeave() { if (--hoverCount <= 0) { hoverCount = 0; resumeSky() } }
 
 interface FavoriteItem {
   id: number
@@ -795,7 +802,7 @@ onBeforeUnmount(() => {
    ════════════════════════════════════════════════════════════════ */
 
 .profile-page {
-  /* 与 style-d.html 完全一致的设计 token */
+  /* —— 严格复刻 style-d.html 的设计 token —— */
   --pd-gold: #ffd98a;
   --pd-gold-soft: rgba(255, 217, 138, 0.45);
   --pd-gold-line: rgba(255, 217, 138, 0.18);
@@ -810,6 +817,10 @@ onBeforeUnmount(() => {
   --pd-font-deco: "Cinzel", "Noto Serif SC", "Songti SC", "Microsoft YaHei", serif;
   --pd-font-serif: "Noto Serif SC", "Songti SC", "Cinzel", "Microsoft YaHei", serif;
   --pd-font-cormorant: "Cormorant Garamond", "Cinzel", "Noto Serif SC", serif;
+  /* —— 动画：完全与 style-d 一致的曲线与时长（集中在一处方便迭代）
+     cubic-bezier(.2,.9,.3,1) → 起点快 / 中间慢 / 终点快 → 平滑有弹性 */
+  --pd-hover-ease: cubic-bezier(.2,.9,.3,1);
+  --pd-hover-dur: 0.5s;
 }
 
 .profile-page {
@@ -1281,7 +1292,7 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  transition: all var(--pd-hover-dur) var(--pd-hover-ease);
 }
 
 .pd-t-item.left .pd-t-card {
@@ -1670,7 +1681,7 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  transition: all var(--pd-hover-dur) var(--pd-hover-ease);
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;

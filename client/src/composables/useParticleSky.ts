@@ -15,8 +15,11 @@ function glowTex(size: number, color: string) {
 
 export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
   const loaded = ref(false)
-  let id = 0; let sc: THREE.Scene; let cam: THREE.PerspectiveCamera; let rend: THREE.WebGLRenderer; let onResize: (() => void) | null = null
+  let id = 0; let sc: THREE.Scene; let cam: THREE.PerspectiveCamera; let rend: THREE.WebGLRenderer
+  let onResize: (() => void) | null = null
   const twinklePhases: number[] = []
+  // 共享暂停状态：init 内部 loop 读这个对象的 paused，外部 pause/resume 改它
+  const runState = { paused: false }
 
   function init() {
     const el = canvas.value; if (!el) return
@@ -102,11 +105,11 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
 
     function loop() {
       id = requestAnimationFrame(loop)
+      if (runState.paused) return
       const t = performance.now() * 0.0003
       for (let gi = 0; gi < grps.length; gi++) {
         grps[gi].rotation.y += grps[gi].userData.spd
         grps[gi].rotation.x += grps[gi].userData.spd * 0.35
-        // 微颤亮度
         if (gi < 3) {
           const m = grps[gi].material as THREE.PointsMaterial
           const base = 0.7; const breath = Math.sin(t) * 0.06
@@ -122,14 +125,18 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
       rend.render(sc, cam)
     }
     loop()
-    let onResize: () => void
     addEventListener('resize', onResize = () => {
       cam.aspect = window.innerWidth / window.innerHeight; cam.updateProjectionMatrix()
       rend.setSize(window.innerWidth, window.innerHeight)
     })
+
     loaded.value = true
   }
   onMounted(async () => { await nextTick(); requestAnimationFrame(() => init()) })
   onBeforeUnmount(() => { cancelAnimationFrame(id); rend?.dispose(); if (onResize!) removeEventListener('resize', onResize) })
-  return { loaded }
+
+  // —— 暴露给外部：卡片 hover 时调用，让出主线程给 CSS transition
+  function pause() { runState.paused = true }
+  function resume() { runState.paused = false }
+  return { loaded, pause, resume }
 }
