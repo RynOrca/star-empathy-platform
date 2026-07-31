@@ -109,7 +109,7 @@
 |---|---|
 | `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板 |
 | `HomePage.vue` | 首页/登录页 |
-| `ProfilePage.vue` | 个人资料页 |
+| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar + 480px 月亮 Hero + 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片（标题/正文 4 行摘录/恒星 Tag/情绪 5 色标签/共鸣/MM DD 日期）、空态 CTA 前往星空；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线、scrollToStory 自动展开；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；4 Modal 统一换肤（签名/星穹之钥密码/故事详情/摘取确认）+ Gold Flash 成功反馈。响应式 768/380 双断点；Prefers-reduced-motion 全停动画 |
 
 ### 组件 `src/components/`
 
@@ -198,6 +198,43 @@
 |---|---|
 | `textures/planets/` | 行星纹理贴图（太阳、月球、水星、金星、火星、木星、土星、天王星、海王星） |
 | `textures/skybox/` | 银河背景贴图 |
+
+---
+
+## docs/ — 设计文档 & 实现计划
+
+按 superpowers 工作流规范：先写 Spec，再生成实现计划。
+
+### 设计规范 `docs/superpowers/specs/`
+
+| 文件 | 用途 |
+|---|---|
+| `2026-07-31-personal-space-ui-style-d-design.md` | **个人空间界面优化设计规范**。Style D（叙事沉浸式）完整 Spec：美学方向、颜色 token、字体层级、4 大段结构、交互流程、数据/API 映射、响应式规则、无障碍、验收清单 |
+
+### 实现计划 `docs/superpowers/plans/`
+
+| 文件 | 用途 |
+|---|---|
+| `2026-07-31-personal-space-ui-style-d.md` | **个人空间 Style D 实现计划**。Subagent-Driven 8 任务分解（色板→骨架→时间轴→星座→星展→Modal→响应式→终检）+ 每任务 2 阶段审核 (spec compliance + code quality) + 规范 commit 信息，对应分支 `fix/personal-space-ui-optimization` |
+| `2026-07-28-story-image-upload-markdown.md` | 故事图片上传 + Markdown 正文支持 实施计划 |
+| `2026-07-28-story-panel-tabs.md` | StarDetail 4→5 Tab 重构 实施计划 |
+| `2026-07-27-narrative-bugs-fix.md` | AI 叙事行星/相似星/天区高亮 Bug 修复计划 |
+
+---
+
+## designs/ — 设计素材与原型
+
+| 路径 | 用途 |
+|---|---|
+| `style-a-minimalist-elegant.jpg` | 方案 A：极简优雅风格概念设计图 |
+| `style-b-dreamy-romantic.jpg` | 方案 B：梦幻浪漫风格概念设计图 |
+| `style-c-curatorial-museum.jpg` | 方案 C：典藏博物风格概念设计图 |
+| `style-d-narrative-immersive.jpg` | 方案 D：叙事沉浸式概念设计图（最终选定） |
+| `prototypes/index.html` | 设计方案导航首页（4 种风格入口） |
+| `prototypes/style-a.html` | 方案 A 可交互 HTML/CSS 原型 |
+| `prototypes/style-b.html` | 方案 B 可交互 HTML/CSS 原型（含 Canvas 粒子） |
+| `prototypes/style-c.html` | 方案 C 可交互 HTML/CSS 原型（星图册 + 侧边栏 + Bento 卡片） |
+| `prototypes/style-d.html` | 方案 D 可交互 HTML/CSS 原型（月亮 Hero + 时间轴 + 星座 SVG + 叠卡星展） |
 
 ---
 
