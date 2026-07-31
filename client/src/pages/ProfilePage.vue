@@ -932,7 +932,21 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
-    transition: none !important;
+  }
+  /* —— 关键：严格与 style-d 保持一致 ——
+     style-d 原型里没有 reduced-motion 过渡禁用，所以 ProfilePage 里
+     .pd-t-card / .pd-gal-card 保持原生 transition 不被覆盖。
+     此前 * + transition: none !important 导致任何 reduced-motion 系统(如 Windows "显示动画"关闭)
+     下卡片 hover 完全无过渡，这就是用户反馈"像没过渡直接跳"的真实根因。 */
+  .pd-t-card,
+  .pd-t-card *,
+  .pd-t-card *::before,
+  .pd-t-card *::after,
+  .pd-gal-card,
+  .pd-gal-card *,
+  .pd-gal-card *::before,
+  .pd-gal-card *::after {
+    transition: all var(--pd-hover-dur) var(--pd-hover-ease) !important;
   }
 }
 
