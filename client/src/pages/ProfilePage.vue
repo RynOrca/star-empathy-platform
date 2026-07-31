@@ -74,11 +74,11 @@
               <button class="pd-t-card" type="button" @click="openStory(s)">
                 <header class="pd-tc-head">
                   <h3 class="pd-tc-title">{{ s.title || '未命名故事' }}</h3>
-                  <span v-if="getStoryPrimaryStar(s)"
+                  <button type="button" v-if="getStoryPrimaryStar(s)"
                     class="pd-tc-star"
                     @click.stop="goToStar(getStoryPrimaryStar(s)!.id)">
                     {{ getStoryPrimaryStar(s)!.name }}<em v-if="getStoryPrimaryStar(s)!.con"> · {{ getStoryPrimaryStar(s)!.con }}</em><strong v-if="getStoryPrimaryStar(s)!.extraCount > 0"> +{{ getStoryPrimaryStar(s)!.extraCount }}</strong>
-                  </span>
+                  </button>
                 </header>
                 <p class="pd-tc-excerpt">{{ s.content }}</p>
                 <footer class="pd-tc-foot">
@@ -272,9 +272,10 @@ const kernelLines = ref<{ x1: string; y1: string; x2: string; y2: string }[]>([]
 // ─── Task3 预留引用 ───
 const visibleCount = ref(VISIBLE_STEP)
 function expandStories() {
-  visibleCount.value = Math.min(visibleCount.value + VISIBLE_STEP, stories.value.length)
+  const oldCount = visibleCount.value
+  visibleCount.value = Math.min(oldCount + VISIBLE_STEP, stories.value.length)
   nextTick(() => {
-    const selector = `.pd-t-item:nth-child(${Math.max(1, visibleCount.value - VISIBLE_STEP + 1)})`
+    const selector = `.pd-t-item:nth-child(${oldCount + 1})`
     const el = document.querySelector(selector) as HTMLElement | null
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
@@ -389,12 +390,6 @@ async function loadNextPage() {
     }
   } catch (e) { console.error('加载故事页失败:', e) }
   finally { loadingMore.value = false }
-}
-
-function onScroll() {
-  const scrollBottom = window.innerHeight + window.scrollY
-  const pageHeight = document.documentElement.scrollHeight
-  if (scrollBottom >= pageHeight - 200) loadNextPage()
 }
 
 async function startEditSig() {
@@ -967,7 +962,7 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 2px;
+  width: 1px;
   transform: translateX(-50%);
   background: linear-gradient(180deg, transparent 0%, var(--pd-gold) 12%, var(--pd-gold) 88%, transparent 100%);
   opacity: 0.55;
@@ -1107,7 +1102,10 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
   color: var(--pd-gold);
   cursor: pointer;
   transition: background 0.25s ease, color 0.25s ease;
+  outline: none;
 }
+
+.pd-tc-star:focus-visible { outline: 2px solid var(--pd-gold-primary); outline-offset: 3px; }
 
 .pd-tc-star:hover {
   background: var(--pd-gold);
