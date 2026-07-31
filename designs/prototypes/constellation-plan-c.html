@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>方案 C · 纺织者之线 — 时间主链 + 共星支线</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Noto Serif SC", "Songti SC", serif;
+    background: #05060f url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=deep%20night%20sky%20stars%20background%20subtle%20nebula&image_size=landscape_16_9') center/cover no-repeat;
+    min-height: 100vh;
+    color: #e8e4ff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px 120px;
+  }
+  .section-head { text-align: center; margin-bottom: 40px; }
+  .eyebrow { font: 700 0.72rem/1 Cinzel, serif; letter-spacing: 0.36em; color: #a9a3c7; margin-bottom: 16px; }
+  .eyebrow::before { content: '· '; } .eyebrow::after { content: ' ·'; }
+  h1 {
+    font: 400 2rem/1.3 Cinzel, "Noto Serif SC", serif;
+    color: #ffd98a;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+  }
+  h1 em { font-style: italic; font-family: "Cormorant Garamond", serif; color: #caa7ff; font-weight: 400; }
+  .sub { color: #a9a3c7; font: 400 0.95rem/1.8 "Noto Serif SC", serif; letter-spacing: 0.05em; }
+  .sub::before { content: '— '; color: #ffd98a; }
+  .sub::after { content: ' —'; color: #ffd98a; }
+
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 1320px; width: 100%; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .board {
+    position: relative;
+    background: rgba(16,18,40,0.55);
+    border: 1px solid rgba(255,217,138,0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 18px;
+    padding: 36px 30px 30px;
+  }
+  .board-tag {
+    display: inline-block;
+    font: 700 0.62rem/1 Cinzel, serif;
+    letter-spacing: 0.28em;
+    color: #05060f;
+    background: linear-gradient(135deg, #ffd98a, #caa7ff);
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-bottom: 22px;
+  }
+  .board h2 {
+    font: 400 1.15rem/1.5 "Noto Serif SC", Cinzel, serif;
+    color: #f6f1ff;
+    margin-bottom: 18px;
+  }
+  .board h2 span { color: #95f0c0; }
+  .board p.notes {
+    color: #a9a3c7;
+    font-size: 0.78rem;
+    line-height: 1.8;
+    margin-top: 16px;
+    border-top: 1px dashed rgba(255,217,138,0.18);
+    padding-top: 16px;
+  }
+  .board p.notes b { color: #ffd98a; font-weight: 500; }
+
+  svg { width: 100%; display: block; }
+
+  /* === 关键：两种线的层级样式 === */
+  .guide { fill: none; stroke: rgba(202,167,255,0.12); stroke-width: 1; stroke-dasharray: 2 6; }
+  .time-line {                           /* 时间主链：白金色 实线 */
+    fill: none;
+    stroke: url(#timeGrad);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    opacity: 0.85;
+    filter: drop-shadow(0 0 4px rgba(255,217,138,0.5));
+    transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  }
+  .time-line.arrow-head {
+    /* 第 01 条线的起点标记 — 纺织的"起针" */
+  }
+  .echo-line {                           /* 共星支线：紫色 虚线 + 脉冲 */
+    fill: none;
+    stroke: rgba(169,177,255,0.6);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    stroke-dasharray: 4 5;
+    opacity: 0.75;
+    animation: echoPulse 2.6s ease-in-out infinite;
+  }
+  .echo-line.hot {
+    stroke: #caa7ff;
+    stroke-width: 1.8;
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(202,167,255,0.7));
+  }
+  @keyframes echoPulse {
+    0%, 100% { stroke-dashoffset: 0; opacity: 0.55; }
+    50%      { stroke-dashoffset: 9; opacity: 0.95; }
+  }
+
+  .node { cursor: pointer; }
+  .node-shape {
+    fill: #05060f;
+    stroke: #ffd98a;
+    stroke-width: 1.6;
+    filter: drop-shadow(0 0 6px rgba(255,217,138,0.7));
+    transform-origin: center;
+    animation: twinkle 2.4s ease-in-out infinite;
+  }
+  .node.core .node-shape {
+    stroke: #caa7ff;
+    stroke-width: 2.2;
+    filter: drop-shadow(0 0 10px rgba(202,167,255,0.9));
+  }
+  @keyframes twinkle {
+    0%, 100% { r: 5; }
+    50%      { r: 6.6; }
+  }
+  .node-idx {
+    fill: #ffd98a;
+    font: 700 10px/1 Cinzel, serif;
+    text-anchor: middle;
+    letter-spacing: 0.1em;
+    opacity: 0.85;
+  }
+  .node-star {
+    fill: rgba(202,167,255,0.7);
+    font: 600 9px/1 "Noto Serif SC", serif;
+    text-anchor: middle;
+    letter-spacing: 0.08em;
+  }
+  .legend {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 24px; padding-top: 20px;
+    border-top: 1px solid rgba(255,217,138,0.15);
+  }
+  .legend-row { display: flex; align-items: center; gap: 12px; font-size: 0.78rem; color: #a9a3c7; line-height: 1.6; }
+  .legend i { display: inline-block; width: 44px; height: 2px; border-radius: 2px; }
+  .legend i.gold  { background: linear-gradient(90deg, #ffd98a, #caa7ff); box-shadow: 0 0 6px rgba(255,217,138,0.5); }
+  .legend i.purpl { background: repeating-linear-gradient(90deg, #caa7ff 0 4px, transparent 4px 9px); }
+  .legend i.ring  { background: transparent; border: 1px dashed rgba(202,167,255,0.4); height: 10px; width: 10px; border-radius: 50%; }
+  .legend-row em { color: #f6f1ff; font-style: normal; font-weight: 500; margin-right: 4px; }
+
+  /* 示例故事表 */
+  table.footnotes {
+    width: 100%; margin-top: 20px; border-collapse: collapse;
+    font-size: 0.74rem; color: #a9a3c7;
+  }
+  table.footnotes th, table.footnotes td {
+    padding: 6px 8px; border-bottom: 1px solid rgba(255,217,138,0.08);
+    text-align: left; vertical-align: top;
+  }
+  table.footnotes th {
+    color: #caa7ff; font-weight: 600; letter-spacing: 0.1em; font-family: Cinzel, serif;
+  }
+  table.footnotes td.num { font-family: Cinzel, serif; color: #ffd98a; font-weight: 700; }
+  table.footnotes td.star { color: #95f0c0; }
+  table.footnotes mark { background: rgba(149,240,192,0.14); color: #95f0c0; padding: 0 3px; border-radius: 3px; }
+
+  /* 悬停放大节点 — 对应真实星座图的交互 */
+  .node:hover .node-shape { stroke-width: 2.6; filter: drop-shadow(0 0 14px rgba(255,217,138,1)); }
+  .node:hover .node-idx { fill: #fff; opacity: 1; }
+</style>
+</head>
+<body>
+
+  <div class="section-head">
+    <div class="eyebrow">OPTION C · WEAVER'S THREAD</div>
+    <h1>纺织者之线 <em>Weaver's Thread</em></h1>
+    <p class="sub">时间足迹为经 · 共星驻足为纬 · 织就独属于你的夜之星座</p>
+  </div>
+
+  <div class="layout">
+
+    <!-- ====== 左：方案说明 + 线类型图例 ====== -->
+    <div class="board">
+      <span class="board-tag">DESIGN NOTES · 设计说明</span>
+      <h2>两层意义的 <span>经 / 纬</span> 编织</h2>
+
+      <svg viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet" style="margin-top:6px;">
+        <defs>
+          <linearGradient id="timeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffd98a"/>
+            <stop offset="100%" stop-color="#caa7ff"/>
+          </linearGradient>
+        </defs>
+        <circle cx="250" cy="180" r="140" fill="url(#timeGrad)" opacity="0.03"/>
+        <!-- 三环轨道 -->
+        <ellipse class="guide" cx="250" cy="180" rx="220" ry="160"/>
+        <ellipse class="guide" cx="250" cy="180" rx="180" ry="130"/>
+        <ellipse class="guide" cx="250" cy="180" rx="140" ry="100"/>
+      </svg>
+
+      <div class="legend">
+        <div class="legend-row">
+          <i class="ring"></i><span><em>三环轨道</em>：节点分布的参考椭圆，营造天球感</span>
+        </div>
+        <div class="legend-row">
+          <i class="gold"></i><span><em>时间主链（经）</em>：01 → 02 → 03 → … → 闭合回 01，白金色渐变实线，代表心事记录的时间顺序</span>
+        </div>
+        <div class="legend-row">
+          <i class="purpl"></i><span><em>共星支线（纬）</em>：两则心事挂在 <b>同一颗恒星</b> 就画一条紫色脉冲虚线，画得越密说明这颗星让你反复驻足</span>
+        </div>
+      </div>
+
+      <p class="notes">
+        <b>为什么是"纺织"？</b>经（纵）线是时间，不能断；纬（横）线是你在某些星上的"回望"与"重访"。每多写一则共星的心事，就多织入一根纬线，星座图案就会越来越密、越来越像 <b>真正的织物</b>。<br/><br/>
+        <b>数量规则：</b>时间主链永远有 <code>N</code> 条（<code>N</code> = 故事数），加 1 条闭合线（最后一颗回第一颗）。共星支线 <code>0 ~ N-1</code> 条，取决于你是否重访同一颗星。
+      </p>
+    </div>
+
+    <!-- ====== 右：完整 C 方案示例图（4 则故事 3 颗共星） ====== -->
+    <div class="board">
+      <span class="board-tag">LIVE EXAMPLE · 4 STORIES / 3 ECHOES</span>
+      <h2>示例：<span>织女星</span> × 2，<span>天璇</span> × 2</h2>
+
+      <svg viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="timeGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffd98a"/>
+            <stop offset="100%" stop-color="#caa7ff"/>
+          </linearGradient>
+          <radialGradient id="bgC" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="rgba(255,217,138,0.05)"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </radialGradient>
+          <!-- 起点箭头（纺织"起针"） -->
+          <marker id="pinStart" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#ffd98a" opacity="0.7"/>
+          </marker>
+        </defs>
+
+        <rect width="500" height="360" fill="url(#bgC)"/>
+        <ellipse class="guide" cx="250" cy="180" rx="220" ry="160"/>
+        <ellipse class="guide" cx="250" cy="180" rx="180" ry="130"/>
+        <ellipse class="guide" cx="250" cy="180" rx="140" ry="100"/>
+
+        <!-- ======= 共星支线（先画在下层） ======= -->
+        <!-- 01 ↔ 03 ：共星 Vega（织女星）-->
+        <line class="echo-line hot" x1="407.8" y1="249.0" x2="105.6" y2="254.3" />
+        <!-- 02 ↔ 04 ：共星 Merak（天璇）-->
+        <line class="echo-line hot" x1="411.1" y1="114.8" x2="113.6" y2="101.7" />
+        <!-- 01 ↔ 04 ：假想的轻度共主题（echo）非共星 → 不画，保持画面干净 -->
+
+        <!-- ======= 时间主链 01→02→03→04→01 闭合 ======= -->
+        <!-- 01 → 02 -->
+        <line class="time-line" marker-start="url(#pinStart)" x1="407.8" y1="249.0" x2="411.1" y2="114.8" />
+        <!-- 02 → 03 -->
+        <line class="time-line" x1="411.1" y1="114.8" x2="105.6" y2="254.3" />
+        <!-- 03 → 04 -->
+        <line class="time-line" x1="105.6" y1="254.3" x2="113.6" y2="101.7" />
+        <!-- 04 → 01 闭合（更淡，代表"夜的循环"） -->
+        <line class="time-line" style="opacity: 0.35; stroke-dasharray: 5 6;" x1="113.6" y1="101.7" x2="407.8" y2="249.0" />
+
+        <!-- 装饰背景星 -->
+        <circle cx="60"  cy="200" r="1"   fill="rgba(255,255,255,0.5)"/>
+        <circle cx="460" cy="50"  r="0.8" fill="rgba(255,255,255,0.5)"/>
+        <circle cx="80"  cy="330" r="1.2" fill="rgba(255,217,138,0.4)"/>
+        <circle cx="450" cy="230" r="0.8" fill="rgba(255,255,255,0.4)"/>
+
+        <!-- ======= 节点 ======= -->
+        <!-- 01 · 织女星 -->
+        <g class="node core" transform="translate(0,0)">
+          <circle class="node-shape" cx="407.8" cy="249.0" r="6" style="animation-delay: 0s"/>
+          <text class="node-idx"  x="407.8" y="233">01</text>
+          <text class="node-star" x="407.8" y="273">织女星 · Vega</text>
+        </g>
+        <!-- 02 · 天璇 -->
+        <g class="node core">
+          <circle class="node-shape" cx="411.1" cy="114.8" r="6" style="animation-delay: 0.4s"/>
+          <text class="node-idx"  x="411.1" y="98">02</text>
+          <text class="node-star" x="411.1" y="138">天璇 · Merak</text>
+        </g>
+        <!-- 03 · 织女星（再次驻足） -->
+        <g class="node">
+          <circle class="node-shape" cx="105.6" cy="254.3" r="5" style="animation-delay: 0.8s"/>
+          <text class="node-idx"  x="105.6" y="238">03</text>
+          <text class="node-star" x="105.6" y="278">织女星 · Vega</text>
+        </g>
+        <!-- 04 · 天璇（再次驻足） -->
+        <g class="node">
+          <circle class="node-shape" cx="113.6" cy="101.7" r="5" style="animation-delay: 1.2s"/>
+          <text class="node-idx"  x="113.6" y="86">04</text>
+          <text class="node-star" x="113.6" y="125">天璇 · Merak</text>
+        </g>
+      </svg>
+
+      <!-- 故事对照表 -->
+      <table class="footnotes">
+        <thead><tr><th>#</th><th>标题</th><th>挂在哪颗星</th><th>连线语义</th></tr></thead>
+        <tbody>
+          <tr><td class="num">01</td><td>今夜星光很好</td><td class="star">织女星 Vega</td><td>时间主线开始 — <mark>起点"起针"</mark></td></tr>
+          <tr><td class="num">02</td><td>关于夏天的回忆</td><td class="star">天璇 Merak</td><td>时间主线：01 → 02（白金实线）</td></tr>
+          <tr><td class="num">03</td><td>又路过织女星</td><td class="star">织女星 Vega</td><td>时间主线 02→03 + <mark>共星支线 01↔03（紫虚线）</mark></td></tr>
+          <tr><td class="num">04</td><td>想起那天夜里的天璇</td><td class="star">天璇 Merak</td><td>时间主线 03→04 + <mark>共星支线 02↔04（紫虚线）</mark> + 闭合虚线回 01</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</body>
+</html>

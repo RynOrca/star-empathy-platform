@@ -129,47 +129,95 @@
             </div>
           </template>
           <template v-else>
-            <svg class="pd-constellation-svg" viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="`私人星座图，包含 ${Math.min(stories.length, 12)} 颗恒星，${constellationLines().length} 条内核连线`">
+            <svg class="pd-constellation-svg" viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="`私人星座图，包含 ${Math.min(stories.length, 12)} 颗恒星，${constellationLines().length} 条编织线（时间+共星）`">
               <defs>
                 <radialGradient id="pd-const-bg" cx="50%" cy="50%">
                   <stop offset="0%" stop-color="rgba(255,217,138,0.05)"/>
                   <stop offset="100%" stop-color="transparent"/>
                 </radialGradient>
+                <!-- 时间主链：白金色渐变 -->
+                <linearGradient id="pd-const-time-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ffd98a"/>
+                  <stop offset="100%" stop-color="#caa7ff"/>
+                </linearGradient>
+                <!-- 01 号"起针"标记（纺织的起点箭头） -->
+                <marker id="pd-const-pin" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 Z" fill="#ffd98a" opacity="0.7"/>
+                </marker>
               </defs>
+
               <rect width="500" height="360" fill="url(#pd-const-bg)"/>
-              <!-- 椭圆轨道 guides -->
-              <ellipse class="pd-const-guide" cx="250" cy="180" rx="180" ry="130" />
+              <!-- 椭圆轨道 guides（紫色虚线圈，营造天球感） -->
               <ellipse class="pd-const-guide" cx="250" cy="180" rx="220" ry="160" />
+              <ellipse class="pd-const-guide" cx="250" cy="180" rx="180" ry="130" />
               <ellipse class="pd-const-guide" cx="250" cy="180" rx="140" ry="100" />
-              <!-- 内核连线 -->
-              <g class="pd-const-lines">
+
+              <!-- 下层：共星支线（纬线，紫虚脉冲）→ 先画，避免盖过时间主线 -->
+              <g class="pd-const-lines pd-const-lines-echo">
                 <line
-                  v-for="(l, i) in constellationLines()"
-                  :key="'cl-' + i"
-                  class="pd-const-line"
+                  v-for="(l, i) in constellationLines().filter(l => l.kind === 'echo')"
+                  :key="'cl-echo-' + i"
+                  class="pd-const-line pd-const-line-echo"
                   :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
                 />
               </g>
+              <!-- 上层：时间主链（经线，白金色实线） -->
+              <g class="pd-const-lines pd-const-lines-time">
+                <line
+                  v-for="(l, i) in constellationLines().filter(l => l.kind === 'time')"
+                  :key="'cl-time-' + i"
+                  class="pd-const-line pd-const-line-time"
+                  :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+                  :marker-start="i === 0 ? 'url(#pd-const-pin)' : undefined"
+                />
+                <!-- 时间闭环（更淡、虚线，象征"夜的循环"） -->
+                <line
+                  v-for="(l, i) in constellationLines().filter(l => l.kind === 'timeClose')"
+                  :key="'cl-close-' + i"
+                  class="pd-const-line pd-const-line-time-close"
+                  :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+                />
+              </g>
+
               <!-- 装饰小星 -->
-              <circle cx="60" cy="200" r="1" fill="rgba(255,255,255,0.5)"/>
-              <circle cx="460" cy="50" r="0.8" fill="rgba(255,255,255,0.5)"/>
-              <circle cx="80" cy="330" r="1.2" fill="rgba(255,217,138,0.4)"/>
+              <circle cx="60"  cy="200" r="1"   fill="rgba(255,255,255,0.5)"/>
+              <circle cx="460" cy="50"  r="0.8" fill="rgba(255,255,255,0.5)"/>
+              <circle cx="80"  cy="330" r="1.2" fill="rgba(255,217,138,0.4)"/>
               <circle cx="450" cy="230" r="0.8" fill="rgba(255,255,255,0.4)"/>
-              <!-- 故事节点（圆点） -->
+
+              <!-- 顶层：故事节点（核心星紫色描边+星名标签，普通星金色描边） -->
               <g class="pd-const-nodes">
                 <g
-                  v-for="(n, i) in constellationNodes()"
-                  :key="'cn-' + n.index"
+                  v-for="(m, i) in constellationNodeMeta()"
+                  :key="'cn-' + m.index"
                   class="pd-const-node"
+                  :class="{ 'is-core': m.isCore }"
                   tabindex="0"
                   role="button"
-                  :aria-label="`跳转至第 ${n.index + 1} 则故事：${stories[n.index]?.title || '未命名故事'}`"
-                  @click="scrollToStory(n.index)"
-                  @keyup.enter="scrollToStory(n.index)"
-                  @keyup.space.prevent="scrollToStory(n.index)"
+                  :aria-label="`跳转至第 ${m.index + 1} 则故事：${stories[m.index]?.title || '未命名故事'}${m.starName ? '（挂于' + m.starName + '）' : ''}`"
+                  @click="scrollToStory(m.index)"
+                  @keyup.enter="scrollToStory(m.index)"
+                  @keyup.space.prevent="scrollToStory(m.index)"
                 >
-                  <circle class="pd-const-node-shape" :cx="n.x" :cy="n.y" :r="i === 1 || i === 3 ? 6 : 5" :style="{ animationDelay: (i * 0.4) + 's' }" />
-                  <text class="pd-const-node-idx" :x="n.x" :y="n.y - 14">{{ String(n.index + 1).padStart(2, '0') }}</text>
+                  <circle
+                    class="pd-const-node-shape"
+                    :cx="constellationNodes()[m.index].x"
+                    :cy="constellationNodes()[m.index].y"
+                    :r="m.isCore ? 6.2 : 5"
+                    :style="{ animationDelay: (m.index * 0.4) + 's' }"
+                  />
+                  <text
+                    class="pd-const-node-idx"
+                    :x="constellationNodes()[m.index].x"
+                    :y="constellationNodes()[m.index].y - 14"
+                  >{{ String(m.index + 1).padStart(2, '0') }}</text>
+                  <!-- 驻足星（isCore）：下方写星名 + 星座 → 视觉上更"织物" -->
+                  <text
+                    v-if="m.isCore && m.starName"
+                    class="pd-const-node-sname"
+                    :x="constellationNodes()[m.index].x"
+                    :y="constellationNodes()[m.index].y + 22"
+                  >{{ m.starName }}<tspan class="pd-const-node-scon" v-if="m.starConstellation"> · {{ m.starConstellation }}</tspan></text>
                 </g>
               </g>
             </svg>
@@ -576,8 +624,8 @@ function storyAriaLabel(s: any, i: number) {
   return `第 ${i+1} 则故事：${title}，于 ${when} 挂在 ${starName}，共鸣 ${s.resonanceCount || 0}`
 }
 
-// ─── Constellation helpers (Task4 uses, pre-write now so data ready) ───
-const kernelLinesRaw = ref<{ from:{catalogStarId:number}; to:{catalogStarId:number} }[]>([])
+// ─── Constellation helpers (方案 C：时间主链 + 共星支线) ───
+// 节点坐标：沿椭圆分布（0.35 rad 偏移避免"第一名"正对右方）
 function constellationNodes() {
   const items = stories.value.slice(0, 12)
   const n = items.length
@@ -588,20 +636,69 @@ function constellationNodes() {
     y: cy + ry * Math.sin((i / n) * Math.PI * 2 + 0.35),
   }))
 }
-function constellationLines() {
+// 节点元信息：返回每颗星"挂在哪颗 catalogStarId 上 + 是否多次驻足(共星)"
+// 用于 SVG 模板画"紫色描边高亮驻足星 + 下方写星名"
+function constellationNodeMeta() {
+  const items = stories.value.slice(0, 12)
+  // 统计每颗 catalogStarId 出现次数
+  const counter = new Map<number, number>()
+  items.forEach(s => {
+    const ids = getStoryStarIds(s)
+    if (ids[0] != null) counter.set(ids[0], (counter.get(ids[0]) || 0) + 1)
+  })
+  return items.map((s, i) => {
+    const ids = getStoryStarIds(s)
+    const cid = ids[0]
+    const isCore = cid != null && (counter.get(cid) || 0) >= 2
+    return {
+      index: i,
+      catalogStarId: cid,
+      starName: cid != null ? getStarName(cid) : '',
+      starConstellation: cid != null ? getStarCon(cid) : '',
+      isCore,   // 同一颗星挂了 ≥2 则为"驻足星"，画紫色高亮 + 星名
+    }
+  })
+}
+// 方案 C：两层线
+//   — 经（时间主链）：0→1→2→…→N-1→0 闭合（最后一条闭合线画成淡虚线，象征"夜的循环"）
+//   — 纬（共星支线）：每对挂在同一颗 catalogStarId 上的故事之间画一条脉冲紫色虚线
+type Line = { x1:number; y1:number; x2:number; y2:number; kind:'time'|'timeClose'|'echo' }
+function constellationLines(): Line[] {
   const limitedStories = stories.value.slice(0, 12)
-  const starToIdx = new Map<number, number>()
+  const n = limitedStories.length
+  if (n < 2) return []
+  const nodes = constellationNodes()
+  const out: Line[] = []
+  // 1) 时间主链：i → i+1
+  for (let i = 0; i < n - 1; i++) {
+    const a = nodes[i], b = nodes[i+1]
+    out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'time' })
+  }
+  // 2) 最后一颗 → 第一颗：闭合线（更淡、虚线），2 条以下不闭合避免单线交叉
+  if (n >= 3) {
+    const a = nodes[n-1], b = nodes[0]
+    out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'timeClose' })
+  }
+  // 3) 共星支线：按 starId 分组，组内每对 story 画一条 echo 线
+  const byStar = new Map<number, number[]>()
   limitedStories.forEach((s, i) => {
     const ids = getStoryStarIds(s)
-    if (ids[0] != null && !starToIdx.has(ids[0])) starToIdx.set(ids[0], i)
+    if (ids[0] == null) return
+    if (!byStar.has(ids[0])) byStar.set(ids[0], [])
+    byStar.get(ids[0])!.push(i)
   })
-  const nodes = constellationNodes()
-  const out: { x1:number; y1:number; x2:number; y2:number }[] = []
-  for (const l of kernelLinesRaw.value) {
-    const a = starToIdx.get(l.from?.catalogStarId)
-    const b = starToIdx.get(l.to?.catalogStarId)
-    if (a == null || b == null || !nodes[a] || !nodes[b]) continue
-    out.push({ x1: nodes[a].x, y1: nodes[a].y, x2: nodes[b].x, y2: nodes[b].y })
+  for (const group of byStar.values()) {
+    if (group.length < 2) continue
+    // 每对画一条；但当一组 >= 3 时，只画"相邻出现对 + 首尾对"（避免蛛网太乱）
+    if (group.length >= 3) {
+      for (let k = 0; k < group.length; k++) {
+        const a = nodes[group[k]], b = nodes[group[(k + 1) % group.length]]
+        out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'echo' })
+      }
+    } else {
+      const a = nodes[group[0]], b = nodes[group[1]]
+      out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'echo' })
+    }
   }
   return out
 }
@@ -731,7 +828,6 @@ async function loadProfileData() {
   hasMore.value = true
   loadingMore.value = false
   activeStory.value = null
-  kernelLinesRaw.value = []
   visibleCount.value = VISIBLE_STEP
 
   const token = getToken()
@@ -753,10 +849,8 @@ async function loadProfileData() {
       currentPage.value = firstJson.data.page ?? 1
       hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
     }
-    try {
-      const lj = await linesRes.json()
-      if (linesRes.ok && lj.data?.length) kernelLinesRaw.value = lj.data
-    } catch { /* 静默 */ }
+    // kernel-lines 预预留（将来如需要服务端连线）
+    try { await linesRes.json() } catch { /* 静默 */ }
     const favJson = await favRes.json()
     if (favRes.ok && Array.isArray(favJson.data)) {
       // 后端返回的是 catalog_star_id: number[]，需要用 starLookup 填充星名/星座等字段
@@ -1542,16 +1636,44 @@ onBeforeUnmount(() => {
 
 .pd-const-guide {
   fill: none;
-  stroke: rgba(255,217,138,0.07);
-  stroke-dasharray: 3 6;
+  stroke: rgba(202,167,255,0.10);
+  stroke-dasharray: 2 8;
+  stroke-width: 0.8;
 }
 
+/* 三层线样式：经线（实） / 闭环（淡虚） / 纬线（紫虚+脉冲） */
 .pd-const-line {
-  stroke: rgba(255,217,138,0.45);
-  stroke-width: 1;
   fill: none;
-  stroke-dasharray: 4 6;
-  animation: pd-edge-glow 5s ease-in-out infinite;
+  transition: opacity 0.5s ease;
+}
+.pd-const-line-time {
+  stroke: url(#pd-const-time-grad);
+  stroke-width: 1.3;
+  filter: drop-shadow(0 0 4px rgba(255,217,138,0.45));
+  stroke-linecap: round;
+  animation: pd-time-flow 6s ease-in-out infinite;
+}
+.pd-const-line-time-close {
+  stroke: rgba(255,217,138,0.14);
+  stroke-width: 0.9;
+  stroke-dasharray: 4 10;
+  stroke-linecap: round;
+}
+.pd-const-line-echo {
+  stroke: rgba(202,167,255,0.78);
+  stroke-width: 1.1;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(202,167,255,0.55));
+  animation: pd-echo-pulse 2.4s ease-in-out infinite;
+}
+@keyframes pd-time-flow {
+  0%, 100% { stroke-opacity: 0.85; }
+  50%      { stroke-opacity: 1; }
+}
+@keyframes pd-echo-pulse {
+  0%, 100% { stroke-opacity: 0.55; stroke-dashoffset: 0; }
+  50%      { stroke-opacity: 1;    stroke-dashoffset: -11; }
 }
 
 .pd-const-node {
@@ -1560,13 +1682,26 @@ onBeforeUnmount(() => {
 
 .pd-const-node-shape {
   fill: var(--pd-gold);
+  stroke: rgba(255,217,138,0.55);
+  stroke-width: 0.8;
   filter: drop-shadow(0 0 8px rgba(255,217,138,0.85));
   animation: pd-node-glow 3s ease-in-out infinite;
   transition: r 0.3s;
 }
 
+/* 驻足星（isCore）：紫色描边 + 更亮的金色主体 */
+.pd-const-node.is-core .pd-const-node-shape {
+  fill: #fff2cc;
+  stroke: rgba(202,167,255,0.95);
+  stroke-width: 2;
+  filter:
+    drop-shadow(0 0 8px rgba(255,217,138,0.9))
+    drop-shadow(0 0 14px rgba(202,167,255,0.7));
+}
+
 .pd-const-node:hover .pd-const-node-shape {
   fill: #fff;
+  stroke: rgba(255,255,255,0.8);
   filter: drop-shadow(0 0 14px rgba(255,255,255,0.95));
 }
 
@@ -1586,6 +1721,22 @@ onBeforeUnmount(() => {
   letter-spacing: 0.1em;
   text-anchor: middle;
   pointer-events: none;
+}
+
+/* 驻足星：节点下方的星名标签 */
+.pd-const-node-sname {
+  font-family: var(--pd-font-deco);
+  font-size: 0.5rem;
+  fill: rgba(202,167,255,0.95);
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.pd-const-node-scon {
+  font-size: 0.42rem;
+  fill: rgba(255,255,255,0.55);
+  font-family: var(--pd-font-body);
+  font-style: italic;
 }
 
 /* Legend（产品增强：辅助导航，单列居中） */
