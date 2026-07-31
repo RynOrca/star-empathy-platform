@@ -6,32 +6,28 @@
     <template v-else>
       <!-- 1. Topbar 固定导航 -->
       <header class="pd-topbar">
-        <button class="pd-btn-back pd-btn-ghost" @click="goBack">← 星空</button>
-        <span class="pd-brand">STARRY · DOME</span>
+        <button class="pd-back-btn" @click="goBack">← BACK TO SKY</button>
+        <div class="pd-brand">STARRY · DOME</div>
         <div class="pd-actions">
-          <button class="pd-btn-ghost" @click="startEditSig">✎ 编辑签名</button>
-          <button class="pd-btn-ghost" @click="clearAndClosePwdModal(); showPwdModal = true">⚙ 修改密码</button>
+          <button class="pd-back-btn" @click="startEditSig">✎ 编辑签名</button>
+          <button class="pd-back-btn" @click="clearAndClosePwdModal(); showPwdModal = true">⚙ 修改密码</button>
         </div>
       </header>
 
       <!-- 2. Hero 区 100vh -->
       <section class="pd-hero">
-        <div class="pd-hero-moon">
+        <div class="pd-moon">
           <div class="pd-moon-disk">
             <div class="moon-mare moon-mare-a"></div>
             <div class="moon-mare moon-mare-b"></div>
             <div class="moon-mare moon-mare-c"></div>
           </div>
         </div>
-        <div class="pd-hero-content">
-          <div class="hero-tag">✦ WEAVER · OF · NIGHT · STORIES ✦</div>
-          <h1 class="hero-name">{{ user?.username }}</h1>
-          <div class="hero-banner">
-            <span class="hero-line hero-line-left"></span>
-            <span class="banner-text">{{ sigText }}</span>
-            <span class="hero-line hero-line-right"></span>
-          </div>
-          <div class="hero-joined">
+        <div class="pd-hero-text">
+          <p class="pd-hero-role">✦ WEAVER OF NIGHT STORIES ✦</p>
+          <h1 class="pd-hero-name">{{ user?.username }}</h1>
+          <div class="pd-hero-band">{{ sigText || 'Starry Dome · 星穹纺织者 · 夜语记录人' }}</div>
+          <div class="pd-hero-joined">
             <span class="pd-gold-sep">◆</span>
             <span>星穹纺织者</span>
             <span class="pd-gold-sep">◆</span>
@@ -39,16 +35,18 @@
             <span class="pd-gold-sep">◆</span>
           </div>
         </div>
-        <div class="scroll-hint">
+        <div class="pd-scroll-hint">
           <span>Scroll · 向下滚动开启回忆</span>
           <span class="pd-scroll-line"></span>
         </div>
       </section>
 
       <!-- 3. Timeline Section -->
-      <section class="pd-section" id="pd-timeline">
-        <h2 class="pd-section-head">· 我的回忆 · THE · TIMELINE ·</h2>
-        <p class="pd-section-sub">—— 挂在星上的，慢慢读 ——</p>
+      <section class="pd-timeline-section" id="pd-timeline">
+        <div class="pd-section-head">
+          <h2>我的回忆 · TIMELINE</h2>
+          <p>—— 挂在星上的，慢慢读 ——</p>
+        </div>
 
         <div class="pd-stats-pills">
           <span class="pd-stats-pill">✦ {{ stats.storyCount }} 故事</span>
@@ -58,7 +56,6 @@
         </div>
 
         <nav class="pd-timeline" aria-label="个人故事时间轴" v-if="stories.length > 0">
-          <div class="pd-t-axis" aria-hidden="true"></div>
           <div class="pd-t-items">
             <article
               v-for="(s, i) in stories.slice(0, visibleCount)"
@@ -69,22 +66,20 @@
               role="article"
               :style="{ animationDelay: Math.min(i * 30, 200) + 'ms' }"
             >
-              <div class="pd-t-node" aria-hidden="true"><span class="pd-t-dot">✦</span></div>
+              <div class="pd-t-node" aria-hidden="true"><div class="pd-t-star"></div></div>
               <div class="pd-t-date" :class="i % 2 === 0 ? 'left' : 'right'">{{ formatMD(s.createdAt) }}</div>
               <button class="pd-t-card" type="button" @click="openStory(s)">
-                <header class="pd-tc-head">
-                  <h3 class="pd-tc-title">{{ s.title || '未命名故事' }}</h3>
-                  <button type="button" v-if="getStoryPrimaryStar(s)"
-                    class="pd-tc-star"
-                    @click.stop="goToStar(getStoryPrimaryStar(s)!.id)">
+                <div class="pd-t-head">
+                  <h3 class="pd-t-title">{{ s.title || '未命名故事' }}</h3>
+                  <span v-if="getStoryPrimaryStar(s)" class="pd-t-star-tag" @click.stop="goToStar(getStoryPrimaryStar(s)!.id)">
                     {{ getStoryPrimaryStar(s)!.name }}<em v-if="getStoryPrimaryStar(s)!.con"> · {{ getStoryPrimaryStar(s)!.con }}</em><strong v-if="getStoryPrimaryStar(s)!.extraCount > 0"> +{{ getStoryPrimaryStar(s)!.extraCount }}</strong>
-                  </button>
-                </header>
-                <p class="pd-tc-excerpt">{{ s.content }}</p>
-                <footer class="pd-tc-foot">
-                  <span v-if="s.tag" class="tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
-                  <span class="pd-tc-res">♡ {{ s.resonanceCount || 0 }}</span>
-                </footer>
+                  </span>
+                </div>
+                <p class="pd-t-body">{{ s.content }}</p>
+                <div class="pd-t-foot">
+                  <span v-if="s.tag" class="pd-t-tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
+                  <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
+                </div>
               </button>
             </article>
           </div>
@@ -93,7 +88,7 @@
           <div class="pd-empty-orb" aria-hidden="true">✧</div>
           <h4 class="pd-empty-title">还没有故事，</h4>
           <p class="pd-empty-sub">去星空投递一颗属于你的星 →</p>
-          <button class="pd-btn-ghost" @click="router.push('/sky')">前往星空</button>
+          <button class="pd-back-btn" @click="router.push('/sky')">前往星空</button>
         </div>
 
         <div v-if="loadingMore" class="pd-bottom-hint">加载中...</div>
@@ -105,56 +100,64 @@
         </div>
       </section>
 
-      <section id="pd-constellation" class="pd-section pd-constellation" aria-label="我的私人星座">
-        <h2 class="pd-section-head">· 私人星座 · THE · CONSTELLATION ·</h2>
-        <p class="pd-section-sub">—— 那些共鸣过的星，在你头顶连成了图 ——</p>
+      <section id="pd-constellation" class="pd-constellation-section" aria-label="我的私人星座">
         <div class="pd-const-wrap">
+          <p class="pd-const-title">· MY · PERSONAL · CONSTELLATION ·</p>
+          <h3 class="pd-const-name">纺织者之线 Weaver's Thread</h3>
+          <p class="pd-const-sub">— 由 {{ Math.min(stories.length, 12) }} 则心事编织的私人星座，独属于你 —</p>
           <template v-if="stories.length === 0">
-            <div class="pd-empty" style="max-width: 480px;">
+            <div class="pd-empty">
               <div class="pd-empty-orb" aria-hidden="true">✧</div>
               <h4 class="pd-empty-title">还没有编织出星座，</h4>
               <p class="pd-empty-sub">先去时间轴投递一些故事，再来看看它们的连接。</p>
             </div>
           </template>
           <template v-else>
-            <div class="pd-const-chart" role="img" :aria-label="`私人星座图，包含 ${Math.min(stories.length, 12)} 颗恒星，${constellationLines().length} 条内核连线`">
-              <!-- SVG 椭圆星座图 -->
-              <svg class="pd-const-svg" viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet">
-                <!-- 椭圆轨道 guides (虚线，不抢戏) -->
-                <ellipse class="pd-const-guide" cx="250" cy="180" rx="180" ry="130" />
-                <ellipse class="pd-const-guide" cx="250" cy="180" rx="220" ry="160" />
-                <ellipse class="pd-const-guide" cx="250" cy="180" rx="140" ry="100" />
-                <!-- 内核连线 kernel dashed -->
-                <g class="pd-const-lines">
-                  <line
-                    v-for="(l, i) in constellationLines()"
-                    :key="'cl-' + i"
-                    class="pd-const-line"
-                    :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
-                  />
+            <svg class="pd-constellation-svg" viewBox="0 0 500 360" preserveAspectRatio="xMidYMid meet" role="img" :aria-label="`私人星座图，包含 ${Math.min(stories.length, 12)} 颗恒星，${constellationLines().length} 条内核连线`">
+              <defs>
+                <radialGradient id="pd-const-bg" cx="50%" cy="50%">
+                  <stop offset="0%" stop-color="rgba(255,217,138,0.05)"/>
+                  <stop offset="100%" stop-color="transparent"/>
+                </radialGradient>
+              </defs>
+              <rect width="500" height="360" fill="url(#pd-const-bg)"/>
+              <!-- 椭圆轨道 guides -->
+              <ellipse class="pd-const-guide" cx="250" cy="180" rx="180" ry="130" />
+              <ellipse class="pd-const-guide" cx="250" cy="180" rx="220" ry="160" />
+              <ellipse class="pd-const-guide" cx="250" cy="180" rx="140" ry="100" />
+              <!-- 内核连线 -->
+              <g class="pd-const-lines">
+                <line
+                  v-for="(l, i) in constellationLines()"
+                  :key="'cl-' + i"
+                  class="pd-const-line"
+                  :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+                />
+              </g>
+              <!-- 装饰小星 -->
+              <circle cx="60" cy="200" r="1" fill="rgba(255,255,255,0.5)"/>
+              <circle cx="460" cy="50" r="0.8" fill="rgba(255,255,255,0.5)"/>
+              <circle cx="80" cy="330" r="1.2" fill="rgba(255,217,138,0.4)"/>
+              <circle cx="450" cy="230" r="0.8" fill="rgba(255,255,255,0.4)"/>
+              <!-- 故事节点（圆点） -->
+              <g class="pd-const-nodes">
+                <g
+                  v-for="(n, i) in constellationNodes()"
+                  :key="'cn-' + n.index"
+                  class="pd-const-node"
+                  tabindex="0"
+                  role="button"
+                  :aria-label="`跳转至第 ${n.index + 1} 则故事：${stories[n.index]?.title || '未命名故事'}`"
+                  @click="scrollToStory(n.index)"
+                  @keyup.enter="scrollToStory(n.index)"
+                  @keyup.space.prevent="scrollToStory(n.index)"
+                >
+                  <circle class="pd-const-node-shape" :cx="n.x" :cy="n.y" :r="i === 1 || i === 3 ? 6 : 5" :style="{ animationDelay: (i * 0.4) + 's' }" />
+                  <text class="pd-const-node-idx" :x="n.x" :y="n.y - 14">{{ String(n.index + 1).padStart(2, '0') }}</text>
                 </g>
-                <!-- 椭圆故事节点 -->
-                <g class="pd-const-nodes">
-                  <g
-                    v-for="(n, i) in constellationNodes()"
-                    :key="'cn-' + n.index"
-                    class="pd-const-node"
-                    tabindex="0"
-                    role="button"
-                    :aria-label="`跳转至第 ${n.index + 1} 则故事：${stories[n.index]?.title || '未命名故事'}`"
-                    @click="scrollToStory(n.index)"
-                    @keyup.enter="scrollToStory(n.index)"
-                    @keyup.space.prevent="scrollToStory(n.index)"
-                  >
-                    <ellipse class="pd-const-node-shape" :cx="n.x" :cy="n.y" rx="22" ry="12" />
-                    <text class="pd-const-node-idx" :x="n.x" :y="n.y + 3.5">{{ String(n.index + 1).padStart(2, '0') }}</text>
-                    <!-- 选中提示 -->
-                    <circle class="pd-const-node-halo" :cx="n.x" :cy="n.y" r="34" />
-                  </g>
-                </g>
-              </svg>
-            </div>
-            <!-- Legend -->
+              </g>
+            </svg>
+            <!-- Legend（产品增强：保留作为辅助导航） -->
             <div class="pd-const-legend" role="list">
               <div v-for="(s, i) in stories.slice(0, 12)" :key="'clg-' + s.id" class="pd-const-legend-item" role="listitem">
                 <span class="pd-const-legend-idx">{{ String(i + 1).padStart(2, '0') }}</span>
@@ -168,23 +171,22 @@
         </div>
       </section>
 
-      <section id="pd-favorites" class="pd-section pd-favorites" aria-label="我的收藏星空">
-        <h2 class="pd-section-head">· 典藏星空 · CURATED · FAVORITES ·</h2>
-        <p class="pd-section-sub">—— 那些收藏过的星，随时取出来读 ——</p>
+      <section id="pd-favorites" class="pd-favorites-section" aria-label="我的收藏星空">
+        <h3 class="pd-favorites-title">FAVORITES · GALLERY · 私人星展</h3>
         <template v-if="favorites.length === 0">
-          <div class="pd-empty" style="max-width: 520px;">
+          <div class="pd-empty">
             <div class="pd-empty-orb" aria-hidden="true">♡</div>
             <h4 class="pd-empty-title">还没有收藏的恒星，</h4>
             <p class="pd-empty-sub">在时间轴上点 ❤ 收藏一颗星，它会出现在这里。</p>
           </div>
         </template>
         <template v-else>
-          <div class="pd-fav-grid" role="list">
+          <div class="pd-gallery" role="list">
             <article
               v-for="(f, i) in favorites"
               :key="f.id"
-              class="pd-fav-card"
-              :class="'shift-' + (i % 4)"
+              class="pd-gal-card"
+              :class="'gal-' + ((i % 4) + 1)"
               role="listitem"
               tabindex="0"
               :aria-label="`恒星收藏卡：${f.title || '未命名收藏'}，恒星 ${f.starName || ''}，共鸣 ${f.resonanceCount || 0}，按 Enter 详情，按 Delete 取消收藏`"
@@ -192,37 +194,20 @@
               @keyup.enter="goToStarWithCheck(f.starCatalogId, f.id)"
               @keyup.delete.prevent="unfavorite(f.id)"
             >
-              <!-- 收藏卡渐变背景图 (CSS radial 层叠模拟星尘) -->
-              <div class="pd-fav-card-bg" aria-hidden="true"></div>
-              <!-- 右上角取消收藏按钮 -->
               <button
                 type="button"
-                class="pd-fav-close"
-                aria-label="取消收藏：{{ f.starName || '星' }}"
+                class="pd-gal-close"
+                aria-label="取消收藏"
                 @click.stop="unfavorite(f.id)"
                 @keyup.enter.stop.prevent="unfavorite(f.id)"
               >×</button>
-              <!-- 恒星编号 & Tag -->
-              <div class="pd-fav-head">
-                <span class="pd-fav-cat">
-                  {{ f.starName?.slice(0, 3) || 'HD' + (f.starCatalogId || 0).toString().slice(0, 4) }}
-                </span>
-                <span v-if="f.starConstellation" class="pd-fav-con">{{ f.starConstellation }}</span>
+              <div class="pd-gal-img" aria-hidden="true">{{ galaxyIcon(f.starName) }}</div>
+              <div class="pd-gal-name">{{ f.title || f.starName || '无名星' }}</div>
+              <div class="pd-gal-sub">
+                {{ f.starConstellation || '未知星座' }} · {{ f.starName || '' }}<br>
+                <template v-if="f.content">{{ f.content.slice(0, 22) }}{{ f.content.length > 22 ? '…' : '' }}</template>
+                <template v-else>♡ {{ f.resonanceCount || 0 }} 共鸣 · {{ formatMD(f.createdAt || '') }}</template>
               </div>
-              <!-- 主内容：标题/作者/摘录（如果有 story） -->
-              <div class="pd-fav-body">
-                <h3 class="pd-fav-title">{{ f.title || f.starName || '无名星' }}</h3>
-                <p v-if="f.content" class="pd-fav-excerpt">{{ f.content }}</p>
-                <p v-else class="pd-fav-excerpt pd-fav-no-story">—— 此处空，是一颗纯净的恒星球面坐标 ——</p>
-              </div>
-              <!-- 底部：共鸣/作者/日期 -->
-              <footer class="pd-fav-foot">
-                <div class="pd-fav-meta">
-                  <span class="pd-fav-res">♡ {{ f.resonanceCount || 0 }}</span>
-                  <span v-if="f.createdAt" class="pd-fav-date">{{ formatMD(f.createdAt) }}</span>
-                </div>
-                <div class="pd-fav-cta" aria-hidden="true">→ 前往星空</div>
-              </footer>
             </article>
           </div>
         </template>
@@ -235,7 +220,7 @@
           @keydown.enter="saveSig" @keydown.escape="editingSig = false"
           class="pd-sign-input" placeholder="写一行签名..." />
         <button type="button" class="pd-btn-primary" @click="saveSig">保存</button>
-        <button type="button" class="pd-btn-ghost" @click="editingSig = false">取消</button>
+        <button type="button" class="pd-back-btn" @click="editingSig = false">取消</button>
       </div>
 
       <!-- 修改密码弹窗 -->
@@ -261,7 +246,7 @@
             <p v-if="pwdError" class="pwd-error">{{ pwdError }}</p>
           </main>
           <footer class="pd-modal-foot">
-            <button type="button" class="pd-btn-ghost" @click="clearAndClosePwdModal">取消</button>
+            <button type="button" class="pd-back-btn" @click="clearAndClosePwdModal">取消</button>
             <button type="button" class="pd-btn-primary" @click="updatePassword" :disabled="pwdLoading">
               {{ pwdLoading ? '修改中...' : '确认修改' }}
             </button>
@@ -275,7 +260,7 @@
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <span v-if="activeStory.tag" class="tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
+              <span v-if="activeStory.tag" class="pd-t-tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -302,7 +287,7 @@
             </div>
           </main>
           <footer class="pd-modal-foot">
-            <button type="button" class="pd-btn-ghost" @click="resonateStory">共鸣 +1</button>
+            <button type="button" class="pd-back-btn" @click="resonateStory">共鸣 +1</button>
             <button type="button" class="pd-btn-danger" @click="activeStoryId = activeStory?.id ?? null; showDeleteConfirm = true">删除此故事</button>
           </footer>
         </div>
@@ -319,7 +304,7 @@
             <p class="pd-delete-text">要把「{{ activeStory?.title || '这则故事' }}」送回星穹吗？此操作不可撤销。</p>
           </main>
           <footer class="pd-modal-foot">
-            <button type="button" class="pd-btn-ghost" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
+            <button type="button" class="pd-back-btn" @click="showDeleteConfirm = false" :disabled="deletingStory">取消</button>
             <button type="button" class="pd-btn-danger" @click="confirmDelete" :disabled="deletingStory">
               {{ deletingStory ? '删除中...' : '确认摘取' }}
             </button>
@@ -586,6 +571,16 @@ function constellationLines() {
   return out
 }
 
+// ─── Favorites gal-img icon helper ───
+const galaxyIcons = ['♁','☾','✧','❋','✦','★','☆','◈','◊','☉']
+function galaxyIcon(name?: string) {
+  if (!name) return '✧'
+  // 按名字 hash 一个稳定的图标
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return galaxyIcons[h % galaxyIcons.length]
+}
+
 function getToken() { return localStorage.getItem('token') }
 
 async function loadNextPage() {
@@ -751,10 +746,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ════════════════════════════════════════════════════════════════
+   Style D · 叙事沉浸式 — 严格对齐 designs/prototypes/style-d.html
+   保留 canvas 背景（用户要求不删除）
+   ════════════════════════════════════════════════════════════════ */
+
 .profile-page {
-  --pd-bg-0: #05060f;
-  --pd-bg-1: rgba(16, 18, 40, 0.6);
-  --pd-bg-2: rgba(26, 28, 54, 0.8);
+  /* 与 style-d.html 完全一致的设计 token */
   --pd-gold: #ffd98a;
   --pd-gold-soft: rgba(255, 217, 138, 0.45);
   --pd-gold-line: rgba(255, 217, 138, 0.18);
@@ -763,74 +761,25 @@ onBeforeUnmount(() => {
   --pd-text-dim: rgba(255, 217, 138, 0.5);
   --pd-border: rgba(255, 217, 138, 0.18);
   --pd-border-hot: rgba(255, 217, 138, 0.5);
-  --pd-font-deco: Cinzel, Noto Serif SC, Songti SC, Microsoft YaHei, serif;
-  --pd-font-serif: Noto Serif SC, Songti SC, Cinzel, Microsoft YaHei, serif;
+  --pd-bg-card: rgba(16, 18, 40, 0.6);
+  --pd-bg-card-hot: rgba(26, 28, 54, 0.8);
+  --pd-bg-0: #05060f;
+  --pd-font-deco: "Cinzel", "Noto Serif SC", "Songti SC", "Microsoft YaHei", serif;
+  --pd-font-serif: "Noto Serif SC", "Songti SC", "Cinzel", "Microsoft YaHei", serif;
 }
 
 .profile-page {
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
   font-family: var(--pd-font-serif);
+  font-weight: 300;
   color: var(--pd-text-pri);
-  padding-bottom: 160px;
   background: var(--pd-bg-0);
 }
 
-.profile-page::before,
-.profile-page::after {
-  content: "";
-  position: fixed;
-  top: -50%;
-  left: -50%;
-  right: -50%;
-  bottom: -50%;
-  width: 200%;
-  height: 200%;
-  z-index: 0;
-  pointer-events: none;
-  background-repeat: repeat;
-}
-
-.profile-page::before {
-  background-image:
-    radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.4), transparent),
-    radial-gradient(1px 1px at 80px 120px, rgba(255, 255, 255, 0.3), transparent),
-    radial-gradient(1px 1px at 160px 60px, rgba(255, 255, 255, 0.35), transparent),
-    radial-gradient(1.5px 1.5px at 240px 200px, rgba(255, 217, 138, 0.3), transparent),
-    radial-gradient(1px 1px at 300px 90px, rgba(255, 255, 255, 0.25), transparent),
-    radial-gradient(1px 1px at 360px 280px, rgba(255, 255, 255, 0.3), transparent);
-  background-size: 400px 400px;
-  opacity: 0.7;
-  animation: pd-sky-drift-1 120s linear infinite;
-}
-
-.profile-page::after {
-  background-image:
-    radial-gradient(1px 1px at 50px 80px, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1.5px 1.5px at 130px 40px, rgba(255, 255, 255, 0.45), transparent),
-    radial-gradient(1px 1px at 200px 170px, rgba(255, 217, 138, 0.4), transparent),
-    radial-gradient(1px 1px at 270px 100px, rgba(255, 255, 255, 0.4), transparent),
-    radial-gradient(1.5px 1.5px at 10px 230px, rgba(255, 255, 255, 0.35), transparent),
-    radial-gradient(1px 1px at 90px 290px, rgba(255, 255, 255, 0.45), transparent),
-    radial-gradient(1px 1px at 170px 20px, rgba(255, 217, 138, 0.35), transparent),
-    radial-gradient(1.5px 1.5px at 250px 260px, rgba(255, 255, 255, 0.4), transparent);
-  background-size: 300px 300px;
-  opacity: 0.7;
-  animation: pd-sky-drift-2 80s linear infinite;
-}
-
-@keyframes pd-sky-drift-1 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(400px, 400px); }
-}
-
-@keyframes pd-sky-drift-2 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(-300px, 300px); }
-}
-
+/* 保留 canvas 背景 */
 .sky-bg.pd-sky-canvas {
   position: fixed;
   top: 0;
@@ -842,25 +791,61 @@ onBeforeUnmount(() => {
   opacity: 0.6;
 }
 
-.loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  font-size: 1.2rem;
-  color: var(--pd-text-sec);
+/* 顶层视差星层（CSS 层叠，叠加在 canvas 之上但不抢戏） */
+.profile-page::before,
+.profile-page::after {
+  content: "";
+  position: fixed;
+  top: -20%;
+  left: -20%;
+  right: -20%;
+  bottom: -20%;
+  width: 140%;
+  height: 140%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
 }
 
-@keyframes pd-node-pulse {
-  0%, 100% { transform: scale(0.92); opacity: 0.7; }
-  50% { transform: scale(1.08); opacity: 1; }
+.profile-page::before {
+  background-image:
+    radial-gradient(0.6px 0.6px at 12% 18%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(0.6px 0.6px at 35% 55%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(0.6px 0.6px at 65% 28%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(0.6px 0.6px at 82% 70%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(0.6px 0.6px at 22% 85%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(0.6px 0.6px at 48% 10%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(0.6px 0.6px at 92% 42%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(0.6px 0.6px at 8% 42%, rgba(255,255,255,0.4), transparent 60%);
+  animation: pd-parallax-slow 120s linear infinite;
 }
 
-@keyframes pd-line-breath {
-  0%, 100% { stroke-opacity: 0.2; }
-  50% { stroke-opacity: 0.6; }
+.profile-page::after {
+  background-image:
+    radial-gradient(1px 1px at 18% 30%, rgba(255,217,138,0.55), transparent 60%),
+    radial-gradient(1px 1px at 72% 50%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(1px 1px at 40% 75%, rgba(202,167,255,0.5), transparent 60%),
+    radial-gradient(1px 1px at 88% 18%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(1px 1px at 10% 68%, rgba(255,255,255,0.4), transparent 60%);
+  animation: pd-parallax-medium 80s linear infinite;
+}
+
+@keyframes pd-parallax-slow { from{transform:translateY(0);} to{transform:translateY(-300px);} }
+@keyframes pd-parallax-medium { from{transform:translateY(0);} to{transform:translateY(-500px);} }
+
+@keyframes pd-node-glow {
+  0%,100% { transform: scale(0.9); opacity:0.7; }
+  50% { transform: scale(1.2); opacity:1; }
+}
+
+@keyframes pd-edge-glow {
+  0%,100% { stroke: rgba(255,217,138,0.25); }
+  50% { stroke: rgba(255,217,138,0.55); }
+}
+
+@keyframes pd-scroll-line {
+  0%,100% { opacity:0.3; transform: scaleY(0.6); transform-origin: top; }
+  50% { opacity:1; transform: scaleY(1); }
 }
 
 @keyframes pd-fade-up {
@@ -868,16 +853,25 @@ onBeforeUnmount(() => {
   100% { transform: translateY(0); opacity: 1; }
 }
 
-@keyframes pd-scroll-hint {
-  0% { transform: translateY(-6px); opacity: 0; }
-  30% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translateY(12px); opacity: 0; }
+@keyframes pd-moon-glow {
+  0%, 100% {
+    box-shadow:
+      inset -30px -20px 80px rgba(0,0,0,0.35),
+      0 0 120px rgba(255,240,200,0.35),
+      0 0 240px rgba(255,220,160,0.2);
+  }
+  50% {
+    box-shadow:
+      inset -30px -20px 80px rgba(0,0,0,0.35),
+      0 0 160px rgba(255,240,200,0.45),
+      0 0 300px rgba(255,220,160,0.28);
+  }
 }
 
-@keyframes pd-moon-glow {
-  0%, 100% { box-shadow: 0 0 40px 8px rgba(255, 217, 138, 0.2), 0 0 80px 16px rgba(255, 217, 138, 0.08); }
-  50% { box-shadow: 0 0 60px 14px rgba(255, 217, 138, 0.32), 0 0 120px 28px rgba(255, 217, 138, 0.14); }
+@keyframes pd-story-flash-kf {
+  0% { outline: 2px solid transparent; box-shadow: none; }
+  15% { outline: 2px solid var(--pd-gold); box-shadow: 0 0 20px -4px var(--pd-gold-soft), 0 0 40px -8px var(--pd-gold-soft); }
+  100% { outline: 2px solid transparent; box-shadow: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -892,46 +886,57 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-/* ===== (a) Topbar ===== */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  font-size: 1.2rem;
+  color: var(--pd-text-sec);
+}
+
+/* ═══ (a) Topbar ═══ */
 .pd-topbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  padding: 14px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(180deg, rgba(5, 6, 15, 0.92) 0%, rgba(5, 6, 15, 0.6) 70%, rgba(5, 6, 15, 0) 100%);
+  padding: 24px 48px;
+  background: linear-gradient(180deg, rgba(5,6,15,0.7) 0%, transparent 100%);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 
-.pd-btn-back,
-.pd-btn-ghost {
-  border: 1px solid var(--pd-gold);
-  border-radius: 2px;
-  padding: 7px 14px;
-  background: transparent;
-  color: var(--pd-gold);
+.pd-back-btn {
   font-family: var(--pd-font-serif);
-  font-size: 0.85rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,217,138,0.2);
+  color: #b9b4d6;
+  padding: 10px 20px;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease;
+  border-radius: 2px;
+  transition: all 0.3s;
 }
 
-.pd-btn-back:hover,
-.pd-btn-ghost:hover {
-  background: var(--pd-gold);
-  color: #130d00;
+.pd-back-btn:hover {
+  border-color: rgba(255,217,138,0.5);
+  color: var(--pd-gold);
+  background: rgba(255,217,138,0.05);
 }
 
 .pd-brand {
   font-family: var(--pd-font-deco);
+  font-size: 0.85rem;
   letter-spacing: 0.3em;
-  color: var(--pd-gold);
-  font-size: 0.78rem;
+  color: rgba(255,217,138,0.6);
 }
 
 .pd-actions {
@@ -939,7 +944,7 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-/* ===== (b) Hero 100vh ===== */
+/* ═══ (b) Hero 100vh ═══ */
 .pd-hero {
   position: relative;
   width: 100%;
@@ -947,119 +952,95 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
   overflow: hidden;
 }
 
-.pd-hero-moon {
+.pd-moon {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1;
-}
-
-.pd-moon-disk {
-  position: relative;
   width: 480px;
   height: 480px;
   border-radius: 50%;
-  background: radial-gradient(circle at 38% 42%, #fff8e1 0%, #e9dcbf 35%, #b8ae95 68%, #7d725e 100%);
+  background: radial-gradient(circle at 38% 35%,
+    rgba(255,255,255,0.95) 0%,
+    rgba(230,224,210,0.85) 20%,
+    rgba(200,195,180,0.7) 40%,
+    rgba(160,155,145,0.55) 65%,
+    rgba(120,115,110,0.35) 85%,
+    transparent 100%);
   box-shadow:
-    inset -20px -30px 60px rgba(80, 68, 48, 0.35),
-    inset 15px 20px 40px rgba(255, 248, 225, 0.4),
-    0 0 40px 8px rgba(255, 217, 138, 0.2),
-    0 0 80px 16px rgba(255, 217, 138, 0.08);
+    inset -30px -20px 80px rgba(0,0,0,0.35),
+    0 0 120px rgba(255,240,200,0.35),
+    0 0 240px rgba(255,220,160,0.2);
+  opacity: 0.95;
   animation: pd-moon-glow 6s ease-in-out infinite;
 }
 
-.moon-mare {
+/* 月坑（用 ::before/::after + 一个 div 模拟 style-d.html 的双月坑） */
+.pd-moon-disk { display: none; }
+.pd-moon::before, .pd-moon::after {
+  content: "";
   position: absolute;
   border-radius: 50%;
-  filter: blur(14px);
-  background: rgba(135, 120, 95, 0.28);
+  background: rgba(150,140,130,0.25);
 }
+.pd-moon::before { width: 70px; height: 60px; top: 25%; left: 30%; filter: blur(6px); }
+.pd-moon::after { width: 50px; height: 45px; top: 55%; left: 55%; filter: blur(5px); }
 
-.moon-mare-a {
-  top: 20%;
-  left: 28%;
-  width: 130px;
-  height: 92px;
-}
+/* 保留 moon-mare 类（虽然 disk 隐藏了，避免引用未定义类警告） */
+.moon-mare { display: none; }
+.moon-mare-a, .moon-mare-b, .moon-mare-c { display: none; }
 
-.moon-mare-b {
-  top: 55%;
-  left: 55%;
-  width: 80px;
-  height: 60px;
-}
-
-.moon-mare-c {
-  top: 70%;
-  left: 25%;
-  width: 100px;
-  height: 50px;
-}
-
-.pd-hero-content {
+.pd-hero-text {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   text-align: center;
   padding: 0 24px;
   max-width: 900px;
 }
 
-.hero-tag {
+.pd-hero-role {
   font-family: var(--pd-font-deco);
-  letter-spacing: 0.4em;
-  color: var(--pd-gold);
-  font-size: 0.78rem;
-  margin-bottom: 28px;
-  opacity: 0.85;
+  font-size: 0.75rem;
+  letter-spacing: 0.5em;
+  color: rgba(255,217,138,0.7);
+  margin-bottom: 20px;
 }
 
-.hero-name {
+.pd-hero-name {
   font-family: var(--pd-font-deco);
-  font-size: clamp(28px, 5vw, 54px);
-  color: #fff9ea;
-  margin: 0 0 32px 0;
-  font-weight: 700;
-  text-shadow:
-    0 0 20px rgba(255, 217, 138, 0.4),
-    0 2px 12px rgba(0, 0, 0, 0.6);
+  font-size: 4.2rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(5,6,15,0.9), 0 0 80px rgba(0,0,0,0.7);
+  margin: 0 0 20px 0;
 }
 
-.hero-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  margin-bottom: 36px;
-}
-
-.hero-line {
+.pd-hero-band {
   display: inline-block;
-  width: 70px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--pd-gold) 50%, transparent 100%);
-}
-
-.banner-text {
-  font-family: var(--pd-font-serif);
+  padding: 12px 36px;
+  border-top: 1px solid rgba(255,217,138,0.5);
+  border-bottom: 1px solid rgba(255,217,138,0.5);
   font-style: italic;
-  color: var(--pd-gold);
-  font-size: 1.05rem;
-  max-width: 480px;
-  text-shadow: 0 0 10px rgba(255, 217, 138, 0.3);
+  font-size: 0.92rem;
+  color: rgba(255,244,220,0.85);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 20px rgba(0,0,0,0.8);
 }
 
-.hero-joined {
+.pd-hero-joined {
+  margin-top: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  color: var(--pd-text-sec);
-  font-size: 0.85rem;
-  letter-spacing: 0.05em;
+  gap: 12px;
+  color: rgba(255,217,138,0.6);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
 }
 
 .pd-gold-sep {
@@ -1067,57 +1048,70 @@ onBeforeUnmount(() => {
   opacity: 0.75;
 }
 
-.scroll-hint {
+.pd-scroll-hint {
   position: absolute;
   bottom: 60px;
   left: 50%;
   transform: translateX(-50%);
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: rgba(255,217,138,0.5);
+  text-transform: uppercase;
   z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  color: var(--pd-gold);
-  opacity: 0.7;
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
+  gap: 14px;
 }
 
 .pd-scroll-line {
   display: block;
   width: 1px;
-  height: 36px;
-  background: linear-gradient(180deg, var(--pd-gold) 0%, transparent 100%);
-  animation: pd-scroll-hint 2.4s ease-in-out infinite;
+  height: 40px;
+  background: linear-gradient(180deg, rgba(255,217,138,0.5) 0%, transparent 100%);
+  animation: pd-scroll-line 2.4s ease-in-out infinite;
 }
 
-/* ===== (c) Section 通用 ===== */
-.pd-section {
+/* ═══ (c) Timeline Section ═══ */
+.pd-timeline-section {
+  position: relative;
+  z-index: 2;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 140px 24px 60px;
-  position: relative;
+  padding: 80px 48px 120px;
 }
 
 .pd-section-head {
+  text-align: center;
+  margin-bottom: 100px;
+  position: relative;
+}
+
+.pd-section-head h2 {
   font-family: var(--pd-font-deco);
-  font-size: 22px;
-  line-height: 32px;
-  color: var(--pd-gold);
+  font-size: 1.8rem;
+  font-weight: 500;
   letter-spacing: 0.2em;
-  text-align: center;
-  margin: 0 0 16px 0;
+  color: var(--pd-gold);
+  margin: 0 0 14px 0;
 }
 
-.pd-section-sub {
+.pd-section-head h2::before, .pd-section-head h2::after {
+  content: "—— ";
+  color: rgba(255,217,138,0.3);
+  font-weight: 300;
+}
+.pd-section-head h2::after { content: " ——"; }
+
+.pd-section-head p {
   font-style: italic;
-  color: #a9a3c7;
-  font-size: 0.88rem;
-  text-align: center;
-  margin: 0 0 48px 0;
+  color: rgba(255,217,138,0.5);
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+  margin: 0;
 }
 
-/* ===== (d) Stats 胶囊 ===== */
+/* Stats 胶囊（产品增强，保留） */
 .pd-stats-pills {
   display: flex;
   flex-wrap: wrap;
@@ -1127,230 +1121,208 @@ onBeforeUnmount(() => {
 }
 
 .pd-stats-pill {
-  border: 1px solid var(--pd-gold);
+  border: 1px solid rgba(255,217,138,0.3);
   border-radius: 999px;
   padding: 6px 16px;
   color: var(--pd-gold);
   font-size: 0.76rem;
   opacity: 0.85;
   letter-spacing: 0.05em;
-  background: rgba(255, 217, 138, 0.04);
-}
-
-/* ===== (e) Bottom 提示 + 展开按钮 ===== */
-.pd-bottom-hint {
-  text-align: center;
-  color: var(--pd-gold);
-  letter-spacing: 0.2em;
-  font-size: 0.72rem;
-  padding: 24px 0;
-  opacity: 0.7;
-}
-
-.pd-expand-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 16px 0;
-}
-
-.pd-btn-expand {
-  padding: 12px 28px;
-  border: 1px solid var(--pd-gold);
-  border-radius: 2px;
-  background: transparent;
-  color: var(--pd-gold);
-  font-family: var(--pd-font-serif);
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease;
-}
-
-.pd-btn-expand:hover {
-  background: var(--pd-gold);
-  color: #130d00;
+  background: rgba(255,217,138,0.04);
 }
 
 /* Timeline */
 .pd-timeline {
   position: relative;
-  padding: 24px 0 48px;
 }
 
-.pd-t-axis {
+.pd-timeline::before {
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
   width: 1px;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, transparent 0%, var(--pd-gold) 12%, var(--pd-gold) 88%, transparent 100%);
-  opacity: 0.55;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(255,217,138,0.15) 8%,
+    rgba(255,217,138,0.55) 50%,
+    rgba(255,217,138,0.15) 92%,
+    transparent 100%);
+  transform: translateX(-0.5px);
 }
 
 .pd-t-items {
   display: flex;
   flex-direction: column;
-  gap: 96px;
+  gap: 0;
 }
 
 .pd-t-item {
   position: relative;
-  width: 44%;
+  margin-bottom: 90px;
+  display: flex;
+  align-items: flex-start;
   animation: pd-fade-up 0.6s ease-out both;
 }
 
-.pd-t-item.left {
-  align-self: flex-start;
-  padding-right: 48px;
-}
+.pd-t-item:last-child { margin-bottom: 0; }
 
-.pd-t-item.right {
-  align-self: flex-end;
-  padding-left: 48px;
-}
+.pd-t-item.left { justify-content: flex-start; }
+.pd-t-item.right { justify-content: flex-end; }
 
 /* Timeline node */
 .pd-t-node {
   position: absolute;
-  top: 22px;
-  width: 36px;
-  height: 36px;
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.pd-t-star {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  position: relative;
 }
 
-.pd-t-item.left .pd-t-node {
-  right: -18px;
-}
-
-.pd-t-item.right .pd-t-node {
-  left: -18px;
-}
-
-.pd-t-node::before {
+.pd-t-star::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 217, 138, 0.45) 0%, rgba(255, 217, 138, 0) 70%);
-  animation: pd-node-pulse 3.5s ease-in-out infinite;
+  inset: -12px;
+  background: radial-gradient(circle, rgba(255,217,138,0.4), transparent 70%);
+  animation: pd-node-glow 3.5s ease-in-out infinite;
 }
 
-.pd-t-dot {
-  position: relative;
-  font-size: 1.1rem;
+.pd-t-star::after {
+  content: "✦";
   color: var(--pd-gold);
-  text-shadow: 0 0 12px var(--pd-gold-soft);
+  font-size: 1.4rem;
+  text-shadow: 0 0 20px rgba(255,217,138,0.8), 0 0 40px rgba(255,217,138,0.5);
+  position: relative;
+  z-index: 2;
 }
 
 /* Timeline date */
 .pd-t-date {
   position: absolute;
-  top: -24px;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--pd-font-deco);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
-  color: var(--pd-text-dim);
+  color: rgba(255,217,138,0.7);
+  white-space: nowrap;
+  z-index: 3;
 }
 
-.pd-t-date.left {
-  right: 48px;
-}
-
-.pd-t-date.right {
-  left: 48px;
+.pd-t-date.left, .pd-t-date.right {
+  /* 与 style-d 一致：都在中线 */
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* Timeline card */
 .pd-t-card {
-  display: block;
-  width: 100%;
-  padding: 22px 26px;
-  background: var(--pd-bg-1);
+  width: 44%;
+  position: relative;
+  padding: 32px 32px 28px;
+  background: var(--pd-bg-card);
   border: 1px solid var(--pd-border);
-  border-radius: 3px;
-  color: var(--pd-text-pri);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  text-align: left;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: transform 0.35s ease, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
   font-family: inherit;
+  text-align: left;
+  color: inherit;
+  display: block;
+}
+
+.pd-t-item.left .pd-t-card {
+  margin-right: auto;
+  border-radius: 2px 18px 18px 18px;
+}
+
+.pd-t-item.right .pd-t-card {
+  margin-left: auto;
+  border-radius: 18px 2px 18px 18px;
 }
 
 .pd-t-card:hover {
+  border-color: rgba(255,217,138,0.5);
+  background: var(--pd-bg-card-hot);
   transform: translateY(-6px);
-  background: var(--pd-bg-2);
-  border-color: var(--pd-border-hot);
-  box-shadow: 0 12px 40px -12px rgba(255, 217, 138, 0.25);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.4),
+    0 0 40px rgba(255,217,138,0.1);
 }
 
 /* Card head */
-.pd-tc-head {
+.pd-t-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.pd-tc-title {
+.pd-t-title {
   font-family: var(--pd-font-serif);
-  font-size: 1.05rem;
+  font-size: 1.12rem;
   font-weight: 500;
+  color: #f6f1ff;
+  line-height: 1.6;
   margin: 0;
-  color: var(--pd-text-pri);
-  transition: color 0.25s ease;
+  transition: color 0.3s;
 }
 
-.pd-t-card:hover .pd-tc-title {
-  color: var(--pd-gold);
-}
+.pd-t-card:hover .pd-t-title { color: var(--pd-gold); }
 
-.pd-tc-star {
+.pd-t-star-tag {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 3px 10px;
-  border: 1px solid var(--pd-gold);
-  border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
   color: var(--pd-gold);
+  padding: 4px 10px;
+  border: 1px solid rgba(255,217,138,0.25);
+  background: rgba(255,217,138,0.04);
+  white-space: nowrap;
   cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease;
-  outline: none;
+  border-radius: 2px;
+  transition: all 0.3s;
 }
 
-.pd-tc-star:focus-visible { outline: 2px solid var(--pd-gold); outline-offset: 3px; }
-
-.pd-tc-star:hover {
-  background: var(--pd-gold);
-  color: #130d00;
+.pd-t-star-tag:hover {
+  background: rgba(255,217,138,0.1);
+  border-color: rgba(255,217,138,0.5);
 }
 
-.pd-tc-star em {
+.pd-t-star-tag em {
   font-style: normal;
   font-size: 0.85em;
   opacity: 0.8;
 }
 
-.pd-tc-star strong {
+.pd-t-star-tag strong {
   font-weight: 600;
   font-size: 0.9em;
 }
 
-/* Card excerpt */
-.pd-tc-excerpt {
-  font-family: var(--pd-font-serif);
-  font-size: 0.86rem;
-  font-style: italic;
+/* Card body */
+.pd-t-body {
+  font-size: 0.85rem;
   line-height: 1.9;
   color: var(--pd-text-sec);
-  margin: 0 0 18px;
+  font-style: italic;
+  margin: 0 0 18px 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
@@ -1358,76 +1330,46 @@ onBeforeUnmount(() => {
 }
 
 /* Card foot */
-.pd-tc-foot {
+.pd-t-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 12px;
-  border-top: 1px dashed var(--pd-gold-line);
-}
-
-.pd-tc-res {
-  font-size: 0.78rem;
-  color: var(--pd-text-dim);
-  letter-spacing: 0.05em;
-}
-
-/* Emotion tags */
-.tag {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,217,138,0.1);
   font-size: 0.72rem;
-  letter-spacing: 0.05em;
+  color: rgba(255,217,138,0.6);
 }
 
-.tag-思念 {
-  background: rgba(255, 158, 184, 0.15);
-  color: #ff9eb8;
-  border: 1px solid rgba(255, 158, 184, 0.3);
+.pd-t-tag {
+  padding: 3px 10px;
+  border-radius: 2px;
+  border: 1px solid;
+  font-size: 0.7rem;
 }
 
-.tag-愿望 {
-  background: rgba(255, 217, 138, 0.15);
-  color: var(--pd-gold);
-  border: 1px solid rgba(255, 217, 138, 0.3);
-}
+/* Tag 配色 — 严格对齐 style-d.html */
+.tag-思念, .tag-miss { color: #ff9eb8; border-color: rgba(255,158,184,0.3); background: rgba(255,158,184,0.05); }
+.tag-愿望, .tag-wish { color: var(--pd-gold); border-color: rgba(255,217,138,0.3); background: rgba(255,217,138,0.05); }
+.tag-孤独, .tag-lonely { color: #95f0c0; border-color: rgba(149,240,192,0.3); background: rgba(149,240,192,0.05); }
+.tag-离别, .tag-leave { color: #caa7ff; border-color: rgba(202,167,255,0.3); background: rgba(202,167,255,0.05); }
+.tag-等待 { color: #86a8ff; border-color: rgba(134,168,255,0.3); background: rgba(134,168,255,0.05); }
 
-.tag-孤独 {
-  background: rgba(128, 222, 170, 0.15);
-  color: #80deaa;
-  border: 1px solid rgba(128, 222, 170, 0.3);
-}
-
-.tag-离别 {
-  background: rgba(196, 158, 255, 0.15);
-  color: #c49eff;
-  border: 1px solid rgba(196, 158, 255, 0.3);
-}
-
-.tag-等待 {
-  background: rgba(128, 191, 255, 0.15);
-  color: #80bfff;
-  border: 1px solid rgba(128, 191, 255, 0.3);
-}
+.pd-t-res::before { content: "♡ "; }
 
 /* Empty state */
 .pd-empty {
   text-align: center;
   padding: 80px 40px;
-  max-width: 420px;
+  max-width: 480px;
   margin: 0 auto;
-  border: 1px dashed var(--pd-gold-line);
-  border-radius: 4px;
-  background: var(--pd-bg-1);
 }
 
 .pd-empty-orb {
   font-size: 3rem;
   color: var(--pd-gold);
-  text-shadow: 0 0 24px var(--pd-gold-soft);
+  text-shadow: 0 0 24px rgba(255,217,138,0.6);
   margin-bottom: 24px;
-  animation: pd-node-pulse 3.5s ease-in-out infinite;
+  animation: pd-node-glow 3.5s ease-in-out infinite;
 }
 
 .pd-empty-title {
@@ -1445,122 +1387,164 @@ onBeforeUnmount(() => {
   margin: 0 0 28px;
 }
 
-/* Constellation Section */
-.pd-constellation {
-  padding-top: 120px;
+/* Bottom hint + Expand button */
+.pd-bottom-hint {
+  text-align: center;
+  color: rgba(255,217,138,0.5);
+  letter-spacing: 0.2em;
+  font-size: 0.72rem;
+  padding: 24px 0;
+}
+
+.pd-expand-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.pd-btn-expand {
+  padding: 12px 28px;
+  border: 1px solid rgba(255,217,138,0.3);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.04);
+  color: var(--pd-gold);
+  font-family: var(--pd-font-serif);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.pd-btn-expand:hover {
+  border-color: rgba(255,217,138,0.5);
+  color: var(--pd-gold);
+  background: rgba(255,217,138,0.08);
+}
+
+/* ═══ (d) Constellation Section ═══ */
+.pd-constellation-section {
+  position: relative;
+  z-index: 2;
+  padding: 120px 48px;
+  text-align: center;
 }
 
 .pd-const-wrap {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 56px;
-  justify-content: center;
-  align-items: flex-start;
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
 }
 
-/* SVG chart */
-.pd-const-chart {
-  width: min(520px, 90vw);
-  height: 380px;
-  aspect-ratio: 500 / 360;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px dashed var(--pd-gold);
-  border-radius: 4px;
-  padding: 40px;
-  background: var(--pd-bg-1);
+.pd-const-title {
+  font-family: var(--pd-font-deco);
+  font-size: 1rem;
+  letter-spacing: 0.35em;
+  color: rgba(255,217,138,0.7);
+  margin: 0 0 18px 0;
 }
 
-.pd-const-svg {
+.pd-const-name {
+  font-family: var(--pd-font-serif);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--pd-gold);
+  font-style: italic;
+  margin: 0 0 14px 0;
+}
+
+.pd-const-name::before, .pd-const-name::after {
+  content: "「 ";
+  color: rgba(255,217,138,0.4);
+  font-style: normal;
+  font-weight: 300;
+}
+.pd-const-name::after { content: " 」"; }
+
+.pd-const-sub {
+  font-size: 0.78rem;
+  color: rgba(202,167,255,0.6);
+  letter-spacing: 0.15em;
+  font-style: italic;
+  margin: 0 0 50px 0;
+}
+
+.pd-constellation-svg {
   width: 100%;
-  height: 100%;
+  max-width: 560px;
+  height: auto;
+  margin: 0 auto;
+  display: block;
 }
 
 .pd-const-guide {
   fill: none;
-  stroke: var(--pd-gold);
-  opacity: 0.07;
+  stroke: rgba(255,217,138,0.07);
   stroke-dasharray: 3 6;
 }
 
-/* kernel lines — dashed breath */
 .pd-const-line {
-  stroke: var(--pd-gold);
-  opacity: 0.42;
-  stroke-dasharray: 4 6;
+  stroke: rgba(255,217,138,0.45);
   stroke-width: 1;
-  animation: pd-line-breath 4s ease-in-out infinite;
+  fill: none;
+  stroke-dasharray: 4 6;
+  animation: pd-edge-glow 5s ease-in-out infinite;
 }
 
-/* Nodes */
 .pd-const-node {
   cursor: pointer;
 }
 
 .pd-const-node-shape {
-  fill: rgba(255, 217, 138, 0.15);
-  stroke: rgba(255, 217, 138, 0.55);
-  stroke-width: 1.5;
-  transition: fill 0.25s ease;
-}
-
-.pd-const-node-halo {
-  fill: none;
-  stroke: var(--pd-gold);
-  stroke-width: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease, stroke-width 0.3s ease;
+  fill: var(--pd-gold);
+  filter: drop-shadow(0 0 8px rgba(255,217,138,0.85));
+  animation: pd-node-glow 3s ease-in-out infinite;
+  transition: r 0.3s;
 }
 
 .pd-const-node:hover .pd-const-node-shape {
-  fill: var(--pd-gold);
+  fill: #fff;
+  filter: drop-shadow(0 0 14px rgba(255,255,255,0.95));
 }
 
-.pd-const-node:hover .pd-const-node-idx {
-  fill: #130d00;
+.pd-const-node:focus-visible {
+  outline: none;
 }
 
-.pd-const-node:focus-visible .pd-const-node-halo {
-  opacity: 0.5;
-  stroke-width: 1;
+.pd-const-node:focus-visible .pd-const-node-shape {
+  fill: #fff;
+  filter: drop-shadow(0 0 14px rgba(255,255,255,0.95));
 }
 
 .pd-const-node-idx {
   font-family: var(--pd-font-deco);
-  font-size: 0.6rem;
-  fill: var(--pd-gold);
-  letter-spacing: 0.05em;
+  font-size: 0.55rem;
+  fill: rgba(255,217,138,0.7);
+  letter-spacing: 0.1em;
   text-anchor: middle;
-  alignment-baseline: middle;
-  dominant-baseline: middle;
-  transition: fill 0.25s ease;
+  pointer-events: none;
 }
 
-/* Legend */
+/* Legend（产品增强：辅助导航，单列居中） */
 .pd-const-legend {
-  flex: 1;
-  max-width: 420px;
-  padding: 28px;
-  border: 1px dashed var(--pd-gold);
-  border-radius: 4px;
-  background: var(--pd-bg-1);
+  max-width: 560px;
+  margin: 50px auto 0;
+  padding: 24px 28px;
+  border: 1px dashed var(--pd-gold-line);
+  background: rgba(16,18,40,0.4);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  text-align: left;
 }
 
 .pd-const-legend-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px dashed var(--pd-gold-line);
 }
 
-.pd-const-legend-item:last-child {
-  border-bottom: none;
-}
+.pd-const-legend-item:last-child { border-bottom: none; }
 
 .pd-const-legend-idx {
   font-family: var(--pd-font-deco);
@@ -1586,7 +1570,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 0.25s ease, text-shadow 0.25s ease;
+  transition: color 0.3s, text-shadow 0.3s;
 }
 
 .pd-const-legend-name:hover {
@@ -1603,235 +1587,134 @@ onBeforeUnmount(() => {
   color: var(--pd-gold);
 }
 
-/* Gold flash for scrollToStory */
-@keyframes pd-story-flash-kf {
-  0% {
-    outline: 2px solid transparent;
-    box-shadow: none;
-    border-left-color: var(--pd-border);
-  }
-  15% {
-    outline: 2px solid var(--pd-gold);
-    box-shadow: 0 0 20px -4px var(--pd-gold-soft), 0 0 40px -8px var(--pd-gold-soft);
-    border-left-color: var(--pd-gold);
-  }
-  100% {
-    outline: 2px solid transparent;
-    box-shadow: none;
-    border-left-color: var(--pd-border);
-  }
-}
-
 .pd-story-flash {
   animation: pd-story-flash-kf 1.4s ease-out forwards;
-  border-left-color: var(--pd-gold);
 }
 
-/* Favorites Section */
-.pd-favorites {
-  padding-top: 120px;
-}
-
-.pd-fav-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 40px 36px;
-  max-width: 1080px;
-  margin: 0 auto;
-}
-
-/* Card stacking shifts 0 1 2 3 index % 4 transforms */
-.pd-fav-card.shift-0 { transform: translateX(-6px) translateY(0) rotate(-0.6deg); }
-.pd-fav-card.shift-1 { transform: translateX(5px) translateY(-10px) rotate(0.4deg); }
-.pd-fav-card.shift-2 { transform: translateX(-3px) translateY(5px) rotate(0.8deg); }
-.pd-fav-card.shift-3 { transform: translateX(4px) translateY(-7px) rotate(-0.5deg); }
-
-/* pd-fav-card main */
-.pd-fav-card {
+/* ═══ (e) Favorites Section ═══ */
+.pd-favorites-section {
   position: relative;
-  padding: 22px 22px 16px;
-  background: var(--pd-bg-1);
-  border: 1px dashed var(--pd-gold);
-  border-radius: 4px;
-  min-height: 260px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  cursor: pointer;
+  z-index: 2;
+  padding: 80px 48px 180px;
+  text-align: center;
+}
+
+.pd-favorites-title {
+  font-family: var(--pd-font-deco);
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.4em;
+  color: var(--pd-gold);
+  margin: 0 0 60px 0;
+}
+
+.pd-favorites-title::before { content: "✦ "; color: #95f0c0; }
+.pd-favorites-title::after { content: " ✦"; color: #caa7ff; }
+
+.pd-gallery {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 0 auto;
+  perspective: 1200px;
+}
+
+.pd-gal-card {
+  width: 170px;
+  height: 240px;
+  padding: 20px 18px;
+  background: rgba(16,18,40,0.7);
+  border: 1px solid rgba(255,217,138,0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.5s cubic-bezier(.2,.9,.3,1);
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
-  transition: transform 0.4s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s;
 }
 
-.pd-fav-card:hover,
-.pd-fav-card:focus-visible {
-  transform: translateY(-4px) rotate(0deg);
-  border-style: solid;
-  border-color: var(--pd-gold);
-  box-shadow: 0 16px 48px -12px rgba(255, 217, 138, 0.3);
+.pd-gal-card.gal-1 { transform: rotate(-6deg) translateY(16px); z-index: 1; }
+.pd-gal-card.gal-2 { transform: rotate(3deg) translateY(-8px); z-index: 3; }
+.pd-gal-card.gal-3 { transform: rotate(-2deg) translateY(10px); z-index: 2; }
+.pd-gal-card.gal-4 { transform: rotate(5deg) translateY(4px); z-index: 1; }
+
+.pd-gal-card:hover,
+.pd-gal-card:focus-visible {
+  transform: translateY(-24px) rotate(0deg) scale(1.08) !important;
+  z-index: 10 !important;
+  border-color: rgba(255,217,138,0.5);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,217,138,0.15);
 }
 
-.pd-fav-card:hover .pd-fav-card-bg,
-.pd-fav-card:focus-visible .pd-fav-card-bg {
-  opacity: 0.55;
+/* gal-img 区 */
+.pd-gal-img {
+  height: 120px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: var(--pd-gold);
+  background: radial-gradient(circle, rgba(255,217,138,0.12), transparent 70%);
+  text-shadow: 0 0 24px rgba(255,217,138,0.6);
 }
 
-/* card-bg radial gradient */
-.pd-fav-card-bg {
+.pd-gal-name {
+  font-family: var(--pd-font-serif);
+  font-size: 0.95rem;
+  color: #f6f1ff;
+  margin-bottom: 6px;
+  transition: color 0.3s;
+}
+
+.pd-gal-card:hover .pd-gal-name,
+.pd-gal-card:focus-visible .pd-gal-name { color: var(--pd-gold); }
+
+.pd-gal-sub {
+  font-size: 0.7rem;
+  color: rgba(202,167,255,0.6);
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+}
+
+/* gal-close button */
+.pd-gal-close {
   position: absolute;
-  inset: 0;
-  opacity: 0.35;
-  pointer-events: none;
-  border-radius: 4px;
-  background:
-    radial-gradient(140px 140px at 20% 20%, rgba(255, 217, 138, 0.22), transparent 60%),
-    radial-gradient(90px 90px at 80% 15%, rgba(255, 217, 138, 0.18), transparent 65%),
-    radial-gradient(110px 110px at 60% 80%, rgba(255, 217, 138, 0.2), transparent 60%),
-    radial-gradient(90px 90px at 90% 90%, rgba(255, 217, 138, 0.16), transparent 65%);
-}
-
-/* close button */
-.pd-fav-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   width: 22px;
   height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--pd-text-dim);
+  border: 1px solid rgba(255,217,138,0.3);
   border-radius: 2px;
-  background: transparent;
-  color: var(--pd-text-dim);
-  font-size: 1rem;
+  background: rgba(5,6,15,0.6);
+  color: rgba(255,217,138,0.7);
+  font-size: 0.9rem;
   line-height: 1;
-  opacity: 0.5;
   cursor: pointer;
   padding: 0;
-  transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+  opacity: 0;
+  transition: all 0.3s;
 }
 
-.pd-fav-close:hover {
+.pd-gal-card:hover .pd-gal-close,
+.pd-gal-card:focus-visible .pd-gal-close,
+.pd-gal-close:focus-visible {
   opacity: 1;
+}
+
+.pd-gal-close:hover {
   color: #ff6b8a;
   border-color: #ff6b8a;
+  background: rgba(255,107,138,0.1);
 }
 
-.pd-fav-close:focus-visible {
-  outline: 2px solid var(--pd-gold);
-  outline-offset: 2px;
-  opacity: 1;
-}
-
-/* card head */
-.pd-fav-head {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: center;
-  position: relative;
-  z-index: 1;
-}
-
-.pd-fav-cat {
-  font-family: var(--pd-font-deco);
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
-  color: var(--pd-gold);
-  border: 1px solid var(--pd-gold);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.pd-fav-con {
-  font-size: 0.7rem;
-  color: var(--pd-gold);
-  opacity: 0.6;
-}
-
-/* card body */
-.pd-fav-body {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-}
-
-.pd-fav-title {
-  font-family: var(--pd-font-serif);
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--pd-text-pri);
-  line-height: 1.25;
-  margin: 0 0 10px;
-}
-
-.pd-fav-excerpt {
-  font-family: var(--pd-font-serif);
-  font-size: 0.78rem;
-  font-style: italic;
-  line-height: 1.8;
-  color: var(--pd-text-sec);
-  margin: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-.pd-fav-no-story {
-  opacity: 0.5;
-  letter-spacing: 0.05em;
-}
-
-/* card foot */
-.pd-fav-foot {
-  padding-top: 12px;
-  margin-top: auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px dashed var(--pd-gold-line);
-  position: relative;
-  z-index: 1;
-}
-
-.pd-fav-meta {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.pd-fav-res {
-  color: var(--pd-gold);
-  font-size: 0.75rem;
-  border: 1px solid var(--pd-gold);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.pd-fav-date {
-  font-family: var(--pd-font-deco);
-  font-size: 0.65rem;
-  color: var(--pd-text-dim);
-  letter-spacing: 0.05em;
-}
-
-.pd-fav-cta {
-  font-family: var(--pd-font-deco);
-  font-size: 0.6rem;
-  letter-spacing: 0.2em;
-  color: var(--pd-gold);
-  opacity: 0.5;
-  transition: opacity 0.25s;
-}
-
-.pd-fav-card:hover .pd-fav-cta,
-.pd-fav-card:focus-visible .pd-fav-cta {
-  opacity: 1;
-}
-
-/* ===== Task6: Modal Base ===== */
+/* ═══ (f) Modal Base ═══ */
 .pd-modal-mask {
   position: fixed;
   inset: 0;
@@ -1850,15 +1733,14 @@ onBeforeUnmount(() => {
   100% { opacity: 1; }
 }
 
-/* ===== Task6: Modal Panel ===== */
 .pd-modal-panel {
   width: min(560px, 92vw);
   max-height: 86vh;
   overflow: auto;
   padding: 32px 28px;
   border: 1px solid var(--pd-gold);
-  border-radius: 3px;
-  background: var(--pd-bg-1);
+  border-radius: 2px;
+  background: rgba(16,18,40,0.85);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 24px 80px -20px rgba(255, 217, 138, 0.25);
@@ -1868,7 +1750,6 @@ onBeforeUnmount(() => {
   width: min(680px, 92vw);
 }
 
-/* ===== Task6: Modal Head (× close) ===== */
 .pd-modal-head {
   display: flex;
   justify-content: space-between;
@@ -1879,12 +1760,12 @@ onBeforeUnmount(() => {
 
 .pd-modal-head h3 {
   font-family: var(--pd-font-deco);
-  font-size: 18px;
-  line-height: 28px;
+  font-size: 1.05rem;
+  line-height: 1.4;
   color: var(--pd-gold);
   letter-spacing: 0.15em;
   margin: 0;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .pd-story-head-title {
@@ -1901,14 +1782,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--pd-gold);
+  border: 1px solid rgba(255,217,138,0.3);
   border-radius: 2px;
   background: transparent;
-  color: var(--pd-text-dim);
+  color: rgba(255,217,138,0.7);
   font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.7;
   transition: all 220ms ease;
   padding: 0;
 }
@@ -1925,7 +1806,6 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-/* ===== Task6: Modal Body / Foot ===== */
 .pd-modal-body {
   padding: 8px 0 12px;
 }
@@ -1962,7 +1842,7 @@ onBeforeUnmount(() => {
 .pd-story-image {
   display: block;
   max-width: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
   margin: 0 0 20px;
   border: 1px solid var(--pd-gold-line);
 }
@@ -1987,13 +1867,12 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-/* ===== Task6: Modal inputs + buttons ===== */
 .pd-modal-input {
   width: 100%;
-  border: 1px solid var(--pd-gold);
+  border: 1px solid rgba(255,217,138,0.3);
   padding: 10px 14px;
   border-radius: 2px;
-  background: transparent;
+  background: rgba(255,255,255,0.04);
   color: var(--pd-text-pri);
   font-family: var(--pd-font-serif);
   font-size: 0.92rem;
@@ -2008,14 +1887,14 @@ onBeforeUnmount(() => {
 }
 
 .pd-modal-input::placeholder {
-  color: var(--pd-text-dim);
+  color: rgba(255,217,138,0.4);
   opacity: 0.6;
 }
 
 .pd-modal-label {
   display: block;
   font-family: var(--pd-font-deco);
-  font-size: 0.65em;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   color: var(--pd-gold);
   margin-bottom: 6px;
@@ -2029,15 +1908,14 @@ onBeforeUnmount(() => {
   font-style: italic;
 }
 
-/* ===== Task6: Primary/Ghost/Danger buttons (reusable) ===== */
+/* Buttons */
 .pd-btn-primary,
-.pd-btn-ghost,
 .pd-btn-danger {
   border-radius: 2px;
-  padding: 9px 20px;
-  font-family: var(--pd-font-deco);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
+  padding: 10px 20px;
+  font-family: var(--pd-font-serif);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
   cursor: pointer;
   transition: all 220ms ease;
   border: 1px solid;
@@ -2057,22 +1935,6 @@ onBeforeUnmount(() => {
 }
 
 .pd-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pd-btn-ghost {
-  background: transparent;
-  color: var(--pd-gold);
-  border-color: var(--pd-gold);
-}
-
-.pd-btn-ghost:hover:not(:disabled) {
-  background: var(--pd-gold);
-  color: #130d00;
-}
-
-.pd-btn-ghost:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -2100,7 +1962,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-/* ===== Task6: Signature inline editor ===== */
+/* Signature inline editor */
 .pd-sign-inline {
   position: fixed;
   top: 72px;
@@ -2110,7 +1972,7 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   border: 1px solid var(--pd-gold);
   border-radius: 2px;
-  background: var(--pd-bg-1);
+  background: rgba(16,18,40,0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -2130,8 +1992,8 @@ onBeforeUnmount(() => {
 .pd-sign-input {
   flex: 1;
   min-width: 220px;
-  background: transparent;
-  border: 1px solid var(--pd-gold);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,217,138,0.3);
   border-radius: 2px;
   padding: 8px 12px;
   color: var(--pd-text-pri);
@@ -2141,23 +2003,24 @@ onBeforeUnmount(() => {
 
 .pd-sign-input:focus {
   outline: none;
+  border-color: var(--pd-gold);
   box-shadow: 0 0 0 2px var(--pd-gold-soft);
 }
 
 .pd-sign-input::placeholder {
-  color: var(--pd-text-dim);
+  color: rgba(255,217,138,0.4);
   opacity: 0.6;
 }
 
-/* ===== Task6: Story meta pills ===== */
+/* Story meta pills (modal) */
 .pd-story-meta-star {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px 12px;
-  border: 1px solid var(--pd-gold);
-  border-radius: 999px;
-  background: rgba(255, 217, 138, 0.06);
+  border: 1px solid rgba(255,217,138,0.3);
+  border-radius: 2px;
+  background: rgba(255,217,138,0.04);
   color: var(--pd-gold);
   font-size: 0.72rem;
   font-family: var(--pd-font-deco);
@@ -2176,7 +2039,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: 2px;
   background: rgba(255, 107, 138, 0.1);
   color: #ff9eb8;
   border: 1px solid rgba(255, 107, 138, 0.3);
@@ -2185,9 +2048,9 @@ onBeforeUnmount(() => {
 
 .pd-story-meta-date {
   font-family: var(--pd-font-deco);
-  font-size: 0.68em;
+  font-size: 0.7rem;
   letter-spacing: 0.15em;
-  color: var(--pd-text-dim);
+  color: rgba(255,217,138,0.6);
 }
 
 .pd-story-meta-loc {
@@ -2196,7 +2059,7 @@ onBeforeUnmount(() => {
   opacity: 0.75;
 }
 
-/* ===== Task6: Flash banner top center ===== */
+/* Gold flash banner */
 .pd-flash-banner {
   position: fixed;
   top: 24px;
@@ -2206,7 +2069,7 @@ onBeforeUnmount(() => {
   padding: 14px 28px;
   border: 1px solid var(--pd-gold);
   border-radius: 999px;
-  background: var(--pd-bg-1);
+  background: rgba(16,18,40,0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   font-family: var(--pd-font-deco);
@@ -2218,24 +2081,23 @@ onBeforeUnmount(() => {
 
 .pd-flash-banner.success {
   border-color: var(--pd-gold);
-  background: linear-gradient(90deg, rgba(255, 217, 138, 0.12) 0%, rgba(255, 217, 138, 0.04) 50%, rgba(255, 217, 138, 0.12) 100%);
+  background: linear-gradient(90deg, rgba(255, 217, 138, 0.12) 0%, rgba(16,18,40,0.92) 50%, rgba(255, 217, 138, 0.12) 100%);
 }
 
 .pd-flash-banner.error {
   border-color: #ff6b8a;
   color: #ff9eb8;
-  background: linear-gradient(90deg, rgba(255, 107, 138, 0.12) 0%, rgba(255, 107, 138, 0.04) 50%, rgba(255, 107, 138, 0.12) 100%);
+  background: linear-gradient(90deg, rgba(255, 107, 138, 0.12) 0%, rgba(16,18,40,0.92) 50%, rgba(255, 107, 138, 0.12) 100%);
   box-shadow: 0 12px 40px -8px rgba(255, 107, 138, 0.3);
 }
 
 .pd-flash-banner.info {
   border-color: #c49eff;
   color: #d9bfff;
-  background: linear-gradient(90deg, rgba(196, 158, 255, 0.12) 0%, rgba(128, 191, 255, 0.04) 50%, rgba(196, 158, 255, 0.12) 100%);
+  background: linear-gradient(90deg, rgba(196, 158, 255, 0.12) 0%, rgba(16,18,40,0.92) 50%, rgba(196, 158, 255, 0.12) 100%);
   box-shadow: 0 12px 40px -8px rgba(196, 158, 255, 0.3);
 }
 
-/* ===== Task6: pd-flash transition ===== */
 .pd-flash-enter-from {
   opacity: 0;
   transform: translateX(-50%) translateY(-10px);
@@ -2254,70 +2116,97 @@ onBeforeUnmount(() => {
   transition: opacity 240ms ease-in, transform 240ms ease-in;
 }
 
-/* =============================================================
-   Responsive: Tablet 768px boundary (switch from alt→single col)
-   ============================================================= */
+/* ════════════════════════════════════════════════════════════════
+   Responsive — 严格对齐 style-d.html 的 @media (max-width: 768px)
+   ════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Topbar: brand hidden; actions full; back btn compact */
-  .pd-topbar { padding: 10px 14px; }
-  .pd-brand { display: none; }
+  /* Topbar */
+  .pd-topbar { padding: 16px 20px; }
+  .pd-brand { font-size: 0.7rem; letter-spacing: 0.2em; }
   .pd-actions { gap: 6px; }
-  .pd-btn-ghost, .pd-btn-back { padding: 5px 9px; font-size: 0.72rem; }
+  .pd-back-btn { padding: 7px 12px; font-size: 0.72rem; letter-spacing: 0.05em; }
 
-  /* Hero: moon shrinks 480→300, name clamp smaller, scroll hint move lower */
-  .pd-hero-moon { transform: scale(0.625); }
-  .pd-moon-disk { width: 300px; height: 300px; }
-  .hero-name { font-size: clamp(22px, 8vw, 36px); }
-  .hero-tag { font-size: 0.52rem; letter-spacing: 0.2em; }
-  .hero-banner { width: 88vw; }
-  .scroll-hint { bottom: 36px; font-size: 0.7rem; }
+  /* Hero */
+  .pd-moon { width: 320px; height: 320px; }
+  .pd-hero-name { font-size: 2.4rem; }
+  .pd-hero-role { font-size: 0.6rem; letter-spacing: 0.3em; margin-bottom: 14px; }
+  .pd-hero-band { padding: 8px 20px; font-size: 0.78rem; }
+  .pd-hero-joined { font-size: 0.66rem; gap: 8px; margin-top: 18px; }
+  .pd-scroll-hint { bottom: 36px; font-size: 0.6rem; gap: 10px; }
+  .pd-scroll-line { height: 30px; }
 
-  /* Section: tighter vertical padding 80→60 / top 100→64 */
-  .pd-section { max-width: 100%; padding: 64px 18px 48px; }
-  .pd-constellation, .pd-favorites { padding-top: 80px; }
-  .pd-section-head { font-size: 1rem; letter-spacing: 0.1em; }
-  .pd-stats-pills { margin-bottom: 40px; }
+  /* Timeline section */
+  .pd-timeline-section { padding: 40px 20px 80px; }
+  .pd-section-head { margin-bottom: 60px; }
+  .pd-section-head h2 { font-size: 1.3rem; letter-spacing: 0.12em; }
+  .pd-section-head p { font-size: 0.78rem; }
+  .pd-stats-pills { margin-bottom: 40px; gap: 6px 8px; }
   .pd-stats-pill { padding: 4px 10px; font-size: 0.68rem; }
 
-  /* TIMELINE SWITCH TO SINGLE COLUMN */
-  .pd-t-axis { left: 22px; right: auto; transform: none; }
+  /* Timeline: switch to single column with axis on left */
+  .pd-timeline::before { left: 24px; transform: none; }
   .pd-t-item {
-    width: calc(100% - 30px) !important;
-    padding-left: 48px !important;
-    padding-right: 0 !important;
-    align-self: flex-start;
+    justify-content: flex-end !important;
+    margin-bottom: 70px;
   }
-  .pd-t-item.left, .pd-t-item.right { padding-right: 0 !important; }
-  .pd-t-node { left: 4px !important; right: auto !important; top: 18px; }
-  .pd-t-date.left, .pd-t-date.right { text-align: left; }
-  .pd-t-item .pd-t-date { position: static; margin-bottom: 6px; }
+  .pd-t-card {
+    width: calc(100% - 60px);
+    border-radius: 14px !important;
+    padding: 20px 18px;
+  }
+  .pd-t-node, .pd-t-date { left: 24px; transform: none; }
+  .pd-t-date { top: 68px; text-align: left; font-size: 0.62rem; }
+  .pd-t-title { font-size: 1rem; }
+  .pd-t-body { font-size: 0.8rem; line-height: 1.8; -webkit-line-clamp: 3; }
+  .pd-t-foot { font-size: 0.66rem; }
 
-  /* Constellation: row wrap → single column, SVG smaller */
-  .pd-const-wrap { flex-direction: column; gap: 24px; }
-  .pd-const-chart { padding: 28px 16px; }
-  .pd-const-legend { max-width: 100%; }
+  /* Constellation */
+  .pd-constellation-section { padding: 80px 20px 120px; }
+  .pd-const-name { font-size: 1.2rem; }
+  .pd-const-title { font-size: 0.78rem; letter-spacing: 0.2em; }
+  .pd-const-sub { font-size: 0.7rem; margin-bottom: 32px; }
+  .pd-const-legend { padding: 18px 16px; }
 
-  /* Favorites grid: minmax 240 → minmax 180 */
-  .pd-fav-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 28px 20px; }
+  /* Favorites */
+  .pd-favorites-section { padding: 60px 20px 120px; }
+  .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
+  .pd-gal-card { width: 140px; height: 200px; padding: 16px 12px; }
+  .pd-gal-img { height: 80px; font-size: 2.2rem; margin-bottom: 10px; }
+  .pd-gal-name { font-size: 0.82rem; }
+  .pd-gal-sub { font-size: 0.62rem; }
+  /* 移动端取消旋转排列，改为正常 flex */
+  .pd-gal-card.gal-1, .pd-gal-card.gal-2, .pd-gal-card.gal-3, .pd-gal-card.gal-4 {
+    transform: none;
+    margin: 6px;
+    z-index: 1;
+  }
+  .pd-gal-card:hover, .pd-gal-card:focus-visible {
+    transform: translateY(-8px) scale(1.04) !important;
+  }
 
-  /* Flash banner: max width 88vw centered */
-  .pd-flash-banner { left: 6vw; right: 6vw; transform: none; width: 88vw; text-align: center; }
-}
-
-/* =============================================================
-   Responsive: Tiny phones 380px
-   ============================================================= */
-@media (max-width: 380px) {
-  .pd-hero-moon { transform: scale(0.5); margin-top: -30px; }
-  .hero-banner .hero-line { width: 40px; }
-  .pd-stats-pills { gap: 6px 8px; }
-  .pd-stats-pill { font-size: 0.62rem; padding: 3px 8px; }
-  .pd-t-card { padding: 16px 14px; }
-  .pd-tc-head { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .pd-tc-excerpt { font-size: 0.8rem; line-height: 1.7; }
-  .pd-fav-grid { grid-template-columns: 1fr; }
+  /* Modal */
   .pd-modal-panel { padding: 22px 18px; }
   .pd-modal-head h3 { font-size: 0.95rem; }
-  .pd-btn-primary, .pd-btn-ghost, .pd-btn-danger { padding: 7px 14px; font-size: 0.7rem; }
+  .pd-btn-primary, .pd-btn-danger { padding: 8px 14px; font-size: 0.72rem; }
+
+  /* Flash banner */
+  .pd-flash-banner { left: 6vw; right: 6vw; transform: none; width: 88vw; text-align: center; }
+
+  /* Sign inline */
+  .pd-sign-inline { flex-wrap: wrap; max-width: 92vw; }
+  .pd-sign-input { min-width: 160px; }
+}
+
+@media (max-width: 380px) {
+  .pd-moon { width: 260px; height: 260px; }
+  .pd-hero-name { font-size: 1.9rem; }
+  .pd-hero-band { padding: 6px 14px; font-size: 0.7rem; }
+  .pd-stats-pill { font-size: 0.62rem; padding: 3px 8px; }
+  .pd-t-card { padding: 16px 14px; }
+  .pd-t-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pd-gal-card { width: 120px; height: 180px; padding: 12px 10px; }
+  .pd-gal-img { height: 60px; font-size: 1.8rem; }
+  .pd-gal-name { font-size: 0.72rem; }
+  .pd-gal-sub { font-size: 0.55rem; }
 }
 </style>
