@@ -57,7 +57,44 @@
           <span class="pd-stats-pill">♡ {{ stats.favoriteCount }} 收藏</span>
         </div>
 
-        <nav class="pd-timeline" aria-label="个人故事时间轴"></nav>
+        <nav class="pd-timeline" aria-label="个人故事时间轴" v-if="stories.length > 0">
+          <div class="pd-t-axis" aria-hidden="true"></div>
+          <div class="pd-t-items">
+            <article
+              v-for="(s, i) in stories.slice(0, visibleCount)"
+              :key="s.id"
+              class="pd-t-item"
+              :class="i % 2 === 0 ? 'left' : 'right'"
+              :aria-label="storyAriaLabel(s, i)"
+              role="article"
+              :style="{ animationDelay: Math.min(i * 30, 200) + 'ms' }"
+            >
+              <div class="pd-t-node" aria-hidden="true"><span class="pd-t-dot">✦</span></div>
+              <div class="pd-t-date" :class="i % 2 === 0 ? 'left' : 'right'">{{ formatMD(s.createdAt) }}</div>
+              <button class="pd-t-card" type="button" @click="openStory(s)">
+                <header class="pd-tc-head">
+                  <h3 class="pd-tc-title">{{ s.title || '未命名故事' }}</h3>
+                  <span v-if="getStoryPrimaryStar(s)"
+                    class="pd-tc-star"
+                    @click.stop="goToStar(getStoryPrimaryStar(s)!.id)">
+                    {{ getStoryPrimaryStar(s)!.name }}<em v-if="getStoryPrimaryStar(s)!.con"> · {{ getStoryPrimaryStar(s)!.con }}</em><strong v-if="getStoryPrimaryStar(s)!.extraCount > 0"> +{{ getStoryPrimaryStar(s)!.extraCount }}</strong>
+                  </span>
+                </header>
+                <p class="pd-tc-excerpt">{{ s.content }}</p>
+                <footer class="pd-tc-foot">
+                  <span v-if="s.tag" class="tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
+                  <span class="pd-tc-res">♡ {{ s.resonanceCount || 0 }}</span>
+                </footer>
+              </button>
+            </article>
+          </div>
+        </nav>
+        <div v-else class="pd-empty">
+          <div class="pd-empty-orb" aria-hidden="true">✧</div>
+          <h4 class="pd-empty-title">还没有故事，</h4>
+          <p class="pd-empty-sub">去星空投递一颗属于你的星 →</p>
+          <button class="pd-btn-ghost" @click="router.push('/sky')">前往星空</button>
+        </div>
 
         <div v-if="loadingMore" class="pd-bottom-hint">加载中...</div>
         <div v-else-if="!hasMore && stories.length>0 && visibleCount>=stories.length" class="pd-bottom-hint">✦ ✦ ✦ 已经到底了</div>
@@ -165,6 +202,7 @@ import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
 
 const PAGE_SIZE = 20
+const VISIBLE_STEP = 5
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -232,13 +270,18 @@ const loadingMore = ref(false)
 const kernelLines = ref<{ x1: string; y1: string; x2: string; y2: string }[]>([])
 
 // ─── Task3 预留引用 ───
-const visibleCount = ref(0)
+const visibleCount = ref(VISIBLE_STEP)
 function expandStories() {
-  visibleCount.value = Math.min(visibleCount.value + 5, stories.value.length)
+  visibleCount.value = Math.min(visibleCount.value + VISIBLE_STEP, stories.value.length)
+  nextTick(() => {
+    const selector = `.pd-t-item:nth-child(${Math.max(1, visibleCount.value - VISIBLE_STEP + 1)})`
+    const el = document.querySelector(selector) as HTMLElement | null
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 async function loadAndExpandNext5() {
   await loadNextPage()
-  visibleCount.value = Math.min(visibleCount.value + 5, stories.value.length)
+  visibleCount.value = Math.min(visibleCount.value + VISIBLE_STEP, stories.value.length)
 }
 
 const sigText = computed(() => user.value?.signature || '今夜星光很好')
@@ -274,67 +317,54 @@ async function removeFavorite(starId: number) {
   } catch {}
 }
 
-const precomputedPositions = ref<{ x: number; y: number; delay: number; size: number }[]>([])
-function starStyle(i: number) {
-  if (i >= precomputedPositions.value.length) return {}
-  const p = precomputedPositions.value[i]
-  return {
-    left: p.x + '%',
-    top: p.y + '%',
-    animationDelay: p.delay + 's',
-    width: p.size + 'px',
-    height: p.size + 'px',
-  }
+// ─── TimeLine Helpers ───
+function getStoryPrimaryStar(s: any): { id: number; name: string; con: string; extraCount: number } | null {
+  const ids = getStoryStarIds(s)
+  if (!ids.length) return null
+  const first = ids[0]
+  return { id: first, name: getStarName(first), con: getStarCon(first), extraCount: Math.max(0, ids.length - 1) }
+}
+function formatMD(d: string) {
+  if (!d) return ''
+  const dt = new Date(d)
+  if (Number.isNaN(dt.getTime())) return d.slice(5,10).replace('-',' / ')
+  return `${String(dt.getMonth()+1).padStart(2,'0')} / ${String(dt.getDate()).padStart(2,'0')}`
+}
+function storyAriaLabel(s: any, i: number) {
+  const when = formatDate(s.createdAt)
+  const starName = getStoryPrimaryStar(s)?.name ?? '无名星'
+  const title = s.title || '未命名故事'
+  return `第 ${i+1} 则故事：${title}，于 ${when} 挂在 ${starName}，共鸣 ${s.resonanceCount || 0}`
 }
 
-function appendPositions(count: number) {
-  for (let i = 0; i < count; i++) {
-    precomputedPositions.value.push({
-      x: 15 + Math.random() * 70,
-      y: 38 + Math.random() * 52,
-      delay: Math.random() * 2,
-      size: 4 + Math.random() * 8,
-    })
-  }
+// ─── Constellation helpers (Task4 uses, pre-write now so data ready) ───
+const kernelLinesRaw = ref<{ from:{catalogStarId:number}; to:{catalogStarId:number} }[]>([])
+function constellationNodes() {
+  const items = stories.value.slice(0, 12)
+  const n = items.length
+  const rx = 180, ry = 130, cx = 250, cy = 180
+  return items.map((_, i) => ({
+    index: i,
+    x: cx + rx * Math.cos((i / n) * Math.PI * 2 + 0.35),
+    y: cy + ry * Math.sin((i / n) * Math.PI * 2 + 0.35),
+  }))
 }
-
-// 根据内核连线 API 结果计算 SVG 坐标
-async function computeKernelLines(linesRes: Response, stories: any[]) {
-  try {
-    const linesJson = await linesRes.json()
-    if (!linesRes.ok || !linesJson.data?.length) return
-    const apiLines = linesJson.data as {
-      from: { catalogStarId: number }
-      to: { catalogStarId: number }
-    }[]
-
-    // 构建 catalog_star_id → 第一个故事节点索引的映射
-    const starToIndex = new Map<number, number>()
-    for (let i = 0; i < stories.length; i++) {
-      const cid = stories[i].catalogStarId
-      if (cid != null && !starToIndex.has(cid)) {
-        starToIndex.set(cid, i)
-      }
-    }
-
-    // 计算连线坐标
-    const lines: { x1: string; y1: string; x2: string; y2: string }[] = []
-    for (const l of apiLines) {
-      const fromIdx = starToIndex.get(l.from.catalogStarId)
-      const toIdx = starToIndex.get(l.to.catalogStarId)
-      if (fromIdx == null || toIdx == null) continue
-      const fromPos = precomputedPositions.value[fromIdx]
-      const toPos = precomputedPositions.value[toIdx]
-      if (!fromPos || !toPos) continue
-      lines.push({
-        x1: fromPos.x + '%',
-        y1: fromPos.y + '%',
-        x2: toPos.x + '%',
-        y2: toPos.y + '%',
-      })
-    }
-    kernelLines.value = lines
-  } catch { /* 静默失败 */ }
+function constellationLines() {
+  const storyIds = stories.value.slice(0, 12)
+  const starToIdx = new Map<number, number>()
+  storyIds.forEach((s, i) => {
+    const ids = getStoryStarIds(s)
+    if (ids[0] != null && !starToIdx.has(ids[0])) starToIdx.set(ids[0], i)
+  })
+  const nodes = constellationNodes()
+  const out: { x1:number; y1:number; x2:number; y2:number }[] = []
+  for (const l of kernelLinesRaw.value) {
+    const a = starToIdx.get(l.from?.catalogStarId)
+    const b = starToIdx.get(l.to?.catalogStarId)
+    if (a == null || b == null || !nodes[a] || !nodes[b]) continue
+    out.push({ x1: nodes[a].x, y1: nodes[a].y, x2: nodes[b].x, y2: nodes[b].y })
+  }
+  return out
 }
 
 function getToken() { return localStorage.getItem('token') }
@@ -355,7 +385,6 @@ async function loadNextPage() {
       stories.value = [...stories.value, ...items]
       currentPage.value = json.data.page ?? nextPage
       hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
-      appendPositions(items.length)
       // 统计数据由 /api/profile/stats 提供，这里不再客户端累加
     }
   } catch (e) { console.error('加载故事页失败:', e) }
@@ -455,10 +484,10 @@ async function loadProfileData() {
   currentPage.value = 0
   hasMore.value = true
   loadingMore.value = false
-  precomputedPositions.value = []
   activeStory.value = null
   kernelLines.value = []
-  visibleCount.value = 0
+  kernelLinesRaw.value = []
+  visibleCount.value = VISIBLE_STEP
 
   const token = getToken()
   if (!token) { router.push('/'); return }
@@ -478,10 +507,11 @@ async function loadProfileData() {
       stories.value = items
       currentPage.value = firstJson.data.page ?? 1
       hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
-      appendPositions(items.length)
-      // 计算内核连线坐标
-      computeKernelLines(linesRes, items)
     }
+    try {
+      const lj = await linesRes.json()
+      if (linesRes.ok && lj.data?.length) kernelLinesRaw.value = lj.data
+    } catch { /* 静默 */ }
     const favJson = await favRes.json()
     if (favRes.ok) { favorites.value = favJson.data }
     // 使用后端聚合统计（准确计数，不受分页影响）
@@ -500,12 +530,9 @@ async function loadProfileData() {
 
 onMounted(() => {
   loadProfileData()
-  window.addEventListener('scroll', onScroll, { passive: true })
 })
 
-onUnmounted(() => {
-  window.removeEventListener('scroll', onScroll)
-})
+onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
 </script>
 
 <style scoped>
@@ -927,5 +954,276 @@ onUnmounted(() => {
 .pd-btn-expand:hover {
   background: var(--pd-gold);
   color: #130d00;
+}
+
+/* Timeline */
+.pd-timeline {
+  position: relative;
+  padding: 24px 0 48px;
+}
+
+.pd-t-axis {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent 0%, var(--pd-gold) 12%, var(--pd-gold) 88%, transparent 100%);
+  opacity: 0.55;
+}
+
+.pd-t-items {
+  display: flex;
+  flex-direction: column;
+  gap: 96px;
+}
+
+.pd-t-item {
+  position: relative;
+  width: 44%;
+  animation: pd-fade-up 0.6s ease-out both;
+}
+
+.pd-t-item.left {
+  align-self: flex-start;
+  padding-right: 48px;
+}
+
+.pd-t-item.right {
+  align-self: flex-end;
+  padding-left: 48px;
+}
+
+/* Timeline node */
+.pd-t-node {
+  position: absolute;
+  top: 22px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.pd-t-item.left .pd-t-node {
+  right: -18px;
+}
+
+.pd-t-item.right .pd-t-node {
+  left: -18px;
+}
+
+.pd-t-node::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 217, 138, 0.45) 0%, rgba(255, 217, 138, 0) 70%);
+  animation: pd-node-pulse 3.5s ease-in-out infinite;
+}
+
+.pd-t-dot {
+  position: relative;
+  font-size: 1.1rem;
+  color: var(--pd-gold);
+  text-shadow: 0 0 12px var(--pd-gold-soft);
+}
+
+/* Timeline date */
+.pd-t-date {
+  position: absolute;
+  top: -24px;
+  font-family: var(--pd-font-deco);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  color: var(--pd-text-dim);
+}
+
+.pd-t-date.left {
+  right: 48px;
+}
+
+.pd-t-date.right {
+  left: 48px;
+}
+
+/* Timeline card */
+.pd-t-card {
+  display: block;
+  width: 100%;
+  padding: 22px 26px;
+  background: var(--pd-bg-1);
+  border: 1px solid var(--pd-border);
+  border-radius: 3px;
+  color: var(--pd-text-pri);
+  cursor: pointer;
+  text-align: left;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 0.35s ease, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  font-family: inherit;
+}
+
+.pd-t-card:hover {
+  transform: translateY(-6px);
+  background: var(--pd-bg-2);
+  border-color: var(--pd-border-hot);
+  box-shadow: 0 12px 40px -12px rgba(255, 217, 138, 0.25);
+}
+
+/* Card head */
+.pd-tc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pd-tc-title {
+  font-family: var(--pd-font-serif);
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--pd-text-pri);
+  transition: color 0.25s ease;
+}
+
+.pd-t-card:hover .pd-tc-title {
+  color: var(--pd-gold);
+}
+
+.pd-tc-star {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 10px;
+  border: 1px solid var(--pd-gold);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  color: var(--pd-gold);
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.pd-tc-star:hover {
+  background: var(--pd-gold);
+  color: #130d00;
+}
+
+.pd-tc-star em {
+  font-style: normal;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.pd-tc-star strong {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+/* Card excerpt */
+.pd-tc-excerpt {
+  font-family: var(--pd-font-serif);
+  font-size: 0.86rem;
+  font-style: italic;
+  line-height: 1.9;
+  color: var(--pd-text-sec);
+  margin: 0 0 18px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+
+/* Card foot */
+.pd-tc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px dashed var(--pd-gold-line);
+}
+
+.pd-tc-res {
+  font-size: 0.78rem;
+  color: var(--pd-text-dim);
+  letter-spacing: 0.05em;
+}
+
+/* Emotion tags */
+.tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.tag-思念 {
+  background: rgba(255, 158, 184, 0.15);
+  color: #ff9eb8;
+  border: 1px solid rgba(255, 158, 184, 0.3);
+}
+
+.tag-愿望 {
+  background: rgba(255, 217, 138, 0.15);
+  color: var(--pd-gold);
+  border: 1px solid rgba(255, 217, 138, 0.3);
+}
+
+.tag-孤独 {
+  background: rgba(128, 222, 170, 0.15);
+  color: #80deaa;
+  border: 1px solid rgba(128, 222, 170, 0.3);
+}
+
+.tag-离别 {
+  background: rgba(196, 158, 255, 0.15);
+  color: #c49eff;
+  border: 1px solid rgba(196, 158, 255, 0.3);
+}
+
+.tag-等待 {
+  background: rgba(128, 191, 255, 0.15);
+  color: #80bfff;
+  border: 1px solid rgba(128, 191, 255, 0.3);
+}
+
+/* Empty state */
+.pd-empty {
+  text-align: center;
+  padding: 80px 40px;
+  max-width: 420px;
+  margin: 0 auto;
+  border: 1px dashed var(--pd-gold-line);
+  border-radius: 4px;
+  background: var(--pd-bg-1);
+}
+
+.pd-empty-orb {
+  font-size: 3rem;
+  color: var(--pd-gold);
+  text-shadow: 0 0 24px var(--pd-gold-soft);
+  margin-bottom: 24px;
+  animation: pd-node-pulse 3.5s ease-in-out infinite;
+}
+
+.pd-empty-title {
+  font-family: var(--pd-font-serif);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--pd-text-pri);
+  margin: 0 0 8px;
+}
+
+.pd-empty-sub {
+  font-style: italic;
+  color: var(--pd-text-sec);
+  font-size: 0.88rem;
+  margin: 0 0 28px;
 }
 </style>
