@@ -161,7 +161,7 @@
                   :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
                 />
               </g>
-              <!-- 上层：时间主链（经线，白金色实线） -->
+              <!-- 上层：时间主链（经线，白金色实线，开放链） -->
               <g class="pd-const-lines pd-const-lines-time">
                 <line
                   v-for="(l, i) in constellationLines().filter(l => l.kind === 'time')"
@@ -169,13 +169,6 @@
                   class="pd-const-line pd-const-line-time"
                   :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
                   :marker-start="i === 0 ? 'url(#pd-const-pin)' : undefined"
-                />
-                <!-- 时间闭环（更淡、虚线，象征"夜的循环"） -->
-                <line
-                  v-for="(l, i) in constellationLines().filter(l => l.kind === 'timeClose')"
-                  :key="'cl-close-' + i"
-                  class="pd-const-line pd-const-line-time-close"
-                  :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
                 />
               </g>
 
@@ -659,27 +652,22 @@ function constellationNodeMeta() {
     }
   })
 }
-// 方案 C：两层线
-//   — 经（时间主链）：0→1→2→…→N-1→0 闭合（最后一条闭合线画成淡虚线，象征"夜的循环"）
+// 方案 C：两层线（开放形状 — 参考真实星座的开放构图）
+//   — 经（时间主链）：0 → 1 → 2 → … → N-1，依时间顺序走，**首尾不闭合**
 //   — 纬（共星支线）：每对挂在同一颗 catalogStarId 上的故事之间画一条脉冲紫色虚线
-type Line = { x1:number; y1:number; x2:number; y2:number; kind:'time'|'timeClose'|'echo' }
+type Line = { x1:number; y1:number; x2:number; y2:number; kind:'time'|'echo' }
 function constellationLines(): Line[] {
   const limitedStories = stories.value.slice(0, 12)
   const n = limitedStories.length
   if (n < 2) return []
   const nodes = constellationNodes()
   const out: Line[] = []
-  // 1) 时间主链：i → i+1
+  // 1) 时间主链：i → i+1（开放链：最后一颗不再回第一颗）
   for (let i = 0; i < n - 1; i++) {
     const a = nodes[i], b = nodes[i+1]
     out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'time' })
   }
-  // 2) 最后一颗 → 第一颗：闭合线（更淡、虚线），2 条以下不闭合避免单线交叉
-  if (n >= 3) {
-    const a = nodes[n-1], b = nodes[0]
-    out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: 'timeClose' })
-  }
-  // 3) 共星支线：按 starId 分组，组内每对 story 画一条 echo 线
+  // 2) 共星支线：按 starId 分组，组内每对 story 画一条 echo 线
   const byStar = new Map<number, number[]>()
   limitedStories.forEach((s, i) => {
     const ids = getStoryStarIds(s)
