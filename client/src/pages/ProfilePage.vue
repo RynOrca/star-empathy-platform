@@ -45,14 +45,26 @@
       <section class="pd-timeline-section" id="pd-timeline">
         <div class="pd-section-head">
           <h2>我的回忆 · TIMELINE</h2>
-          <p>—— 挂在星上的，慢慢读 ——</p>
+          <p>—— 每一颗被点亮的星，都是我曾驻足的夜晚 ——</p>
         </div>
 
-        <div class="pd-stats-pills">
-          <span class="pd-stats-pill">✦ {{ stats.storyCount }} 故事</span>
-          <span class="pd-stats-pill">❁ {{ stats.totalResonance }} 收到共鸣</span>
-          <span class="pd-stats-pill">☾ {{ stats.resonanceGivenCount }} 发出共鸣</span>
-          <span class="pd-stats-pill">♡ {{ stats.favoriteCount }} 收藏</span>
+        <div class="pd-stats">
+          <div class="pd-stat">
+            <div class="stat-num">{{ stats.storyCount }}</div>
+            <div class="stat-label">Stories</div>
+          </div>
+          <div class="pd-stat">
+            <div class="stat-num">{{ stats.totalResonance }}</div>
+            <div class="stat-label">Resonance In</div>
+          </div>
+          <div class="pd-stat">
+            <div class="stat-num">{{ stats.resonanceGivenCount }}</div>
+            <div class="stat-label">Resonance Out</div>
+          </div>
+          <div class="pd-stat">
+            <div class="stat-num">{{ stats.favoriteCount }}</div>
+            <div class="stat-label">Favorites</div>
+          </div>
         </div>
 
         <nav class="pd-timeline" aria-label="个人故事时间轴" v-if="stories.length > 0">
@@ -485,7 +497,7 @@ async function resonateStory() {
   } catch { showFlash('共鸣失败', 'error') }
 }
 
-const sigText = computed(() => user.value?.signature || '今夜星光很好')
+const sigText = computed(() => user.value?.signature || '')
 const daysAgo = computed(() => {
   if (!user.value) return 0
   return Math.max(0, Math.floor((Date.now() - new Date(user.value.createdAt).getTime()) / 86400000))
@@ -619,7 +631,7 @@ async function saveSig() {
   if (!token) return
   try {
     const r = await fetch('/api/auth/signature', {
-      method: 'POST',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ signature: v }),
     })
@@ -630,9 +642,11 @@ async function saveSig() {
       editingSig.value = false
       sigDraft.value = sigText.value
     } else {
-      showFlash('签名更新失败', 'error')
+      showFlash(j.message || '签名更新失败', 'error')
     }
-  } catch {}
+  } catch (e) {
+    showFlash('签名更新失败 · 网络异常', 'error')
+  }
 }
 
 function openStory(s: any) { activeStory.value = s }
@@ -721,16 +735,29 @@ async function loadProfileData() {
       if (linesRes.ok && lj.data?.length) kernelLinesRaw.value = lj.data
     } catch { /* 静默 */ }
     const favJson = await favRes.json()
-    if (favRes.ok) { favorites.value = favJson.data }
+    if (favRes.ok && Array.isArray(favJson.data)) {
+      // 后端返回的是 catalog_star_id: number[]，需要用 starLookup 填充星名/星座等字段
+      favorites.value = (favJson.data as number[]).map((cid) => {
+        const star = starLookup.get(cid)
+        return {
+          id: cid,
+          starCatalogId: cid,
+          starName: star?.name || `星星 #${cid}`,
+          starConstellation: star ? (constellationNames[star.con] || star.con) : '',
+          resonanceCount: 0,
+          createdAt: '',
+        } as FavoriteItem
+      })
+    }
     // 使用后端聚合统计（准确计数，不受分页影响）
     const statsJson = await statsRes.json()
     if (statsRes.ok && statsJson.data) {
       stats.value.storyCount = statsJson.data.storyCount ?? 0
       stats.value.totalResonance = statsJson.data.totalResonance ?? 0
       stats.value.resonanceGivenCount = statsJson.data.resonanceGivenCount ?? 0
-      stats.value.favoriteCount = statsJson.data.favoriteCount ?? favJson.data?.length ?? 0
-    } else if (favJson.data) {
-      stats.value.favoriteCount = favJson.data.length
+      stats.value.favoriteCount = statsJson.data.favoriteCount ?? favorites.value.length ?? 0
+    } else {
+      stats.value.favoriteCount = favorites.value.length
     }
   } catch (e) { console.error('加载失败', e) }
   loaded.value = true
@@ -766,6 +793,7 @@ onBeforeUnmount(() => {
   --pd-bg-0: #05060f;
   --pd-font-deco: "Cinzel", "Noto Serif SC", "Songti SC", "Microsoft YaHei", serif;
   --pd-font-serif: "Noto Serif SC", "Songti SC", "Cinzel", "Microsoft YaHei", serif;
+  --pd-font-cormorant: "Cormorant Garamond", "Cinzel", "Noto Serif SC", serif;
 }
 
 .profile-page {
@@ -1111,24 +1139,31 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-/* Stats 胶囊（产品增强，保留） */
-.pd-stats-pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px 16px;
-  margin-bottom: 72px;
+/* Stats — 严格对齐 style-a.html 的 .stats/.stat-num/.stat-label */
+.pd-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 72px;
 }
 
-.pd-stats-pill {
-  border: 1px solid rgba(255,217,138,0.3);
-  border-radius: 999px;
-  padding: 6px 16px;
+.pd-stat .stat-num {
+  font-family: var(--pd-font-cormorant);
+  font-size: 3.2rem;
+  font-weight: 300;
   color: var(--pd-gold);
-  font-size: 0.76rem;
-  opacity: 0.85;
-  letter-spacing: 0.05em;
-  background: rgba(255,217,138,0.04);
+  line-height: 1;
+  margin-bottom: 12px;
+  text-shadow: 0 0 24px rgba(255, 217, 138, 0.25);
+}
+
+.pd-stat .stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  color: #6e6893;
+  text-transform: uppercase;
 }
 
 /* Timeline */
@@ -2140,8 +2175,9 @@ onBeforeUnmount(() => {
   .pd-section-head { margin-bottom: 60px; }
   .pd-section-head h2 { font-size: 1.3rem; letter-spacing: 0.12em; }
   .pd-section-head p { font-size: 0.78rem; }
-  .pd-stats-pills { margin-bottom: 40px; gap: 6px 8px; }
-  .pd-stats-pill { padding: 4px 10px; font-size: 0.68rem; }
+  .pd-stats { grid-template-columns: repeat(2, 1fr); gap: 32px 16px; margin-bottom: 40px; }
+  .pd-stat .stat-num { font-size: 2.4rem; }
+  .pd-stat .stat-label { font-size: 0.62rem; letter-spacing: 0.12em; }
 
   /* Timeline: switch to single column with axis on left */
   .pd-timeline::before { left: 24px; transform: none; }
@@ -2201,7 +2237,8 @@ onBeforeUnmount(() => {
   .pd-moon { width: 260px; height: 260px; }
   .pd-hero-name { font-size: 1.9rem; }
   .pd-hero-band { padding: 6px 14px; font-size: 0.7rem; }
-  .pd-stats-pill { font-size: 0.62rem; padding: 3px 8px; }
+  .pd-stat .stat-num { font-size: 2rem; }
+  .pd-stat .stat-label { font-size: 0.55rem; letter-spacing: 0.08em; }
   .pd-t-card { padding: 16px 14px; }
   .pd-t-head { flex-direction: column; align-items: flex-start; gap: 6px; }
   .pd-gal-card { width: 120px; height: 180px; padding: 12px 10px; }
