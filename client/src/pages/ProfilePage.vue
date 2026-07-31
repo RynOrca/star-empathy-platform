@@ -1271,12 +1271,13 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  /* 只过渡合成友好属性，避免 all 触发 layout/paint 重绘 */
+  /* 只过渡合成友好属性，避免 all 触发 layout/paint 重绘
+     ease-out-expo: 起始缓慢→中段加速→结束丝滑收尾，避免"瞬间跳出"感 */
   transition:
-    transform 0.55s cubic-bezier(.2,.9,.3,1),
-    box-shadow 0.55s cubic-bezier(.2,.9,.3,1),
-    border-color 0.4s ease,
-    background-color 0.4s ease;
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: inherit;
   text-align: left;
   color: inherit;
@@ -1674,11 +1675,11 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  /* 只过渡合成友好属性 */
+  /* 只过渡合成友好属性 — ease-out-expo 丝滑曲线 */
   transition:
-    transform 0.55s cubic-bezier(.2,.9,.3,1),
-    box-shadow 0.55s cubic-bezier(.2,.9,.3,1),
-    border-color 0.4s ease;
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   outline: none;
@@ -2171,9 +2172,12 @@ onBeforeUnmount(() => {
    Responsive — 严格对齐 style-d.html 的 @media (max-width: 768px)
    ════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Topbar */
-  .pd-topbar { padding: 16px 20px; }
-  .pd-brand { font-size: 0.7rem; letter-spacing: 0.2em; }
+  /* Topbar — 隐藏中央 brand，让两端按钮充分留白，避免拥挤 */
+  .pd-topbar {
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .pd-brand { display: none; }
   .pd-actions { gap: 6px; }
   .pd-back-btn { padding: 7px 12px; font-size: 0.72rem; letter-spacing: 0.05em; }
 
@@ -2187,7 +2191,7 @@ onBeforeUnmount(() => {
   .pd-scroll-line { height: 30px; }
 
   /* Timeline section */
-  .pd-timeline-section { padding: 40px 20px 80px; }
+  .pd-timeline-section { padding: 40px 18px 80px; }
   .pd-section-head { margin-bottom: 60px; }
   .pd-section-head h2 { font-size: 1.3rem; letter-spacing: 0.12em; }
   .pd-section-head p { font-size: 0.78rem; }
@@ -2195,19 +2199,38 @@ onBeforeUnmount(() => {
   .pd-stat .stat-num { font-size: 2.4rem; }
   .pd-stat .stat-label { font-size: 0.62rem; letter-spacing: 0.12em; }
 
-  /* Timeline: switch to single column with axis on left */
-  .pd-timeline::before { left: 24px; transform: none; }
+  /* Timeline 移动端：单列布局，轴线在左 20px，星星贴在卡片左外侧
+     卡片右对齐到容器右侧，左边缘距轴线 ~28px，星星在卡片左外侧紧贴 */
+  .pd-timeline::before {
+    left: 20px;
+    transform: none;
+  }
   .pd-t-item {
     justify-content: flex-end !important;
     margin-bottom: 70px;
+    padding-left: 0;
   }
   .pd-t-card {
-    width: calc(100% - 60px);
+    width: calc(100% - 50px);
+    margin-left: 50px;
+    margin-right: 0;
     border-radius: 14px !important;
     padding: 20px 18px;
   }
-  .pd-t-node, .pd-t-date { left: 24px; transform: none; }
-  .pd-t-date { top: 68px; text-align: left; font-size: 0.62rem; }
+  /* 星星节点：固定在轴线中心 (left: 20px)，用 translateX(-50%) 居中 */
+  .pd-t-node {
+    left: 20px;
+    top: 22px;
+    transform: translateX(-50%);
+  }
+  .pd-t-date {
+    left: 20px;
+    top: 56px;
+    transform: translateX(-50%);
+    text-align: center;
+    font-size: 0.62rem;
+    white-space: nowrap;
+  }
   .pd-t-title { font-size: 1rem; }
   .pd-t-body { font-size: 0.8rem; line-height: 1.8; -webkit-line-clamp: 3; }
   .pd-t-foot { font-size: 0.66rem; }
@@ -2219,21 +2242,32 @@ onBeforeUnmount(() => {
   .pd-const-sub { font-size: 0.7rem; margin-bottom: 32px; }
   .pd-const-legend { padding: 18px 16px; }
 
-  /* Favorites */
-  .pd-favorites-section { padding: 60px 20px 120px; }
+  /* Favorites — 移动端改为 grid 2 列竖直排布 */
+  .pd-favorites-section { padding: 60px 18px 120px; }
   .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
-  .pd-gal-card { width: 140px; height: 200px; padding: 16px 12px; }
+  .pd-gallery {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    max-width: 100%;
+    margin: 0;
+  }
+  .pd-gal-card {
+    width: 100%;
+    height: 200px;
+    padding: 16px 12px;
+    margin: 0;
+  }
   .pd-gal-img { height: 80px; font-size: 2.2rem; margin-bottom: 10px; }
   .pd-gal-name { font-size: 0.82rem; }
   .pd-gal-sub { font-size: 0.62rem; }
-  /* 移动端取消旋转排列，改为正常 flex */
+  /* 移动端取消桌面端旋转，保留 GPU 合成层避免动画跳帧 */
   .pd-gal-card.gal-1, .pd-gal-card.gal-2, .pd-gal-card.gal-3, .pd-gal-card.gal-4 {
-    transform: none;
-    margin: 6px;
+    transform: translateZ(0);
     z-index: 1;
   }
   .pd-gal-card:hover, .pd-gal-card:focus-visible {
-    transform: translateY(-8px) scale(1.04) !important;
+    transform: translateZ(0) translateY(-6px) scale(1.03) !important;
   }
 
   /* Modal */
