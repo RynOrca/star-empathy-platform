@@ -211,7 +211,7 @@
               </div>
               <!-- 主内容：标题/作者/摘录（如果有 story） -->
               <div class="pd-fav-body">
-                <h3 class="pd-fav-title">{{ f.title || f.starName || '一颗无名星' }}</h3>
+                <h3 class="pd-fav-title">{{ f.title || f.starName || '无名星' }}</h3>
                 <p v-if="f.content" class="pd-fav-excerpt">{{ f.content }}</p>
                 <p v-else class="pd-fav-excerpt pd-fav-no-story">—— 此处空，是一颗纯净的恒星球面坐标 ——</p>
               </div>
@@ -1256,7 +1256,7 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
   outline: none;
 }
 
-.pd-tc-star:focus-visible { outline: 2px solid var(--pd-gold-primary); outline-offset: 3px; }
+.pd-tc-star:focus-visible { outline: 2px solid var(--pd-gold); outline-offset: 3px; }
 
 .pd-tc-star:hover {
   background: var(--pd-gold);
@@ -1572,14 +1572,10 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
 }
 
 /* Card stacking shifts 0 1 2 3 index % 4 transforms */
-.pd-fav-card.shift-0 { transform: translateY(0) rotate(-0.6deg); }
-.pd-fav-card.shift-1 { transform: translateY(-10px) rotate(0.4deg); }
-.pd-fav-card.shift-2 { transform: translateY(5px) rotate(0.8deg); }
-.pd-fav-card.shift-3 { transform: translateY(-7px) rotate(-0.5deg); }
-
-.pd-fav-card {
-  transition: transform 0.4s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s;
-}
+.pd-fav-card.shift-0 { transform: translateX(-6px) translateY(0) rotate(-0.6deg); }
+.pd-fav-card.shift-1 { transform: translateX(5px) translateY(-10px) rotate(0.4deg); }
+.pd-fav-card.shift-2 { transform: translateX(-3px) translateY(5px) rotate(0.8deg); }
+.pd-fav-card.shift-3 { transform: translateX(4px) translateY(-7px) rotate(-0.5deg); }
 
 /* pd-fav-card main */
 .pd-fav-card {
@@ -1595,6 +1591,7 @@ onBeforeUnmount(() => { /* manual expand, no cleanup needed */ })
   display: flex;
   flex-direction: column;
   outline: none;
+  transition: transform 0.4s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s;
 }
 
 .pd-fav-card:hover,
