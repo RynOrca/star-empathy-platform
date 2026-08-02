@@ -61,7 +61,7 @@
           似乎每一个仰望它的人，都在它的光里看到了某个
           <strong>{{ seeInLight }}</strong>。
         </p>
-        <div class="pt-para last">
+        <div class="pt-suggest-wrap">
           <span class="pt-tip">✨ 如果你也想在这里挂心事</span>
           <span class="pt-suggest">{{ suggest }}</span>
         </div>
@@ -329,27 +329,22 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   padding: 3px 6px 0 0;
   font-family: 'Noto Serif SC', Georgia, serif;
 }
-.pt-para.last {
-  margin-top: 4px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 6px;
-  border-left: 2px solid rgba(255, 217, 138, 0.3);
+.pt-suggest-wrap {
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  text-align: left;
+  gap: 4px;
 }
 .pt-tip {
-  font-size: 0.7rem;
-  color: rgba(255, 217, 138, 0.9);
-  font-weight: 600;
+  font-size: 0.72rem;
+  color: rgba(255, 217, 138, 0.78);
   letter-spacing: 0.02em;
+  line-height: 1.6;
 }
 .pt-suggest {
-  font-size: 0.74rem;
-  color: rgba(255, 255, 255, 0.55);
-  line-height: 1.7;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.8;
 }
 
 @media (max-width: 768px) {
