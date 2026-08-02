@@ -41,7 +41,6 @@
         </svg>
 
         <div class="sc-tags">
-          <span class="sc-tag sc-tag-gold">{{ mbti }}</span>
           <span class="sc-tag" v-for="t in personaTags" :key="t">{{ t }}</span>
         </div>
       </div>
@@ -50,19 +49,17 @@
       <div class="persona-text">
         <p v-if="paraFirst" class="pt-para first" v-html="paraFirst"></p>
         <p v-else class="pt-para first">
-          <span class="pt-drop-cap">这</span>
-          颗 <strong class="star-name-hl">{{ starName }}</strong> 在故事中呈现出一种
-          <em class="em-gold">{{ tone }}</em> 的古典气质。它最常被人们在深夜凝望，
-          故事中反复出现 <em class="em-purple">「{{ motifA }}」「{{ motifB }}」</em> 等意象，
+          这颗 <strong class="star-name-hl">{{ starName }}</strong> 在故事中呈现出一种
+          <strong>{{ tone }}</strong> 的古典气质。它最常被人们在深夜凝望，
+          故事中反复出现「{{ motifA }}」「{{ motifB }}」等意象，
           是亮星中情感浓度最高的一颗之一。
         </p>
         <p v-if="paraSecond" class="pt-para" v-html="paraSecond"></p>
         <p v-else class="pt-para">
-          <span class="em-dash">—</span>
-          人们在这里写下的心事，<em class="em-purple">{{ emoPct }}%</em> 与
-          <em class="em-gold">{{ emoTheme }}</em> 有关，远高于全库平均的 54%。
+          人们在这里写下的心事，<strong>{{ emoPct }}%</strong> 与
+          <strong>{{ emoTheme }}</strong> 有关，远高于全库平均的 54%。
           似乎每一个仰望它的人，都在它的光里看到了某个
-          <em class="em-blue">{{ seeInLight }}</em>。
+          <strong>{{ seeInLight }}</strong>。
         </p>
         <div class="pt-para last">
           <span class="pt-tip">✨ 如果你也想在这里挂心事</span>
@@ -124,7 +121,6 @@ const SUGGEST = [
 ]
 
 const hanName = computed(() => S?.hanName ?? HAN[hFallback % HAN.length])
-const mbti = computed(() => S?.mbti ?? MBTI[(hFallback >>> 3) % MBTI.length])
 const personaTags = computed(() => S?.tags ?? TAGS_POOL[(hFallback >>> 5) % TAGS_POOL.length])
 
 // 文案：如果 persona 带 paragraphs 就用 paragraphs[i] 且保留星名/tone/意象/emo 注入结构
@@ -304,13 +300,21 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 .pt-para {
   font-size: 0.8rem;
   line-height: 1.85;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.02em;
   margin: 0;
+  text-align: justify;
+}
+.pt-para :deep(em),
+.pt-para :deep(b),
+.pt-para :deep(strong) {
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 600;
+  font-style: normal;
 }
 .star-name-hl {
-  color: rgba(255,255,255,0.85);
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 .pt-para.first {
@@ -318,54 +322,34 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 }
 .pt-drop-cap {
   float: left;
-  font-size: 1.65rem;
+  font-size: 1.6rem;
   font-weight: 700;
   line-height: 1;
-  color: #ffd98a;
+  color: rgba(255, 217, 138, 0.92);
   padding: 3px 6px 0 0;
   font-family: 'Noto Serif SC', Georgia, serif;
 }
 .pt-para.last {
   margin-top: 4px;
   padding: 10px 12px;
-  background: rgba(255,255,255,0.02);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 6px;
-  border-left: 2px solid rgba(255,217,138,0.3);
+  border-left: 2px solid rgba(255, 217, 138, 0.3);
   display: flex;
   flex-direction: column;
   gap: 5px;
+  text-align: left;
 }
 .pt-tip {
   font-size: 0.7rem;
-  color: #ffd98a;
-  opacity: 0.85;
+  color: rgba(255, 217, 138, 0.9);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 .pt-suggest {
   font-size: 0.74rem;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.55);
   line-height: 1.7;
-}
-.em-gold { color: #ffd98a; font-style: normal; font-weight: 600; }
-.em-purple { color: #caa7ff; font-style: normal; font-weight: 700; }
-.em-blue { color: #86a8ff; font-style: normal; font-weight: 600; }
-.em-dash {
-  display: inline-flex;
-  align-items: center;
-  color: rgba(255,255,255,0.4);
-  font-size: 1rem;
-  font-weight: 300;
-  letter-spacing: -0.08em;
-  line-height: 1;
-  margin: 3px 6px 0 0;
-  flex-shrink: 0;
-}
-
-/* 首段中的 EmDash 包裹 */
-.pt-para:not(.first):not(.last) {
-  display: flex;
-  align-items: flex-start;
 }
 
 @media (max-width: 768px) {

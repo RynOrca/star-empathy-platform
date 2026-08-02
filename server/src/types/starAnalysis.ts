@@ -11,11 +11,12 @@ export type PersonaDimension = {
 export type PersonaPayload = {
   constellation: string;  // "织女星 · 天琴座"（前端展示用）
   hanName: string;        // 四字汉名："望月听风"
-  mbti: 'INFP' | 'INFJ' | 'ENFP' | 'ISFP' | 'INTP' | 'ENFJ' | 'ISFJ' | 'ISTP' | 'ENTP' | string;
+  /** @deprecated 产品已移除 MBTI，仅为兼容历史保留，新生成一律 undefined/缺省 */
+  mbti?: 'INFP' | 'INFJ' | 'ENFP' | 'ISFP' | 'INTP' | 'ENFJ' | 'ISFJ' | 'ISTP' | string;
   tags: string[];         // 最多 5 个
   quote: string;          // 30~50 字金句
   suggestIntro: string;   // 60~100 字
-  paragraphs: [string, string]; // 两段解读，70~120 字
+  paragraphs: [string, string]; // 两段解读：复用旧"古今共望"叙事正文（去掉三节）
   dimensions: [PersonaDimension, PersonaDimension, PersonaDimension, PersonaDimension]; // 4 维
 };
 

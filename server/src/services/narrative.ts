@@ -524,6 +524,69 @@ export interface NarrativeResult {
 }
 
 /**
+ * 从 narrative.content 里**截掉结尾三个小节**（🌟藏心事 / 💭如果会说话 / 📖一句摘录），
+ * 只保留中间"古今共望"正文段落，拆成数组返回。
+ * 用于复用到 persona.paragraphs / 其他需要"正经叙事段"的地方。
+ */
+export function extractNarrativeBodyParagraphs(content: string): string[] {
+  if (!content) return []
+  // 找到第一个 "### 🌟" / "### 💭" / "### 📖" 的位置，整段截掉
+  const idx = content.search(/###\s*(?:🌟|💭|📖)/)
+  const main = (idx >= 0 ? content.slice(0, idx) : content).trim()
+  // 去掉第一行标题 "# 今夜，你看到 XX。" / "# 此刻，XX 正在地平线之下"
+  const withoutTitle = main.replace(/^\s*#[^\n]*\n+/, '').trim()
+  return withoutTitle
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    // 剔除：独立的"（诗人名）写："、`> "...（朝代·出处）"` 引用行、`——...` 来源单独行
+    .filter(p => {
+      if (!p) return false
+      if (/^\s*>\s*[""「]/.test(p)) return false
+      if (/^\s*（.*?）写[：:]/.test(p)) return false
+      if (/^\s*——/.test(p)) return false
+      return true
+    })
+}
+
+/**
+ * 复用旧 AI 叙事逻辑，但**不走 narratives 表缓存也不写缓存**，
+ * 只返回拆好的正文段落数组（一般 2~3 段，每段 70~150 字）。
+ * 不传位置则默认地平线以上 visible=true。
+ */
+export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<string[]> {
+  // ─── 太阳系星体 ───
+  if (isPlanetId(catalogStarId)) {
+    let visible = true
+    const hasPosition = lat !== undefined && lng !== undefined
+    if (hasPosition && ra !== undefined && dec !== undefined) {
+      visible = isAboveHorizon({ ra, dec }, lat, lng)
+    }
+    const { system, user } = visible
+      ? buildPlanetNarrativePromptVisible(catalogStarId)
+      : buildPlanetNarrativePromptHidden(catalogStarId)
+    const content = await deepseekChat(
+      [{ role: 'system', content: system }, { role: 'user', content: user }],
+      // 叙事生成是 Markdown，prompt 里没有 "json" 字样 → 必须关掉 json_mode，否则 DeepSeek 400
+      { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+    )
+    return extractNarrativeBodyParagraphs(content).slice(0, 3)
+  }
+
+  const star = getStarInfo(catalogStarId)
+  if (!star) {
+    throw Object.assign(new Error('恒星不存在'), { statusCode: 404 })
+  }
+  const hasPosition = lat !== undefined && lng !== undefined
+  const visible = hasPosition ? isAboveHorizon(star, lat, lng) : true
+  const { system, user } = buildNarrativePrompt(star, visible)
+  const content = await deepseekChat(
+    [{ role: 'system', content: system }, { role: 'user', content: user }],
+    { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+  )
+  return extractNarrativeBodyParagraphs(content).slice(0, 3)
+}
+
+/**
  * 获取恒星叙事（优先缓存，无缓存则生成并缓存）
  */
 export async function getNarrative(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<NarrativeResult> {
@@ -554,6 +617,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
       {
         temperature: 0.9,
         maxTokens: 3000,
+        jsonMode: false,
       },
     )
 
@@ -591,6 +655,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
     {
       temperature: 0.9,
       maxTokens: 3000,
+      jsonMode: false,
     },
   )
 

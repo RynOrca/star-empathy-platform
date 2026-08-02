@@ -20,6 +20,7 @@
 
 import db from '../../db'
 import { deepseekChat } from '../../services/deepseek'
+import { generateNarrativeBodyOnly } from '../../services/narrative'
 import type { PersonaPayload } from '../../types/starAnalysis'
 
 type KernelRow = {
@@ -34,16 +35,15 @@ type KernelRow = {
 
 const SYSTEM = `你是「星语穹庭」的星语画像师。你根据一颗星下真实的用户心事集合，为它塑造一个有人格、有温度的"星格"。
 
-你的输出必须是严格的 JSON，符合 PersonaPayload schema，无任何前后解释，不要 Markdown 代码块。
+你的输出必须是严格的 JSON，无任何前后解释，不要 Markdown 代码块。
 
-字段与硬约束：
+字段与硬约束（**注意：没有 mbti 字段**）：
 - constellation：字符串，恒星名 + 所属星座
 - hanName：四字汉名，国风气质（例：望月听风 / 落雪眠云 / 枕河听浪）
-- mbti：以下 8 类之一：INFP | INFJ | ENFP | ISFP | INTP | ENFJ | ISFJ | ISTP
 - tags：恰好 5 个中文标签，每个 2~4 字，语义不重复
 - quote：30~50 字金句，有画面感，类似"它永远为那些在午夜想起故乡的人亮着"
 - suggestIntro：60~100 字；像一个朋友在对刚点进星详情的用户轻声介绍这颗星
-- paragraphs：恰好 2 段，每段 70~120 字；分别从"它接住了什么情绪"与"它与访客怎么共鸣"切入；段内允许 ≤2 个 <b>/<em> 轻强调
+- paragraphs：**严格输出 ["__KEEP__", "__KEEP__"] 两个占位符**。不要自己写解读，解读文案由上层用旧版"古今共望"叙事正文填充
 - dimensions：恰好 4 维，每维结构 { left, right, percent, side }
   * left / right：二词对立中文概念（例：内敛 / 外放、念旧 / 向前、独处 / 共鸣、含蓄 / 直白）
   * percent：10~90 之间的整数，不要 50
@@ -116,25 +116,36 @@ export async function generatePersona(
     throw new Error(`[personaGen] 星 ${catalogStarId} 无故事样本，无法生成画像`)
   }
 
-  const content = await deepseekChat(
-    [
-      { role: 'system', content: SYSTEM },
+  // 并行：1) 画像 JSON（汉名/标签/金句/开场白/维度）  2) 旧 AI 叙事正文（两段解读）
+  const cidNum = Number(catalogStarId)
+  const [content, narrativeParagraphs] = await Promise.all([
+    deepseekChat(
+      [
+        { role: 'system', content: SYSTEM },
+        {
+          role: 'user',
+          content: buildUserPrompt({
+            starName: meta.starName || '未命名星',
+            constellation: meta.constellation || '未分星座',
+            totalStoryCount: total,
+            samples,
+          }),
+        },
+      ],
       {
-        role: 'user',
-        content: buildUserPrompt({
-          starName: meta.starName || '未命名星',
-          constellation: meta.constellation || '未分星座',
-          totalStoryCount: total,
-          samples,
-        }),
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+        temperature: 0.8,
+        maxTokens: 1200,
       },
-    ],
-    {
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-      temperature: 0.8,
-      maxTokens: 1400,
-    },
-  )
+    ),
+    // 复用旧版 "古今共望" 叙事 prompt，但去掉三段小节 + 标题，只留正文 2~3 段
+    Number.isFinite(cidNum)
+      ? generateNarrativeBodyOnly(cidNum).catch(err => {
+          console.warn(`[personaGen] generateNarrativeBodyOnly fallback failed: ${err?.message ?? err}`)
+          return []
+        })
+      : Promise.resolve([]),
+  ])
 
   const json = safeParsePersona(content)
   if (!json) {
@@ -142,8 +153,21 @@ export async function generatePersona(
   }
   // 前端会覆盖 constellation，但至少塞一份可读的进去
   if (!json.constellation) json.constellation = `${meta.starName} · ${meta.constellation}`
+
+  // 替换 AI 占位的 paragraphs 为真实的"古今共望"叙事正文
+  // 保证是 2 段；叙事段不足则用 persona.json 原本内容补齐（如果原来不是占位符就保留）
+  const orig = json.paragraphs as unknown as string[] | undefined
+  const p0 = narrativeParagraphs[0]?.trim() || (!orig || orig[0] === '__KEEP__' ? FALLBACK_PARAGRAPH[0] : orig[0])
+  const p1 = narrativeParagraphs[1]?.trim() || narrativeParagraphs[0]?.trim() || (!orig || orig[1] === '__KEEP__' ? FALLBACK_PARAGRAPH[1] : orig[1])
+  json.paragraphs = [p0, p1] as [string, string]
+
   return json
 }
+
+const FALLBACK_PARAGRAPH: [string, string] = [
+  '这颗星接住了最多那些来不及说出口的话——关于告别、关于年少、关于某个再也回不去的夏夜。人们在它的光里放下重量，也在它的光里重新看见自己。',
+  '仰望它的人，往往能在心事里找到与自己同频的那一束。它不会替你做决定，但会陪你在夜里坐一会儿，让银河替你把话慢慢说。',
+]
 
 // ──────────────────────── 工具函数 ────────────────────────
 
@@ -158,7 +182,6 @@ function safeParsePersona(text: string): PersonaPayload | null {
     const o = JSON.parse(s) as Partial<PersonaPayload>
     if (
       typeof o.hanName === 'string' &&
-      typeof o.mbti === 'string' &&
       Array.isArray(o.tags) && o.tags.length >= 3 &&
       typeof o.quote === 'string' &&
       typeof o.suggestIntro === 'string' &&
@@ -168,11 +191,14 @@ function safeParsePersona(text: string): PersonaPayload | null {
       return {
         constellation: o.constellation || '',
         hanName: o.hanName.slice(0, 6),
-        mbti: String(o.mbti).toUpperCase().slice(0, 6),
+        // MBTI 已经被产品移除，但为了兼容历史存量 JSON，仍允许字段存在但不校验
+        ...(typeof (o as unknown as { mbti?: string }).mbti === 'string'
+          ? { mbti: String((o as unknown as { mbti?: string }).mbti).toUpperCase().slice(0, 6) }
+          : { mbti: undefined }),
         tags: (o.tags as string[]).slice(0, 5).map(t => String(t).slice(0, 8)),
         quote: String(o.quote).slice(0, 120),
         suggestIntro: String(o.suggestIntro).slice(0, 160),
-        paragraphs: [String(o.paragraphs[0]).slice(0, 220), String(o.paragraphs[1]).slice(0, 220)] as [string, string],
+        paragraphs: [String(o.paragraphs[0]).slice(0, 260), String(o.paragraphs[1]).slice(0, 260)] as [string, string],
         dimensions: (o.dimensions as Array<Partial<PersonaPayload['dimensions'][0]>>).slice(0, 4).map(d => {
           const pct = clampPct(d.percent)
           return {

@@ -79,6 +79,12 @@ interface ChatOptions {
   temperature?: number
   maxTokens?: number
   enableSearch?: boolean
+  /**
+   * 是否启用 response_format={type:"json_object"}。
+   * 注意：DeepSeek/OpenAI 对这个模式有硬约束——prompt 里必须出现「json」这个词，
+   * 否则会直接 400。写"古今共望"叙事 Markdown 的时候请显式传 false。
+   */
+  jsonMode?: boolean
 }
 
 /**
@@ -107,8 +113,9 @@ export async function deepseekChat(
   if (options.enableSearch) {
     body.enable_search = true
   }
-  // JSON 模式提示（OpenAI/DeepSeek 都兼容，提升 JSON 稳定性；非思考模型也适用）
-  body.response_format = { type: 'json_object' }
+  // JSON 模式（默认开；写叙事等 Markdown/自由文任务显式 jsonMode=false）
+  const wantJson = options.jsonMode !== false
+  if (wantJson) body.response_format = { type: 'json_object' }
 
   console.log(`🤖 DeepSeek 请求: ${model}, ${messages.length} 条消息 (try=${_retry + 1})`)
 
