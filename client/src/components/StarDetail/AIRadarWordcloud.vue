@@ -1,11 +1,13 @@
 <template>
-  <div class="double-wrap">
-    <!-- 情感解构卡片 -->
-    <div class="card emotion-card">
-      <div class="card-head">
-        <Sparkle :size="10" class="head-ico ico-purple" />
-        <span class="head-title">情感解构</span>
-        <span class="head-sub">基于 5 维情感模型 · {{ storyCount }} 条语料</span>
+  <div class="stack-wrap">
+    <!-- 1. 情感解构 -->
+    <div class="ai-card emotion-card">
+      <div class="ai-head">
+        <div class="ai-badge ai-badge-purple">
+          <Sparkle :size="10" class="ai-spark" />
+          <span>星语 AI · 情感解构</span>
+        </div>
+        <div class="ai-sub">基于 5 维情感模型 · {{ storyCount }} 条语料</div>
       </div>
 
       <div class="emotion-body">
@@ -36,12 +38,14 @@
       </div>
     </div>
 
-    <!-- 故事摘录卡片 -->
-    <div class="card quote-card">
-      <div class="card-head">
-        <Quote :size="10" class="head-ico ico-gold" />
-        <span class="head-title">故事摘录</span>
-        <span class="head-sub">AI 精选的 3 段最动人独白</span>
+    <!-- 2. 故事摘录 -->
+    <div class="ai-card quote-card">
+      <div class="ai-head">
+        <div class="ai-badge ai-badge-gold">
+          <Quote :size="10" class="ai-spark" />
+          <span>星语 AI · 故事摘录</span>
+        </div>
+        <div class="ai-sub">AI 精选的 3 段最动人独白</div>
       </div>
 
       <div class="quote-list">
@@ -150,36 +154,65 @@ function orbSize(e: { value: number }) { return 40 + e.value * 26 }
 </script>
 
 <style scoped>
-.double-wrap {
-  margin: 0 28px 22px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.stack-wrap {
+  margin: 0 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.card {
-  background: rgba(255,255,255,0.018);
+/* 每个独立面板：和 persona-wrap 同风格（边框 + 顶边渐变线 + padding） */
+.ai-card {
+  padding: 16px 18px 18px;
+  background: rgba(255,255,255,0.015);
   border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 10px;
-  padding: 14px 16px 16px;
+  border-radius: 12px;
+  position: relative;
 }
-.card-head {
+.ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
+  pointer-events: none;
+}
+
+/* 头：左 星语AI徽章 + 右 小字说明 */
+.ai-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
-.head-ico { opacity: 0.85; }
-.ico-purple { color: #caa7ff; }
-.ico-gold { color: #ffd98a; }
-.head-title {
-  font-size: 0.82rem;
+.ai-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.8);
-  flex: 1;
+  letter-spacing: 0.03em;
 }
-.head-sub {
+.ai-badge-purple {
+  background: linear-gradient(135deg, rgba(202,167,255,0.18), rgba(255,217,138,0.08));
+  border: 1px solid rgba(202,167,255,0.28);
+  color: #caa7ff;
+}
+.ai-badge-gold {
+  background: linear-gradient(135deg, rgba(255,217,138,0.2), rgba(202,167,255,0.08));
+  border: 1px solid rgba(255,217,138,0.35);
+  color: #ffd98a;
+}
+.ai-spark {
+  color: #ffd98a;
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.ai-sub {
   font-size: 0.6rem;
   color: rgba(255,255,255,0.22);
   letter-spacing: 0.03em;
@@ -319,9 +352,8 @@ function orbSize(e: { value: number }) { return 40 + e.value * 26 }
 .q-date { color: rgba(255,255,255,0.22); }
 
 @media (max-width: 900px) {
-  .double-wrap {
-    grid-template-columns: 1fr;
-    margin: 0 18px 20px;
+  .stack-wrap {
+    margin: 0 18px 16px;
   }
 }
 </style>

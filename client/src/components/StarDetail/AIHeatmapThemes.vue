@@ -1,11 +1,13 @@
 <template>
-  <div class="double-wrap">
-    <!-- 主题森林 -->
-    <div class="card forest-card">
-      <div class="card-head">
-        <TreeDeciduous :size="10" class="head-ico ico-green" />
-        <span class="head-title">主题森林</span>
-        <span class="head-sub">{{ total }} 条故事 · {{ Math.min(8, themes.length) }} 个主题</span>
+  <div class="stack-wrap">
+    <!-- 1. 主题森林 -->
+    <div class="ai-card forest-card">
+      <div class="ai-head">
+        <div class="ai-badge ai-badge-green">
+          <TreeDeciduous :size="10" class="ai-spark" />
+          <span>星语 AI · 主题森林</span>
+        </div>
+        <div class="ai-sub">{{ total }} 条故事 · {{ Math.min(8, themes.length) }} 个主题</div>
       </div>
 
       <!-- 8 棵小树苗：上排 4，下排 4 -->
@@ -56,7 +58,7 @@
         </div>
       </div>
 
-      <!-- AI 文字点评（可选：有 AI 生成 → 显示；没有 → fallback 动态文案） -->
+      <!-- AI 文字点评 -->
       <div class="forest-note">
         <Leaf :size="11" class="leaf-ico" />
         <div class="note-text">
@@ -71,12 +73,14 @@
       </div>
     </div>
 
-    <!-- 时辰观察 -->
-    <div class="card hour-card">
-      <div class="card-head">
-        <Clock3 :size="10" class="head-ico ico-blue" />
-        <span class="head-title">时辰观察</span>
-        <span class="head-sub">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</span>
+    <!-- 2. 时辰观察 -->
+    <div class="ai-card hour-card">
+      <div class="ai-head">
+        <div class="ai-badge ai-badge-blue">
+          <Clock3 :size="10" class="ai-spark" />
+          <span>星语 AI · 时辰观察</span>
+        </div>
+        <div class="ai-sub">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</div>
       </div>
 
       <!-- 顶部念珠状 24 小时小圆 -->
@@ -215,36 +219,64 @@ function beadSize(v: number) {
 </script>
 
 <style scoped>
-.double-wrap {
-  margin: 0 28px 22px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.stack-wrap {
+  margin: 0 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.card {
-  background: rgba(255,255,255,0.018);
+.ai-card {
+  padding: 16px 18px 18px;
+  background: rgba(255,255,255,0.015);
   border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 10px;
-  padding: 14px 16px 16px;
+  border-radius: 12px;
+  position: relative;
 }
-.card-head {
+.ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
+  pointer-events: none;
+}
+
+/* 头：徽章 + 右侧说明 */
+.ai-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
-.head-ico { opacity: 0.85; }
-.ico-green { color: #9ae6b4; }
-.ico-blue { color: #86a8ff; }
-.head-title {
-  font-size: 0.82rem;
+.ai-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.8);
-  flex: 1;
+  letter-spacing: 0.03em;
 }
-.head-sub {
+.ai-badge-green {
+  background: linear-gradient(135deg, rgba(154,230,180,0.18), rgba(255,217,138,0.08));
+  border: 1px solid rgba(154,230,180,0.3);
+  color: #9ae6b4;
+}
+.ai-badge-blue {
+  background: linear-gradient(135deg, rgba(134,168,255,0.2), rgba(202,167,255,0.08));
+  border: 1px solid rgba(134,168,255,0.32);
+  color: #86a8ff;
+}
+.ai-spark {
+  color: #ffd98a;
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.ai-sub {
   font-size: 0.6rem;
   color: rgba(255,255,255,0.22);
   letter-spacing: 0.03em;
@@ -401,9 +433,8 @@ function beadSize(v: number) {
 }
 
 @media (max-width: 900px) {
-  .double-wrap {
-    margin: 0 18px 20px;
-    grid-template-columns: 1fr;
+  .stack-wrap {
+    margin: 0 18px 16px;
   }
 }
 </style>
