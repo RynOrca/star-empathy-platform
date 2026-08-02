@@ -320,6 +320,7 @@
       <div class="mobile-overlay" @click.self="$emit('close')">
         <div
           class="mobile-sheet"
+          :class="{ dragging: isDragging }"
           :style="{ height: sheetHeight }"
           @touchstart.passive="onTouchStart"
           @touchmove.passive="onTouchMove"
@@ -641,11 +642,13 @@ const { isMobile } = useMediaQuery()
 const sheetHeight = ref('60vh')
 const touchStartY = ref(0)
 const touchStartHeight = ref(0)
+const isDragging = ref(false)
 
 function onTouchStart(e: TouchEvent) {
   touchStartY.value = e.touches[0].clientY
   const sheet = (e.target as HTMLElement).closest('.mobile-sheet') as HTMLElement
   touchStartHeight.value = sheet?.offsetHeight || window.innerHeight * 0.6
+  isDragging.value = true
 }
 
 function onTouchMove(e: TouchEvent) {
@@ -660,6 +663,7 @@ function onTouchEnd() {
   const sheet = document.querySelector('.mobile-sheet') as HTMLElement
   const currentH = sheet?.offsetHeight || window.innerHeight * 0.6
   const vh = window.innerHeight
+  isDragging.value = false
   if (currentH < vh * 0.3) {
     // 下拉低于 30vh → 关闭
     emit('close')
@@ -1785,6 +1789,10 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 拖拽时高度变化才需要过渡，enter/leave 用 transform 过渡避免冲突 */
+.mobile-sheet.dragging {
   transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: height;
 }
