@@ -269,7 +269,7 @@
     </div>
 
     <!-- issue #124：移动端吸附星辰后的「凝听星语」按钮（替代触屏点击进入故事） -->
-    <Transition name="story-enter">
+    <Transition name="story-enter" appear>
       <button
         v-if="isMobile && snappedStarId !== null && !selectedStarInfo"
         class="story-enter-btn"
@@ -2248,11 +2248,15 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 /* 滑入/滑出过渡 */
 .story-enter-enter-active,
 .story-enter-leave-active {
-  transition: transform 0.4s cubic-bezier(.2, .9, .3, 1);
+  transition: transform 0.4s cubic-bezier(.2, .9, .3, 1) !important;
 }
 .story-enter-enter-from,
 .story-enter-leave-to {
   transform: translateY(100%);
+}
+.story-enter-enter-to,
+.story-enter-leave-from {
+  transform: translateY(0);
 }
 
 /* 尊重用户的减少动画偏好 */
