@@ -1,14 +1,25 @@
 /**
  * DeepSeek API 封装
  * 兼容 OpenAI Chat Completions 格式
- * 默认模型：deepseek-v4-flash
+ *
+ * 默认模型：deepseek-chat（V3 非思考模型）
+ *
+ * 说明：
+ *   · deepseek-v4-flash / deepseek-reasoner 属于「思考模型」，它会把正式答案放在
+ *     `content`，把思维链放在 `reasoning_content`。但如果 prompt 要求严格 JSON，模型偶
+ *     发会只写 reasoning_content 而 content 为空。对此我们做了 3 层兜底：
+ *       1) content 空 -> 用 reasoning_content 里解析 JSON
+ *       2) 还是空 -> 自动 sleep 后 retry 一次（思考模型偶尔首轮只推理不输出正文）
+ *       3) 实在不行抛错（上层 generator 会写 partial 并跳过）
+ *   · 不建议把默认模型换成思考模型（又慢又贵又不稳定，JSON 任务 V3 足够）
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
-const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
+// JSON 任务：非思考模型（deepseek-chat = V3）更便宜更稳，不要用 V4/R1
+const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
 
 // 运行时 API Key 持久化文件（兼容 ts-node 开发 和 tsc 编译后生产环境）
 function resolveKeyFilePath(): string {
@@ -77,6 +88,7 @@ interface ChatOptions {
 export async function deepseekChat(
   messages: ChatMessage[],
   options: ChatOptions = {},
+  _retry = 0,
 ): Promise<string> {
   const apiKey = getApiKey()
   if (!apiKey) {
@@ -95,8 +107,10 @@ export async function deepseekChat(
   if (options.enableSearch) {
     body.enable_search = true
   }
+  // JSON 模式提示（OpenAI/DeepSeek 都兼容，提升 JSON 稳定性；非思考模型也适用）
+  body.response_format = { type: 'json_object' }
 
-  console.log(`🤖 DeepSeek 请求: ${model}, ${messages.length} 条消息`)
+  console.log(`🤖 DeepSeek 请求: ${model}, ${messages.length} 条消息 (try=${_retry + 1})`)
 
   const res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
@@ -110,20 +124,70 @@ export async function deepseekChat(
   if (!res.ok) {
     const errText = await res.text()
     console.error(`DeepSeek API 错误 (${res.status}):`, errText.slice(0, 300))
+    // 429 或 5xx：自动重试一次
+    if (_retry === 0 && (res.status === 429 || res.status >= 500)) {
+      await sleep(1500)
+      return deepseekChat(messages, options, _retry + 1)
+    }
     throw new Error(`DeepSeek API 请求失败 (${res.status}): ${errText}`)
   }
 
   const json = await res.json() as {
-    choices: Array<{ message: { content: string; reasoning_content?: string } }>
+    choices: Array<{ message: { content: string | null; reasoning_content?: string | null } }>
   }
 
-  // DeepSeek v4 推理模型有时把回复放在 reasoning_content 而不是 content
   const message = json.choices?.[0]?.message
-  const content = message?.content || ''
-  if (!content) {
-    console.error('DeepSeek API 返回内容为空，完整响应:', JSON.stringify(json).slice(0, 500))
-    throw new Error('DeepSeek API 返回内容为空')
+  const content = (message?.content ?? '').trim()
+  const reasoning = (message?.reasoning_content ?? '').trim()
+
+  // 1) 正常情况：content 有值直接用
+  if (content) return content
+
+  // 2) content 空但 reasoning_content 里含 JSON：可能是思考模型没把答案输出到 content，
+  //    就把 reasoning 里的 JSON 抠出来（通常最后一段是结论 JSON）
+  if (reasoning) {
+    const extracted = extractJsonFromText(reasoning)
+    if (extracted) {
+      console.warn('⚠️ [deepseek] content 为空，从 reasoning_content 提取 JSON 成功')
+      return extracted
+    }
   }
 
-  return content
+  // 3) 首轮没出正文：自动重试一次
+  if (_retry === 0) {
+    console.warn('⚠️ [deepseek] content 为空，1.5s 后重试一次')
+    await sleep(1500)
+    return deepseekChat(messages, options, _retry + 1)
+  }
+
+  console.error('DeepSeek API 返回内容为空，完整响应:', JSON.stringify(json).slice(0, 500))
+  throw new Error('DeepSeek API 返回内容为空')
+}
+
+// ──────────────────────── utils ────────────────────────
+
+/**
+ * 从一坨自由文（reasoning_content）里抓最像 JSON 的块（{} 对里最外层的那个）。
+ * 找不到返回 null。
+ */
+function extractJsonFromText(text: string): string | null {
+  // 先取 ```json``` fence
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fence && fence[1]?.trim()) return fence[1].trim()
+  const l = text.lastIndexOf('{')
+  const r = text.lastIndexOf('}')
+  if (l >= 0 && r > l) {
+    const candidate = text.slice(l, r + 1)
+    try {
+      JSON.parse(candidate)
+      return candidate
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(res => setTimeout(res, ms))
 }
