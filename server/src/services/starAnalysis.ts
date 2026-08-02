@@ -118,16 +118,20 @@ function normalizeTheme(raw: string): string {
  * themes 直接从 story_kernels.themes (JSON 数组字符串) 聚合。
  * 24h 分布从 stars.created_at 按 UTC+8 时区聚合。
  */
-export function computeThemeHour(catalogStarId: number): ThemeHourPayload {
+export function computeThemeHour(catalogStarId: string | number): ThemeHourPayload {
+  const cid = String(catalogStarId)
+
   // ── 8 Themes（按 count 降序，Top 8） ──
+  // 通过连接表 story_catalog_stars 统一拿该星所有故事 + kernels，兼容一个故事挂多颗星
   const stories = db
     .prepare(
       `SELECT s.id AS sid, sk.themes AS themes_json
-       FROM stars s
+       FROM story_catalog_stars scs
+       JOIN stars s ON s.id = scs.story_id
        LEFT JOIN story_kernels sk ON sk.story_id = s.id
-       WHERE s.catalog_star_id = ?`
+       WHERE scs.catalog_star_id = ?`
     )
-    .all(catalogStarId) as Array<{ sid: number; themes_json: string | null }>
+    .all(cid) as Array<{ sid: number; themes_json: string | null }>
 
   const counter = new Map<string, number>()
   for (const row of stories) {
@@ -144,11 +148,16 @@ export function computeThemeHour(catalogStarId: number): ThemeHourPayload {
       /* ignore malformed json */
     }
   }
-  // 没有 kernels → 退化到 stars.tag 字段聚合（给老数据兜底）
+  // 没有 kernels → 退化到 stars.tag 字段聚合（老数据兜底；用连接表）
   if (counter.size === 0) {
     const tagRows = db
-      .prepare('SELECT tag FROM stars WHERE catalog_star_id = ? AND tag IS NOT NULL AND tag != \'\'')
-      .all(catalogStarId) as Array<{ tag: string }>
+      .prepare(
+        `SELECT s.tag AS tag
+         FROM story_catalog_stars scs
+         JOIN stars s ON s.id = scs.story_id
+         WHERE scs.catalog_star_id = ? AND s.tag IS NOT NULL AND s.tag != ''`
+      )
+      .all(cid) as Array<{ tag: string }>
     for (const r of tagRows) {
       const n = normalizeTheme(r.tag)
       counter.set(n, (counter.get(n) ?? 0) + 1)
@@ -173,14 +182,15 @@ export function computeThemeHour(catalogStarId: number): ThemeHourPayload {
   // SQLite datetime() 默认 UTC。北京时区 = +8h。
   const hourRows = db
     .prepare(
-      `SELECT cast(strftime('%H', datetime(created_at, '+8 hours')) AS INTEGER) AS h,
-              COUNT(*) AS c
-       FROM stars
-       WHERE catalog_star_id = ?
-         AND created_at IS NOT NULL
+      `SELECT cast(strftime('%H', datetime(s.created_at, '+8 hours')) AS INTEGER) AS h,
+              COUNT(DISTINCT s.id) AS c
+       FROM story_catalog_stars scs
+       JOIN stars s ON s.id = scs.story_id
+       WHERE scs.catalog_star_id = ?
+         AND s.created_at IS NOT NULL
        GROUP BY h`
     )
-    .all(catalogStarId) as Array<{ h: number; c: number }>
+    .all(cid) as Array<{ h: number; c: number }>
 
   const hourly: number[] = new Array(24).fill(0)
   for (const r of hourRows) {
@@ -207,7 +217,7 @@ export function computeThemeHour(catalogStarId: number): ThemeHourPayload {
  * 读 catalog_star_analyses 表，拼合返回给前端的完整 payload。
  * themehour 表里没存时会即时 SQL 聚合返回（轻量）。
  */
-export function readAnalysis(catalogStarId: number): CatalogAnalysisFull {
+export function readAnalysis(catalogStarId: string | number): CatalogAnalysisFull {
   const row = db
     .prepare(
       `SELECT persona_json, emotion_json, themehour_json, generated_at

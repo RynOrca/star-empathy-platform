@@ -7,7 +7,8 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/src/index.js",
-    "seed": "ts-node scripts/seed.ts"
+    "seed": "ts-node scripts/seed.ts",
+    "agent:analyze": "ts-node scripts/generateAllAnalyses.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
