@@ -15,6 +15,8 @@
 import crypto from 'node:crypto'
 import db from '../db'
 import { computeThemeHour } from '../services/starAnalysis'
+import { getCatalogStar, getStarDisplay, listAllCatalogStars } from '../services/catalogMeta'
+export { getStarDisplay } from '../services/catalogMeta'
 import { countStarStories, generatePersona } from './generators/personaGen'
 import { generateEmotion } from './generators/emotionGen'
 import { generateThemeHourTexts } from './generators/themeHourGen'
@@ -23,7 +25,8 @@ import type { PersonaPayload, EmotionPayload, ThemeHourPayload } from '../types/
 export type AgentStep = 'themehour' | 'persona' | 'emotion'
 
 export type EnsureOpts = {
-  meta: { starName: string; constellation: string }
+  /** 可选：外部强制指定（一般不传）；不传时从 catalogMeta 自动拿 */
+  meta?: { starName: string; constellation: string }
   /** true 时忽略 story_hash 强制重算 */
   force?: boolean
   /** 只做指定阶段（调试用） */
@@ -66,30 +69,29 @@ export function getStarStoryMeta(catalogStarId: string | number): StarStoryMeta 
     .prepare(
       `SELECT
          COUNT(DISTINCT s.id) AS total,
-         MAX(s.created_at) AS latestAt,
-         cs.mag AS catalogMag,
-         cs.name AS catalogName
+         MAX(s.created_at) AS latestAt
        FROM story_catalog_stars scs
        LEFT JOIN stars s ON s.id = scs.story_id
-       LEFT JOIN catalog_stars cs ON cs.id = CAST(scs.catalog_star_id AS INTEGER)
        WHERE scs.catalog_star_id = ?
        GROUP BY scs.catalog_star_id`
     )
     .get(cid) as
-    | { total: number; latestAt: string | null; catalogMag: number | null; catalogName: string | null }
+    | { total: number; latestAt: string | null }
     | undefined
+  // catalog meta（星图元数据：星名/星等来自内存 lookup，不来自不存在的 catalog_stars 表
+  const cstar = getCatalogStar(cid)
   return {
     catalogStarId: cid,
     total: r?.total ?? 0,
     latestAt: r?.latestAt ?? null,
-    catalogMag: r?.catalogMag ?? null,
-    catalogName: r?.catalogName ?? null,
+    catalogMag: cstar?.mag ?? null,
+    catalogName: cstar?.name ?? null,
   }
 }
 
 /**
  * 列出待处理的 catalog 星（priority 排序：故事数 DESC × 10 + 亮星加成）。
- * minStories=0 时会把完全没故事的亮星也列进来（可让它们只跑 persona 的 fallback？ —— 我们这里跳过，等有故事再说）
+ * 注意：catalog meta（name/mag）来自内存 catalogMeta lookup，不用 JOIN 不存在的 catalog_stars 表。
  */
 export function listPrioritizedStars(opts: {
   limit?: number
@@ -105,20 +107,36 @@ export function listPrioritizedStars(opts: {
       `SELECT
          CAST(scs.catalog_star_id AS TEXT) AS catalogStarId,
          COUNT(DISTINCT scs.story_id) AS total,
-         MAX(s.created_at) AS latestAt,
-         cs.mag AS catalogMag,
-         cs.name AS catalogName
+         MAX(s.created_at) AS latestAt
        FROM story_catalog_stars scs
        LEFT JOIN stars s ON s.id = scs.story_id
-       LEFT JOIN catalog_stars cs ON cs.id = CAST(scs.catalog_star_id AS INTEGER)
        GROUP BY scs.catalog_star_id
        HAVING total >= ?
-       ORDER BY total DESC, COALESCE(cs.mag, 99) ASC
+       ORDER BY total DESC
        LIMIT ?`
     )
-    .all(minStories, limit * 5) as Array<StarStoryMeta & { total: number }>
+    .all(minStories, limit * 20) as Array<{ catalogStarId: string; total: number; latestAt: string | null }>
 
-  let list = rows
+  // 拼 join 内存里补 catalog meta，按故事数 + 亮星加成后再排一次序（原来的 SQL 少 JOIN cs.mag 已经不存在这张表了）
+  const withMeta: StarStoryMeta[] = rows.map(r => {
+    const cs = getCatalogStar(r.catalogStarId)
+    return {
+      catalogStarId: r.catalogStarId,
+      total: r.total,
+      latestAt: r.latestAt ?? null,
+      catalogMag: cs?.mag ?? null,
+      catalogName: cs?.name ?? null,
+    }
+  })
+  withMeta.sort((a, b) => {
+    const byStory = (b.total ?? 0) - (a.total ?? 0)
+    if (byStory !== 0) return byStory
+    const am = a.catalogMag ?? 999
+    const bm = b.catalogMag ?? 999
+    return am - bm
+  })
+
+  let list = withMeta
   if (onlyIds) {
     const set = new Set(onlyIds)
     list = list.filter(r => set.has(r.catalogStarId))
@@ -213,6 +231,8 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
   const meta = getStarStoryMeta(cid)
   const hash = computeStoryHash(meta)
   const row = loadDbRow(cid)
+  // meta 优先从 catalogMeta 查，外部强制指定仅作为覆盖（少见）
+  const displayMeta = opts.meta ?? getStarDisplay(cid)
 
   if (!opts.force && row?.story_hash === hash) {
     const hasAll =
@@ -231,7 +251,7 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
       const base = computeThemeHour(cid)
       let th: ThemeHourPayload
       if (storyCount >= 1) {
-        const texts = await generateThemeHourTexts(cid, opts.meta)
+        const texts = await generateThemeHourTexts(cid, displayMeta)
         th = { ...base, ...texts }
       } else {
         // 没故事的亮星跳过 AI 三段文（免得胡编），只给 SQL 聚合（全 0 数组）
@@ -254,7 +274,7 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
   if (steps.includes('persona')) {
     if (storyCount >= 1) {
       try {
-        const persona = await generatePersona(cid, opts.meta)
+        const persona = await generatePersona(cid, displayMeta)
         upsertAnalysis(cid, { persona, storyCount, storyHash: hash })
         opts.onProgress?.({ catalogStarId: cid, step: 'persona', ok: true })
         await sleep(throttle)
@@ -272,7 +292,7 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
   if (steps.includes('emotion')) {
     if (storyCount >= 1) {
       try {
-        const emotion = await generateEmotion(cid, opts.meta)
+        const emotion = await generateEmotion(cid, displayMeta)
         upsertAnalysis(cid, { emotion, storyCount, storyHash: hash, generatedAt: Date.now() })
         opts.onProgress?.({ catalogStarId: cid, step: 'emotion', ok: true })
         await sleep(throttle)
@@ -334,13 +354,16 @@ export async function runAll(opts: RunAllOpts): Promise<RunAllSummary> {
       }
     }
 
-    const name = star.catalogName || opts.meta.starName
-    const constellation = opts.meta.constellation
+    // meta 从 catalogMeta lookup 取（外部传 meta 仅作覆盖）
+    const defaultDisplay = getStarDisplay(star.catalogStarId)
+    const displayMeta = opts.meta
+      ? { starName: opts.meta.starName || defaultDisplay.starName, constellation: opts.meta.constellation || defaultDisplay.constellation }
+      : defaultDisplay
 
     try {
       await ensureOne(star.catalogStarId, {
         ...opts,
-        meta: { starName: name || '未命名星', constellation: constellation || '未分星座' },
+        meta: displayMeta,
         onProgress: localProgress,
       })
       const set = stepTracker.get(star.catalogStarId) ?? new Set<AgentStep>()

@@ -16,7 +16,7 @@
  */
 
 import 'dotenv/config'
-import { runAll, ensureOne, listPrioritizedStars } from '../src/agents/starAnalysisAgent'
+import { runAll, ensureOne, listPrioritizedStars, getStarStoryMeta, getStarDisplay } from '../src/agents/starAnalysisAgent'
 import type { AgentStep } from '../src/agents/starAnalysisAgent'
 
 type Args = {
@@ -94,15 +94,15 @@ async function main() {
     })
     console.log(`\n📋 计划处理 ${list.length} 颗星：`)
     for (const s of list) {
-      const name = s.catalogName ? `${s.catalogName.padEnd(10)}` : '未命名    '
+      const disp = getStarDisplay(s.catalogStarId)
       const mag = s.catalogMag == null ? ' -- ' : s.catalogMag.toFixed(2).padStart(5)
-      console.log(`  id=${String(s.catalogStarId).padEnd(6)}  ${name}  mag=${mag}  stories=${fmtNum(s.total)}`)
+      const nameDisp = (disp.starName + ' · ' + disp.constellation).padEnd(28)
+      console.log(`  id=${String(s.catalogStarId).padEnd(6)}  ${nameDisp}  mag=${mag}  stories=${fmtNum(s.total)}`)
     }
     return
   }
 
   const start = Date.now()
-  const meta = { starName: '未命名星', constellation: '未分星座' }
   console.log(`\n🚀 starAnalysisAgent 启动
   limit       = ${args.limit}
   minStories  = ${args.minStories}
@@ -119,9 +119,10 @@ async function main() {
     const total = args.ids.length
     for (const id of args.ids) {
       i++
-      console.log(`\n🔭 [${i}/${total}] id=${id}`)
+      const disp = getStarDisplay(id)
+      const sm = getStarStoryMeta(id)
+      console.log(`\n🔭 [${i}/${total}] id=${id}  ${disp.starName} · ${disp.constellation}  stories=${sm.total}`)
       await ensureOne(id, {
-        meta,
         force: args.force,
         onlySteps: args.only,
         throttleMs: args.throttle,
@@ -138,7 +139,6 @@ async function main() {
   }
 
   const summary = await runAll({
-    meta,
     limit: args.limit,
     minStories: args.minStories,
     onlyCatalogIds: args.ids,
