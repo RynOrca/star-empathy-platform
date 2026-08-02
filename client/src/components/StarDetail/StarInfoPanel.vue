@@ -112,38 +112,7 @@
       </div>
     </div>
 
-    <!-- 月相 widget -->
-    <div class="astro-events moon-widget" v-if="astroData?.moon">
-      <div class="astro-events-header">
-        <MoonIcon :size="13" class="astro-icon" />
-        <span class="astro-events-title">今日月相</span>
-        <span
-          class="moon-phase-icon"
-          :style="{ '--moon-brightness': astroData.moon.phaseBrightness + '%' }"
-          :title="astroData.moon.phaseLabel"
-        ></span>
-      </div>
-      <div class="astro-events-grid">
-        <div class="astro-event-item">
-          <div class="astro-event-content">
-            <span class="astro-event-label">相位</span>
-            <span class="astro-event-value">{{ astroData.moon.phaseLabel }}</span>
-          </div>
-        </div>
-        <div class="astro-event-item">
-          <div class="astro-event-content">
-            <span class="astro-event-label">亮面</span>
-            <span class="astro-event-value">{{ (astroData.moon.illumination * 100).toFixed(0) }}%</span>
-          </div>
-        </div>
-        <div class="astro-event-item" v-if="astroData.moon.nextFullMoon">
-          <div class="astro-event-content">
-            <span class="astro-event-label">下次满月</span>
-            <span class="astro-event-value">{{ formatDateTime(astroData.moon.nextFullMoon) }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    
 
     <!-- 北极星岁差科普 -->
     <div v-if="catalogStarId === 4" class="info-section precession-lore">
@@ -163,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { Sun, Sparkles, Navigation, Thermometer, BookOpen, Heart, Eye, Compass, Sunrise, Sunset, Clock, Moon } from 'lucide-vue-next'
+import { Sun, Sparkles, Navigation, Thermometer, BookOpen, Heart, Eye, Compass, Sunrise, Sunset, Clock } from 'lucide-vue-next'
 
 const SunIcon = Sun
 const SparklesIcon = Sparkles
@@ -176,7 +145,6 @@ const CompassIcon = Compass
 const SunriseIcon = Sunrise
 const SunsetIcon = Sunset
 const ClockIcon = Clock
-const MoonIcon = Moon
 const StarIcon = Sparkles
 
 defineProps<{
@@ -295,23 +263,6 @@ defineProps<{
   background: rgba(120, 200, 120, 0.16);
   color: #8ad88a;
 }
-.moon-phase-icon {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #1a1a2e;
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.moon-phase-icon::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: linear-gradient(90deg, #e8e0d0 var(--moon-brightness, 0%), transparent var(--moon-brightness, 0%));
-}
 .astro-events-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -339,10 +290,6 @@ defineProps<{
   white-space: nowrap;
 }
 .astro-event-sub { font-size: 0.68rem; color: var(--muted-light); }
-.moon-widget {
-  margin-top: 10px;
-  background: linear-gradient(180deg, rgba(180, 200, 255, 0.04), rgba(180, 200, 255, 0.01));
-}
 
 /* ─── Info Section ─── */
 .info-section {

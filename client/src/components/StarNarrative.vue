@@ -157,6 +157,48 @@ const renderedContent = computed(() => {
   color: var(--star-purple);
 }
 
+/* ── Markdown 新增章节（关键词 / 独白 / 摘录） ── */
+.narrative-body :deep(h3) {
+  margin: 22px 0 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.02em;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding-left: 8px;
+  border-left: 2px solid rgba(255, 217, 138, 0.35);
+}
+
+/* Hashtag 行：紧跟关键词 H3 之后的第一段落 */
+.narrative-body :deep(h3 + p) {
+  margin: 4px 0 8px;
+  padding: 0;
+}
+.narrative-body :deep(h3 + p)::first-line {
+  /* hashtags 行 */
+}
+
+/* hashtag 里直接出现的 #xxx 标签 */
+.narrative-body :deep(p) {
+  word-break: break-word;
+}
+
+/* 摘录专用 blockquote（H3 摘录下的 blockquote） */
+.narrative-body :deep(blockquote) {
+  margin: 10px 0;
+}
+
+/* Markdown 内的 hashtag 标签段落（直接文本匹配 #xxx 样式太复杂，包一层 span）
+   这里用简单方式：任何开头包含 # 的段落用 monospaced 字重 */
+.narrative-body :deep(p) code {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
 /* ── 闲置 ── */
 .narrative-idle {
   display: flex;
