@@ -24,14 +24,6 @@
           <template v-if="activeTab === 'narrative'">
             <div class="narrative-layout">
               <div class="narrative-top">
-                <StarNarrative
-                  :content="narrative.content.value"
-                  :loading="narrative.loading.value"
-                  :error="narrative.error.value"
-                  :cached="narrative.cached.value"
-                  @retry="narrative.fetchNarrative(catalogStarId)"
-                />
-
                 <!-- A. 星语数据条 -->
                 <div v-if="catalogStats" class="story-stats-bar">
                   <div class="stat-item">
@@ -605,15 +597,148 @@
                 </div>
               </template>
 
-              <!-- AI 叙事 -->
+              <!-- AI 叙事（移动端）：只保留星语AI 往下的内容，旧 Markdown 叙事整块移除 -->
               <template v-else-if="activeTab === 'narrative'">
-                <StarNarrative
-                  :content="narrative.content.value"
-                  :loading="narrative.loading.value"
-                  :error="narrative.error.value"
-                  :cached="narrative.cached.value"
-                  @retry="narrative.fetchNarrative(catalogStarId)"
-                />
+                <div class="narrative-layout mobile-narrative-layout">
+                  <div class="narrative-top">
+                    <!-- A. 星语数据条 -->
+                    <div v-if="catalogStats" class="story-stats-bar">
+                      <div class="stat-item">
+                        <EyeIcon :size="14" class="stat-icon stat-icon-eye" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.starViews?.toLocaleString() ?? 0 }}</div>
+                          <div class="stat-label">凝望次数</div>
+                        </div>
+                      </div>
+                      <div class="stat-divider"></div>
+                      <div class="stat-item">
+                        <BookOpen :size="14" class="stat-icon stat-icon-story" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.storyCount ?? 0 }}</div>
+                          <div class="stat-label">心事总数</div>
+                        </div>
+                      </div>
+                      <div class="stat-divider"></div>
+                      <div class="stat-item">
+                        <HeartIcon :size="14" class="stat-icon stat-icon-heart" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.totalResonance?.toLocaleString() ?? 0 }}</div>
+                          <div class="stat-label">共鸣总数</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 🧠 AI 分析模块（1）星格画像 -->
+                    <AIPersonaCard
+                      :updatedAt="analysisUpdatedText || '刚刚生成'"
+                      :starName="currentStarName"
+                      :constellationName="currentConstellation || '未知星座'"
+                      :starColor="getStarColor(catalogStarId)"
+                      :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                    />
+
+                    <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
+                    <AIRadarWordcloud
+                      :storyCount="catalogStats?.storyCount ?? 0"
+                      :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                    />
+
+                    <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
+                    <AIHeatmapThemes
+                      :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                    />
+
+                    <div class="narrative-bottom">
+                      <div class="panel-wrapper pw-left">
+                        <div class="panel-head">
+                          <Sparkle :size="10" class="pw-icon pw-gold" />
+                          <span class="pw-title">内核相似</span>
+                          <span class="pw-count">{{ similarStars.similarStars.value?.length ?? 0 }} 颗</span>
+                        </div>
+                        <SimilarStarsPanel
+                          :similarStars="similarStars.similarStars.value"
+                          :getStarName="getStarName"
+                          :getStarColor="getStarColor"
+                          :getConstellationName="getConstellationName"
+                          :onSimilarStarClick="onSimilarStarClick"
+                        />
+                      </div>
+                      <div class="panel-wrapper pw-right">
+                        <div class="panel-head">
+                          <BookOpen :size="10" class="pw-icon pw-purple" />
+                          <span class="pw-title">天区精选</span>
+                          <span class="pw-count">{{ areaHighlightsData?.length ?? 0 }} 则</span>
+                        </div>
+                        <AreaHighlightsPanel
+                          :highlights="areaHighlightsData"
+                          :loading="areaLoading"
+                          :currentStarId="catalogStarId"
+                          :getStarName="getStarName"
+                          :getStarColor="getStarColor"
+                          :getConstellationName="getConstellationName"
+                          :onSimilarStarClick="onSimilarStarClick"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- E. 共鸣榜 Top 3 -->
+                    <div v-if="topResonatedStories.length > 0" class="story-section story-section-bottom">
+                      <div class="section-header">
+                        <FlameIcon :size="13" class="section-icon section-icon-orange" />
+                        <span class="section-title">共鸣榜</span>
+                        <span class="section-count">Top {{ topResonatedStories.length }}</span>
+                      </div>
+                      <div class="story-cards">
+                        <div
+                          v-for="(s, si) in topResonatedStories"
+                          :key="s.id"
+                          class="story-card story-card-top"
+                          @click="openStoryDetail(s)"
+                        >
+                          <div class="card-rank" :class="`rank-${si + 1}`">{{ si + 1 }}</div>
+                          <div class="card-body">
+                            <div class="card-title" v-if="s.title">{{ s.title }}</div>
+                            <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <div class="card-meta">
+                              <HeartIcon :size="10" />
+                              <span>{{ getDisplayResonance(s) }} 共鸣</span>
+                              <span v-if="s.username" class="meta-sep">·</span>
+                              <span v-if="s.username" class="meta-user">{{ s.username }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- F. 最新 3 条心事 -->
+                    <div v-if="latestStories.length > 0" class="story-section story-section-bottom">
+                      <div class="section-header">
+                        <Sparkle :size="12" class="section-icon section-icon-blue" />
+                        <span class="section-title">最新心事</span>
+                        <span class="section-count">{{ latestStories.length }} 则</span>
+                      </div>
+                      <div class="story-cards story-cards-latest">
+                        <div
+                          v-for="s in latestStories"
+                          :key="s.id"
+                          class="story-card story-card-latest"
+                          @click="openStoryDetail(s)"
+                        >
+                          <div class="card-body">
+                            <div class="card-title" v-if="s.title">{{ s.title }}</div>
+                            <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <div class="card-meta">
+                              <ClockIcon :size="10" class="meta-clock" />
+                              <span>{{ formatTime(s.createdAt) }}</span>
+                              <span class="meta-sep">·</span>
+                              <span class="story-tag">#{{ s.tag }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </template>
 
               <!-- 历史故事 -->
