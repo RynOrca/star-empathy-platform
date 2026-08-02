@@ -338,63 +338,93 @@
       <Transition name="candidates-fade">
         <div v-if="showMatchCandidates" class="candidates-backdrop" @click.self="closeMatchCandidates">
           <div class="candidates-sheet">
-            <div class="candidates-header">
-              <div class="candidates-title-row">
-                <Sparkles :size="15" class="candidates-sparkle" />
-                <h3 class="candidates-title">为你找到这些契合的星辰</h3>
-                <span class="candidates-hint">选一颗，把你的故事挂上去</span>
+            <!-- ═══ Header：panel-wrapper 风格 ═══ -->
+            <div class="candidates-header panel-wrapper pw-sheet-head">
+              <div class="panel-head">
+                <Sparkles :size="10" class="pw-icon pw-gold" />
+                <span class="pw-title">为你找到这些契合的星辰</span>
+                <span class="pw-count">共 {{ matchCandidates.length }} 颗 · 选一颗挂上你的故事</span>
               </div>
-              <button class="candidates-close" @click="closeMatchCandidates"><X :size="17" /></button>
+              <button class="candidates-close" @click="closeMatchCandidates"><X :size="15" /></button>
             </div>
+
+            <!-- ═══ 卡片列表 ═══ -->
             <div class="candidates-list">
               <div
                 v-for="(c, idx) in matchCandidates"
                 :key="c.catalogStarId"
-                class="candidate-card"
-                :class="{ fallback: c.isFallback, submitting: submittingCandidateId === c.catalogStarId }"
+                class="panel-wrapper candidate-card pw-candidate"
+                :class="{
+                  'is-gold': !c.isFallback,
+                  'is-purple': c.isFallback,
+                  submitting: submittingCandidateId === c.catalogStarId
+                }"
               >
-                <div class="candidate-rank">{{ idx + 1 }}</div>
-                <div class="candidate-body">
-                  <div class="candidate-star-row">
+                <!-- 卡片 Head：排名 + 星名 + 星座 + 徽标 -->
+                <div class="panel-head candidate-panel-head">
+                  <div class="candidate-rank-badge" :class="{ gold: !c.isFallback, purple: c.isFallback }">
+                    {{ idx + 1 }}
+                  </div>
+                  <div class="candidate-star-meta">
                     <span class="candidate-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</span>
                     <span class="candidate-constellation">{{ c.constellationCN }}</span>
-                    <span v-if="Number.isFinite(c.mag)" class="candidate-mag">视星等 {{ c.mag.toFixed(2) }}</span>
-                    <span v-if="c.distance != null" class="candidate-dist">{{ c.distance }} ly</span>
-                    <span v-if="c.isFallback" class="candidate-fallback-badge">等待点亮</span>
                   </div>
+                  <div class="candidate-head-tags">
+                    <span v-if="Number.isFinite(c.mag)" class="candidate-chip">m{{ c.mag.toFixed(1) }}</span>
+                    <span v-if="c.distance != null" class="candidate-chip">{{ c.distance }}ly</span>
+                    <span v-if="c.isFallback" class="candidate-chip chip-purple">等待点亮</span>
+                  </div>
+                </div>
 
+                <!-- 卡片 Body -->
+                <div class="candidate-body">
+                  <!-- 契合度 -->
                   <div class="candidate-score-row">
+                    <span class="score-label">契合度</span>
                     <div class="score-bar">
                       <div
                         class="score-bar-fill"
-                        :style="{ width: Math.round(c.finalScore * 100) + '%', background: c.isFallback
-                          ? 'linear-gradient(90deg, #a0c4ff, #b8a6ff)'
-                          : 'linear-gradient(90deg, #ffd98a, #ffb060)' }"
+                        :style="{
+                          width: Math.round(c.finalScore * 100) + '%',
+                          background: c.isFallback
+                            ? 'linear-gradient(90deg, #a0c4ff, #b8a6ff)'
+                            : 'linear-gradient(90deg, #ffd98a, #ffb060)'
+                        }"
                       ></div>
                     </div>
-                    <span class="score-num">{{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}</span>
-                  </div>
-
-                  <p class="candidate-reason">{{ c.matchReason }}</p>
-
-                  <div v-if="c.starEssences.length" class="candidate-essences">
-                    <span class="essence-title">该星的故事内核：</span>
-                    <span v-for="(e, i) in c.starEssences" :key="i" class="essence-chip">
-                      「{{ e }}」
+                    <span class="score-num" :class="{ purple: c.isFallback }">
+                      {{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}
                     </span>
                   </div>
 
+                  <!-- AI 理由 -->
+                  <p class="candidate-reason" :class="{ purple: c.isFallback }">{{ c.matchReason }}</p>
+
+                  <!-- 故事内核 -->
+                  <div v-if="c.starEssences.length" class="candidate-essences">
+                    <Search :size="11" class="essence-search-icon" />
+                    <span class="essence-title">该星的故事内核</span>
+                    <div class="essence-chips">
+                      <span v-for="(e, i) in c.starEssences" :key="i" class="essence-chip" :class="{ purple: c.isFallback }">
+                        {{ e }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- 选择按钮 -->
                   <button
                     class="candidate-pick-btn"
+                    :class="{ gold: !c.isFallback, purple: c.isFallback }"
                     :disabled="submittingCandidateId === c.catalogStarId"
                     @click="pickCandidate(c)"
                   >
                     <template v-if="submittingCandidateId === c.catalogStarId">
-                      <span class="pick-btn-spinner"></span> 正在挂上星星…
+                      <span class="pick-btn-spinner"></span>
+                      <span>正在挂上星星…</span>
                     </template>
                     <template v-else>
                       <Star :size="14" />
-                      选这颗星
+                      <span>选这颗星</span>
                     </template>
                   </button>
                 </div>
@@ -2482,12 +2512,19 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
 }
 
-/* ─── 候选星面板背景 ─── */
+/* ═══════════════════════════════════════
+   候选星面板 · 对齐 StarDetail panel-wrapper
+   ═══════════════════════════════════════ */
+
+/* ── Backdrop：星空氛围感，背景提亮 + 左上金/右上紫径向光斑 ── */
 .candidates-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 6, 18, 0.6);
-  backdrop-filter: blur(8px);
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(255,217,138,0.10), transparent 70%),
+    radial-gradient(ellipse 55% 38% at 85% 18%, rgba(202,167,255,0.10), transparent 70%),
+    rgba(7, 8, 22, 0.38);
+  backdrop-filter: blur(10px);
   z-index: 210;
   display: flex;
   align-items: center;
@@ -2495,256 +2532,376 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   padding: 24px;
 }
 .candidates-fade-enter-active, .candidates-fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.28s ease;
 }
 .candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0; }
 
+/* ── Sheet：整体容器（不再是纯黑） ── */
 .candidates-sheet {
-  width: min(920px, 96vw);
-  max-height: 86vh;
-  background: linear-gradient(180deg, #121326 0%, #0e0f20 100%);
-  border: 1px solid rgba(255, 217, 138, 0.15);
-  border-radius: 20px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
+  width: min(1080px, 96vw);
+  max-height: 88vh;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,217,138,0.05), transparent 70%),
+    var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: sheetRise 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sheetRise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes sheetRise {
-  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  from { opacity: 0; transform: translateY(16px) scale(0.985); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ── Header：panel-wrapper 风格 ── */
 .candidates-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 22px 26px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: linear-gradient(180deg, rgba(255, 217, 138, 0.04), transparent);
+  position: relative;
+  padding: 16px 22px;
+  margin: 18px 22px 0;
+  flex-shrink: 0;
 }
-.candidates-title-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.pw-sheet-head {
+  position: relative;
 }
-.candidates-sparkle {
-  color: #ffd98a;
-  filter: drop-shadow(0 0 6px rgba(255, 217, 138, 0.5));
+.pw-sheet-head::before {
+  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.35), rgba(202,167,255,0.35), transparent);
 }
-.candidates-title {
-  margin: 0;
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.candidates-hint {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.45);
-  margin-left: 23px; /* 对齐 sparkle 图标后的标题 */
+.candidates-header .panel-head {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 .candidates-close {
-  width: 32px; height: 32px;
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 50%;
-  color: rgba(255,255,255,0.55);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
   cursor: pointer;
   transition: all 0.15s;
+  padding: 0;
 }
 .candidates-close:hover {
   color: #fff;
-  background: rgba(255, 139, 125, 0.1);
-  border-color: rgba(255, 139, 125, 0.3);
+  background: rgba(255, 139, 125, 0.08);
+  border-color: rgba(255, 139, 125, 0.25);
+  transform: translateY(-1px);
 }
 
-/* ─── 候选星列表 ─── */
-.candidates-list {
-  padding: 22px 26px 26px;
+/* ═══ panel-wrapper 基础样式（与 StarDetail 保持一致） ═══ */
+.panel-wrapper {
+  position: relative;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+}
+.panel-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
+}
+.panel-head {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-gold   { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-green  { color: #9ae6b4; }
+.pw-blue   { color: #86a8ff; }
+.pw-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  letter-spacing: 0.01em;
+}
+.pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* ── 候选星列表：放大卡片，横向均匀铺开 ── */
+.candidates-list {
+  padding: 20px 22px 24px;
+  display: flex;
+  gap: 18px;
   overflow-y: auto;
   flex-wrap: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+  flex: 1;
+  min-height: 0;
 }
-.candidate-card {
-  position: relative;
+.candidates-list::-webkit-scrollbar { height: 6px; width: 6px; }
+.candidates-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.14);
+  border-radius: 10px;
+}
+
+/* ═══ 候选星卡片：panel-wrapper 独立卡片，无左边黄竖线！ ═══ */
+.pw-candidate {
   flex: 1;
   min-width: 0;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 16px;
-  padding: 20px 20px 18px 52px;
-  transition: all 0.2s ease;
+  padding: 14px 16px 16px;
+  transition: all 0.22s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* 顶部渐变线：金卡=金色系，紫卡=紫色系 */
+.pw-candidate.is-gold::before {
+  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.45), rgba(255,176,96,0.35), transparent);
+}
+.pw-candidate.is-purple::before {
+  background: linear-gradient(90deg, transparent, rgba(160,196,255,0.45), rgba(202,167,255,0.4), transparent);
+}
+.pw-candidate:hover {
+  transform: translateY(-2px);
+}
+.pw-candidate.is-gold:hover {
+  border-color: rgba(255, 217, 138, 0.22);
+  background: rgba(255, 217, 138, 0.028);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,217,138,0.06);
+}
+.pw-candidate.is-purple:hover {
+  border-color: rgba(160, 196, 255, 0.22);
+  background: rgba(160, 196, 255, 0.025);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.28), 0 0 0 1px rgba(160,196,255,0.06);
+}
+.pw-candidate.submitting {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* candidate 专属 panel-head：排名徽章 + 星名/星座 + 头部 chips */
+.candidate-panel-head {
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.candidate-rank-badge {
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.candidate-rank-badge.gold {
+  color: #ffe5a8;
+  background: rgba(255, 217, 138, 0.12);
+  border: 1px solid rgba(255, 217, 138, 0.28);
+}
+.candidate-rank-badge.purple {
+  color: #cfd8ff;
+  background: rgba(160, 196, 255, 0.10);
+  border: 1px solid rgba(160, 196, 255, 0.26);
+}
+.candidate-star-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.candidate-star-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.2;
+}
+.candidate-constellation {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.candidate-head-tags {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.candidate-chip {
+  font-size: 0.68rem;
+  color: var(--muted);
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.05);
+  letter-spacing: 0.01em;
+}
+.candidate-chip.chip-purple {
+  color: #caa7ff;
+  background: rgba(202,167,255,0.08);
+  border-color: rgba(202,167,255,0.18);
+}
+
+/* ── candidate body ── */
+.candidate-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.candidate-card::before {
-  content: '';
-  position: absolute;
-  left: 22px; top: 22px;
-  width: 6px; height: calc(100% - 44px);
-  background: linear-gradient(180deg, #ffd98a, #ffb060);
-  border-radius: 3px;
-  opacity: 0.8;
-}
-.candidate-card.fallback::before {
-  background: linear-gradient(180deg, #a0c4ff, #b8a6ff);
-}
-.candidate-card:hover {
-  border-color: rgba(255, 217, 138, 0.28);
-  background: rgba(255, 217, 138, 0.03);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 217, 138, 0.08);
-}
-.candidate-card.fallback:hover {
-  border-color: rgba(160, 196, 255, 0.28);
-  background: rgba(160, 196, 255, 0.03);
-}
-.candidate-card.submitting {
-  opacity: 0.75;
-  pointer-events: none;
-}
-.candidate-rank {
-  position: absolute;
-  top: 16px; right: 16px;
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #ffd98a;
-  background: rgba(255, 217, 138, 0.1);
-  border: 1px solid rgba(255, 217, 138, 0.22);
-}
-.candidate-card.fallback .candidate-rank {
-  color: #b8a6ff;
-  background: rgba(160, 196, 255, 0.08);
-  border-color: rgba(160, 196, 255, 0.22);
-}
-.candidate-body {
-  display: flex; flex-direction: column; gap: 10px; flex: 1;
+  flex: 1;
   min-width: 0;
 }
-.candidate-star-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-}
-.candidate-star-name {
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: #fff;
-}
-.candidate-constellation {
-  font-size: 0.76rem;
-  color: rgba(255,255,255,0.55);
-  padding: 2px 8px;
-  background: rgba(255,255,255,0.05);
-  border-radius: 10px;
-}
-.candidate-mag, .candidate-dist {
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.4);
-}
-.candidate-fallback-badge {
-  font-size: 0.7rem;
-  color: #b8a6ff;
-  padding: 2px 8px;
-  background: rgba(160, 196, 255, 0.08);
-  border: 1px solid rgba(160, 196, 255, 0.2);
-  border-radius: 10px;
-}
-
+/* 契合度：左边加文字标签，对齐 panel 风格 */
 .candidate-score-row {
-  display: flex; align-items: center; gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.score-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 .score-bar {
   flex: 1;
-  height: 6px;
-  background: rgba(255,255,255,0.06);
+  height: 5px;
+  background: rgba(255,255,255,0.055);
   border-radius: 3px;
   overflow: hidden;
 }
 .score-bar-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .score-num {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #ffd98a;
-  min-width: 36px;
+  color: #ffe5a8;
+  min-width: 38px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.candidate-card.fallback .score-num { color: #b8a6ff; }
+.score-num.purple { color: #cfd8ff; }
 
+/* AI 理由：用 panel-wrapper 里的 info-section 风格（浅底+浅左条） */
 .candidate-reason {
   margin: 0;
-  font-size: 0.86rem;
-  line-height: 1.6;
-  color: rgba(255,255,255,0.82);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: justify;
   padding: 10px 12px;
-  background: rgba(255, 217, 138, 0.05);
-  border-left: 2px solid rgba(255, 217, 138, 0.35);
-  border-radius: 6px;
+  background: rgba(255, 217, 138, 0.035);
+  border-left: 2px solid rgba(255, 217, 138, 0.28);
+  border-radius: 8px;
 }
-.candidate-card.fallback .candidate-reason {
-  background: rgba(160, 196, 255, 0.04);
-  border-left-color: rgba(160, 196, 255, 0.3);
+.candidate-reason.purple {
+  background: rgba(160, 196, 255, 0.03);
+  border-left-color: rgba(160, 196, 255, 0.28);
 }
+
+/* 故事内核：带搜索小图标 */
 .candidate-essences {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.candidate-essences > span:first-of-type {
+  display: contents;
+}
+.essence-search-icon {
+  color: var(--muted-light);
+  opacity: 0.8;
+  vertical-align: -1px;
+  margin-right: 4px;
 }
 .essence-title {
   font-size: 0.72rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+.essence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-left: 15px; /* 对齐 essence-title 缩进（图标+字） */
 }
 .essence-chip {
   font-size: 0.72rem;
-  color: rgba(255, 217, 138, 0.85);
+  color: rgba(255, 217, 138, 0.88);
   background: rgba(255, 217, 138, 0.06);
-  padding: 3px 8px;
-  border-radius: 10px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  letter-spacing: 0.01em;
 }
+.essence-chip.purple {
+  color: rgba(202, 167, 255, 0.9);
+  background: rgba(202, 167, 255, 0.06);
+}
+
+/* 选这颗星按钮：对齐 StarDetail .empty-login-btn（金边浅底金字） */
 .candidate-pick-btn {
   margin-top: auto;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, rgba(255, 217, 138, 0.14), rgba(255, 176, 96, 0.06));
-  border: 1px solid rgba(255, 217, 138, 0.26);
-  border-radius: 12px;
-  color: #ffe5a8;
-  font-size: 0.86rem;
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: 0.84rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  letter-spacing: 0.01em;
 }
-.candidate-card.fallback .candidate-pick-btn {
-  background: linear-gradient(135deg, rgba(160, 196, 255, 0.12), rgba(184, 166, 255, 0.06));
-  border-color: rgba(160, 196, 255, 0.26);
-  color: #cfd8ff;
+.candidate-pick-btn.gold {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 60%),
+    var(--accent-subtle);
+}
+.candidate-pick-btn.purple {
+  border-color: rgba(202, 167, 255, 0.32);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 60%),
+    rgba(202, 167, 255, 0.08);
+  color: #e5d6ff;
 }
 .candidate-pick-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(255, 217, 138, 0.25), rgba(255, 176, 96, 0.15));
-  border-color: rgba(255, 217, 138, 0.55);
-  color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(255, 217, 138, 0.2);
 }
-.candidate-card.fallback .candidate-pick-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(160, 196, 255, 0.25), rgba(184, 166, 255, 0.18));
-  border-color: rgba(160, 196, 255, 0.55);
+.candidate-pick-btn.gold:hover:not(:disabled) {
+  background: var(--accent-bg);
+  box-shadow: 0 6px 16px rgba(255, 217, 138, 0.15);
+}
+.candidate-pick-btn.purple:hover:not(:disabled) {
+  background: rgba(202, 167, 255, 0.16);
+  border-color: rgba(202, 167, 255, 0.5);
   color: #fff;
-  box-shadow: 0 8px 20px rgba(160, 196, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(202, 167, 255, 0.18);
+}
+.candidate-pick-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .pick-btn-spinner {
   width: 14px; height: 14px;
@@ -2757,20 +2914,25 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 
 /* 移动端适配 */
 @media (max-width: 720px) {
+  .candidates-backdrop { padding: 10px; }
   .candidates-sheet {
-    max-height: 92vh;
+    max-height: 94vh;
     width: 96vw;
-    border-radius: 16px;
+    border-radius: 14px;
   }
+  .candidates-header {
+    margin: 14px 14px 0;
+    padding: 12px 14px;
+  }
+  .pw-sheet-head .pw-title { font-size: 0.78rem; }
+  .pw-sheet-head .pw-count { display: none; }
+  .candidates-close { top: 10px; right: 10px; }
   .candidates-list {
+    padding: 16px 14px 18px;
     flex-direction: column;
-    flex-wrap: nowrap;
+    gap: 14px;
   }
-  .candidate-card {
-    padding: 18px 18px 16px 46px;
-  }
-  .candidates-hint {
-    margin-left: 0;
-  }
+  .candidate-panel-head { flex-wrap: wrap; }
+  .candidate-head-tags { order: 3; width: 100%; padding-left: 36px; }
 }
 </style>

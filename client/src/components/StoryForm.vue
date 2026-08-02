@@ -1,162 +1,200 @@
 <template>
   <div class="overlay" @click.self="onCloseRequest">
     <div class="form-panel">
-      <div class="form-header">
-        <h2 class="form-heading"><PenSquare :size="16" /> {{ mode === 'auto-match' ? '记录此刻心事' : '写我的故事' }}</h2>
-        <button class="close-icon" @click="onCloseRequest"><X :size="15" /></button>
+      <!-- ═══ Header：panel-wrapper 风格 ═══ -->
+      <div class="form-header panel-wrapper pw-head">
+        <div class="panel-head">
+          <component :is="mode === 'auto-match' ? Sparkles : PenSquare" :size="10" class="pw-icon pw-gold" />
+          <span class="pw-title">{{ mode === 'auto-match' ? '记录此刻心事' : '写我的故事' }}</span>
+          <span class="pw-count">{{ mode === 'auto-match' ? 'AI 将为你寻找最契合的星辰' : step === 1 ? '第 1 / 2 步 · 写下内容' : '第 2 / 2 步 · 补充细节' }}</span>
+        </div>
+        <button class="close-icon" @click="onCloseRequest"><X :size="14" /></button>
       </div>
 
+      <!-- ═══ Body ═══ -->
       <div class="form-body">
-        <template v-if="step === 1">
-          <div class="field">
-            <label class="field-label">标题</label>
-            <input
-              v-model="title"
-              class="field-input"
-              placeholder="给你的故事起个名字..."
-              maxlength="60"
-            />
-          </div>
 
-          <div class="field">
-            <label class="field-label">故事</label>
-            <textarea
-              v-model="content"
-              class="field-textarea"
-              :placeholder="mode === 'auto-match' ? '此刻你想起了什么？写下你的心事，我们会为它寻找夜空中最契合的星辰...' : '此刻你在这颗星下想起了什么？写下你的心事吧...'"
-              maxlength="300"
-              rows="6"
-              ref="textareaRef"
-            ></textarea>
-            <div class="char-count" :class="{ warn: content.length >= 280 }">
-              {{ content.length }} / 300
+        <!-- ═══════ Step 1：标题 + 故事（金主题主卡） ═══════ -->
+        <template v-if="step === 1">
+          <div class="panel-wrapper pw-gold-card form-main-card">
+            <div class="panel-head">
+              <PenSquare :size="10" class="pw-icon pw-gold" />
+              <span class="pw-title">故事内容</span>
+              <span class="pw-count">标题必填 · 故事 1~300 字</span>
+            </div>
+            <div class="card-body">
+              <div class="field">
+                <label class="field-label">标题</label>
+                <input
+                  v-model="title"
+                  class="field-input"
+                  placeholder="给你的故事起个名字..."
+                  maxlength="60"
+                />
+              </div>
+
+              <div class="field">
+                <label class="field-label">故事</label>
+                <textarea
+                  v-model="content"
+                  class="field-textarea"
+                  :placeholder="mode === 'auto-match' ? '此刻你想起了什么？写下你的心事，我们会为它寻找夜空中最契合的星辰...' : '此刻你在这颗星下想起了什么？写下你的心事吧...'"
+                  maxlength="300"
+                  rows="6"
+                  ref="textareaRef"
+                ></textarea>
+                <div class="char-count" :class="{ warn: content.length >= 280 }">
+                  {{ content.length }} / 300
+                </div>
+              </div>
             </div>
           </div>
 
-          <button class="submit-btn" :disabled="!title.trim() || !content.trim()" @click="step = 2">
-            <span>下一页</span>
+          <button class="submit-btn next-btn" :class="{ gold: true }" :disabled="!title.trim() || !content.trim()" @click="step = 2">
+            <span>继续补充细节</span>
             <ChevronRight :size="14" />
           </button>
         </template>
 
+        <!-- ═══════ Step 2：细节 4 张卡 ═══════ -->
         <template v-else>
           <button class="back-btn" @click="step = 1">
             <ArrowLeft :size="14" />
-            <span>返回</span>
+            <span>返回修改内容</span>
           </button>
 
-          <!-- 预关联星星（bind-star 模式显示，auto-match 模式隐藏） -->
-          <div v-if="mode === 'bind-star' && starName" class="field">
-            <label class="field-label">
-              <Star :size="13" class="inline-icon" />
-              关联星辰
-            </label>
-            <div class="star-name-badge">{{ starName }}</div>
+          <!-- 卡1：关联星辰（紫卡，仅 bind-star 模式） -->
+          <div v-if="mode === 'bind-star' && starName" class="panel-wrapper pw-purple-card">
+            <div class="panel-head">
+              <Star :size="10" class="pw-icon pw-purple" />
+              <span class="pw-title">关联星辰</span>
+              <span class="pw-count">预绑定 · 无法更改</span>
+            </div>
+            <div class="card-body">
+              <div class="star-name-badge">
+                <Star :size="13" class="badge-star" />
+                <span>{{ starName }}</span>
+              </div>
+            </div>
           </div>
 
-          <!-- 情绪标签 -->
-          <div class="field">
-            <label class="field-label">情绪标签 <span class="optional">- 可选</span></label>
-            <div class="tag-picker">
+          <!-- 卡2：情绪标签（紫卡） -->
+          <div class="panel-wrapper pw-purple-card">
+            <div class="panel-head">
+              <Sparkles :size="10" class="pw-icon pw-purple" />
+              <span class="pw-title">情绪标签</span>
+              <span class="pw-count">可选 · 最多选 1 个</span>
+            </div>
+            <div class="card-body">
+              <div class="tag-picker">
+                <button
+                  v-for="t in tagOptions"
+                  :key="t"
+                  class="tag-btn"
+                  :class="{ active: selectedTag === t, ['tag-' + t]: true }"
+                  @click="selectedTag = selectedTag === t ? null : t"
+                  type="button"
+                >{{ t }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡3：图片上传（紫卡） -->
+          <div class="panel-wrapper pw-purple-card">
+            <div class="panel-head">
+              <ImageIcon :size="10" class="pw-icon pw-purple" />
+              <span class="pw-title">配图</span>
+              <span class="pw-count">可选 · 5MB 以内</span>
+            </div>
+            <div class="card-body">
+              <div
+                class="image-upload-zone"
+                :class="{ 'has-image': imagePreview }"
+                @click="triggerFileInput"
+                @dragover.prevent
+                @drop.prevent="onDrop"
+              >
+                <template v-if="!imagePreview">
+                  <ImageIcon :size="20" class="upload-icon" />
+                  <span class="upload-text">点击或拖拽上传图片</span>
+                  <span class="upload-hint">支持 JPG / PNG / WebP / GIF</span>
+                </template>
+                <template v-else>
+                  <img :src="imagePreview" class="upload-preview" />
+                  <button class="upload-remove" @click.stop="removeImage" type="button">
+                    <X :size="13" />
+                  </button>
+                </template>
+              </div>
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                class="file-input-hidden"
+                @change="onFileChange"
+              />
+              <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
+            </div>
+          </div>
+
+          <!-- 卡4：匿名选项 + 提交按钮（金卡） -->
+          <div class="panel-wrapper pw-gold-card">
+            <div class="panel-head">
+              <Send :size="10" class="pw-icon pw-gold" />
+              <span class="pw-title">投递设置</span>
+              <span class="pw-count">{{ mode === 'auto-match' ? '下一步：匹配星辰' : '下一步：挂上星星' }}</span>
+            </div>
+            <div class="card-body">
+              <label class="field-checkbox">
+                <input type="checkbox" v-model="isAnonymous" />
+                <span class="checkbox-label">匿名投递（故事属于你，但不显示你的名字）</span>
+              </label>
+
+              <p v-if="error" class="form-error">{{ error }}</p>
+
               <button
-                v-for="t in tagOptions"
-                :key="t"
-                class="tag-btn"
-                :class="{ active: selectedTag === t, ['tag-' + t]: true }"
-                @click="selectedTag = selectedTag === t ? null : t"
-              >{{ t }}</button>
+                class="submit-btn"
+                :class="{ gold: true, 'is-match-btn': mode === 'auto-match' }"
+                :disabled="(submitting || matching) || !title.trim() || !content.trim()"
+                @click="onPrimaryClick"
+                type="button"
+              >
+                <template v-if="mode === 'auto-match'">
+                  <Sparkles :size="14" />
+                  <span>{{ matching ? '寻找归属星辰中…' : '寻找归属星辰' }}</span>
+                </template>
+                <template v-else>
+                  <Send :size="14" />
+                  <span>{{ submitting ? '化作星光中…' : '挂上星星' }}</span>
+                </template>
+              </button>
             </div>
           </div>
-
-          <!-- 图片上传 -->
-          <div class="field">
-            <label class="field-label">图片 <span class="optional">- 可选</span></label>
-            <div
-              class="image-upload-zone"
-              :class="{ 'has-image': imagePreview }"
-              @click="triggerFileInput"
-              @dragover.prevent
-              @drop.prevent="onDrop"
-            >
-              <template v-if="!imagePreview">
-                <ImageIcon :size="24" class="upload-icon" />
-                <span class="upload-text">点击或拖拽上传图片</span>
-                <span class="upload-hint">支持 JPG/PNG/WebP/GIF，最大 5MB</span>
-              </template>
-              <template v-else>
-                <img :src="imagePreview" class="upload-preview" />
-                <button class="upload-remove" @click.stop="removeImage">
-                  <X :size="14" />
-                </button>
-              </template>
-            </div>
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              class="file-input-hidden"
-              @change="onFileChange"
-            />
-            <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
-          </div>
-
-          <!-- 匿名投递 -->
-          <div class="field">
-            <label class="field-checkbox">
-              <input type="checkbox" v-model="isAnonymous" />
-              <span>匿名投递（故事属于你，但不显示你的名字）</span>
-            </label>
-          </div>
-
-          <p v-if="error" class="form-error">{{ error }}</p>
-
-          <button
-            class="submit-btn"
-            :class="{ 'is-match-btn': mode === 'auto-match' }"
-            :disabled="(submitting || matching) || !title.trim() || !content.trim()"
-            @click="onPrimaryClick"
-          >
-            <template v-if="mode === 'auto-match'">
-              <Sparkles :size="14" />
-              <span>{{ matching ? '寻找归属星辰中...' : '寻找归属星辰' }}</span>
-            </template>
-            <template v-else>
-              <Send :size="14" />
-              <span>{{ submitting ? '化作星光中...' : '挂上星星' }}</span>
-            </template>
-          </button>
         </template>
       </div>
 
-      <!-- ═══ auto-match 模式：匹配中遮罩 ═══ -->
+      <!-- ═══ auto-match 匹配中遮罩：AI 生成中风格，无粒子无 3 步条！ ═══ -->
       <Transition name="match-mask">
         <div v-if="mode === 'auto-match' && matching" class="match-mask">
-          <div class="match-mask-inner">
-            <div class="match-stars" aria-hidden="true">
-              <span v-for="i in 5" :key="i" class="match-star-particle" :style="particleStyle(i)"></span>
+          <div class="match-mask-inner panel-wrapper pw-match-mask">
+            <div class="match-icon-wrap">
+              <Sparkles :size="22" class="match-spin-icon" />
             </div>
-            <div class="match-step-row">
-              <div class="match-step" :class="{ done: stepProgress >= 1, active: stepProgress === 1 }">
-                <div class="step-dot">{{ stepProgress > 1 ? '✓' : 1 }}</div>
-                <div class="step-label">提取故事内核</div>
-              </div>
-              <div class="match-step-line" :class="{ fill: stepProgress >= 2 }"></div>
-              <div class="match-step" :class="{ done: stepProgress >= 2, active: stepProgress === 2 }">
-                <div class="step-dot">{{ stepProgress > 2 ? '✓' : 2 }}</div>
-                <div class="step-label">夜空寻星</div>
-              </div>
-              <div class="match-step-line" :class="{ fill: stepProgress >= 3 }"></div>
-              <div class="match-step" :class="{ done: stepProgress >= 3, active: stepProgress === 3 }">
-                <div class="step-dot">{{ stepProgress > 3 ? '✓' : 3 }}</div>
-                <div class="step-label">判断缘分</div>
-              </div>
+            <div class="match-title">
+              {{ matchStepLabel(stepProgress) }}
             </div>
-            <p class="match-tip">
-              <template v-if="stepProgress === 1">📜 正在从你的文字里提取情绪与主题…</template>
-              <template v-else-if="stepProgress === 2">🌌 正在浩瀚星空中扫描相似的故事…</template>
-              <template v-else-if="stepProgress === 3">⭐ AI 正在判断每颗星与你的缘分…</template>
+            <div class="match-desc">
+              <template v-if="stepProgress <= 1">正在从你的文字里提取情绪与主题，构建故事内核…</template>
+              <template v-else-if="stepProgress === 2">正在浩瀚星海中扫描相似的故事，丈量每颗星与你的距离…</template>
+              <template v-else-if="stepProgress >= 3">AI 正在判断每颗星与你的缘分，为你挑选最契合的归属…</template>
               <template v-else>✨ 请稍候…</template>
-            </p>
+            </div>
+            <!-- skeleton lines（AI 卡片生成中风格） -->
+            <div class="match-skeleton">
+              <span class="sk-line sk-1"></span>
+              <span class="sk-line sk-2"></span>
+              <span class="sk-line sk-3"></span>
+            </div>
             <div class="match-error" v-if="matchError">{{ matchError }}，请稍后再试</div>
           </div>
         </div>
@@ -231,16 +269,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 // ── 匹配进度：取 props.matchingStep 供模板用
 const stepProgress = computed(() => props.matchingStep || 0)
 
-function particleStyle(i: number) {
-  const size = 4 + (i % 3) * 2
-  const left = 15 + i * 18 + Math.random() * 10
-  const delay = (i - 1) * 0.4
-  return {
-    width: size + 'px',
-    height: size + 'px',
-    left: left + '%',
-    animationDelay: delay + 's',
-  }
+/** AI 匹配遮罩：当前步骤标题 */
+function matchStepLabel(p: number): string {
+  if (p <= 1) return '① 正在提取故事内核'
+  if (p === 2) return '② 正在夜空扫描星辰'
+  if (p >= 3) return '③ 正在判断契合缘分'
+  return 'AI 正在分析…'
 }
 
 function onCloseRequest() {
@@ -448,56 +482,126 @@ defineExpose({
 </script>
 
 <style scoped>
-/* ─── Overlay ─── */
+/* ════════════════════════════════════════════
+   StoryForm · 对齐 StarDetail panel-wrapper
+   ════════════════════════════════════════════ */
+
+/* ── Overlay：星空氛围感，径向光斑（金左上 + 紫右上） ── */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(7, 8, 22, 0.45);
-  backdrop-filter: blur(4px);
+  background:
+    radial-gradient(ellipse 60% 40% at 18% 22%, rgba(255,217,138,0.10), transparent 70%),
+    radial-gradient(ellipse 55% 38% at 82% 20%, rgba(202,167,255,0.10), transparent 70%),
+    rgba(7, 8, 22, 0.42);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.18s ease-out;
+  padding: 16px;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* ─── Form Panel ─── */
+/* ── Form Panel ── */
 .form-panel {
-  width: 540px;
-  max-width: 92vw;
-  background: var(--surface);
+  position: relative;
+  width: 560px;
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,217,138,0.05), transparent 70%),
+    var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.2s ease-out;
+  animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ─── Header ─── */
-.form-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--rule);
+/* ═══ panel-wrapper 基础（与 StarDetail 保持一致） ═══ */
+.panel-wrapper {
+  position: relative;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
 }
-.form-heading {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--ink);
+.panel-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
+}
+/* 金卡：顶部渐变线 = 金色系 */
+.panel-wrapper.pw-gold-card::before,
+.panel-wrapper.pw-head::before {
+  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.42), rgba(255,176,96,0.32), transparent);
+}
+/* 紫卡：顶部渐变线 = 紫色系 */
+.panel-wrapper.pw-purple-card::before {
+  background: linear-gradient(90deg, transparent, rgba(160,196,255,0.42), rgba(202,167,255,0.4), transparent);
+}
+.panel-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-gold   { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-green  { color: #9ae6b4; }
+.pw-blue   { color: #86a8ff; }
+.pw-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  letter-spacing: 0.01em;
+}
+.pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.card-body {
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Form Header（最外层独立 panel） ── */
+.form-header {
+  position: relative;
+  padding: 16px 18px;
+  margin: 18px 20px 0;
+  flex-shrink: 0;
+}
+.form-header .panel-head {
+  padding-bottom: 10px;
 }
 .close-icon {
-  width: 30px;
-  height: 30px;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -506,96 +610,109 @@ defineExpose({
   border-radius: var(--radius-sm);
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: all 0.15s;
   padding: 0;
 }
 .close-icon:hover {
-  color: var(--ink);
-  border-color: var(--rule-hover);
+  color: #fff;
+  background: rgba(255, 139, 125, 0.08);
+  border-color: rgba(255, 139, 125, 0.25);
+  transform: translateY(-1px);
 }
 
-/* ─── Body ─── */
+/* ── Form Body：滚动区，卡片间距用 gap ── */
 .form-body {
-  padding: 24px;
+  padding: 18px 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 217, 138, 0.12) transparent;
+  flex: 1;
+  min-height: 0;
+}
+.form-body::-webkit-scrollbar { width: 5px; }
+.form-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.14);
+  border-radius: 10px;
 }
 
+/* ── Step1 主卡：占据视觉重心 ── */
+.form-main-card { padding: 14px 16px 16px; }
+.form-main-card .card-body { padding-top: 14px; gap: 14px; }
+
+/* ═══ Field 与 Input（对齐 StarDetail 输入体系） ═══ */
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .field-label {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 400;
-  color: var(--ink-secondary);
+  color: var(--muted);
+  letter-spacing: 0.01em;
 }
-
-/* ─── Inputs (PrimeVue form field style) ─── */
-.field-input {
+.field-input,
+.field-textarea {
   padding: 10px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--rule);
   background: var(--surface-ground);
   color: var(--ink);
   font-family: var(--font);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
+  line-height: 1.6;
   outline: none;
-  transition: border-color 0.15s;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
 }
-.field-input:focus {
-  border-color: var(--accent);
-}
-.field-input::placeholder {
-  color: var(--muted-light);
-}
-
 .field-textarea {
   resize: vertical;
-  min-height: 130px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--rule);
-  background: var(--surface-ground);
-  color: var(--ink);
-  font-family: var(--font);
-  font-size: 0.88rem;
-  line-height: 1.65;
-  outline: none;
-  transition: border-color 0.15s;
+  min-height: 150px;
+  line-height: 1.75;
 }
-.field-textarea:focus {
-  border-color: var(--accent);
-}
+.field-input::placeholder,
 .field-textarea::placeholder {
   color: var(--muted-light);
 }
+.field-input:focus,
+.field-textarea:focus {
+  border-color: var(--accent-border);
+  background:
+    linear-gradient(180deg, rgba(255,217,138,0.02), transparent 50%),
+    var(--surface-ground);
+  box-shadow:
+    0 0 0 3px rgba(255, 217, 138, 0.06),
+    0 0 12px rgba(255, 217, 138, 0.08);
+}
 
-/* ─── Char Count ─── */
+/* 字数计数 */
 .char-count {
-  text-align: right;
-  font-size: 0.72rem;
+  align-self: flex-end;
+  font-size: 0.7rem;
   color: var(--muted-light);
-  margin-top: 2px;
+  margin: -4px 2px 0;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
 }
-.char-count.warn {
-  color: #e8a84c;
-}
+.char-count.warn { color: #e8a84c; }
 
-/* ─── Error ─── */
+/* 表单错误提示 */
 .form-error {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--star-red);
   padding: 8px 12px;
   background: rgba(255, 139, 125, 0.06);
   border: 1px solid rgba(255, 139, 125, 0.12);
   border-radius: var(--radius-sm);
+  line-height: 1.5;
 }
 
-/* ─── Back Button ─── */
+/* 返回按钮（Step2） */
 .back-btn {
   display: flex;
   align-items: center;
@@ -604,276 +721,340 @@ defineExpose({
   border: none;
   color: var(--muted);
   font-family: var(--font);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   cursor: pointer;
-  padding: 0;
-  transition: color 0.15s;
+  padding: 2px 4px;
+  transition: color 0.15s, transform 0.15s;
   align-self: flex-start;
+  letter-spacing: 0.01em;
 }
 .back-btn:hover {
   color: var(--ink);
+  transform: translateX(-1px);
 }
 
-/* ─── Submit Button ─── */
+/* ═══ Submit 按钮（对齐 StarDetail 金边浅底金字） ═══ */
 .submit-btn {
   width: 100%;
   padding: 11px 0;
   border-radius: var(--radius-md);
-  border: none;
-  background: var(--accent);
-  color: rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent);
   font-family: var(--font);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: all 0.18s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 4px;
+  letter-spacing: 0.01em;
 }
 .submit-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+.submit-btn.gold:hover:not(:disabled) {
+  background: var(--accent-bg);
+  box-shadow: 0 6px 16px rgba(255, 217, 138, 0.15);
 }
 .submit-btn:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(0);
 }
-
-.tag-picker { display: flex; gap: 6px; flex-wrap: wrap; }
-.tag-btn {
-  padding: 4px 12px; border-radius: 14px; border: 1px solid rgba(48,55,87,0.4);
-  background: rgba(255,255,255,0.04); color: #7a759c; font-size: 0.78rem;
-  cursor: pointer; transition: all 0.15s;
-}
-.tag-btn:hover { border-color: rgba(48,55,87,0.7); color: #b9b4d6; }
-.tag-btn.active { border-color: transparent; }
-.tag-btn.tag-思念.active { background: rgba(255,139,125,0.2); color: #ff8b7d; }
-.tag-btn.tag-等待.active { background: rgba(134,168,255,0.2); color: #86a8ff; }
-.tag-btn.tag-离别.active { background: rgba(202,167,255,0.2); color: #caa7ff; }
-.tag-btn.tag-愿望.active { background: rgba(255,217,138,0.2); color: #ffd98a; }
-.tag-btn.tag-孤独.active { background: rgba(149,240,192,0.2); color: #95f0c0; }
-.optional { color: #5a5580; font-size: 0.75rem; font-weight: 400; }
-.field-checkbox { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.8rem; color: #7a759c; }
-.field-checkbox input[type="checkbox"] { accent-color: #ffd98a; width: 15px; height: 15px; cursor: pointer; }
 .submit-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.38;
   cursor: not-allowed;
 }
+/* Step1 下一页按钮 → 金卡风格 */
+.submit-btn.next-btn {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 60%),
+    var(--accent-subtle);
+}
+/* auto-match 模式的匹配按钮 */
+.submit-btn.is-match-btn {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 50%),
+    var(--accent-bg);
+  border-color: rgba(255, 217, 138, 0.32);
+  color: #ffe5a8;
+  box-shadow: 0 2px 10px rgba(255, 217, 138, 0.12);
+}
+.submit-btn.is-match-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 18px rgba(255, 217, 138, 0.22);
+}
 
-/* ─── Image Upload ─── */
+/* ═══ 情绪标签 Picker（无发光阴影） ═══ */
+.tag-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tag-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.01em;
+}
+.tag-btn:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--rule-hover);
+  color: var(--ink-secondary);
+  transform: translateY(-1px);
+}
+.tag-btn.active {
+  border-color: transparent;
+  font-weight: 500;
+}
+/* 5 色（仅底色 + 字色，无发光） */
+.tag-btn.tag-思念.active { background: rgba(255,139,125,0.12); color: #ff9b8d; }
+.tag-btn.tag-等待.active { background: rgba(134,168,255,0.12); color: #96b2ff; }
+.tag-btn.tag-离别.active { background: rgba(202,167,255,0.12); color: #d0b9ff; }
+.tag-btn.tag-愿望.active { background: rgba(255,217,138,0.14); color: #ffe5a8; }
+.tag-btn.tag-孤独.active { background: rgba(149,240,192,0.12); color: #a8f5cb; }
+
+/* ═══ Checkbox：匿名投递 ═══ */
+.field-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  user-select: none;
+  line-height: 1.45;
+  transition: color 0.15s;
+  padding: 2px 0;
+}
+.field-checkbox:hover { color: var(--ink-secondary); }
+.field-checkbox input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  margin: 1px 0 0;
+  flex-shrink: 0;
+}
+.checkbox-label { line-height: 1.5; }
+
+/* ═══ 图片上传（实边 1px） ═══ */
 .image-upload-zone {
-  border: 2px dashed rgba(255,255,255,0.12);
+  border: 1px solid var(--rule);
   border-radius: var(--radius-md);
-  padding: 24px;
+  padding: 20px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: all 0.18s ease;
   position: relative;
-  min-height: 100px;
+  min-height: 96px;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.01);
 }
 .image-upload-zone:hover {
-  border-color: rgba(255,255,255,0.25);
-  background: rgba(255,255,255,0.02);
+  border-color: rgba(202,167,255,0.28);
+  background: rgba(202,167,255,0.03);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(202,167,255,0.08);
 }
 .image-upload-zone.has-image {
   padding: 0;
-  border-style: solid;
-  border-color: rgba(255,255,255,0.08);
+  background: none;
 }
 .upload-icon {
   color: var(--muted);
+  margin-bottom: 4px;
+  opacity: 0.8;
 }
 .upload-text {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--muted);
 }
+.image-upload-zone:hover .upload-text { color: #dcd6ff; }
 .upload-hint {
   font-size: 0.7rem;
   color: var(--muted-light);
+  letter-spacing: 0.02em;
 }
 .upload-preview {
   width: 100%;
-  max-height: 200px;
+  max-height: 220px;
   object-fit: cover;
   border-radius: var(--radius-md);
+  display: block;
 }
 .upload-remove {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.6);
-  border: none;
+  background: rgba(0,0,0,0.62);
+  border: 1px solid rgba(255,255,255,0.12);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 .upload-remove:hover {
-  background: rgba(255, 90, 90, 0.8);
+  background: rgba(255, 90, 90, 0.82);
+  transform: scale(1.06);
 }
 .upload-error {
-  margin: 4px 0 0;
+  margin: 6px 2px 0;
   font-size: 0.78rem;
   color: var(--star-red);
+  line-height: 1.4;
 }
-.file-input-hidden {
-  display: none;
-}
+.file-input-hidden { display: none; }
 
-/* ─── Inline Icon & Star Badge (bind-star 模式显示) ─── */
-.inline-icon { vertical-align: -2px; margin-right: 4px; }
+/* ═══ 关联星辰徽章 ═══ */
 .star-name-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: linear-gradient(90deg, rgba(255, 217, 138, 0.08), rgba(255, 217, 138, 0.02));
-  border: 1px solid rgba(255, 217, 138, 0.18);
-  border-radius: 12px;
-  color: #ffe5a8;
-  font-size: 0.82rem;
+  gap: 7px;
+  padding: 8px 14px;
+  background: rgba(202, 167, 255, 0.10);
+  border: 1px solid rgba(202, 167, 255, 0.26);
+  border-radius: var(--radius-md);
+  color: #e5d6ff;
+  font-size: 0.84rem;
   font-weight: 500;
   width: fit-content;
+  letter-spacing: 0.01em;
+  transition: all 0.15s ease;
 }
-.submit-btn.is-match-btn {
-  background: linear-gradient(90deg, #ffd98a, #f0b86a);
-  box-shadow: 0 4px 16px rgba(255, 217, 138, 0.22);
+.star-name-badge:hover {
+  background: rgba(202, 167, 255, 0.18);
+  transform: translateY(-1px);
 }
-.submit-btn.is-match-btn:hover:not(:disabled) {
-  background: linear-gradient(90deg, #ffe5a8, #f5c47a);
+.badge-star {
+  color: #caa7ff;
+  opacity: 0.9;
 }
 
-/* ─── Matching Mask (遮罩) ─── */
+/* ════════════════════════════════════════
+   匹配遮罩：AI 生成中风格
+   去掉粒子浮动动画，去掉 3 步进度条
+   改用：旋转 Sparkles 图标 + 标题 + 描述 + skeleton lines
+   ════════════════════════════════════════ */
 .match-mask {
   position: absolute;
   inset: 0;
-  background: rgba(10, 8, 22, 0.86);
-  backdrop-filter: blur(10px);
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 30%, rgba(255,217,138,0.10), transparent 70%),
+    rgba(8, 7, 20, 0.82);
+  backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-lg);
   z-index: 5;
+  padding: 24px;
 }
 .match-mask-enter-active, .match-mask-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.3s ease;
 }
 .match-mask-enter-from, .match-mask-leave-to {
   opacity: 0;
 }
 .match-mask-inner {
-  width: 88%;
+  width: 100%;
   max-width: 420px;
+  padding: 22px 22px 24px !important;
   text-align: center;
 }
-.match-stars {
-  position: relative;
-  height: 70px;
-  margin-bottom: 22px;
+/* 匹配遮罩用金渐变顶线 */
+.panel-wrapper.pw-match-mask::before {
+  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.5), rgba(202,167,255,0.5), transparent);
 }
-.match-star-particle {
-  position: absolute;
-  bottom: 0;
+.match-icon-wrap {
+  margin: 4px auto 14px;
+  width: 56px; height: 56px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff5c0, #ffd98a 60%, transparent 80%);
-  box-shadow: 0 0 12px rgba(255, 217, 138, 0.8);
-  animation: floatStar 2.2s ease-in-out infinite;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 217, 138, 0.12);
+  border: 1px solid rgba(255, 217, 138, 0.28);
+  box-shadow: 0 0 24px rgba(255, 217, 138, 0.18);
 }
-@keyframes floatStar {
-  0% { transform: translateY(0) scale(1); opacity: 0.3; }
-  40% { transform: translateY(-26px) scale(1.2); opacity: 1; }
-  80% { transform: translateY(-50px) scale(0.8); opacity: 0.4; }
-  100% { transform: translateY(-60px) scale(0.3); opacity: 0; }
+.match-spin-icon {
+  color: #ffe5a8;
+  opacity: 0.9;
+  animation: spinSlow 3.5s linear infinite;
 }
-.match-step-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-  margin-bottom: 18px;
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+.match-title {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+  margin: 0 0 6px;
 }
-.match-step {
+.match-desc {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.68);
+  line-height: 1.7;
+  margin: 0 0 16px;
+  padding: 0 6px;
+}
+/* skeleton 占位条（AI 卡片生成中同款） */
+.match-skeleton {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
+  gap: 7px;
+  padding: 6px 4px 2px;
 }
-.step-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.04);
-  color: rgba(255,255,255,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
+.sk-line {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,217,138,0.06) 0%, rgba(255,217,138,0.16) 50%, rgba(255,217,138,0.06) 100%);
+  background-size: 200% 100%;
+  animation: skShine 1.6s linear infinite;
 }
-.match-step.active .step-dot {
-  border-color: #ffd98a;
-  background: rgba(255, 217, 138, 0.12);
-  color: #ffe5a8;
-  box-shadow: 0 0 12px rgba(255, 217, 138, 0.35);
-  animation: stepPulse 1.2s ease-in-out infinite;
-}
-.match-step.done .step-dot {
-  border-color: rgba(149, 240, 192, 0.5);
-  background: rgba(149, 240, 192, 0.1);
-  color: #95f0c0;
-}
-@keyframes stepPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-}
-.step-label {
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.45);
-  white-space: nowrap;
-  transition: color 0.3s;
-}
-.match-step.active .step-label { color: #ffe5a8; }
-.match-step.done .step-label   { color: rgba(149, 240, 192, 0.85); }
-.match-step-line {
-  height: 1.5px;
-  flex: 1;
-  max-width: 42px;
-  background: rgba(255,255,255,0.12);
-  position: relative;
-  overflow: hidden;
-  margin: -18px 4px 0;
-}
-.match-step-line::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  width: 0%;
-  background: linear-gradient(90deg, #ffd98a, rgba(149, 240, 192, 0.8));
-  transition: width 0.35s ease;
-}
-.match-step-line.fill::after { width: 100%; }
-.match-tip {
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.78);
-  margin: 0;
-  letter-spacing: 0.02em;
+.sk-1 { width: 86%; }
+.sk-2 { width: 70%; }
+.sk-3 { width: 52%; }
+@keyframes skShine {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 .match-error {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 0.8rem;
   color: #ff8b7d;
+  line-height: 1.5;
+}
+
+/* ═══ 移动端适配 ═══ */
+@media (max-width: 640px) {
+  .overlay { padding: 8px; }
+  .form-panel {
+    max-height: calc(100vh - 16px);
+    width: 96vw;
+    border-radius: 14px;
+  }
+  .form-header {
+    margin: 14px 14px 0;
+    padding: 12px 14px;
+  }
+  .pw-head .pw-count { display: none; }
+  .close-icon { top: 10px; right: 10px; }
+  .form-body { padding: 16px 14px 18px; gap: 12px; }
+  .tag-btn { padding: 5px 12px; font-size: 0.76rem; }
+  .match-mask-inner { padding: 18px 18px 20px !important; }
+  .match-title { font-size: 0.9rem; }
+  .match-desc { font-size: 0.78rem; }
 }
 </style>
