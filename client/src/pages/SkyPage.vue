@@ -68,7 +68,7 @@
           <MapPin :size="18" />
         </button>
         <!-- 设置 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="showSettings = true" title="设置">
+        <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
         <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
@@ -280,6 +280,7 @@
         :current-user-id="currentUserId"
         :observer-lat="userLat"
         :observer-lng="userLng"
+        :is-guest="isGuest"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -353,6 +354,8 @@ const myToggleFeedback = ref('')
 const locationCityToast = ref('')
 
 function toggleMyStories() {
+  // 访客账号无个人故事，跳登录页
+  if (isGuest.value) { goLogin(); return }
   // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
   if (!currentUserId.value) {
     myToggleFeedback.value = '请先登录'
@@ -1079,7 +1082,7 @@ async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
 function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
-function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
+function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
   const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
@@ -1144,6 +1147,8 @@ function onDeleteStory(storyId: number) {
   }
 }
 async function onResonate(storyId: number) {
+  // 访客账号不能共鸣，跳登录页
+  if (isGuest.value) { goLogin(); return }
   resonating.value = true
   try {
     const token = localStorage.getItem('token')

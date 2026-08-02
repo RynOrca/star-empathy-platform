@@ -611,6 +611,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component } from 'vue'
+import { useRouter } from 'vue-router'
 import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown } from 'lucide-vue-next'
 import StarNarrative from '../StarNarrative.vue'
 import AncientChat from '../AncientChat.vue'
@@ -695,6 +696,7 @@ const props = defineProps<{
   currentUserId: number | null
   observerLat?: number | null
   observerLng?: number | null
+  isGuest?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -711,6 +713,13 @@ const emit = defineEmits<{
   updateSimilarStars: [ids: number[]]
   deleteStory: [storyId: number]
 }>()
+
+const router = useRouter()
+// 访客拦截：体验账号不能收藏/共鸣/写故事/与古人共赏，跳登录页
+function guestGuard(): boolean {
+  if (props.isGuest) { router.push('/'); return true }
+  return false
+}
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
@@ -931,6 +940,7 @@ onMounted(() => {
 })
 
 function onResonate(story: { id: number; resonanceCount: number }) {
+  if (guestGuard()) return
   const current = getDisplayResonance(story)
   resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
@@ -985,6 +995,7 @@ const isFavorited = computed(() => props.favoriteStarIds.includes(props.catalogS
 function getToken() { return localStorage.getItem('token') }
 
 async function toggleFavorite() {
+  if (guestGuard()) return
   const token = getToken()
   if (!token) {
     alert('请先登录后再收藏')
@@ -1017,11 +1028,11 @@ async function fetchCatalogStatsFromFront() {
   } catch { /* 静默 */ }
 }
 
-function onWriteStory() { emit('writeStory') }
+function onWriteStory() { if (guestGuard()) return; emit('writeStory') }
 
 // ─── 古人陪看聊天 ───
 const showChat = ref(false)
-function openChat() { showChat.value = true }
+function openChat() { if (guestGuard()) return; showChat.value = true }
 
 function openStoryDetail(story: { id: number }) {
   detailStoryId.value = story.id

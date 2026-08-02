@@ -339,7 +339,6 @@
               {{ pwdLoading ? '修改中...' : '确认修改' }}
             </button>
           </footer>
-          <p class="pwd-forgot-link" @click="goForgotPassword">忘了旧密码？去 HomePage 找回</p>
         </div>
       </div>
 
@@ -496,13 +495,6 @@ async function handleLogout() {
     showLogoutModal.value = false
     router.push('/')
   }
-}
-
-// 忘了旧密码 → 退出后回首页走找回流程
-async function goForgotPassword() {
-  clearAndClosePwdModal()
-  await logout()
-  router.push('/')
 }
 
 async function updatePassword() {
@@ -1160,10 +1152,14 @@ onBeforeUnmount(() => {
 }
 
 .pd-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--pd-font-deco);
   font-size: 0.85rem;
   letter-spacing: 0.3em;
   color: rgba(255,217,138,0.6);
+  pointer-events: none;
 }
 
 .pd-actions {
@@ -2233,19 +2229,6 @@ onBeforeUnmount(() => {
   font-style: italic;
 }
 
-/* 改密码弹窗底部「找回」链接 */
-.pwd-forgot-link {
-  text-align: center;
-  font-size: 0.78rem;
-  color: rgba(255,217,138,0.5);
-  margin-top: 14px;
-  cursor: pointer;
-  letter-spacing: 0.05em;
-  transition: color 0.2s;
-  font-family: var(--pd-font-serif);
-}
-.pwd-forgot-link:hover { color: var(--pd-gold); }
-
 /* 退出确认小弹窗 */
 .pd-modal-sm { max-width: 380px; }
 .pd-modal-hint {
@@ -2495,7 +2478,6 @@ onBeforeUnmount(() => {
   /* 退出/设置弹窗自适应 */
   .pd-modal-sm { max-width: 92vw; }
   .pd-modal-hint { font-size: 0.82rem; }
-  .pwd-forgot-link { font-size: 0.72rem; }
   .pd-settings-item { padding: 12px 16px; font-size: 0.82rem; }
 
   /* Timeline section */
