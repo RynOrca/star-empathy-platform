@@ -1,6 +1,7 @@
 <template>
   <!-- ═══ PC 端布局 ═══ -->
-  <div v-if="!isMobile" class="overlay" @click.self="$emit('close')">
+  <Transition name="pc-detail-fade" @after-leave="emit('close')">
+    <div v-if="!isMobile && show" class="overlay" @click.self="handleClose">
     <div class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
@@ -181,7 +182,7 @@
       <div class="panel panel-info">
         <!-- 顶部固定：关闭按钮 + 星星名字 -->
         <div class="info-header">
-          <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
+          <button class="close-btn" @click="handleClose"><X :size="15" /></button>
           <StarHeader :starInfo="starInfo" />
         </div>
 
@@ -313,11 +314,11 @@
       </div>
     </div>
   </div>
+  </Transition>
 
   <!-- ═══ 移动端布局：底部抽屉 ═══ -->
-  <template v-else>
-    <Transition name="mobile-sheet-fade">
-      <div class="mobile-overlay" @click.self="$emit('close')">
+  <Transition name="mobile-sheet-fade" @after-leave="emit('close')">
+    <div v-if="isMobile && show" class="mobile-overlay" @click.self="handleClose">
         <div
           class="mobile-sheet"
           :class="{ dragging: isDragging }"
@@ -326,12 +327,12 @@
           @touchmove.passive="onTouchMove"
           @touchend="onTouchEnd"
         >
-          <!-- 拖拽条 -->
-          <div class="mobile-handle"></div>
+          <!-- 拖拽条（点击关闭） -->
+          <div class="mobile-handle" @click="handleClose"></div>
 
           <!-- 顶部栏：关闭 + Tab 下拉 -->
           <div class="mobile-top-bar">
-            <button class="mobile-close-btn" @click="$emit('close')">
+            <button class="mobile-close-btn" @click="handleClose">
               <X :size="18" />
             </button>
             <div class="mobile-tab-select-wrap">
@@ -377,22 +378,6 @@
                   :formatClockTime="formatClockTime"
                   :formatDateTime="formatDateTime"
                 />
-
-                <!-- 相似星星 + 天区故事精选（移动端纵向堆叠） -->
-                <div class="mobile-side-panels">
-                  <SimilarStarsPanel
-                    :similarStars="similarStars.similarStars.value"
-                    :getStarName="getStarName"
-                    :onSimilarStarClick="onSimilarStarClick"
-                  />
-                  <AreaHighlightsPanel
-                    :highlights="areaHighlightsData"
-                    :loading="areaLoading"
-                    :currentStarId="catalogStarId"
-                    :getStarName="getStarName"
-                    :onSimilarStarClick="onSimilarStarClick"
-                  />
-                </div>
 
                 <!-- 标签（内联编辑） -->
                 <div class="info-section-mobile">
@@ -478,6 +463,22 @@
                   :cached="narrative.cached.value"
                   @retry="narrative.fetchNarrative(catalogStarId)"
                 />
+
+                <!-- 相似星星 + 天区故事精选（与叙事文本左右对齐，竖向堆叠） -->
+                <div class="mobile-side-panels">
+                  <SimilarStarsPanel
+                    :similarStars="similarStars.similarStars.value"
+                    :getStarName="getStarName"
+                    :onSimilarStarClick="onSimilarStarClick"
+                  />
+                  <AreaHighlightsPanel
+                    :highlights="areaHighlightsData"
+                    :loading="areaLoading"
+                    :currentStarId="catalogStarId"
+                    :getStarName="getStarName"
+                    :onSimilarStarClick="onSimilarStarClick"
+                  />
+                </div>
               </template>
 
               <!-- 历史故事 -->
@@ -607,11 +608,10 @@
         />
       </div>
     </Transition>
-  </template>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, type Component } from 'vue'
+import { computed, ref, reactive, onMounted, nextTick, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown } from 'lucide-vue-next'
 import StarNarrative from '../StarNarrative.vue'
@@ -666,7 +666,7 @@ function onTouchEnd() {
   isDragging.value = false
   if (currentH < vh * 0.3) {
     // 下拉低于 30vh → 关闭
-    emit('close')
+    handleClose()
   } else if (currentH < vh * 0.75) {
     sheetHeight.value = '60vh'
   } else {
@@ -924,11 +924,19 @@ function getStarName(catalogStarId: number): string {
   return s?.name || s?.con || `恒星 #${catalogStarId}`
 }
 function onSimilarStarClick(catalogStarId: number) {
+  // 跳转新星星：直接 emit('close') 让父组件卸载当前 StarDetail，新 StarDetail 挂载时有 enter 动画
   emit('close')
   window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
 }
 
+// ─── 抽屉动画控制：内部 show 状态触发 enter/leave ───
+const show = ref(false)
+function handleClose() {
+  show.value = false
+}
+
 onMounted(() => {
+  nextTick(() => { show.value = true })
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -1797,14 +1805,25 @@ watch(() => props.catalogStarId, () => {
   will-change: height;
 }
 
-/* ─── Drag Handle ─── */
+/* ─── Drag Handle（统一黄色拖拽杠风格） ─── */
 .mobile-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.mobile-handle::after {
+  content: '';
   width: 36px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  margin: 10px auto 6px;
-  flex-shrink: 0;
+  background: rgba(255, 217, 138, 0.3);
+  transition: background 0.2s;
+}
+.mobile-handle:active::after {
+  background: var(--accent, #ffd98a);
 }
 
 /* ─── Mobile Top Bar ─── */
@@ -2008,13 +2027,13 @@ watch(() => props.catalogStarId, () => {
   transition: opacity 0.25s ease;
 }
 .mobile-sheet-fade-enter-active .mobile-sheet {
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.22s ease;
 }
 .mobile-sheet-fade-leave-active .mobile-sheet {
-  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-enter-from {
   opacity: 0;
@@ -2027,6 +2046,28 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-sheet-fade-leave-to .mobile-sheet {
   transform: translateY(100%);
+}
+
+/* ─── PC Transitions ─── */
+.pc-detail-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.pc-detail-fade-enter-active .detail-wrap {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pc-detail-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.pc-detail-fade-leave-active .detail-wrap {
+  transition: transform 0.2s ease-in;
+}
+.pc-detail-fade-enter-from,
+.pc-detail-fade-leave-to {
+  opacity: 0;
+}
+.pc-detail-fade-enter-from .detail-wrap,
+.pc-detail-fade-leave-to .detail-wrap {
+  transform: scale(0.95) translateY(16px);
 }
 
 .mobile-story-slide-enter-active {
