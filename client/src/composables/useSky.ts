@@ -1092,13 +1092,13 @@ for (const s of stars) starById.set(s.id, s)
   let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
   let crosshairStyle: HTMLStyleElement | null = null
   let snappedStarId = -1                            // 当前吸附的星 ID，-1 = 未吸附
-  let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（10px 脱吸附判定）
+  let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
   // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
   const SNAP_THRESHOLD = 0.01
-  const SNAP_RELEASE_PX = 10                        // 脱吸附的指针移动阈值（屏幕像素）
-  const SNAP_FOV_DELTA = 8                          // 吸附时 FOV 缩小量（度）
+  const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
+  const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
 
   /**
    * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
@@ -1126,7 +1126,9 @@ for (const s of stars) starById.set(s.id, s)
     tooltipInner.style.opacity = '0'
     hoverGlowTargetOpacity = 0
     if (snapBaseFov > 0) {
-      animateFov(snapBaseFov)
+      const targetFov = snapBaseFov
+      animateFov(targetFov, 300)
+      userFov = targetFov
       snapBaseFov = 0
     }
   }
@@ -1325,33 +1327,35 @@ for (const s of stars) starById.set(s.id, s)
       if (!planetHovered) planetHoverTargetOpacity = 0
       // 行星 hover 时跳过恒星 hover（bestId = -1 让下方阈值判断走 else 分支清除恒星高亮）
       if (planetHovered) bestId = -1
-      // 阈值通过 cfg.hoverThreshold 配置
-      if (bestDist < cfg.hoverThreshold && bestId !== -1) {
-        if (bestId !== hoveredStarId) {
-          // 清除旧的长悬浮计时器
+      // 阈值通过 cfg.hoverThreshold 配置（移动端跳过 hover：仅吸附星显示 tooltip）
+      if (!isMobile) {
+        if (bestDist < cfg.hoverThreshold && bestId !== -1) {
+          if (bestId !== hoveredStarId) {
+            // 清除旧的长悬浮计时器
+            if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
+            hoveredStarId = bestId
+            // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
+            const currentStarId = bestId
+            hoverLongTimer = setTimeout(() => {
+              options?.onStarHoverLong?.(currentStarId)
+            }, cfg.hoverLongDelayMs)
+            updateTooltipContent(bestId)
+          } else {
+            // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
+            updateTooltipPosition(bestId)
+            refreshTooltipStats(bestId)
+          }
+        } else if (hoveredStarId !== -1) {
           if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-          hoveredStarId = bestId
-          // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
-          const currentStarId = bestId
-          hoverLongTimer = setTimeout(() => {
-            options?.onStarHoverLong?.(currentStarId)
-          }, cfg.hoverLongDelayMs)
-          updateTooltipContent(bestId)
-        } else {
-          // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
-          updateTooltipPosition(bestId)
-          refreshTooltipStats(bestId)
+          // 拖拽旋转时不触发离开逻辑，保持连线可见
+          if (!dragging) {
+            options?.onStarHoverLong?.(null)
+          }
+          hoveredStarId = -1
+          tooltipInner.style.opacity = '0'
+          hoverGlowTargetOpacity = 0
+          options?.onStarHover?.(null)
         }
-      } else if (hoveredStarId !== -1) {
-        if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-        // 拖拽旋转时不触发离开逻辑，保持连线可见
-        if (!dragging) {
-          options?.onStarHoverLong?.(null)
-        }
-        hoveredStarId = -1
-        tooltipInner.style.opacity = '0'
-        hoverGlowTargetOpacity = 0
-        options?.onStarHover?.(null)
       }
 
       // ─── issue #116 移动端准星吸附 ───
@@ -1407,6 +1411,8 @@ for (const s of stars) starById.set(s.id, s)
         options?.onStarClick?.(snappedStarId)
         return
       }
+      // issue #116：移动端非吸附状态下点击无操作（仅准星选中可触发）
+      if (isMobile) return
 
       // issue #116 修复：用真实点击坐标更新 mouse，确保检测位置准确
       const rect = canvas.getBoundingClientRect()
@@ -1514,9 +1520,10 @@ for (const s of stars) starById.set(s.id, s)
         rotX = camera.rotation.x - baseRotX + 0.3
         userFov = camera.fov
       }
-      // 单指旋转
-      rotY += (e.clientX - px) * 0.004
-      rotX += (e.clientY - py) * 0.004
+      // 单指旋转（issue #116：吸附时拖动阻力 1/4 速度，模拟"穿越糖蜜"手感）
+      const dragFactor = (isMobile && snappedStarId !== -1) ? 0.25 : 1
+      rotY += (e.clientX - px) * 0.004 * dragFactor
+      rotX += (e.clientY - py) * 0.004 * dragFactor
       rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
       if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
       px = e.clientX; py = e.clientY
