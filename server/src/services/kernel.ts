@@ -233,7 +233,7 @@ function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: 
 /**
  * 获取与指定恒星共享任何故事的其他 catalog_star_id 集合
  * issue #117：同一故事绑定的多颗星（如星座神话）共享同一份内核，
- * 相似度必然为 1.0，不应出现在"内核相似的星星"推荐中
+ * 星座神话场景下相似度为 1.0，即使有额外独有故事也极高，无推荐价值
  */
 function getSharedStoryStarIds(catalogStarId: number): Set<number> {
   const rows = db.prepare(`
@@ -270,7 +270,7 @@ export function getSimilarStars(catalogStarId: number, limit = 8): SimilarStar[]
   const target = allKernels.get(catalogStarId)
   if (!target) return []
 
-  // issue #117：排除与目标星共享同一故事的星（它们内核完全相同，相似度=1.0，无推荐价值）
+  // issue #117：排除与目标星共享同一故事的星（共享内核导致相似度极高，无推荐价值）
   const sharedStoryStarIds = getSharedStoryStarIds(catalogStarId)
 
   const results: SimilarStar[] = []
