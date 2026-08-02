@@ -1,6 +1,7 @@
 <template>
   <!-- ═══ PC 端布局 ═══ -->
-  <div v-if="!isMobile" class="overlay" @click.self="$emit('close')">
+  <Transition name="pc-detail-fade" @after-leave="emit('close')">
+    <div v-if="!isMobile && show" class="overlay" @click.self="handleClose">
     <div class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
@@ -281,7 +282,7 @@
       <div class="panel panel-info">
         <!-- 顶部固定：关闭按钮 + 星星名字 -->
         <div class="info-header">
-          <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
+          <button class="close-btn" @click="handleClose"><X :size="15" /></button>
           <StarHeader :starInfo="starInfo" />
         </div>
 
@@ -413,24 +414,25 @@
       </div>
     </div>
   </div>
+  </Transition>
 
   <!-- ═══ 移动端布局：底部抽屉 ═══ -->
-  <template v-else>
-    <Transition name="mobile-sheet-fade">
-      <div class="mobile-overlay" @click.self="$emit('close')">
+  <Transition name="mobile-sheet-fade" @after-leave="emit('close')">
+    <div v-if="isMobile && show" class="mobile-overlay" @click.self="handleClose">
         <div
           class="mobile-sheet"
+          :class="{ dragging: isDragging }"
           :style="{ height: sheetHeight }"
           @touchstart.passive="onTouchStart"
           @touchmove.passive="onTouchMove"
           @touchend="onTouchEnd"
         >
-          <!-- 拖拽条 -->
-          <div class="mobile-handle"></div>
+          <!-- 拖拽条（点击关闭） -->
+          <div class="mobile-handle" @click="handleClose"></div>
 
           <!-- 顶部栏：关闭 + Tab 下拉 -->
           <div class="mobile-top-bar">
-            <button class="mobile-close-btn" @click="$emit('close')">
+            <button class="mobile-close-btn" @click="handleClose">
               <X :size="18" />
             </button>
             <div class="mobile-tab-select-wrap">
@@ -843,7 +845,6 @@
         />
       </div>
     </Transition>
-  </template>
 </template>
 
 <script setup lang="ts">
@@ -902,11 +903,13 @@ const { isMobile } = useMediaQuery()
 const sheetHeight = ref('60vh')
 const touchStartY = ref(0)
 const touchStartHeight = ref(0)
+const isDragging = ref(false)
 
 function onTouchStart(e: TouchEvent) {
   touchStartY.value = e.touches[0].clientY
   const sheet = (e.target as HTMLElement).closest('.mobile-sheet') as HTMLElement
   touchStartHeight.value = sheet?.offsetHeight || window.innerHeight * 0.6
+  isDragging.value = true
 }
 
 function onTouchMove(e: TouchEvent) {
@@ -921,9 +924,10 @@ function onTouchEnd() {
   const sheet = document.querySelector('.mobile-sheet') as HTMLElement
   const currentH = sheet?.offsetHeight || window.innerHeight * 0.6
   const vh = window.innerHeight
+  isDragging.value = false
   if (currentH < vh * 0.3) {
     // 下拉低于 30vh → 关闭
-    emit('close')
+    handleClose()
   } else if (currentH < vh * 0.75) {
     sheetHeight.value = '60vh'
   } else {
@@ -957,6 +961,7 @@ const props = defineProps<{
   currentUserId: number | null
   observerLat?: number | null
   observerLng?: number | null
+  isGuest?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -973,6 +978,18 @@ const emit = defineEmits<{
   updateSimilarStars: [ids: number[]]
   deleteStory: [storyId: number]
 }>()
+
+const router = useRouter()
+// 访客拦截：体验账号不能收藏/共鸣/写故事/与古人共赏，跳登录页
+// 必须先清 token 再跳转，否则路由守卫（to.path === '/' && token）会重定向回 /sky
+function guestGuard(): boolean {
+  if (props.isGuest) {
+    localStorage.removeItem('token')
+    router.push('/')
+    return true
+  }
+  return false
+}
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
@@ -1094,10 +1111,13 @@ const pcTabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-// 移动端：包含「星信息」
-const mobileTabs: { id: TabId; label: string; icon: Component }[] = [
-  { id: 'info', label: '星信息', icon: Star },
-  ...pcTabs,
+// 移动端：包含「星信息」，下拉框使用罗马数字前缀（与设置弹窗风格一致）
+const mobileTabs: { id: TabId; label: string; roman: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', roman: 'Ⅰ', icon: Star },
+  { id: 'narrative', label: 'AI 叙事', roman: 'Ⅱ', icon: Sparkles },
+  { id: 'history', label: '历史故事', roman: 'Ⅲ', icon: BookOpen },
+  { id: 'all', label: '用户故事', roman: 'Ⅳ', icon: List },
+  { id: 'mine', label: '我的故事', roman: 'Ⅴ', icon: User },
 ]
 // 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
 const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
@@ -1209,11 +1229,19 @@ function getConstellationName(catalogStarId: number): string {
 const currentStarName = computed(() => getStarName(props.catalogStarId))
 const currentConstellation = computed(() => getConstellationName(props.catalogStarId))
 function onSimilarStarClick(catalogStarId: number) {
+  // 跳转新星星：直接 emit('close') 让父组件卸载当前 StarDetail，新 StarDetail 挂载时有 enter 动画
   emit('close')
   window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
 }
 
+// ─── 抽屉动画控制：内部 show 状态触发 enter/leave ───
+const show = ref(false)
+function handleClose() {
+  show.value = false
+}
+
 onMounted(() => {
+  nextTick(() => { show.value = true })
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -1234,6 +1262,7 @@ onMounted(() => {
 })
 
 function onResonate(story: { id: number; resonanceCount: number }) {
+  if (guestGuard()) return
   const current = getDisplayResonance(story)
   resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
@@ -1288,6 +1317,7 @@ const isFavorited = computed(() => props.favoriteStarIds.includes(props.catalogS
 function getToken() { return localStorage.getItem('token') }
 
 async function toggleFavorite() {
+  if (guestGuard()) return
   const token = getToken()
   if (!token) {
     alert('请先登录后再收藏')
@@ -1320,11 +1350,11 @@ async function fetchCatalogStatsFromFront() {
   } catch { /* 静默 */ }
 }
 
-function onWriteStory() { emit('writeStory') }
+function onWriteStory() { if (guestGuard()) return; emit('writeStory') }
 
 // ─── 古人陪看聊天 ───
 const showChat = ref(false)
-function openChat() { showChat.value = true }
+function openChat() { if (guestGuard()) return; showChat.value = true }
 
 function openStoryDetail(story: { id: number }) {
   detailStoryId.value = story.id
@@ -2369,35 +2399,55 @@ watch(() => props.catalogStarId, () => {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(4, 4, 18, 0.5);
+  background: rgba(7, 8, 22, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-/* ─── Mobile Sheet ─── */
+/* ─── Mobile Sheet（对齐 SettingsModal 风格） ─── */
 .mobile-sheet {
   width: 100%;
   max-width: 500px;
-  background: rgba(12, 16, 36, 0.98);
-  border: 1px solid rgba(48, 55, 87, 0.4);
-  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  /* 顶部金色边框（与罗马数字同色） */
+  border-top: 5px solid var(--accent);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+/* 拖拽时高度变化才需要过渡，enter/leave 用 transform 过渡避免冲突 */
+.mobile-sheet.dragging {
   transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: height;
 }
 
-/* ─── Drag Handle ─── */
+/* ─── Drag Handle（金色拖拽杠，与设置弹窗风格一致） ─── */
 .mobile-handle {
-  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.mobile-handle::after {
+  content: '';
+  width: 40px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  margin: 10px auto 6px;
-  flex-shrink: 0;
+  background: var(--accent-border);
+  transition: background 0.2s;
+}
+.mobile-handle:active::after {
+  background: var(--accent);
 }
 
 /* ─── Mobile Top Bar ─── */
@@ -2405,13 +2455,14 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 16px 10px;
+  padding: 8px 18px 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .mobile-close-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2440,7 +2491,7 @@ watch(() => props.catalogStarId, () => {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 0 16px;
+  padding: 16px 18px;
 }
 
 /* ─── Mobile Section (Collapsible) ─── */
@@ -2601,13 +2652,13 @@ watch(() => props.catalogStarId, () => {
   transition: opacity 0.25s ease;
 }
 .mobile-sheet-fade-enter-active .mobile-sheet {
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.22s ease;
 }
 .mobile-sheet-fade-leave-active .mobile-sheet {
-  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-enter-from {
   opacity: 0;
@@ -2620,6 +2671,28 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-sheet-fade-leave-to .mobile-sheet {
   transform: translateY(100%);
+}
+
+/* ─── PC Transitions ─── */
+.pc-detail-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.pc-detail-fade-enter-active .detail-wrap {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pc-detail-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.pc-detail-fade-leave-active .detail-wrap {
+  transition: transform 0.2s ease-in;
+}
+.pc-detail-fade-enter-from,
+.pc-detail-fade-leave-to {
+  opacity: 0;
+}
+.pc-detail-fade-enter-from .detail-wrap,
+.pc-detail-fade-leave-to .detail-wrap {
+  transform: scale(0.95) translateY(16px);
 }
 
 .mobile-story-slide-enter-active {

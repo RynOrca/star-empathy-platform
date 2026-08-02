@@ -292,6 +292,8 @@ export interface SkyAPI {
   toggleConstellations: () => boolean
   /** issue #34：更新星空显示配置（部分覆盖） */
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
+  /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
+  releaseSnap: () => void
 }
 
 export function useSky(
@@ -301,6 +303,8 @@ export function useSky(
     onStarHover?: (starId: number | null) => void
     onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string, planetId: number) => void
+    /** issue #124：准星吸附状态变化通知（starId=number 表示吸附到该星，null 表示脱吸附） */
+    onSnapChange?: (starId: number | null) => void
     observerLat?: number
     observerLng?: number
     /** 星空显示配置（issue #34）：覆盖默认 STAR_DISPLAY_CONFIG 的任意字段 */
@@ -1085,6 +1089,111 @@ for (const s of stars) starById.set(s.id, s)
   // hoverLongTimer 提升到外层作用域，以便 dispose 能清除未触发的长悬浮回调
   let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
   let hoveredStarId = -1  // 提升到外层作用域，供 animate 中中心近距检测使用
+
+  // ═══ 移动端准星吸附状态（issue #116） ═══
+  // 仅在 (max-width: 768px) 启用；PC 完全不进入逻辑分支
+  let isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
+  let crosshairStyle: HTMLStyleElement | null = null
+  let snappedStarId = -1                            // 当前吸附的星 ID，-1 = 未吸附
+  let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
+  let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
+  let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
+  const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
+  const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
+  const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
+
+  /**
+   * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
+   * 复用文件已有的 easeOutQuart 缓动；新动画会取消进行中的旧动画。
+   */
+  function animateFov(targetFov: number, durationMs = 300) {
+    cancelAnimationFrame(snapFovRafId)
+    const startFov = camera.fov
+    const startTime = performance.now()
+    function step() {
+      if (disposed) return
+      const t = Math.min(1, (performance.now() - startTime) / durationMs)
+      camera.fov = startFov + (targetFov - startFov) * easeOutQuart(t)
+      camera.updateProjectionMatrix()
+      if (t < 1) snapFovRafId = requestAnimationFrame(step)
+    }
+    snapFovRafId = requestAnimationFrame(step)
+  }
+
+  /** 释放准星吸附：清状态、还原准星视觉、隐藏 tooltip、FOV 缩回 */
+  function releaseSnap() {
+    if (snappedStarId === -1) return
+    snappedStarId = -1
+    if (crosshairEl) crosshairEl.classList.remove('snapped')
+    tooltipInner.style.opacity = '0'
+    hoverGlowTargetOpacity = 0
+    if (snapBaseFov > 0) {
+      const targetFov = snapBaseFov
+      animateFov(targetFov, 300)
+      userFov = targetFov
+      snapBaseFov = 0
+    }
+    // issue #124：通知外部已脱吸附
+    options?.onSnapChange?.(null)
+  }
+
+  // ═══ 移动端准星 DOM（issue #116） ═══
+  // 仅移动端可见；PC 端 display:none，pointer-events:none 不拦截触摸
+  crosshairEl = document.createElement('div')
+  crosshairEl.className = 'm-crosshair' + (isMobile ? ' visible' : '')
+  crosshairEl.innerHTML = `
+    <span class="mch-arm mch-tl"></span>
+    <span class="mch-arm mch-tr"></span>
+    <span class="mch-arm mch-bl"></span>
+    <span class="mch-arm mch-br"></span>
+  `
+  crosshairStyle = document.createElement('style')
+  crosshairStyle.textContent = `
+    .m-crosshair {
+      position: fixed; top: 50%; left: 50%;
+      width: 26px; height: 26px;
+      margin: -13px 0 0 -13px;
+      pointer-events: none; z-index: 50;
+      display: none;
+      color: rgba(255, 220, 150, 0.5);
+    }
+    .m-crosshair.visible { display: block; }
+    .mch-arm {
+      position: absolute;
+      width: 8px; height: 1.5px;
+      background: currentColor;
+      filter: drop-shadow(0 0 3px currentColor);
+      transition: transform 0.3s cubic-bezier(.2,.9,.3,1), color 0.2s;
+    }
+    .mch-tl { top: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(45deg); }
+    .mch-tr { top: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(-45deg); }
+    .mch-bl { bottom: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(-45deg); }
+    .mch-br { bottom: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(45deg); }
+    /* 吸附时四线段向中心收缩 4px，形成聚焦感 */
+    .m-crosshair.snapped .mch-tl { transform: rotate(45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-tr { transform: rotate(-45deg) translate(-4px, 0); }
+    .m-crosshair.snapped .mch-bl { transform: rotate(-45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-br { transform: rotate(45deg) translate(-4px, 0); }
+    @keyframes mch-breathe {
+      0%, 100% { color: rgba(255, 220, 150, 0.95); filter: drop-shadow(0 0 8px rgba(255, 220, 150, 0.85)) drop-shadow(0 0 14px rgba(255, 220, 150, 0.4)); }
+      50% { color: rgba(202, 167, 255, 0.95); filter: drop-shadow(0 0 8px rgba(202, 167, 255, 0.85)) drop-shadow(0 0 14px rgba(202, 167, 255, 0.4)); }
+    }
+    .m-crosshair.snapped .mch-arm { animation: mch-breathe 1.6s ease-in-out infinite; }
+  `
+  document.head.appendChild(crosshairStyle)
+  document.body.appendChild(crosshairEl)
+  // 响应式：窗口尺寸变化时更新 isMobile 并显示/隐藏准星
+  {
+    const mql = window.matchMedia('(max-width: 768px)')
+    mql.addEventListener('change', () => {
+      isMobile = mql.matches
+      if (crosshairEl) crosshairEl.classList.toggle('visible', isMobile)
+      if (!isMobile) releaseSnap()
+    }, { signal: abortController.signal })
+  }
+
   {
     const mouse = new Vector2()
     const _v = new Vector3()
@@ -1160,6 +1269,27 @@ for (const s of stars) starById.set(s.id, s)
     }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false }, { signal: abortController.signal })
+
+      // ─── 屏幕投影星体检测（hover 与 click 共用同一套判断逻辑，issue #116）───
+      // 给定 NDC 坐标，返回距离最近的可见恒星 ID 及其屏幕投影距离平方
+      function detectStarByProjection(ndcX: number, ndcY: number): { id: number; dist: number } {
+        skyGroup.updateMatrixWorld()
+        camera.updateMatrixWorld()
+        camera.updateProjectionMatrix()
+        let bestDist = Infinity
+        let bestId = -1
+        for (const sn of allStarNorms) {
+          _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+            .applyMatrix4(skyGroup.matrixWorld).project(camera)
+          if (_v.z > 1) continue // 在相机后面
+          const dx = _v.x - ndcX
+          const dy = _v.y - ndcY
+          const d = dx * dx + dy * dy
+          if (d < bestDist) { bestDist = d; bestId = sn.id }
+        }
+        return { id: bestId, dist: bestDist }
+      }
+
     canvas.addEventListener('pointermove', (e) => {
       // 给拖动标记距离，由 pointerup 判读是否是点击
       if (dragging) {
@@ -1177,21 +1307,8 @@ for (const s of stars) starById.set(s.id, s)
       if (now - hoverCheckTimer < cfg.hoverThrottleMs) return
       hoverCheckTimer = now
 
-      // 用屏幕投影找最近的星（考虑 skyGroup 旋转）
-      skyGroup.updateMatrixWorld()
-      camera.updateMatrixWorld()
-      camera.updateProjectionMatrix()
-      let bestDist = Infinity
-      let bestId = -1
-      let bestNx = 0, bestNy = 0, bestNz = 0
-      for (const sn of allStarNorms) {
-        _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld).project(camera)
-        if (_v.z > 1) continue // 在相机后面
-        const dx = _v.x - mouse.x
-        const dy = _v.y - mouse.y
-        const d = dx*dx + dy*dy
-        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
-      }
+      // 用屏幕投影找最近的星（issue #116：提取为共用函数，hover 与 click 同一套逻辑）
+      let { id: bestId, dist: bestDist } = detectStarByProjection(mouse.x, mouse.y)
       // 行星 hover 检测（issue #82 补充：行星含日月 hover 淡光晕，与恒星互斥）
       // 特写模式下跳过（相机太近光晕会糊屏）
       let planetHovered = false
@@ -1221,33 +1338,73 @@ for (const s of stars) starById.set(s.id, s)
       if (!planetHovered) planetHoverTargetOpacity = 0
       // 行星 hover 时跳过恒星 hover（bestId = -1 让下方阈值判断走 else 分支清除恒星高亮）
       if (planetHovered) bestId = -1
-      // 阈值通过 cfg.hoverThreshold 配置
-      if (bestDist < cfg.hoverThreshold && bestId !== -1) {
-        if (bestId !== hoveredStarId) {
-          // 清除旧的长悬浮计时器
+      // 阈值通过 cfg.hoverThreshold 配置（移动端跳过 hover：仅吸附星显示 tooltip）
+      if (!isMobile) {
+        if (bestDist < cfg.hoverThreshold && bestId !== -1) {
+          if (bestId !== hoveredStarId) {
+            // 清除旧的长悬浮计时器
+            if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
+            hoveredStarId = bestId
+            // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
+            const currentStarId = bestId
+            hoverLongTimer = setTimeout(() => {
+              options?.onStarHoverLong?.(currentStarId)
+            }, cfg.hoverLongDelayMs)
+            updateTooltipContent(bestId)
+          } else {
+            // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
+            updateTooltipPosition(bestId)
+            refreshTooltipStats(bestId)
+          }
+        } else if (hoveredStarId !== -1) {
           if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-          hoveredStarId = bestId
-          // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
-          const currentStarId = bestId
-          hoverLongTimer = setTimeout(() => {
-            options?.onStarHoverLong?.(currentStarId)
-          }, cfg.hoverLongDelayMs)
-          updateTooltipContent(bestId)
-        } else {
-          // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
-          updateTooltipPosition(bestId)
-          refreshTooltipStats(bestId)
+          // 拖拽旋转时不触发离开逻辑，保持连线可见
+          if (!dragging) {
+            options?.onStarHoverLong?.(null)
+          }
+          hoveredStarId = -1
+          tooltipInner.style.opacity = '0'
+          hoverGlowTargetOpacity = 0
+          options?.onStarHover?.(null)
         }
-      } else if (hoveredStarId !== -1) {
-        if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-        // 拖拽旋转时不触发离开逻辑，保持连线可见
-        if (!dragging) {
-          options?.onStarHoverLong?.(null)
+      }
+
+      // ─── issue #116 移动端准星吸附 ───
+      // 仅移动端 + 非行星特写模式启用；拖拽时也运行（拖拽瞄准是核心交互）
+      if (isMobile && closeupState === 'IDLE') {
+        const { id: centerId, dist: centerDist } = detectStarByProjection(0, 0)
+        if (centerId !== -1 && centerDist < SNAP_THRESHOLD) {
+          if (snappedStarId !== centerId) {
+            // 新吸附：锁定目标 + 呼吸动画 + tooltip + FOV 放大
+            snappedStarId = centerId
+            snapStartX = e.clientX
+            snapStartY = e.clientY
+            if (snapBaseFov === 0) {
+              cancelAnimationFrame(snapFovRafId)
+              snapBaseFov = camera.fov
+            }
+            if (crosshairEl) crosshairEl.classList.add('snapped')
+            updateTooltipContent(centerId)
+            // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
+            hoveredStarId = centerId
+            animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+            // issue #124：通知外部已吸附到该星（驱动底部「凝听星语」按钮滑入）
+            options?.onSnapChange?.(centerId)
+          } else {
+            // 已吸附同一颗星：检查是否移动超过阈值
+            const dx = e.clientX - snapStartX
+            const dy = e.clientY - snapStartY
+            if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
+              releaseSnap()
+            } else {
+              // 维持吸附：刷新 tooltip 位置（skyGroup 可能已旋转）
+              updateTooltipPosition(centerId)
+            }
+          }
+        } else if (snappedStarId !== -1) {
+          // 中心无星或超出范围：释放吸附
+          releaseSnap()
         }
-        hoveredStarId = -1
-        tooltipInner.style.opacity = '0'
-        hoverGlowTargetOpacity = 0
-        options?.onStarHover?.(null)
       }
     }, { signal: abortController.signal })
     canvas.addEventListener('pointerup', (e) => {
@@ -1261,69 +1418,39 @@ for (const s of stars) starById.set(s.id, s)
         hoverCheckTimer = 0 // 重置节流，强制下一帧立即检测
         return
       }
-      if (hoveredStarId !== -1) {
-        // 仍需与行星 hitbox 比较：hover 命中的恒星可能位于行星 hitbox 之后，
-        // 取几何距离最近者，避免恒星"吞掉"行星点击
-        skyGroup.updateMatrixWorld()
-        const raycaster = new Raycaster()
-        raycaster.setFromCamera(mouse, camera)
-        let bestStarDist = Infinity
-        let bestStarId = hoveredStarId
-        // 用 raycaster 复测恒星距离
-        raycaster.params.Points!.threshold = 8
-        const starHits = raycaster.intersectObjects(starPointsRefs)
-        if (starHits.length > 0) {
-          const tier = (starHits[0].object as Points).userData.tierIndex as number
-          const sid = tierStarIds[tier]?.[starHits[0].index!]
-          if (sid != null) bestStarDist = starHits[0].distance
-        }
-        // 同时检测行星 hitbox
-        let bestPlanetDist = Infinity
-        let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
-        if (planetMeshes.length) {
-          const planetHits = raycaster.intersectObjects(planetMeshes)
-          if (planetHits.length) {
-            const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-            if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
-          }
-        }
-        // 几何距离最近者获胜：行星更近则命中行星，否则命中恒星
-        if (bestPlanetPd && bestPlanetDist < bestStarDist) {
-          options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
-        } else {
-          options?.onStarClick?.(bestStarId)
-        }
-        return
-      }
 
-      // 悬浮检测未命中恒星，仍同时检测恒星和行星，取几何距离最近者
+      // issue #124：移动端不再用触屏点击进入故事页，改为吸附后点击底部「凝听星语」按钮
+      // 移动端 pointerup 一律不触发 PC 端 Raycaster 点击逻辑（进入故事由底部按钮驱动）
+      if (isMobile) return
+
+      // issue #116 修复：用真实点击坐标更新 mouse，确保检测位置准确
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      // 用屏幕投影检测点击位置最近的恒星（与 hover 同一套逻辑，不依赖 hoveredStarId）
+      const { id: clickStarId, dist: clickStarDist } = detectStarByProjection(mouse.x, mouse.y)
+      const starHit = clickStarId !== -1 && clickStarDist < cfg.hoverThreshold
+
+      // 行星检测仍用 Raycaster（行星有 Mesh hitbox，投影法不适用）
       skyGroup.updateMatrixWorld()
       const raycaster = new Raycaster()
       raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const starHits = raycaster.intersectObjects(starPointsRefs)
-      let bestStarDist = Infinity
-      let bestStarId: number | null = null
-      if (starHits.length > 0) {
-        const tier = (starHits[0].object as Points).userData.tierIndex as number
-        const sid = tierStarIds[tier]?.[starHits[0].index!]
-        if (sid != null) { bestStarDist = starHits[0].distance; bestStarId = sid }
-      }
-      // 同时检测行星 hitbox
-      let bestPlanetDist = Infinity
       let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
       if (planetMeshes.length) {
         const planetHits = raycaster.intersectObjects(planetMeshes)
         if (planetHits.length) {
           const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-          if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
+          if (pd.planetName) { bestPlanetPd = pd }
         }
       }
-      // 几何距离最近者获胜
-      if (bestPlanetPd && bestPlanetDist < bestStarDist) {
+
+      // 优先级：行星直接命中 > 恒星在阈值内
+      // 行星 hitbox 是几何 Mesh，Raycaster 命中即说明点击在行星上
+      if (bestPlanetPd) {
         options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
-      } else if (bestStarId != null) {
-        options?.onStarClick?.(bestStarId)
+      } else if (starHit) {
+        options?.onStarClick?.(clickStarId)
       }
     }, { signal: abortController.signal })
   }
@@ -1402,9 +1529,10 @@ for (const s of stars) starById.set(s.id, s)
         rotX = camera.rotation.x - baseRotX + 0.3
         userFov = camera.fov
       }
-      // 单指旋转
-      rotY += (e.clientX - px) * 0.004
-      rotX += (e.clientY - py) * 0.004
+      // 单指旋转（issue #116：吸附时拖动阻力 1/4 速度，模拟"穿越糖蜜"手感）
+      const dragFactor = (isMobile && snappedStarId !== -1) ? 0.1667 : 1  // 吸附时阻力增大 1.5 倍（1/6 速度）
+      rotY += (e.clientX - px) * 0.004 * dragFactor
+      rotX += (e.clientY - py) * 0.004 * dragFactor
       rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
       if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
       px = e.clientX; py = e.clientY
@@ -3876,6 +4004,10 @@ for (const s of stars) starById.set(s.id, s)
       if (debugEl) debugEl.remove()
       // 移除 tooltipEl DOM（被 CSS2DObject 包装后加入 scene）
       if (tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl)
+      // issue #116：清理移动端准星 DOM + 样式 + FOV 动画
+      cancelAnimationFrame(snapFovRafId)
+      if (crosshairEl && crosshairEl.parentNode) crosshairEl.parentNode.removeChild(crosshairEl)
+      if (crosshairStyle) crosshairStyle.remove()
       // 释放 GPU 资源（geometry/material/texture）
       // scene.clear() 只移除场景图引用，不释放 GPU 内存
       scene.traverse((obj) => {
@@ -3943,5 +4075,7 @@ for (const s of stars) starById.set(s.id, s)
       texCache.forEach(t => t.dispose())
       texCache.clear()
     },
+    // issue #124：主动释放准星吸附（供外部「凝听星语」按钮点击后调用）
+    releaseSnap,
   }
 }

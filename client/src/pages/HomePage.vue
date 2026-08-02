@@ -359,7 +359,7 @@ onMounted(async () => {
 /* ================= 基础样式复位 ================= */
 .home-page {
   width: 100vw;
-  height: 100dvh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   background-color: #02040A;
@@ -694,20 +694,102 @@ onMounted(async () => {
 
 /* ================= 响应式 ================= */
 @media (max-width: 768px) {
+  .home-page {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .split-container {
     flex-direction: column;
+    min-height: 100dvh;
+    height: auto;
   }
+  /* 品牌区压缩为顶部精简横幅 */
   .left-panel {
-    flex: 3;
-    padding: 2rem;
-    justify-content: flex-end;
-  }
-  .right-panel {
-    flex: 7;
-    padding: 2rem;
+    flex: none;
+    padding: 1.5rem 1.5rem 0.5rem;
+    justify-content: flex-start;
   }
   .brand-title {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
+    letter-spacing: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .brand-subtitle {
+    font-size: 0.9rem;
+    letter-spacing: 0.12rem;
+    line-height: 1.5;
+  }
+  /* 表单区自然流动，允许内容撑开 */
+  .right-panel {
+    flex: none;
+    padding: 1rem 1.25rem 2rem;
+    box-shadow: none;
+    border-left: none;
+    background-color: rgba(6, 9, 18, 0.92);
+    justify-content: flex-start;
+  }
+  .form-container {
+    max-width: 100%;
+  }
+  .form-header {
+    margin-bottom: 1.5rem;
+  }
+  .form-title {
+    font-size: 1.5rem;
+  }
+  .form-input {
+    padding: 0.95rem 1rem;
+    font-size: 1rem;
+  }
+  .submit-btn,
+  .guest-btn {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+  .tab-menu {
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .tab-item {
+    padding-bottom: 0.6rem;
+  }
+  .auth-form {
+    gap: 1.25rem;
+  }
+  .stats {
+    margin-top: 1.5rem;
+  }
+}
+
+/* 窄屏进一步收窄 */
+@media (max-width: 380px) {
+  .left-panel {
+    padding: 1rem 1rem 0.25rem;
+  }
+  .brand-title {
+    font-size: 1.5rem;
+    letter-spacing: 0.3rem;
+  }
+  .brand-subtitle {
+    font-size: 0.82rem;
+  }
+  .right-panel {
+    padding: 0.75rem 1rem 1.5rem;
+  }
+  .form-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* 尊重用户的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .tab-item,
+  .form-input,
+  .submit-btn,
+  .guest-btn,
+  .forgot-link,
+  .back-link {
+    transition: none;
   }
 }
 </style>

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -68,14 +68,14 @@
           <MapPin :size="18" />
         </button>
         <!-- 设置 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="showSettings = true" title="设置">
+        <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
-        <!-- 用户 -->
-        <button v-if="username" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+        <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
+        <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
           <User :size="18" />
         </button>
-        <button v-if="!username" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+        <button v-if="!username || isGuest" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
           <User :size="18" />
         </button>
       </div>
@@ -137,7 +137,7 @@
       <div v-if="locationCityToast" class="location-toast"><MapPin :size="13" /> {{ locationCityToast }}</div>
     </Transition>
 
-    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" @snap-change="onSnapChange" />
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -268,6 +268,19 @@
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
+    <!-- issue #124：移动端吸附星辰后的「凝听星语」按钮（替代触屏点击进入故事） -->
+    <Transition name="story-enter" appear>
+      <button
+        v-if="isMobile && snappedStarId !== null && !selectedStarInfo"
+        class="story-enter-btn"
+        type="button"
+        @click="onStoryEnterClick"
+      >
+        <span class="story-enter-main">凝听星语</span>
+        <span v-if="snappedStarName" class="story-enter-sub">{{ snappedStarName }}</span>
+      </button>
+    </Transition>
+
       <StarDetail
         v-if="selectedStarInfo"
         :stories="selectedStories"
@@ -280,6 +293,7 @@
         :current-user-id="currentUserId"
         :observer-lat="userLat"
         :observer-lng="userLng"
+        :is-guest="isGuest"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -345,12 +359,16 @@ const router = useRouter()
 const route = useRoute()
 const { startRefreshTimer, stopRefreshTimer } = useAuth()
 const username = ref('')
+// 访客账号（体验账号）无个人主页，点用户按钮应跳登录页
+const isGuest = computed(() => username.value === '星穹访客')
 const currentUserId = ref<number | null>(null)
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
 const locationCityToast = ref('')
 
 function toggleMyStories() {
+  // 访客账号无个人故事，跳登录页
+  if (isGuest.value) { goLogin(); return }
   // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
   if (!currentUserId.value) {
     myToggleFeedback.value = '请先登录'
@@ -639,21 +657,6 @@ function focusOnQueryStar() {
 watch(() => route.query.star, () => {
   focusOnQueryStar()
 })
-
-async function doLogout() {
-  const token = localStorage.getItem('token')
-  if (token) {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    } catch { /* 即使 API 失败也清除本地状态 */ }
-  }
-  stopRefreshTimer()
-  localStorage.removeItem('token')
-  router.push('/')
-}
 
 function goLogin() {
   stopRefreshTimer()
@@ -952,6 +955,30 @@ function formatStarName(s: CatalogStar): string {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
 
+// issue #124：准星吸附状态（驱动移动端底部「凝听星语」按钮显示）
+const snappedStarId = ref<number | null>(null)
+const snappedStarName = ref<string>('')
+
+function onSnapChange(starId: number | null) {
+  if (starId === null) {
+    snappedStarId.value = null
+    snappedStarName.value = ''
+    return
+  }
+  const star = catalogStarLookup.get(starId)
+  snappedStarId.value = starId
+  snappedStarName.value = star ? formatStarName(star) : ''
+}
+
+// issue #124：点击「凝听星语」按钮 → 进入故事详情并释放吸附
+function onStoryEnterClick() {
+  const id = snappedStarId.value
+  if (id === null) return
+  // 先释放吸附（同步触发 onSnapChange(null) 清状态），再打开故事
+  skyRef.value?.sky?.releaseSnap?.()
+  onStarClick(id)
+}
+
 // 当 SkyCanvas 渲染完成后，传入等待的统计数据
 watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
   if (sRef?.sky && statsMap) {
@@ -1092,7 +1119,7 @@ async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
 function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
-function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
+function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
   const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
@@ -1157,6 +1184,8 @@ function onDeleteStory(storyId: number) {
   }
 }
 async function onResonate(storyId: number) {
+  // 访客账号不能共鸣，跳登录页
+  if (isGuest.value) { goLogin(); return }
   resonating.value = true
   try {
     const token = localStorage.getItem('token')
@@ -2167,6 +2196,77 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   .zoom-controls {
     right: 0.5rem;
     bottom: 5rem;
+  }
+}
+
+/* ================= issue #124：移动端「凝听星语」按钮 ================= */
+/* 对齐项目移动端抽屉美术：5px 金边 + 深蓝灰 + 顶部圆角 + 向上投影 */
+.story-enter-btn {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 1rem 1.5rem calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
+  background: #1a1e35;
+  border: none;
+  border-top: 5px solid #ffd98a;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.55);
+  color: #ffd98a;
+  font-family: 'Cinzel', 'Noto Serif SC', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.25s ease;
+}
+.story-enter-btn:active {
+  background: #232648;
+}
+.story-enter-main {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: 0.3rem;
+  text-indent: 0.3rem; /* 视觉补偿字距导致的居中偏移 */
+  line-height: 1.2;
+}
+.story-enter-sub {
+  font-size: 0.82rem;
+  letter-spacing: 0.15rem;
+  color: rgba(255, 217, 138, 0.7);
+  line-height: 1.2;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 滑入/滑出过渡 */
+.story-enter-enter-active,
+.story-enter-leave-active {
+  transition: transform 0.4s cubic-bezier(.2, .9, .3, 1) !important;
+}
+.story-enter-enter-from,
+.story-enter-leave-to {
+  transform: translateY(100%);
+}
+.story-enter-enter-to,
+.story-enter-leave-from {
+  transform: translateY(0);
+}
+
+/* 尊重用户的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .story-enter-btn {
+    transition: none;
+  }
+  .story-enter-enter-active,
+  .story-enter-leave-active {
+    transition: none;
   }
 }
 </style>

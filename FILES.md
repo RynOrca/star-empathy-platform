@@ -125,15 +125,15 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板 |
-| `HomePage.vue` | 首页/登录页 |
-| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar + 480px 月亮 Hero + 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片（标题/正文 4 行摘录/恒星 Tag/情绪 5 色标签/共鸣/MM DD 日期）、空态 CTA 前往星空；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线、scrollToStory 自动展开；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；4 Modal 统一换肤（签名/星穹之钥密码/故事详情/摘取确认）+ Gold Flash 成功反馈。响应式 768/380 双断点；Prefers-reduced-motion 全停动画 |
+| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板、移动端底部「凝听星语」按钮（吸附星辰后滑入，issue #124） |
+| `HomePage.vue` | 首页/登录页。粒子星空背景 + 左右分栏（品牌意境/登录注册表单），含找回密码、匿名访客体验；移动端可竖向滚动（issue #124） |
+| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
 
 ### 组件 `src/components/`
 
 | 文件 | 用途 |
 |---|---|
-| `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停事件 |
+| `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停/准星吸附事件（`starClick`/`starHover`/`starHoverLong`/`planetClick`/`snapChange`） |
 | `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、PC端 4 个 Tab（AI 叙事/历史故事/用户故事/我的故事）+ 移动端 5 个 Tab（含星信息）、标签编辑、删除确认 |
 | `StarDetail/StoryCard.vue` | 故事卡片子组件（4 个 Tab 复用） |
 | `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除） |
@@ -156,7 +156,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint） |
+| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint）、移动端准星吸附（`onSnapChange` 回调 + `releaseSnap` 主动释放，issue #124） |
 | `useStars.ts` | 星星数据获取、过滤、本地更新 |
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
@@ -196,7 +196,7 @@
 | 文件 | 用途 |
 |---|---|
 | `router/index.ts` | Vue Router 路由配置 |
-| `stores/auth.ts` | 用户认证状态管理（Zustand 风格） |
+| `stores/auth.ts` | 用户认证状态管理（Zustand 风格）。login/register/logout（调后端黑名单 API）/fetchMe/token 自动刷新；导出 `authFetch`（401 兜底清 token 跳登录）、`setAuthRouter`（注入路由实例）、`isGuest`（访客账号判断） |
 
 ### 样式 `src/styles/`
 
@@ -228,6 +228,7 @@
 | 文件 | 用途 |
 |---|---|
 | `2026-07-31-personal-space-ui-style-d-design.md` | **个人空间界面优化设计规范**。Style D（叙事沉浸式）完整 Spec：美学方向、颜色 token、字体层级、4 大段结构、交互流程、数据/API 映射、响应式规则、无障碍、验收清单 |
+| `2026-08-02-mobile-login-and-story-button-design.md` | **移动端登录页适配 + 凝听星语按钮设计规范**（issue #124）。登录页可滚动 + 移动端进入故事改用底部「凝听星语」按钮（吸附星辰后滑入）替代触屏点击 |
 
 ### 实现计划 `docs/superpowers/plans/`
 

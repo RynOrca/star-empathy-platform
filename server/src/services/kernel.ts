@@ -230,6 +230,21 @@ function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: 
   return map
 }
 
+/**
+ * 获取与指定恒星共享任何故事的其他 catalog_star_id 集合
+ * issue #117：同一故事绑定的多颗星（如星座神话）共享同一份内核，
+ * 星座神话场景下相似度为 1.0，即使有额外独有故事也极高，无推荐价值
+ */
+function getSharedStoryStarIds(catalogStarId: number): Set<number> {
+  const rows = db.prepare(`
+    SELECT DISTINCT scs2.catalog_star_id
+    FROM story_catalog_stars scs1
+    JOIN story_catalog_stars scs2 ON scs1.story_id = scs2.story_id
+    WHERE scs1.catalog_star_id = ? AND scs2.catalog_star_id != ?
+  `).all(catalogStarId, catalogStarId) as { catalog_star_id: number }[]
+  return new Set(rows.map(r => r.catalog_star_id))
+}
+
 /** 计算 Jaccard 相似度 */
 function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 && b.size === 0) return 0
@@ -255,14 +270,19 @@ export function getSimilarStars(catalogStarId: number, limit = 8): SimilarStar[]
   const target = allKernels.get(catalogStarId)
   if (!target) return []
 
+  // issue #117：排除与目标星共享同一故事的星（共享内核导致相似度极高，无推荐价值）
+  const sharedStoryStarIds = getSharedStoryStarIds(catalogStarId)
+
   const results: SimilarStar[] = []
   for (const [cid, tags] of allKernels) {
     if (cid === catalogStarId) continue
+    if (sharedStoryStarIds.has(cid)) continue // 跳过共享故事的星
     const emotionSim = jaccardSimilarity(target.emotionalTags, tags.emotionalTags)
     const themeSim = jaccardSimilarity(target.themes, tags.themes)
     // 情绪权重 0.6，主题权重 0.4
     const score = emotionSim * 0.6 + themeSim * 0.4
-    if (score <= 0) continue
+    // issue #117：阈值从 score > 0 提升至 score >= 0.2，过滤仅有微弱标签重叠的噪音推荐
+    if (score < 0.2) continue
 
     const sharedEmotions = [...target.emotionalTags].filter(t => tags.emotionalTags.has(t))
     const sharedThemes = [...target.themes].filter(t => tags.themes.has(t))
