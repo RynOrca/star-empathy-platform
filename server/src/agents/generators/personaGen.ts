@@ -29,7 +29,7 @@ type KernelRow = {
   resonance_count: number
   origin: string | null
   themes: string | null
-  emotion: string | null
+  emotional_tags: string | null // story_kernels.emotional_tags（JSON array），不是不存在的 emotion
 }
 
 const SYSTEM = `你是「星语穹庭」的星语画像师。你根据一颗星下真实的用户心事集合，为它塑造一个有人格、有温度的"星格"。
@@ -65,7 +65,7 @@ function buildUserPrompt(args: {
   const sampleLines = samples
     .map((r, i) => {
       const themes = r.themes ? `（主题：${r.themes}）` : ''
-      const emo = r.emotion ? `（情绪：${r.emotion}）` : ''
+      const emo = r.emotional_tags ? `（情绪标签：${r.emotional_tags}）` : ''
       const c = (r.content || '').replace(/\s+/g, ' ').slice(0, 120)
       const t = r.title ? `《${r.title}》` : ''
       return `${i + 1}. ${t}${themes}${emo}\n   ${c}`
@@ -87,7 +87,7 @@ ${sampleLines}
 export function loadStorySamplesForPersona(catalogStarId: string | number, limit = 60): KernelRow[] {
   const stmt = db.prepare(`
     SELECT s.id as story_id, s.title, s.content, s.resonance_count, s.origin,
-           k.themes, k.emotion
+           k.themes, k.emotional_tags
     FROM story_catalog_stars scs
     JOIN stars s ON s.id = scs.story_id
     LEFT JOIN story_kernels k ON k.story_id = s.id

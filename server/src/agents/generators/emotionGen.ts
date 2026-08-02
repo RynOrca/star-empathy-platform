@@ -45,10 +45,11 @@ type KernelEmoRow = {
   content: string | null
   resonance_count: number
   origin: string | null
-  location: string | null
+  location_lat: number | null
+  location_lng: number | null
   created_at: string | null
   themes: string | null // JSON string array
-  emotion: string | null
+  emotional_tags: string | null // 真实列：story_kernels.emotional_tags（JSON array）
 }
 
 // ──────────────────────── SQL 层 ────────────────────────
@@ -56,9 +57,9 @@ type KernelEmoRow = {
 function loadKernelRows(catalogStarId: string | number, limit = 100): KernelEmoRow[] {
   const stmt = db.prepare(`
     SELECT s.id as story_id, s.title, s.content, s.resonance_count, s.origin,
-           CASE WHEN s.location IS NOT NULL AND s.location != '' THEN s.location ELSE s.origin END AS location,
+           s.location_lat, s.location_lng,
            s.created_at,
-           k.themes, k.emotion
+           k.themes, k.emotional_tags
     FROM story_catalog_stars scs
     JOIN stars s ON s.id = scs.story_id
     LEFT JOIN story_kernels k ON k.story_id = s.id
@@ -77,7 +78,15 @@ function computeEmotionScores(rows: KernelEmoRow[]): Record<string, number> {
   const raw: Record<string, number> = { 思念: 0, 孤独: 0, 希望: 0, 释然: 0, 共鸣: 0 }
   if (!rows.length) return raw
   for (const r of rows) {
-    const text = `${r.title ?? ''} ${r.content ?? ''} ${r.themes ?? ''} ${r.emotion ?? ''}`
+    // 把 emotional_tags（JSON array）也展开进关键词匹配文本里
+    let etags = ''
+    try {
+      if (r.emotional_tags) {
+        const t = JSON.parse(r.emotional_tags) as unknown
+        if (Array.isArray(t)) etags = t.join(' ')
+      }
+    } catch { /* ignore */ }
+    const text = `${r.title ?? ''} ${r.content ?? ''} ${r.themes ?? ''} ${etags}`
     const weight = 1 + Math.log2(1 + (r.resonance_count || 0))
     for (const name of EMOTION_NAMES) {
       const kws = EMOTION_KEYWORDS[name] || []
@@ -128,8 +137,12 @@ function pickStoryQuotes(rows: KernelEmoRow[]): [StoryQuote, StoryQuote, StoryQu
       }
     } catch { /* ignore */ }
     if (themes.length < 2) themes = [['思念', '深夜'], ['孤独', '释然'], ['希望', '共鸣']][i] || ['星语', '随笔']
-    let loc = r.location?.trim() || null
-    if (!loc && r.origin) loc = r.origin
+    // 没有 location 列（只存 lat/lng），显示层面用 origin 或 "夜空"
+    let loc: string | null = null
+    if (r.origin?.trim()) loc = r.origin.trim()
+    if (!loc && (r.location_lat != null || r.location_lng != null)) {
+      loc = '附近的夜空'
+    }
     if (!loc) loc = '夜空'
     const illusList = ['sakura', 'moon', 'house'] as const
     return {
