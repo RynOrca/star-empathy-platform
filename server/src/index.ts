@@ -206,87 +206,40 @@ app.use('/api/moon', moonRouter);
 // 定位（IP 定位 + 反向地理编码）
 app.use('/api/location', locationRouter);
 
-// 设置 API Key（运行时覆盖）
+// ════════════════════════════════════════════════════════════════
+// 设置（只读）：
+//   · Key 只允许通过「环境变量」或「管理员服务器上写 .runtime-key」配置，
+//     不提供前端写入接口（项目不做权限系统，写接口开放 = 任意访客替换/清空 Key）。
+//   · GET /api/settings/*-key 只返回 hasKey 状态，永远不返回 Key 正文。
+//   · POST 写接口 → 统一 405 Method Not Allowed（防止旧版前端 POST 404 或 500 乱蹦）
+// ════════════════════════════════════════════════════════════════
+
+const SETTINGS_READONLY_MSG = '出于安全考虑，运行时 Key 只允许通过服务器环境变量或 .runtime-key 文件配置，前端不提供写入通道。';
+
+function methodNotAllowed(res: Response, msg: string) {
+  res.status(405).json({ code: 405, message: msg, data: null });
+}
+
+// DeepSeek
 app.get('/api/settings/api-key', (_req: Request, res: Response) => {
   ok(res, 'ok', { hasKey: !!getApiKey() });
 });
-app.post('/api/settings/api-key', (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
-    setApiKey(null);
-    ok(res, '已清除 API Key');
-    return;
-  }
-  setApiKey(apiKey.trim());
-  ok(res, 'API Key 已保存');
+app.post('/api/settings/api-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
+});
+app.post('/api/settings/test-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
 
-// 测试 API Key 连通性
-app.post('/api/settings/test-key', async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getApiKey();
-  if (!key) {
-    return badRequest(res, '请先设置 API Key');
-  }
-  try {
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 5,
-      }),
-    });
-    if (resp.ok) {
-      ok(res, '星河已连通');
-    } else {
-      badRequest(res, '未能连通');
-    }
-  } catch (e: any) {
-    serverError(res, `网络错误: ${e.message}`);
-  }
-});
-
-// 高德地图 API Key（运行时覆盖）
+// 高德地图
 app.get('/api/settings/amap-key', (_req: Request, res: Response) => {
   ok(res, 'ok', { hasKey: !!getAmapKey() });
 });
-app.post('/api/settings/amap-key', (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
-    setAmapKey(null);
-    ok(res, '已清除高德 Key');
-    return;
-  }
-  setAmapKey(apiKey.trim());
-  ok(res, '高德 Key 已保存');
+app.post('/api/settings/amap-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
-
-// 测试高德 Key 连通性
-app.post('/api/settings/test-amap-key', async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getAmapKey();
-  if (!key) {
-    return badRequest(res, '请先设置高德 API Key');
-  }
-  try {
-    const resp = await fetch(
-      `https://restapi.amap.com/v3/geocode/regeo?key=${encodeURIComponent(key)}&location=116.4,39.9&output=JSON`,
-      { signal: AbortSignal.timeout(5000) },
-    );
-    const data = await resp.json() as { status: string; info?: string };
-    if (data.status === '1') {
-      ok(res, '高德地图已连通');
-    } else {
-      badRequest(res, `高德返回错误: ${data.info || '未知错误'}`);
-    }
-  } catch (e: any) {
-    serverError(res, `网络错误: ${e.message}`);
-  }
+app.post('/api/settings/test-amap-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
 
 // SPA 回退：非 API 路径返回 index.html
