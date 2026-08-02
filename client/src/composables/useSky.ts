@@ -1096,7 +1096,7 @@ for (const s of stars) starById.set(s.id, s)
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
   // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
-  const SNAP_THRESHOLD = 0.01
+  const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
   const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
   const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
 
@@ -1159,15 +1159,20 @@ for (const s of stars) starById.set(s.id, s)
       width: 8px; height: 1.5px;
       background: currentColor;
       filter: drop-shadow(0 0 3px currentColor);
-      transition: color 0.2s;
+      transition: transform 0.3s cubic-bezier(.2,.9,.3,1), color 0.2s;
     }
     .mch-tl { top: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(45deg); }
     .mch-tr { top: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(-45deg); }
     .mch-bl { bottom: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(-45deg); }
     .mch-br { bottom: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(45deg); }
+    /* 吸附时四线段向中心收缩 4px，形成聚焦感 */
+    .m-crosshair.snapped .mch-tl { transform: rotate(45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-tr { transform: rotate(-45deg) translate(-4px, 0); }
+    .m-crosshair.snapped .mch-bl { transform: rotate(-45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-br { transform: rotate(45deg) translate(-4px, 0); }
     @keyframes mch-breathe {
-      0%, 100% { color: rgba(255, 220, 150, 0.9); filter: drop-shadow(0 0 6px rgba(255, 220, 150, 0.6)); }
-      50% { color: rgba(202, 167, 255, 0.9); filter: drop-shadow(0 0 6px rgba(202, 167, 255, 0.6)); }
+      0%, 100% { color: rgba(255, 220, 150, 0.95); filter: drop-shadow(0 0 8px rgba(255, 220, 150, 0.85)) drop-shadow(0 0 14px rgba(255, 220, 150, 0.4)); }
+      50% { color: rgba(202, 167, 255, 0.95); filter: drop-shadow(0 0 8px rgba(202, 167, 255, 0.85)) drop-shadow(0 0 14px rgba(202, 167, 255, 0.4)); }
     }
     .m-crosshair.snapped .mch-arm { animation: mch-breathe 1.6s ease-in-out infinite; }
   `
@@ -1521,7 +1526,7 @@ for (const s of stars) starById.set(s.id, s)
         userFov = camera.fov
       }
       // 单指旋转（issue #116：吸附时拖动阻力 1/4 速度，模拟"穿越糖蜜"手感）
-      const dragFactor = (isMobile && snappedStarId !== -1) ? 0.25 : 1
+      const dragFactor = (isMobile && snappedStarId !== -1) ? 0.1667 : 1  // 吸附时阻力增大 1.5 倍（1/6 速度）
       rotY += (e.clientX - px) * 0.004 * dragFactor
       rotX += (e.clientY - py) * 0.004 * dragFactor
       rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
