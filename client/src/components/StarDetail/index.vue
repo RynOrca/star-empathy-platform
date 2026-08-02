@@ -848,7 +848,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, type Component, toRef } from 'vue'
+import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
