@@ -89,65 +89,64 @@
 
 <script setup lang="ts">
 import { Sparkle, Quote } from 'lucide-vue-next'
+import { computed } from 'vue'
+import type { EmotionPayload } from '../../composables/useStarAnalysis'
 
-defineProps<{ storyCount?: number }>()
+const props = withDefaults(defineProps<{
+  storyCount?: number
+  emotion?: EmotionPayload
+}>(), { storyCount: 0 })
 
-const emotions = [
+function seedHash(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+const FALLBACK_EMOTIONS = [
   { name: '思念', value: 0.88, color: '#ffd98a' },
   { name: '孤独', value: 0.74, color: '#86a8ff' },
   { name: '希望', value: 0.62, color: '#9ae6b4' },
   { name: '释然', value: 0.48, color: '#caa7ff' },
   { name: '共鸣', value: 0.81, color: '#ff8b7d' },
 ]
+const FALLBACK_INSIGHTS = [
+  { title: '主色调 · 浓思念', pct: '42.3%', color: '#ffd98a',
+    desc: '每 5 条故事里就有 2 条在写"想回去的地方"，频次是全星库平均的 2.1 倍。这颗星像一只收集乡愁的瓶子。' },
+  { title: '暗涌 · 深夜孤独', pct: '28.1%', color: '#86a8ff',
+    desc: '故事里高频出现"一个人""睡不着""安静的房间"。但孤独并不悲伤，人们更愿意把它写得很温柔。' },
+  { title: '暖色尾调 · 希望与共鸣', pct: '23.6%', color: '#ff8b7d',
+    desc: '37% 的故事以释然结尾。即使开头写得悲伤，最后一句总有人写"谢谢有人愿意听"。' },
+]
+const FALLBACK_QUOTES = [
+  { text: '老家的樱花开了，我在三千公里外看到这颗星，就当奶奶也在看我。',
+    color: '#ffd98a', tags: ['思乡', '奶奶'], author: '@匿名星友·东京', date: '3 天前', illus: 'sakura' },
+  { text: '失眠第三十七天，我跟这颗星说的话，比跟过去一年认识的人都多。',
+    color: '#86a8ff', tags: ['深夜', '倾诉'], author: '@某颗小行星', date: '上周', illus: 'moon' },
+  { text: '终于搬离了出租屋。最后一晚在这里看星星，原来只要抬头，就一直有家。',
+    color: '#caa7ff', tags: ['搬家', '治愈'], author: '@月光在左', date: '6 月 14 日', illus: 'house' },
+]
+
+const fallbackH = seedHash(String(props.storyCount ?? 0) + 'emotion')
+
+const emotions = computed(() => {
+  const e = props.emotion
+  if (e && Array.isArray(e.emotions) && e.emotions.length >= 5) return e.emotions
+  return FALLBACK_EMOTIONS
+})
+const emotionInsights = computed(() => {
+  const e = props.emotion
+  if (e && Array.isArray(e.insights) && e.insights.length >= 3) return e.insights
+  return FALLBACK_INSIGHTS
+})
+const quotes = computed(() => {
+  const e = props.emotion
+  if (e && Array.isArray(e.quotes) && e.quotes.length >= 3) return e.quotes
+  const rot = (fallbackH % 2)
+  if (!rot) return FALLBACK_QUOTES
+  return [FALLBACK_QUOTES[2], FALLBACK_QUOTES[0], FALLBACK_QUOTES[1]]
+})
 function orbSize(e: { value: number }) { return 40 + e.value * 26 }
-
-const emotionInsights = [
-  {
-    title: '主色调 · 浓思念',
-    pct: '42.3%',
-    color: '#ffd98a',
-    desc: '每 5 条故事里就有 2 条在写"想回去的地方"，频次是全星库平均的 2.1 倍。这颗星像一只收集乡愁的瓶子。',
-  },
-  {
-    title: '暗涌 · 深夜孤独',
-    pct: '28.1%',
-    color: '#86a8ff',
-    desc: '故事里高频出现"一个人""睡不着""安静的房间"。但孤独并不悲伤，人们更愿意把它写得很温柔。',
-  },
-  {
-    title: '暖色尾调 · 希望与共鸣',
-    pct: '23.6%',
-    color: '#ff8b7d',
-    desc: '37% 的故事以释然结尾。即使开头写得悲伤，最后一句总有人写"谢谢有人愿意听"。',
-  },
-]
-
-const quotes = [
-  {
-    text: '老家的樱花开了，我在三千公里外看到这颗星，就当奶奶也在看我。',
-    color: '#ffd98a',
-    tags: ['思乡', '奶奶'],
-    author: '@匿名星友·东京',
-    date: '3 天前',
-    illus: 'sakura',
-  },
-  {
-    text: '失眠第三十七天，我跟这颗星说的话，比跟过去一年认识的人都多。',
-    color: '#86a8ff',
-    tags: ['深夜', '倾诉'],
-    author: '@某颗小行星',
-    date: '上周',
-    illus: 'moon',
-  },
-  {
-    text: '终于搬离了出租屋。最后一晚在这里看星星，原来只要抬头，就一直有家。',
-    color: '#caa7ff',
-    tags: ['搬家', '治愈'],
-    author: '@月光在左',
-    date: '6 月 14 日',
-    illus: 'house',
-  },
-]
 </script>
 
 <style scoped>

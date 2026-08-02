@@ -139,6 +139,19 @@ db.exec(`
     generated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_moon_insights_day ON moon_insights(phase_label, lunar_day, date(generated_at));
+
+  -- AI 预生成的单星分析结果（门户首页 + 情感 + 主题时辰）
+  CREATE TABLE IF NOT EXISTS catalog_star_analyses (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    catalog_star_id   TEXT NOT NULL UNIQUE,
+    persona_json      TEXT,
+    emotion_json      TEXT,
+    themehour_json    TEXT,
+    story_count       INTEGER NOT NULL DEFAULT 0,
+    story_hash        TEXT,
+    generated_at      INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_csa_star ON catalog_star_analyses(catalog_star_id);
 `);
 
 // 兼容旧数据库：添加新列

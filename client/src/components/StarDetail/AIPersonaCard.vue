@@ -48,14 +48,16 @@
 
       <!-- 右：文字解读（80%） -->
       <div class="persona-text">
-        <p class="pt-para first">
+        <p v-if="paraFirst" class="pt-para first" v-html="paraFirst"></p>
+        <p v-else class="pt-para first">
           <span class="pt-drop-cap">这</span>
           颗 <strong class="star-name-hl">{{ starName }}</strong> 在故事中呈现出一种
           <em class="em-gold">{{ tone }}</em> 的古典气质。它最常被人们在深夜凝望，
           故事中反复出现 <em class="em-purple">「{{ motifA }}」「{{ motifB }}」</em> 等意象，
           是亮星中情感浓度最高的一颗之一。
         </p>
-        <p class="pt-para">
+        <p v-if="paraSecond" class="pt-para" v-html="paraSecond"></p>
+        <p v-else class="pt-para">
           <span class="em-dash">—</span>
           人们在这里写下的心事，<em class="em-purple">{{ emoPct }}%</em> 与
           <em class="em-gold">{{ emoTheme }}</em> 有关，远高于全库平均的 54%。
@@ -74,12 +76,14 @@
 <script setup lang="ts">
 import { Sparkle, RefreshCw } from 'lucide-vue-next'
 import { computed } from 'vue'
+import type { PersonaPayload } from '../../composables/useStarAnalysis'
 
 const props = withDefaults(defineProps<{
   updatedAt?: string
   starName?: string
   constellationName?: string
   starColor?: string
+  persona?: PersonaPayload
 }>(), {
   updatedAt: '刚刚生成',
   starName: '织女星',
@@ -87,13 +91,16 @@ const props = withDefaults(defineProps<{
   starColor: '#ffd98a',
 })
 
-// 下方是可以后续由 Agent 预生成的字段（目前用 props.starName 做确定性 hash → 选择一组模板）
+// 如果 persona 有就用服务端数据；否则 fallback 到 seed hash
+const S = props.persona
+
+// 伪随机种子（fallback 时才计算）
 function seedHash(s: string) {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
   return h
 }
-const h = seedHash(props.starName + props.constellationName)
+const hFallback = S ? 0 : seedHash(props.starName + props.constellationName)
 
 const HAN = ['望月听风', '枕星自语', '载梦渡夜', '拾光归墟', '渡云栖梦', '怀川望海', '摘雪煎茶', '听雨寄书']
 const MBTI = ['INFP', 'INFJ', 'ENFP', 'ISFP', 'INTP']
@@ -116,16 +123,29 @@ const SUGGEST = [
   '以「如果那年…」作为开头，它承载了太多类似的「如果」。',
 ]
 
-const hanName = computed(() => HAN[h % HAN.length])
-const mbti = computed(() => MBTI[(h >>> 3) % MBTI.length])
-const personaTags = computed(() => TAGS_POOL[(h >>> 5) % TAGS_POOL.length])
-const tone = computed(() => TONE[(h >>> 7) % TONE.length])
-const motifA = computed(() => MOTIF_A[(h >>> 11) % MOTIF_A.length])
-const motifB = computed(() => MOTIF_B[(h >>> 13) % MOTIF_B.length])
-const emoPct = computed(() => EMO_PCT[(h >>> 17) % EMO_PCT.length])
-const emoTheme = computed(() => EMO_THEME[(h >>> 19) % EMO_THEME.length])
-const seeInLight = computed(() => SEE_IN[(h >>> 23) % SEE_IN.length])
-const suggest = computed(() => SUGGEST[(h >>> 2) % SUGGEST.length])
+const hanName = computed(() => S?.hanName ?? HAN[hFallback % HAN.length])
+const mbti = computed(() => S?.mbti ?? MBTI[(hFallback >>> 3) % MBTI.length])
+const personaTags = computed(() => S?.tags ?? TAGS_POOL[(hFallback >>> 5) % TAGS_POOL.length])
+
+// 文案：如果 persona 带 paragraphs 就用 paragraphs[i] 且保留星名/tone/意象/emo 注入结构
+// 否则 fallback 到模板句式
+const tone = computed(() => TONE[(hFallback >>> 7) % TONE.length])
+const motifA = computed(() => MOTIF_A[(hFallback >>> 11) % MOTIF_A.length])
+const motifB = computed(() => MOTIF_B[(hFallback >>> 13) % MOTIF_B.length])
+const emoPct = computed(() => EMO_PCT[(hFallback >>> 17) % EMO_PCT.length])
+const emoTheme = computed(() => EMO_THEME[(hFallback >>> 19) % EMO_THEME.length])
+const seeInLight = computed(() => SEE_IN[(hFallback >>> 23) % SEE_IN.length])
+const suggest = computed(() => S?.suggestIntro ?? SUGGEST[(hFallback >>> 2) % SUGGEST.length])
+
+// paragraphs 结构：persona 给了就用 persona 的段落
+const paraFirst = computed(() => {
+  if (S?.paragraphs?.[0]) return S.paragraphs[0]
+  return null // 用模板渲染
+})
+const paraSecond = computed(() => {
+  if (S?.paragraphs?.[1]) return S.paragraphs[1]
+  return null
+})
 
 // 背景小星位置（伪随机，固定 seed）
 const bgStars = Array.from({ length: 26 }, (_, i) => ({

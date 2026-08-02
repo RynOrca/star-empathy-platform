@@ -17,6 +17,7 @@ import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
 import moonRouter from './routes/moon';
 import locationRouter from './routes/location';
+import analysisRouter from './routes/analysis';
 import { ok, badRequest, serverError } from './utils/response';
 import { authRequired } from './middleware/auth';
 import { setApiKey, getApiKey } from './services/deepseek';
@@ -180,6 +181,7 @@ app.use('/api/stories', storiesRouter);
 app.post('/api/catalog/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/catalog/stars', analysisRouter);  // :id/analysis 放最前面，避免被 :id 匹配吞掉
 app.use('/api/catalog/stars', narrativeRouter); // 叙事路由（/narrative）
 app.use('/api/catalog/stars', chatRouter);      // 聊天路由（/chat/figures, /chat）
 app.use('/api/catalog/stars', catalogRouter);
@@ -192,6 +194,7 @@ app.post('/api/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/stars/story/:storyId/view', writeLimiter);
 app.post('/api/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/stars', analysisRouter); // 兼容旧 URL: /api/stars/:id/analysis
 app.use('/api/stars', starsRouter);
 
 // 个人主页

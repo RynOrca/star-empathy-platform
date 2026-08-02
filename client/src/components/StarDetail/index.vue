@@ -61,17 +61,23 @@
 
                 <!-- 🧠 AI 分析模块（1）星格画像 -->
                 <AIPersonaCard
-                  updatedAt="刚刚生成"
+                  :updatedAt="analysisUpdatedText || '刚刚生成'"
                   :starName="currentStarName"
                   :constellationName="currentConstellation || '未知星座'"
                   :starColor="getStarColor(catalogStarId)"
+                  :persona="starAnalysis.analysis.value?.persona ?? undefined"
                 />
 
                 <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
-                <AIRadarWordcloud :storyCount="catalogStats?.storyCount ?? 0" />
+                <AIRadarWordcloud
+                  :storyCount="catalogStats?.storyCount ?? 0"
+                  :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                />
 
                 <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
-                <AIHeatmapThemes />
+                <AIHeatmapThemes
+                  :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                />
 
                 <div class="narrative-bottom">
                   <div class="panel-wrapper pw-left">
@@ -741,7 +747,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, type Component } from 'vue'
+import { computed, ref, reactive, onMounted, watch, type Component, toRef } from 'vue'
 import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
@@ -769,6 +775,7 @@ import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
 import { useSimilarStars } from '../../composables/useSimilarStars'
 import { useAreaHighlights } from '../../composables/useAreaHighlights'
+import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
 import { useMediaQuery } from '../../composables/useMediaQuery'
 import catalogData from '../../data/stars.json'
@@ -1065,6 +1072,22 @@ watch(() => similarStars.similarStars.value, (stars) => {
 // ─── 天区故事精选 ───
 const areaHighlights = useAreaHighlights(() => props.catalogStarId)
 const { highlights: areaHighlightsData, loading: areaLoading } = areaHighlights
+
+// ─── AI 预生成分析（persona/emotion/themehour） ───
+const catalogStarIdRef = toRef(props, 'catalogStarId')
+const catalogStarIdNullable = computed<number | null>(() => catalogStarIdRef.value ?? null)
+const starAnalysis = useStarAnalysis(catalogStarIdNullable)
+
+// 从 persona 返回里取 updatedAt 文案（用服务端生成时间）
+const analysisUpdatedText = computed(() => {
+  const t = starAnalysis.analysis.value?.generatedAt
+  if (!t) return undefined
+  const diff = Date.now() - t
+  if (diff < 60 * 1000) return '刚刚生成'
+  if (diff < 3600 * 1000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
+  return new Date(t).toLocaleDateString('zh-CN')
+})
 
 const catalogLookup = new Map<number, { name: string | null; con: string; color: string }>()
 for (const s of (catalogData as any).stars) {
