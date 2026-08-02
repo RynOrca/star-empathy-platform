@@ -234,14 +234,7 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
   // meta 优先从 catalogMeta 查，外部强制指定仅作为覆盖（少见）
   const displayMeta = opts.meta ?? getStarDisplay(cid)
 
-  if (!opts.force && row?.story_hash === hash) {
-    const hasAll =
-      !!row.persona_json &&
-      !!row.emotion_json &&
-      !!row.themehour_json &&
-      themehourHasTexts(row.themehour_json)
-    if (hasAll) return
-  }
+  if (!opts.force && allStepsReady(steps, row, hash)) return
 
   const storyCount = meta.total ?? countStarStories(cid)
 
@@ -319,6 +312,7 @@ export type RunAllSummary = {
 
 export async function runAll(opts: RunAllOpts): Promise<RunAllSummary> {
   const skipReady = opts.skipReady ?? true
+  const onlySteps = opts.onlySteps?.length ? opts.onlySteps : DEFAULT_STEPS
   const stars = listPrioritizedStars({
     limit: opts.limit,
     minStories: opts.minStories,
@@ -341,15 +335,11 @@ export async function runAll(opts: RunAllOpts): Promise<RunAllSummary> {
       const row = loadDbRow(star.catalogStarId)
       const meta = getStarStoryMeta(star.catalogStarId)
       const hash = computeStoryHash(meta)
-      const ready =
-        row?.story_hash === hash &&
-        !!row.persona_json &&
-        !!row.emotion_json &&
-        !!row.themehour_json &&
-        themehourHasTexts(row.themehour_json)
+      // 只按 onlySteps 判断 ready（原来永远按三步全齐，导致 --only X 时要么乱跳要么全不跳）
+      const ready = allStepsReady(onlySteps, row, hash)
       if (ready) {
         summary.skippedReady.push(star.catalogStarId)
-        console.log(`[starAnalysisAgent] skip ready id=${star.catalogStarId} total=${meta.total}`)
+        console.log(`[starAnalysisAgent] skip ready id=${star.catalogStarId} total=${meta.total} only=${onlySteps.join(',')}`)
         continue
       }
     }
@@ -367,10 +357,11 @@ export async function runAll(opts: RunAllOpts): Promise<RunAllSummary> {
         onProgress: localProgress,
       })
       const set = stepTracker.get(star.catalogStarId) ?? new Set<AgentStep>()
+      // missing 只看 onlySteps 里的（only 外的步骤不要求完成，不算 partial 也不算 failed）
       const missing: string[] = []
-      if (!set.has('themehour')) missing.push('themehour')
-      if (!set.has('persona')) missing.push('persona')
-      if (!set.has('emotion')) missing.push('emotion')
+      for (const s of onlySteps) {
+        if (!set.has(s)) missing.push(s)
+      }
       if (missing.length === 0) summary.ok.push({ id: star.catalogStarId })
       else summary.partial.push({ id: star.catalogStarId, missing: missing.join(',') })
     } catch (e) {
@@ -390,6 +381,39 @@ function themehourHasTexts(jsonStr: string): boolean {
   } catch {
     return false
   }
+}
+
+type DbRow = NonNullable<ReturnType<typeof loadDbRow>>
+
+/**
+ * 检查某一步是否已经「真的 ready」。
+ * - 有 story_hash 相等的前提（避免按旧内容跳过）
+ * - themhour 需要 AI 三段文全有（不是只有 SQL 聚合的全 0）
+ * - persona / emotion 只要 JSON 非空就算（persona 里的 mbti 是否缺省都无所谓，生成时已经去掉）
+ */
+function oneStepReady(step: AgentStep, row: DbRow | undefined, hash: string): boolean {
+  if (!row) return false
+  if (row.story_hash !== hash) return false
+  switch (step) {
+    case 'themehour':
+      return !!row.themehour_json && themehourHasTexts(row.themehour_json)
+    case 'persona':
+      return !!row.persona_json
+    case 'emotion':
+      return !!row.emotion_json
+    default:
+      return false
+  }
+}
+
+/**
+ * 按 onlySteps 判断「用户这一轮要求的全部步骤」是否都 ready。
+ * onlySteps 空数组等价 DEFAULT_STEPS 三步全。
+ */
+function allStepsReady(onlySteps: AgentStep[] | undefined, row: DbRow | undefined, hash: string): boolean {
+  const steps = onlySteps?.length ? onlySteps : DEFAULT_STEPS
+  if (!steps.length) return false
+  return steps.every(s => oneStepReady(s, row, hash))
 }
 
 function sleep(ms: number): Promise<void> {
