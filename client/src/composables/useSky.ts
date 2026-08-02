@@ -1085,6 +1085,102 @@ for (const s of stars) starById.set(s.id, s)
   // hoverLongTimer 提升到外层作用域，以便 dispose 能清除未触发的长悬浮回调
   let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
   let hoveredStarId = -1  // 提升到外层作用域，供 animate 中中心近距检测使用
+
+  // ═══ 移动端准星吸附状态（issue #116） ═══
+  // 仅在 (max-width: 768px) 启用；PC 完全不进入逻辑分支
+  let isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
+  let crosshairStyle: HTMLStyleElement | null = null
+  let snappedStarId = -1                            // 当前吸附的星 ID，-1 = 未吸附
+  let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（10px 脱吸附判定）
+  let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
+  let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
+  const SNAP_THRESHOLD = 0.01
+  const SNAP_RELEASE_PX = 10                        // 脱吸附的指针移动阈值（屏幕像素）
+  const SNAP_FOV_DELTA = 8                          // 吸附时 FOV 缩小量（度）
+
+  /**
+   * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
+   * 复用文件已有的 easeOutQuart 缓动；新动画会取消进行中的旧动画。
+   */
+  function animateFov(targetFov: number, durationMs = 300) {
+    cancelAnimationFrame(snapFovRafId)
+    const startFov = camera.fov
+    const startTime = performance.now()
+    function step() {
+      if (disposed) return
+      const t = Math.min(1, (performance.now() - startTime) / durationMs)
+      camera.fov = startFov + (targetFov - startFov) * easeOutQuart(t)
+      camera.updateProjectionMatrix()
+      if (t < 1) snapFovRafId = requestAnimationFrame(step)
+    }
+    snapFovRafId = requestAnimationFrame(step)
+  }
+
+  /** 释放准星吸附：清状态、还原准星视觉、隐藏 tooltip、FOV 缩回 */
+  function releaseSnap() {
+    if (snappedStarId === -1) return
+    snappedStarId = -1
+    if (crosshairEl) crosshairEl.classList.remove('snapped')
+    tooltipInner.style.opacity = '0'
+    hoverGlowTargetOpacity = 0
+    if (snapBaseFov > 0) {
+      animateFov(snapBaseFov)
+      snapBaseFov = 0
+    }
+  }
+
+  // ═══ 移动端准星 DOM（issue #116） ═══
+  // 仅移动端可见；PC 端 display:none，pointer-events:none 不拦截触摸
+  crosshairEl = document.createElement('div')
+  crosshairEl.className = 'm-crosshair' + (isMobile ? ' visible' : '')
+  crosshairEl.innerHTML = `
+    <span class="mch-arm mch-tl"></span>
+    <span class="mch-arm mch-tr"></span>
+    <span class="mch-arm mch-bl"></span>
+    <span class="mch-arm mch-br"></span>
+  `
+  crosshairStyle = document.createElement('style')
+  crosshairStyle.textContent = `
+    .m-crosshair {
+      position: fixed; top: 50%; left: 50%;
+      width: 26px; height: 26px;
+      margin: -13px 0 0 -13px;
+      pointer-events: none; z-index: 50;
+      display: none;
+      color: rgba(255, 220, 150, 0.5);
+    }
+    .m-crosshair.visible { display: block; }
+    .mch-arm {
+      position: absolute;
+      width: 8px; height: 1.5px;
+      background: currentColor;
+      filter: drop-shadow(0 0 3px currentColor);
+      transition: color 0.2s;
+    }
+    .mch-tl { top: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(45deg); }
+    .mch-tr { top: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(-45deg); }
+    .mch-bl { bottom: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(-45deg); }
+    .mch-br { bottom: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(45deg); }
+    @keyframes mch-breathe {
+      0%, 100% { color: rgba(255, 220, 150, 0.9); filter: drop-shadow(0 0 6px rgba(255, 220, 150, 0.6)); }
+      50% { color: rgba(202, 167, 255, 0.9); filter: drop-shadow(0 0 6px rgba(202, 167, 255, 0.6)); }
+    }
+    .m-crosshair.snapped .mch-arm { animation: mch-breathe 1.6s ease-in-out infinite; }
+  `
+  document.head.appendChild(crosshairStyle)
+  document.body.appendChild(crosshairEl)
+  // 响应式：窗口尺寸变化时更新 isMobile 并显示/隐藏准星
+  {
+    const mql = window.matchMedia('(max-width: 768px)')
+    mql.addEventListener('change', () => {
+      isMobile = mql.matches
+      if (crosshairEl) crosshairEl.classList.toggle('visible', isMobile)
+      if (!isMobile) releaseSnap()
+    }, { signal: abortController.signal })
+  }
+
   {
     const mouse = new Vector2()
     const _v = new Vector3()
@@ -1257,6 +1353,42 @@ for (const s of stars) starById.set(s.id, s)
         hoverGlowTargetOpacity = 0
         options?.onStarHover?.(null)
       }
+
+      // ─── issue #116 移动端准星吸附 ───
+      // 仅移动端 + 非行星特写模式启用；拖拽时也运行（拖拽瞄准是核心交互）
+      if (isMobile && closeupState === 'IDLE') {
+        const { id: centerId, dist: centerDist } = detectStarByProjection(0, 0)
+        if (centerId !== -1 && centerDist < SNAP_THRESHOLD) {
+          if (snappedStarId !== centerId) {
+            // 新吸附：锁定目标 + 呼吸动画 + tooltip + FOV 放大
+            snappedStarId = centerId
+            snapStartX = e.clientX
+            snapStartY = e.clientY
+            if (snapBaseFov === 0) {
+              cancelAnimationFrame(snapFovRafId)
+              snapBaseFov = camera.fov
+            }
+            if (crosshairEl) crosshairEl.classList.add('snapped')
+            updateTooltipContent(centerId)
+            // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
+            hoveredStarId = centerId
+            animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+          } else {
+            // 已吸附同一颗星：检查是否移动超过阈值
+            const dx = e.clientX - snapStartX
+            const dy = e.clientY - snapStartY
+            if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
+              releaseSnap()
+            } else {
+              // 维持吸附：刷新 tooltip 位置（skyGroup 可能已旋转）
+              updateTooltipPosition(centerId)
+            }
+          }
+        } else if (snappedStarId !== -1) {
+          // 中心无星或超出范围：释放吸附
+          releaseSnap()
+        }
+      }
     }, { signal: abortController.signal })
     canvas.addEventListener('pointerup', (e) => {
       if (disposed) return
@@ -1267,6 +1399,12 @@ for (const s of stars) starById.set(s.id, s)
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
         hoverCheckTimer = 0 // 重置节流，强制下一帧立即检测
+        return
+      }
+
+      // issue #116 移动端准星：吸附状态下点击直接触发吸附星
+      if (isMobile && snappedStarId !== -1) {
+        options?.onStarClick?.(snappedStarId)
         return
       }
 
@@ -3850,6 +3988,10 @@ for (const s of stars) starById.set(s.id, s)
       if (debugEl) debugEl.remove()
       // 移除 tooltipEl DOM（被 CSS2DObject 包装后加入 scene）
       if (tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl)
+      // issue #116：清理移动端准星 DOM + 样式 + FOV 动画
+      cancelAnimationFrame(snapFovRafId)
+      if (crosshairEl && crosshairEl.parentNode) crosshairEl.parentNode.removeChild(crosshairEl)
+      if (crosshairStyle) crosshairStyle.remove()
       // 释放 GPU 资源（geometry/material/texture）
       // scene.clear() 只移除场景图引用，不释放 GPU 内存
       scene.traverse((obj) => {
