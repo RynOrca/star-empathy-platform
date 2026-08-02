@@ -129,7 +129,7 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
 }
 @keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致 ── */
+/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致（但不写 min-height:0，避免 narrative-top 里被 flex 压缩折叠） ── */
 .stack-wrap {
   margin: 0 28px 14px;
   display: grid;
@@ -146,7 +146,6 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   gap: 10px;
   position: relative;
   overflow: hidden;
-  min-height: 0;
 }
 .panel-wrapper::before {
   content: '';
@@ -183,16 +182,13 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   letter-spacing: 0.03em;
 }
 
-/* 卡片内部 body，不再搞额外 padding */
+/* 卡片内部 body，不再搞额外 padding —— narrative-top 卡片不固定高度，所以不需要内部 overflow 滚动，整张卡片由 narrative-top 整体滚动 */
 .pw-body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
   padding-right: 2px;
 }
-.pw-body::-webkit-scrollbar { width: 5px; }
-.pw-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 999px; }
 
 /* 情感解构内部 */
 .emotion-orbs {

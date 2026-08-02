@@ -108,7 +108,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 }
 @keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致 ── */
+/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（但不写 min-height:0，避免 narrative-top 里被 flex 压缩折叠） ── */
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -119,7 +119,6 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   gap: 10px;
   position: relative;
   overflow: hidden;
-  min-height: 0;
   margin: 0 28px 14px;
 }
 .panel-wrapper::before {

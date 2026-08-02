@@ -217,7 +217,6 @@ function beadSize(v: number) {
   gap: 10px;
   position: relative;
   overflow: hidden;
-  min-height: 0;
 }
 .panel-wrapper::before {
   content: '';
@@ -259,11 +258,8 @@ function beadSize(v: number) {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
   padding-right: 2px;
 }
-.pw-body::-webkit-scrollbar { width: 5px; }
-.pw-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 999px; }
 
 /* 主题森林内部 */
 .tree-rows {
