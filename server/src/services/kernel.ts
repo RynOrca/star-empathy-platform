@@ -665,7 +665,7 @@ function parseRerankResult(raw: string): Array<{ catalogStarId: number; aiScore:
       catalogStarId: typeof r.catalog_star_id === 'number' ? r.catalog_star_id : (parseInt(String(r.catalogStarId ?? r.id ?? 0), 10) || 0),
       aiScore: typeof r.ai_score === 'number' ? clamp01(r.ai_score) : (clamp01(Number(r.aiScore) || 0)),
       matchReason: typeof r.match_reason === 'string' ? r.match_reason.trim() : (String(r.matchReason ?? '').trim() || '主题高度契合'),
-    })).filter(r => r.catalogStarId > 0)
+    })).filter((r: { catalogStarId: number }) => r.catalogStarId > 0)
   } catch {
     // 自由文 fallback：逐行抠出 catalogStarId / score / reason
     const lines = jsonStr.split(/\n/).map(l => l.trim()).filter(Boolean)
@@ -828,7 +828,7 @@ ${rerankCandidates.map((c, i) => `${i + 1}. [catalogStarId=${c.catalogStarId}] $
         const disp = getStarDisplay(e.catalogStarId)
         return {
           catalogStarId: e.catalogStarId,
-          name: s?.name ?? disp.starName.replace(/^星 #\d+$/, '') || null,
+          name: (s?.name ?? disp.starName.replace(/^星 #\d+$/, '')) || null,
           constellationCN: disp.constellation,
           mag: s?.mag ?? 0,
           distance: s?.dist ?? null,
@@ -854,7 +854,7 @@ ${rerankCandidates.map((c, i) => `${i + 1}. [catalogStarId=${c.catalogStarId}] $
         const reason = tagHint ? `共享${tagHint}等情绪主题，与你的故事高度契合` : '与你的故事内核相似度较高'
         return {
           catalogStarId: e.catalogStarId,
-          name: s?.name ?? disp.starName.replace(/^星 #\d+$/, '') || null,
+          name: (s?.name ?? disp.starName.replace(/^星 #\d+$/, '')) || null,
           constellationCN: disp.constellation,
           mag: s?.mag ?? 0,
           distance: s?.dist ?? null,
