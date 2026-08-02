@@ -1,17 +1,15 @@
 <template>
-  <div v-if="!hasData" class="empty-state">
-    <Clock3 :size="10" class="pw-icon pw-green" style="animation:tw 2.2s ease-in-out infinite" />
-    <span>主题与时辰观察生成中…</span>
-  </div>
-  <div v-else class="stack-wrap">
+  <div class="stack-wrap">
     <!-- 1. 主题森林 -->
     <div class="panel-wrapper pw-forest">
       <div class="panel-head">
         <TreeDeciduous :size="10" class="pw-icon pw-green" />
         <span class="pw-title">主题森林</span>
-        <span class="pw-count">{{ total }} 条 · {{ Math.min(8, themes.length) }} 主题</span>
+        <span class="pw-count">{{ hasForest ? `${total} 条 · ${Math.min(8, themes.length)} 主题` : (tooFewStories ? '未生成' : '生成中') }}</span>
       </div>
-      <div class="pw-body">
+
+      <!-- 真实数据 -->
+      <div v-if="hasForest" class="pw-body">
         <div class="tree-rows">
           <div class="tree-row">
             <div class="tree" v-for="t in themes.slice(0, 4)" :key="t.name">
@@ -66,6 +64,21 @@
           </div>
         </div>
       </div>
+
+      <!-- 空态 1：故事数太少 -->
+      <div v-else-if="tooFewStories" class="mini-empty mini-scant">
+        <BookDashed :size="13" />
+        <div class="me-title">心事不够多</div>
+        <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后生长主题林</div>
+      </div>
+
+      <!-- 空态 2：生成中（树和时辰数据有 SQL 聚合，但 AI 三段文没生成 → 仍显示生成中） -->
+      <div v-else class="mini-empty mini-loading mini-loading-green">
+        <TreeDeciduous :size="13" class="sway-slow" />
+        <div class="me-title">AI 主题森林生成中…</div>
+        <div class="me-sub">正在从 {{ storyCount }} 条故事抽取主题与意蕴</div>
+        <div class="mini-sk mini-sk-green"><span></span><span></span></div>
+      </div>
     </div>
 
     <!-- 2. 时辰观察 -->
@@ -73,9 +86,11 @@
       <div class="panel-head">
         <Clock3 :size="10" class="pw-icon pw-blue" />
         <span class="pw-title">时辰观察</span>
-        <span class="pw-count">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</span>
+        <span class="pw-count">{{ hasHour ? `高峰 ${peakHour}:00 · 低谷 ${lowHour}:00` : (tooFewStories ? '未生成' : '生成中') }}</span>
       </div>
-      <div class="pw-body">
+
+      <!-- 真实数据 -->
+      <div v-if="hasHour" class="pw-body">
         <div class="hour-beads">
           <span
             v-for="(v, h) in hourly"
@@ -114,25 +129,51 @@
           </div>
         </div>
       </div>
+
+      <!-- 空态 1：故事数太少 -->
+      <div v-else-if="tooFewStories" class="mini-empty mini-scant">
+        <BookDashed :size="13" />
+        <div class="me-title">心事不够多</div>
+        <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后观察时辰</div>
+      </div>
+
+      <!-- 空态 2：生成中 -->
+      <div v-else class="mini-empty mini-loading mini-loading-blue">
+        <Clock3 :size="13" class="spin-slow" />
+        <div class="me-title">AI 时辰观察生成中…</div>
+        <div class="me-sub">正在分析 {{ storyCount }} 条故事的时间节律</div>
+        <div class="mini-sk mini-sk-blue"><span></span><span></span></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { TreeDeciduous, Clock3, Leaf } from 'lucide-vue-next'
+import { TreeDeciduous, Clock3, Leaf, BookDashed } from 'lucide-vue-next'
 import type { ThemeHourPayload } from '../../composables/useStarAnalysis'
 
 const props = withDefaults(defineProps<{
+  storyCount?: number
   themeHour?: ThemeHourPayload
-}>(), {})
+}>(), { storyCount: 0 })
 
-const hasData = computed(() => {
+const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
+
+// 故事数 >=5 且 themes>=2 + hourly 完整 + AI note（forestNote）已生成 → 算有真实数据
+const hasForest = computed(() => {
+  if (tooFewStories.value) return false
   const t = props.themeHour
   if (!t) return false
   if (!Array.isArray(t.themes) || t.themes.length < 2) return false
+  return !!forestNote.value?.length  // 必须 AI note 也生成了
+})
+const hasHour = computed(() => {
+  if (tooFewStories.value) return false
+  const t = props.themeHour
+  if (!t) return false
   if (!Array.isArray(t.hourly) || t.hourly.length !== 24) return false
-  return true
+  return !!(peakText.value?.length || lowText.value?.length)
 })
 
 const rawThemes = computed(() => props.themeHour?.themes ?? [])
@@ -186,20 +227,17 @@ function beadSize(v: number) {
 </script>
 
 <style scoped>
-.empty-state {
-  margin: 0 28px 14px;
-  padding: 28px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.018);
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.05);
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin 4.5s linear infinite; }
+@keyframes sway {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(6deg); }
 }
-@keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
+.sway-slow { animation: sway 2.6s ease-in-out infinite; transform-origin: 50% 95%; }
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 .stack-wrap {
   margin: 0 28px 14px;
@@ -408,8 +446,71 @@ function beadSize(v: number) {
   color: rgba(255,255,255,0.48);
 }
 
+/* ─── 双态空态（mini）：心事太少 / 生成中 ─── */
+.mini-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 14px 22px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  border: 1px dashed rgba(255,255,255,0.06);
+  flex: 1;
+  text-align: center;
+}
+.mini-scant {
+  color: rgba(255,255,255,0.35);
+}
+.mini-loading {
+  gap: 8px;
+  color: rgba(255,255,255,0.35);
+}
+.mini-loading-green { box-shadow: inset 0 0 22px rgba(154,230,180,0.05); }
+.mini-loading-blue  { box-shadow: inset 0 0 22px rgba(134,168,255,0.05); }
+.me-title {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+.me-sub {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.26);
+  line-height: 1.7;
+}
+.me-sub b { color: rgba(255,255,255,0.42); font-weight: 600; }
+
+/* 生成中 mini 骨架 */
+.mini-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 88%;
+  margin-top: 6px;
+}
+.mini-sk span {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(202,167,255,0.08), rgba(202,167,255,0.18), rgba(202,167,255,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.mini-sk span:nth-child(1) { width: 100%; }
+.mini-sk span:nth-child(2) { width: 72%; margin-left: 10%; }
+.mini-sk-green span {
+  background: linear-gradient(90deg, rgba(154,230,180,0.08), rgba(154,230,180,0.2), rgba(154,230,180,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.mini-sk-blue span {
+  background: linear-gradient(90deg, rgba(134,168,255,0.08), rgba(134,168,255,0.2), rgba(134,168,255,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
 @media (max-width: 900px) {
   .stack-wrap { margin: 0 18px 14px; grid-template-columns: 1fr; }
-  .empty-state { margin: 0 18px 14px; }
 }
 </style>

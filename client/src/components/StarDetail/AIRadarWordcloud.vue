@@ -1,17 +1,15 @@
 <template>
-  <div v-if="!hasData" class="empty-state">
-    <Sparkle :size="10" class="pw-icon pw-gold" style="animation:tw 2.2s ease-in-out infinite" />
-    <span>AI 情感与摘录生成中…</span>
-  </div>
-  <div v-else class="stack-wrap">
+  <div class="stack-wrap">
     <!-- 1. 情感解构 -->
     <div class="panel-wrapper pw-emotion">
       <div class="panel-head">
         <Sparkle :size="10" class="pw-icon pw-purple" />
         <span class="pw-title">情感解构</span>
-        <span class="pw-count">{{ storyCount }} 条 · 5 维模型</span>
+        <span class="pw-count">{{ hasEmotion ? `${storyCount} 条 · 5 维模型` : (tooFewStories ? '未生成' : '生成中') }}</span>
       </div>
-      <div class="pw-body">
+
+      <!-- 真实数据 -->
+      <div v-if="hasEmotion" class="pw-body">
         <div class="emotion-orbs">
           <span
             v-for="e in emotions"
@@ -33,6 +31,21 @@
           </div>
         </div>
       </div>
+
+      <!-- 空态 1：故事数太少 -->
+      <div v-else-if="tooFewStories" class="mini-empty mini-scant">
+        <BookDashed :size="13" />
+        <div class="me-title">心事不够多</div>
+        <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后生成</div>
+      </div>
+
+      <!-- 空态 2：生成中 -->
+      <div v-else class="mini-empty mini-loading mini-loading-purple">
+        <Sparkle :size="13" class="spin-slow" />
+        <div class="me-title">AI 情感解构生成中…</div>
+        <div class="me-sub">正在提取 {{ storyCount }} 条故事的情绪构成</div>
+        <div class="mini-sk"><span></span><span></span></div>
+      </div>
     </div>
 
     <!-- 2. 故事摘录 -->
@@ -40,9 +53,11 @@
       <div class="panel-head">
         <Quote :size="10" class="pw-icon pw-gold" />
         <span class="pw-title">故事摘录</span>
-        <span class="pw-count">AI 精选 3 段独白</span>
+        <span class="pw-count">{{ hasQuote ? 'AI 精选 3 段独白' : (tooFewStories ? '未生成' : '生成中') }}</span>
       </div>
-      <div class="pw-body">
+
+      <!-- 真实数据 -->
+      <div v-if="hasQuote" class="pw-body">
         <div class="quote-list">
           <div class="quote-item" v-for="(q, i) in quotes" :key="i">
             <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="illus">
@@ -80,12 +95,27 @@
           </div>
         </div>
       </div>
+
+      <!-- 空态 1：故事数太少 -->
+      <div v-else-if="tooFewStories" class="mini-empty mini-scant">
+        <BookDashed :size="13" />
+        <div class="me-title">心事不够多</div>
+        <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后摘录</div>
+      </div>
+
+      <!-- 空态 2：生成中 -->
+      <div v-else class="mini-empty mini-loading mini-loading-gold">
+        <Quote :size="13" class="spin-slow" />
+        <div class="me-title">AI 故事摘录生成中…</div>
+        <div class="me-sub">正在从 {{ storyCount }} 条故事中抽取独白片段</div>
+        <div class="mini-sk mini-sk-gold"><span></span><span></span></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Sparkle, Quote } from 'lucide-vue-next'
+import { Sparkle, Quote, BookDashed } from 'lucide-vue-next'
 import { computed } from 'vue'
 import type { EmotionPayload } from '../../composables/useStarAnalysis'
 
@@ -94,11 +124,16 @@ const props = withDefaults(defineProps<{
   emotion?: EmotionPayload
 }>(), { storyCount: 0 })
 
-const hasData = computed(() => {
+const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
+
+const hasEmotion = computed(() => {
   const e = props.emotion
   return !!(e && Array.isArray(e.emotions) && e.emotions.length >= 5
-    && Array.isArray(e.insights) && e.insights.length >= 3
-    && Array.isArray(e.quotes) && e.quotes.length >= 3)
+    && Array.isArray(e.insights) && e.insights.length >= 3)
+})
+const hasQuote = computed(() => {
+  const e = props.emotion
+  return !!(e && Array.isArray(e.quotes) && e.quotes.length >= 3)
 })
 
 const emotions = computed(() => props.emotion?.emotions ?? [])
@@ -114,22 +149,14 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
 </script>
 
 <style scoped>
-.empty-state {
-  margin: 0 28px 14px;
-  padding: 28px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.018);
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.05);
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin 4.5s linear infinite; }
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
-@keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致（但不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
+/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致（不写 min-height:0；加 flex-shrink:0） ── */
 .stack-wrap {
   margin: 0 28px 14px;
   display: grid;
@@ -184,7 +211,7 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   letter-spacing: 0.03em;
 }
 
-/* 卡片内部 body，不再搞额外 padding —— narrative-top 卡片不固定高度，所以不需要内部 overflow 滚动，整张卡片由 narrative-top 整体滚动 */
+/* 卡片内部 body */
 .pw-body {
   display: flex;
   flex-direction: column;
@@ -320,8 +347,70 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
 .q-author { color: rgba(255,255,255,0.38); font-weight: 500; }
 .q-date { color: rgba(255,255,255,0.22); }
 
+/* ─── 双态空态（mini）：心事太少 / 生成中 ─── */
+.mini-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 14px 22px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  border: 1px dashed rgba(255,255,255,0.06);
+  flex: 1;
+  text-align: center;
+}
+.mini-scant {
+  color: rgba(255,255,255,0.35);
+}
+.mini-loading {
+  gap: 8px;
+  color: rgba(255,255,255,0.35);
+}
+.mini-loading-purple {
+  box-shadow: inset 0 0 22px rgba(202,167,255,0.06);
+}
+.mini-loading-gold {
+  box-shadow: inset 0 0 22px rgba(255,217,138,0.05);
+}
+.me-title {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+.me-sub {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.26);
+  line-height: 1.7;
+}
+.me-sub b { color: rgba(255,255,255,0.42); font-weight: 600; }
+
+/* 生成中 mini 骨架 */
+.mini-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 88%;
+  margin-top: 6px;
+}
+.mini-sk span {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(202,167,255,0.08), rgba(202,167,255,0.18), rgba(202,167,255,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.mini-sk span:nth-child(1) { width: 100%; }
+.mini-sk span:nth-child(2) { width: 72%; margin-left: 10%; }
+.mini-sk-gold span {
+  background: linear-gradient(90deg, rgba(255,217,138,0.08), rgba(255,217,138,0.2), rgba(255,217,138,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
 @media (max-width: 900px) {
   .stack-wrap { margin: 0 18px 14px; grid-template-columns: 1fr; }
-  .empty-state { margin: 0 18px 14px; }
 }
 </style>

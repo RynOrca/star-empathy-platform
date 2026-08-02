@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/src/index.js",
     "seed": "ts-node scripts/seed.ts",
+    "agent:kernels": "ts-node scripts/generateKernels.ts",
     "agent:analyze": "ts-node scripts/generateAllAnalyses.ts"
   },
   "dependencies": {

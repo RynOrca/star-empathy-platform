@@ -26,6 +26,7 @@
               <div class="narrative-top">
                 <!-- 🧠 AI 分析模块（1）星格画像 -->
                 <AIPersonaCard
+                  :storyCount="catalogStats?.storyCount ?? 0"
                   :updatedAt="analysisUpdatedText || '刚刚生成'"
                   :starName="currentStarName"
                   :constellationName="currentConstellation || '未知星座'"
@@ -41,6 +42,7 @@
 
                 <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
                 <AIHeatmapThemes
+                  :storyCount="catalogStats?.storyCount ?? 0"
                   :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
                 />
 

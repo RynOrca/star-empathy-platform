@@ -44,6 +44,7 @@
 | `location.ts` | 反向地理编码路由（`/api/location/reverse`）。高德 → BigDataCloud → Nominatim 三级回退 |
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
+| `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回 |
 
 ### 服务层 `src/services/`
 
@@ -55,6 +56,7 @@
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合） |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务 |
+| `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
 | `emailService.ts` | 邮件发送服务 |
 
@@ -83,9 +85,25 @@
 |---|---|
 | `seed.ts` | **冷启动数据注入**。23 条古诗/星座神话/社区语录初始数据 |
 | `generateKernels.ts` | 故事内核（情感标签）批量生成 |
+| `generateAllAnalyses.ts` | **单星分析批量生成**。调用 starAnalysisAgent.runAll()：themehour SQL 聚合 + AI 三段文 / persona 画像 / emotion 情感故事摘录；支持 --ids/--limit/--only/--force/--throttle；对应脚本名 `npm run agent:analyze`；内核脚本为 `npm run agent:kernels` |
 | `migrate-origin.ts` | 数据迁移脚本（旧 origin 字段迁移） |
 | `seed_user_stories.ts` | 用户故事种子数据 |
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
+
+### AI 分析 Agent `src/agents/`
+
+| 文件 | 用途 |
+|---|---|
+| `starAnalysisAgent.ts` | **分析总控 Agent**。`ensureOne()` 单星懒生成（story_hash 幂等 + 1200ms 节流 + partial 入库）；`runAll()` 批量按故事数 DESC + 亮星优先级排序；`upsertAnalysis()` 写 catalog_star_analyses 表 |
+| `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读 |
+| `generators/emotionGen.ts` | 情感解构 + 故事摘录生成器。5 色情绪球 + 百分比洞察 + Top3 独白卡片 |
+| `generators/themeHourGen.ts` | 主题森林/时辰观察三段文生成器。forestNote（森林引导） + peakText（活跃时段） + lowText（沉睡时段） |
+
+### 类型 `src/types/`
+
+| 文件 | 用途 |
+|---|---|
+| `starAnalysis.ts` | 分析完整类型：`PersonaPayload` / `EmotionPayload` / `ThemeHourPayload` / `CatalogAnalysisFull` |
 
 ---
 

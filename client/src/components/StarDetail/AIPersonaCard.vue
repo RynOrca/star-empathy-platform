@@ -1,16 +1,13 @@
 <template>
-  <div v-if="!hasReal" class="empty-state">
-    <Sparkle :size="10" class="pw-icon pw-gold" style="animation:tw 2.2s ease-in-out infinite" />
-    <span>AI 星格画像生成中…</span>
-  </div>
-  <div v-else class="panel-wrapper pw-persona">
+  <div class="panel-wrapper pw-persona">
     <div class="panel-head">
       <Sparkle :size="10" class="pw-icon pw-purple" />
       <span class="pw-title">星格画像</span>
-      <span class="pw-count">{{ updatedAt }}</span>
+      <span class="pw-count">{{ hasReal ? updatedAt : (tooFewStories ? '未生成' : '生成中') }}</span>
     </div>
 
-    <div class="persona-body">
+    <!-- 真实数据 -->
+    <div v-if="hasReal" class="persona-body">
       <!-- 左：星象小卡（20%） -->
       <div class="star-card">
         <div class="sc-corner sc-tl"></div>
@@ -49,26 +46,57 @@
         </div>
       </div>
     </div>
+
+    <!-- 状态 1：故事数 < 5 — 暂不生成 -->
+    <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+      <div class="pe-icon-wrap pe-scant">
+        <BookDashed :size="14" />
+      </div>
+      <div class="pe-text">
+        <div class="pe-title">心事还不够多</div>
+        <div class="pe-sub">当前 <b>{{ storyCount }}</b> 条故事，累计 5 条后 AI 将为它生成人格画像</div>
+      </div>
+    </div>
+
+    <!-- 状态 2：生成中 — 带动画 -->
+    <div v-else class="persona-empty empty-loading">
+      <div class="pe-icon-wrap pe-loading">
+        <Sparkle :size="14" class="spin-slow" />
+      </div>
+      <div class="pe-text">
+        <div class="pe-title">AI 星格画像生成中…</div>
+        <div class="pe-sub">正在从 {{ storyCount }} 条故事中抽取性格标签与星象意蕴</div>
+      </div>
+      <div class="skeleton-lines">
+        <span class="sk-line sk-1"></span>
+        <span class="sk-line sk-2"></span>
+        <span class="sk-line sk-3"></span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Sparkle } from 'lucide-vue-next'
+import { Sparkle, BookDashed } from 'lucide-vue-next'
 import { computed } from 'vue'
 import type { PersonaPayload } from '../../composables/useStarAnalysis'
 
 const props = withDefaults(defineProps<{
+  storyCount?: number
   updatedAt?: string
   starName?: string
   constellationName?: string
   starColor?: string
   persona?: PersonaPayload
 }>(), {
+  storyCount: 0,
   updatedAt: '刚刚生成',
   starName: '未知星',
   constellationName: '未知星座',
   starColor: '#ffd98a',
 })
+
+const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
 
 const hasReal = computed(() => {
   const p = props.persona
@@ -93,23 +121,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 </script>
 
 <style scoped>
-.empty-state {
-  margin: 0 28px 14px;
-  padding: 34px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.74rem;
-  color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.018);
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.05);
-  flex-shrink: 0;
-}
-@keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
-
-/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（但不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
+/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -157,15 +169,8 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   gap: 4px;
 }
 .pw-count svg { opacity: 0.6; }
-.pw-count::before {
-  content: '';
-  display: inline-block;
-  width: 9px; height: 9px;
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12a9 9 0 1 1 18 0A9 9 0 0 1 3 12z'/><path d='M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18'/></svg>") no-repeat center / cover;
-  animation: spin 6s linear infinite;
-  margin-right: 2px;
-}
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin 4.5s linear infinite; }
 
 /* ─── 主体：星象小卡 + 文字 ─── */
 .persona-body {
@@ -302,6 +307,76 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   line-height: 1.75;
 }
 
+/* ─── 空态统一：心事太少 / 生成中 ─── */
+.persona-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px 22px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  border: 1px dashed rgba(255,255,255,0.06);
+}
+.pe-icon-wrap {
+  width: 44px; height: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.pe-icon-wrap.pe-loading {
+  background: rgba(202,167,255,0.12);
+  color: #caa7ff;
+  box-shadow: 0 0 16px rgba(202,167,255,0.18);
+}
+.pe-icon-wrap.pe-scant {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.35);
+}
+.pe-text {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pe-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.68);
+}
+.pe-sub {
+  font-size: 0.64rem;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.02em;
+}
+.pe-sub b { color: rgba(255,255,255,0.45); font-weight: 600; }
+
+/* 生成中骨架线 */
+.skeleton-lines {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sk-line {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(202,167,255,0.08), rgba(202,167,255,0.18), rgba(202,167,255,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.sk-line.sk-1 { width: 92%; }
+.sk-line.sk-2 { width: 76%; }
+.sk-line.sk-3 { width: 58%; }
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* 响应式 */
 @media (max-width: 1000px) {
   .persona-body { grid-template-columns: 130px 1fr; gap: 14px; }
@@ -309,7 +384,6 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   .pt-suggest { font-size: 0.7rem; }
 }
 @media (max-width: 900px) {
-  .panel-wrapper,
-  .empty-state { margin: 0 18px 14px; }
+  .panel-wrapper { margin: 0 18px 14px; }
 }
 </style>
