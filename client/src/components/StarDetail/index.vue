@@ -1796,8 +1796,8 @@ watch(() => props.catalogStarId, () => {
   max-width: 500px;
   background: var(--surface);
   border: 1px solid var(--rule);
-  /* 顶部金色边框（与设置弹窗一致） */
-  border-top: 7px solid var(--accent-border);
+  /* 顶部金色边框（与罗马数字同色） */
+  border-top: 5px solid var(--accent);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.4);
   display: flex;
