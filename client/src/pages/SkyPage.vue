@@ -67,6 +67,10 @@
         <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
+        <!-- 记录：AI 匹配星辰写故事 -->
+        <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
+          <PenLine :size="18" />
+        </button>
         <!-- 设置 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
@@ -316,6 +320,91 @@
         @close="showForm = false"
       />
 
+      <!-- ═══ 记录：auto-match 模式表单 + 候选星面板 ═══ -->
+      <StoryForm
+        v-if="showRecordForm"
+        ref="recordFormRef"
+        mode="auto-match"
+        star-name=""
+        :catalog-star-id="-1"
+        :matching="recordMatching.matching.value"
+        :matching-step="recordMatching.step.value"
+        :match-error="recordMatching.error.value"
+        @request-match="onRecordRequestMatch"
+        @submitted="onRecordStorySubmitted"
+        @close="closeRecordForm"
+      />
+
+      <Transition name="candidates-fade">
+        <div v-if="showMatchCandidates" class="candidates-backdrop" @click.self="closeMatchCandidates">
+          <div class="candidates-sheet">
+            <div class="candidates-header">
+              <div class="candidates-title-row">
+                <Sparkles :size="15" class="candidates-sparkle" />
+                <h3 class="candidates-title">为你找到这些契合的星辰</h3>
+                <span class="candidates-hint">选一颗，把你的故事挂上去</span>
+              </div>
+              <button class="candidates-close" @click="closeMatchCandidates"><X :size="17" /></button>
+            </div>
+            <div class="candidates-list">
+              <div
+                v-for="(c, idx) in matchCandidates"
+                :key="c.catalogStarId"
+                class="candidate-card"
+                :class="{ fallback: c.isFallback, submitting: submittingCandidateId === c.catalogStarId }"
+              >
+                <div class="candidate-rank">{{ idx + 1 }}</div>
+                <div class="candidate-body">
+                  <div class="candidate-star-row">
+                    <span class="candidate-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</span>
+                    <span class="candidate-constellation">{{ c.constellationCN }}</span>
+                    <span v-if="Number.isFinite(c.mag)" class="candidate-mag">视星等 {{ c.mag.toFixed(2) }}</span>
+                    <span v-if="c.distance != null" class="candidate-dist">{{ c.distance }} ly</span>
+                    <span v-if="c.isFallback" class="candidate-fallback-badge">等待点亮</span>
+                  </div>
+
+                  <div class="candidate-score-row">
+                    <div class="score-bar">
+                      <div
+                        class="score-bar-fill"
+                        :style="{ width: Math.round(c.finalScore * 100) + '%', background: c.isFallback
+                          ? 'linear-gradient(90deg, #a0c4ff, #b8a6ff)'
+                          : 'linear-gradient(90deg, #ffd98a, #ffb060)' }"
+                      ></div>
+                    </div>
+                    <span class="score-num">{{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}</span>
+                  </div>
+
+                  <p class="candidate-reason">{{ c.matchReason }}</p>
+
+                  <div v-if="c.starEssences.length" class="candidate-essences">
+                    <span class="essence-title">该星的故事内核：</span>
+                    <span v-for="(e, i) in c.starEssences" :key="i" class="essence-chip">
+                      「{{ e }}」
+                    </span>
+                  </div>
+
+                  <button
+                    class="candidate-pick-btn"
+                    :disabled="submittingCandidateId === c.catalogStarId"
+                    @click="pickCandidate(c)"
+                  >
+                    <template v-if="submittingCandidateId === c.catalogStarId">
+                      <span class="pick-btn-spinner"></span> 正在挂上星星…
+                    </template>
+                    <template v-else>
+                      <Star :size="14" />
+                      选这颗星
+                    </template>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+      <!-- ═══ 记录 结束 ═══ -->
+
       <SettingsModal
         :visible="showSettings"
         @close="showSettings = false"
@@ -338,7 +427,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -348,6 +437,7 @@ import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
 import { useLocation } from '../composables/useLocation'
+import { useStarMatching, type MatchCandidate } from '../composables/useStarMatching'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
@@ -1046,6 +1136,111 @@ const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
 const showSettings = ref(false)
+
+// ─── 记录 · AI 归属星辰匹配 ───
+const showRecordForm = ref(false)
+const recordFormRef = ref<InstanceType<typeof StoryForm> | null>(null)
+const recordMatching = useStarMatching()
+const showMatchCandidates = ref(false)
+const matchCandidates = ref<MatchCandidate[]>([])
+const submittingCandidateId = ref<number | null>(null)
+
+/** 暂存待提交的表单数据（匹配成功后，用户选星时直接用） */
+const pendingRecordPayload = ref<{
+  title: string
+  content: string
+  tag: string | null
+  isAnonymous: boolean
+  imageFile: File | null
+  imageUrl: string | null
+} | null>(null)
+
+function openRecordForm() {
+  if (isGuest.value) { goLogin(); return }
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  submittingCandidateId.value = null
+  showRecordForm.value = true
+  nextTick(() => recordFormRef.value?.resetForm())
+}
+
+function closeRecordForm() {
+  if (recordMatching.matching.value || submittingCandidateId.value != null) return
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  showRecordForm.value = false
+}
+
+function closeMatchCandidates() {
+  if (submittingCandidateId.value != null) return
+  showMatchCandidates.value = false
+  matchCandidates.value = []
+}
+
+/** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
+async function onRecordRequestMatch(payload: {
+  title: string; content: string; tag: string | null; isAnonymous: boolean; imageFile: File | null; imageUrl: string | null
+}) {
+  if (isGuest.value) { goLogin(); return }
+  // 暂存表单，选完候选星后再真提交
+  pendingRecordPayload.value = payload
+  try {
+    const list = await recordMatching.matchStars(payload.title, payload.content, 3)
+    if (list.length === 0) {
+      throw new Error('未找到合适的星辰')
+    }
+    matchCandidates.value = list
+    showMatchCandidates.value = true
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    // 不自动清空 form，用户可重试
+    console.warn('[record-match] 匹配失败:', msg)
+  }
+}
+
+/** 用户点「选这颗星」→ doSubmit 真正入库 → 飞相机 → 开详情 */
+async function pickCandidate(c: MatchCandidate) {
+  if (!pendingRecordPayload.value || !recordFormRef.value) return
+  submittingCandidateId.value = c.catalogStarId
+  try {
+    const res = await recordFormRef.value.doSubmit(c.catalogStarId, [c.catalogStarId])
+    if (!res?.ok) {
+      // StoryForm 内部已经给 error 字段赋值，这里只清 candidate 提交态
+      submittingCandidateId.value = null
+      return
+    }
+    // 成功：onRecordStorySubmitted 已经先通过 emitted 更新了数据
+    // 这里做额外 UI 动作（飞相机 + 开详情）
+    submittingCandidateId.value = null
+    showMatchCandidates.value = false
+    matchCandidates.value = []
+    showRecordForm.value = false
+    pendingRecordPayload.value = null
+    recordMatching.reset()
+
+    // 相机飞到这颗星 + 高亮 + 打开 StarDetail
+    const star = catalogStarLookup.get(c.catalogStarId)
+    if (star) {
+      skyRef.value?.sky?.focusOnStar(star.x, star.y, star.z)
+      setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1000)
+    }
+    nextTick(() => onStarClick(c.catalogStarId))
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[record-match] 挂载故事失败:', msg)
+    submittingCandidateId.value = null
+  }
+}
+
+/** record 表单 submitted 事件（复用 onStorySubmitted 的数据更新逻辑） */
+function onRecordStorySubmitted(story: any) {
+  onStorySubmitted(story)
+  showRecordForm.value = false
+}
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
@@ -2267,6 +2462,315 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   .story-enter-enter-active,
   .story-enter-leave-active {
     transition: none;
+  }
+}
+
+/* ════════════════════════════════════════════════ */
+/*  记录 · 归属星辰匹配（导航栏按钮 + 候选星面板） */
+/* ════════════════════════════════════════════════ */
+.nav-record-btn {
+  color: #ffe5a8 !important;
+  border-color: rgba(255, 217, 138, 0.28) !important;
+  background: rgba(255, 217, 138, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.06), inset 0 0 12px rgba(255, 217, 138, 0.05);
+  transition: all 0.2s ease !important;
+}
+.nav-record-btn:hover {
+  color: #fff !important;
+  border-color: rgba(255, 217, 138, 0.55) !important;
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.18), rgba(255, 176, 96, 0.1)) !important;
+  box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
+}
+
+/* ─── 候选星面板背景 ─── */
+.candidates-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 18, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.candidates-fade-enter-active, .candidates-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0; }
+
+.candidates-sheet {
+  width: min(920px, 96vw);
+  max-height: 86vh;
+  background: linear-gradient(180deg, #121326 0%, #0e0f20 100%);
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sheetRise 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes sheetRise {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.candidates-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(255, 217, 138, 0.04), transparent);
+}
+.candidates-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.candidates-sparkle {
+  color: #ffd98a;
+  filter: drop-shadow(0 0 6px rgba(255, 217, 138, 0.5));
+}
+.candidates-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.candidates-hint {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 23px; /* 对齐 sparkle 图标后的标题 */
+}
+.candidates-close {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50%;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.candidates-close:hover {
+  color: #fff;
+  background: rgba(255, 139, 125, 0.1);
+  border-color: rgba(255, 139, 125, 0.3);
+}
+
+/* ─── 候选星列表 ─── */
+.candidates-list {
+  padding: 22px 26px 26px;
+  display: flex;
+  gap: 16px;
+  overflow-y: auto;
+  flex-wrap: nowrap;
+}
+.candidate-card {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 20px 20px 18px 52px;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.candidate-card::before {
+  content: '';
+  position: absolute;
+  left: 22px; top: 22px;
+  width: 6px; height: calc(100% - 44px);
+  background: linear-gradient(180deg, #ffd98a, #ffb060);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+.candidate-card.fallback::before {
+  background: linear-gradient(180deg, #a0c4ff, #b8a6ff);
+}
+.candidate-card:hover {
+  border-color: rgba(255, 217, 138, 0.28);
+  background: rgba(255, 217, 138, 0.03);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 217, 138, 0.08);
+}
+.candidate-card.fallback:hover {
+  border-color: rgba(160, 196, 255, 0.28);
+  background: rgba(160, 196, 255, 0.03);
+}
+.candidate-card.submitting {
+  opacity: 0.75;
+  pointer-events: none;
+}
+.candidate-rank {
+  position: absolute;
+  top: 16px; right: 16px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffd98a;
+  background: rgba(255, 217, 138, 0.1);
+  border: 1px solid rgba(255, 217, 138, 0.22);
+}
+.candidate-card.fallback .candidate-rank {
+  color: #b8a6ff;
+  background: rgba(160, 196, 255, 0.08);
+  border-color: rgba(160, 196, 255, 0.22);
+}
+.candidate-body {
+  display: flex; flex-direction: column; gap: 10px; flex: 1;
+  min-width: 0;
+}
+.candidate-star-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+.candidate-star-name {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #fff;
+}
+.candidate-constellation {
+  font-size: 0.76rem;
+  color: rgba(255,255,255,0.55);
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+.candidate-mag, .candidate-dist {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.4);
+}
+.candidate-fallback-badge {
+  font-size: 0.7rem;
+  color: #b8a6ff;
+  padding: 2px 8px;
+  background: rgba(160, 196, 255, 0.08);
+  border: 1px solid rgba(160, 196, 255, 0.2);
+  border-radius: 10px;
+}
+
+.candidate-score-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.score-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.score-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffd98a;
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.candidate-card.fallback .score-num { color: #b8a6ff; }
+
+.candidate-reason {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.82);
+  padding: 10px 12px;
+  background: rgba(255, 217, 138, 0.05);
+  border-left: 2px solid rgba(255, 217, 138, 0.35);
+  border-radius: 6px;
+}
+.candidate-card.fallback .candidate-reason {
+  background: rgba(160, 196, 255, 0.04);
+  border-left-color: rgba(160, 196, 255, 0.3);
+}
+.candidate-essences {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+}
+.essence-title {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.4);
+}
+.essence-chip {
+  font-size: 0.72rem;
+  color: rgba(255, 217, 138, 0.85);
+  background: rgba(255, 217, 138, 0.06);
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+.candidate-pick-btn {
+  margin-top: auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.14), rgba(255, 176, 96, 0.06));
+  border: 1px solid rgba(255, 217, 138, 0.26);
+  border-radius: 12px;
+  color: #ffe5a8;
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.candidate-card.fallback .candidate-pick-btn {
+  background: linear-gradient(135deg, rgba(160, 196, 255, 0.12), rgba(184, 166, 255, 0.06));
+  border-color: rgba(160, 196, 255, 0.26);
+  color: #cfd8ff;
+}
+.candidate-pick-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.25), rgba(255, 176, 96, 0.15));
+  border-color: rgba(255, 217, 138, 0.55);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(255, 217, 138, 0.2);
+}
+.candidate-card.fallback .candidate-pick-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(160, 196, 255, 0.25), rgba(184, 166, 255, 0.18));
+  border-color: rgba(160, 196, 255, 0.55);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(160, 196, 255, 0.2);
+}
+.pick-btn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 移动端适配 */
+@media (max-width: 720px) {
+  .candidates-sheet {
+    max-height: 92vh;
+    width: 96vw;
+    border-radius: 16px;
+  }
+  .candidates-list {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+  .candidate-card {
+    padding: 18px 18px 16px 46px;
+  }
+  .candidates-hint {
+    margin-left: 0;
   }
 }
 </style>
