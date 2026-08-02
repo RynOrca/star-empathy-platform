@@ -386,6 +386,97 @@ export function triggerKernelGeneration(storyId: number, content: string, title?
   runNextKernelJob()
 }
 
+// ════════════════════════════════════════════════════════════════
+// 新增故事 → 自动更新 catalog_star_analyses（前端 AI 卡片）
+//
+// 规则：
+//   · storyCount < 5 → 什么都不做（前端显示「心事太少」）
+//   · storyCount ≥ 5 → debounce 15s 合并窗口后调用 starAnalysisAgent.ensureOne
+//     （短时间多条故事进同一颗星，只在最后一条落库后跑一次，省 API）
+//   · 确保同一 catalog_star_id 在跑的只有一份（并发锁）
+// ════════════════════════════════════════════════════════════════
+
+const ANALYSIS_DEBOUNCE_MS = 15 * 1000
+const analysisDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const activeAnalysisIds = new Set<string>()
+const analysisRetryQueue: string[] = []
+let analysisWorkerRunning = false
+
+async function runAnalysisFor(catalogStarId: string): Promise<void> {
+  // 懒 import（避免循环依赖 kernel ↔ starAnalysisAgent）
+  const mod = await import('../agents/starAnalysisAgent')
+  try {
+    await mod.ensureOne(catalogStarId, {})
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error(`[analysis] cid=${catalogStarId} 自动生成失败:`, msg.slice(0, 200))
+  }
+}
+
+function runNextAnalysisJob() {
+  if (analysisWorkerRunning) return
+  const next = analysisRetryQueue.shift()
+  if (!next) return
+  if (activeAnalysisIds.has(next)) {
+    // 同一颗星正在跑，移到下一轮再试
+    analysisRetryQueue.push(next)
+    setTimeout(runNextAnalysisJob, 2000).unref?.()
+    return
+  }
+  analysisWorkerRunning = true
+  activeAnalysisIds.add(next)
+  runAnalysisFor(next).finally(() => {
+    activeAnalysisIds.delete(next)
+    analysisWorkerRunning = false
+    setImmediate(runNextAnalysisJob)
+  })
+}
+
+/**
+ * 触发某 catalog 星的分析自动再生（非阻塞、debounce 合并、并发 1）
+ * - 内部会先查 storyCount，<5 直接放弃（不会浪费一次 ensureOne 调用）
+ * - 一个新故事挂了多颗星，对每颗 id 都要调一次
+ */
+export function triggerAnalysisRegeneration(catalogStarIds: Array<string | number>): void {
+  if (!catalogStarIds?.length) return
+  // 懒 import：取 story meta 和 storyCount 用
+  let getStarStoryMeta: ((cid: string | number) => { total: number }) | null = null
+
+  for (const raw of catalogStarIds) {
+    const cid = String(raw)
+
+    // 1) 合并窗口：15s 内同星多次触发只跑最后一次
+    const existing = analysisDebounceTimers.get(cid)
+    if (existing) clearTimeout(existing)
+
+    const t = setTimeout(async () => {
+      analysisDebounceTimers.delete(cid)
+      try {
+        // 延迟加载，避免模块加载期互相 import
+        if (!getStarStoryMeta) {
+          const mod = await import('../agents/starAnalysisAgent')
+          getStarStoryMeta = mod.getStarStoryMeta
+        }
+        const meta = getStarStoryMeta(cid)
+        if ((meta.total ?? 0) < 5) {
+          console.log(`[analysis] cid=${cid} stories=${meta.total}<5，暂不生成分析`)
+          return
+        }
+        // 入并发 1 的串行队列
+        if (!activeAnalysisIds.has(cid)) {
+          analysisRetryQueue.push(cid)
+          setImmediate(runNextAnalysisJob)
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[analysis] trigger cid=${cid} 调度失败:`, msg.slice(0, 200))
+      }
+    }, ANALYSIS_DEBOUNCE_MS)
+    t.unref?.() // Node 下不会阻止进程退出；Express 进程常驻时本句无副作用
+    analysisDebounceTimers.set(cid, t)
+  }
+}
+
 /** 启动时补全所有缺失的内核（批量，不阻塞服务启动） */
 export function backfillMissingKernels(): void {
   const rows = db.prepare(`

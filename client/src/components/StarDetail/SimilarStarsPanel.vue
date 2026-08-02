@@ -1,40 +1,61 @@
 <template>
   <div class="similar-panel">
-    <div class="panel-header">
-      <SparklesIcon :size="13" class="panel-icon" />
-      <span class="panel-title">内核相似的星星</span>
-    </div>
     <div v-if="similarStars.length > 0" class="panel-body">
       <div
-        v-for="s in similarStars.slice(0, 5)"
+        v-for="s in similarStars.slice(0, 8)"
         :key="s.catalogStarId"
         class="similar-item"
         @click="onSimilarStarClick(s.catalogStarId)"
       >
-        <div class="similar-info">
-          <span class="similar-name">{{ getStarName(s.catalogStarId) }}</span>
-          <span class="similar-score">{{ Math.round(s.score * 100) }}%</span>
+        <div class="item-main">
+          <div class="item-left">
+            <span
+              class="star-dot"
+              :style="{ background: getStarColor(s.catalogStarId), boxShadow: `0 0 5px ${getStarColor(s.catalogStarId)}` }"
+            ></span>
+            <span class="star-name">{{ getStarName(s.catalogStarId) }}</span>
+            <span class="con-tag">{{ getConstellationName(s.catalogStarId) }}</span>
+          </div>
+          <span class="score-num">{{ Math.round(s.score * 100) }}%</span>
         </div>
-        <div class="similar-tags">
-          <span v-for="tag in s.sharedEmotions.slice(0, 3)" :key="tag" class="similar-tag-emotion">{{ tag }}</span>
+        <div class="score-bar">
+          <div
+            class="score-fill"
+            :style="{ width: Math.round(s.score * 100) + '%' }"
+          ></div>
+        </div>
+        <div class="tags-row" v-if="s.sharedEmotions.length > 0 || s.sharedThemes.length > 0">
+          <span
+            v-for="tag in [...s.sharedEmotions.slice(0, 2), ...s.sharedThemes.slice(0, 2)].slice(0, 3)"
+            :key="tag"
+            class="tag"
+            :class="{
+              'tag-emotion': s.sharedEmotions.includes(tag),
+              'tag-theme': s.sharedThemes.includes(tag),
+            }"
+          >
+            {{ tag }}
+          </span>
+        </div>
+        <div class="item-footer" v-if="s.storyCount > 0">
+          <span class="story-dot"></span>
+          <span>{{ s.storyCount }} 故事</span>
         </div>
       </div>
     </div>
+
     <div v-else class="panel-empty">
-      <SparklesIcon :size="14" class="empty-icon" />
       <span>暂无相似星星</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Sparkles } from 'lucide-vue-next'
-
-const SparklesIcon = Sparkles
-
 defineProps<{
-  similarStars: Array<{ catalogStarId: number; score: number; sharedEmotions: string[] }>
+  similarStars: Array<{ catalogStarId: number; score: number; sharedEmotions: string[]; sharedThemes: string[]; storyCount: number }>
   getStarName: (id: number) => string
+  getStarColor: (id: number) => string
+  getConstellationName: (id: number) => string
   onSimilarStarClick: (id: number) => void
 }>()
 </script>
@@ -44,100 +65,148 @@ defineProps<{
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.015);
+  flex: 1;
   overflow: hidden;
 }
 
-.panel-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--rule);
-  flex-shrink: 0;
-  background: rgba(255, 217, 138, 0.03);
-}
-.panel-icon { color: var(--accent); flex-shrink: 0; }
-.panel-title {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--muted);
-}
-
 .panel-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,217,138,0.18) transparent;
 }
-.panel-body::-webkit-scrollbar { width: 5px; }
-.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar {
+  width: 3px;
+}
+.panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
 .panel-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: rgba(255, 217, 138, 0.18);
+  border-radius: 2px;
+}
+.panel-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 217, 138, 0.3);
 }
 
 .similar-item {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: background 0.18s ease;
+  flex-shrink: 0;
 }
 .similar-item:hover {
-  border-color: var(--accent-border);
-  background: rgba(255, 217, 138, 0.04);
+  background: rgba(255, 217, 138, 0.08);
 }
-.similar-info {
+
+.item-main {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
-.similar-name {
-  font-size: 0.8rem;
-  color: var(--ink);
-  font-weight: 500;
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
-.similar-score {
-  font-size: 0.72rem;
-  color: var(--accent);
+.star-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.star-name {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.88);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.similar-tags {
+.con-tag {
+  font-size: 0.63rem;
+  color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.score-num {
+  font-size: 0.72rem;
+  color: #ffd98a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.score-bar {
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.score-fill {
+  height: 100%;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 217, 138, 0.4), #ffd98a);
+  transition: width 0.5s ease;
+}
+
+.tags-row {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-bottom: 6px;
 }
-.similar-tag-emotion {
-  font-size: 0.65rem;
-  padding: 1px 6px;
+.tag {
+  font-size: 0.62rem;
+  padding: 2px 6px;
   border-radius: 3px;
+  font-weight: 500;
+}
+.tag-emotion {
   background: rgba(255, 139, 125, 0.1);
   color: #ff8b7d;
-  border: 1px solid rgba(255, 139, 125, 0.15);
+}
+.tag-theme {
+  background: rgba(134, 168, 255, 0.1);
+  color: #86a8ff;
+}
+
+.item-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.25);
+}
+.story-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .panel-empty {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 16px 10px;
-  color: var(--muted-light);
+  color: rgba(255, 255, 255, 0.2);
   font-size: 0.75rem;
-  font-style: italic;
-  opacity: 0.5;
+  padding: 20px 10px;
 }
-.empty-icon { opacity: 0.3; }
 </style>
