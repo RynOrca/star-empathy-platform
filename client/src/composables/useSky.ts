@@ -1283,13 +1283,12 @@ for (const s of stars) starById.set(s.id, s)
       skyGroup.updateMatrixWorld()
       const raycaster = new Raycaster()
       raycaster.setFromCamera(mouse, camera)
-      let bestPlanetDist = Infinity
       let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
       if (planetMeshes.length) {
         const planetHits = raycaster.intersectObjects(planetMeshes)
         if (planetHits.length) {
           const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-          if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
+          if (pd.planetName) { bestPlanetPd = pd }
         }
       }
 
