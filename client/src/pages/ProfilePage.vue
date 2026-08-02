@@ -6,11 +6,20 @@
     <template v-else>
       <!-- 1. Topbar 固定导航 -->
       <header class="pd-topbar">
-        <button class="pd-back-btn" @click="goBack">← BACK TO SKY</button>
+        <button class="pd-back-btn pd-action-btn" @click="goBack">
+          <span class="pd-roman">Ⅰ</span><span class="pd-action-sep">·</span><span class="pd-action-label">返航</span>
+        </button>
         <div class="pd-brand">STARRY · DOME</div>
         <div class="pd-actions">
-          <button class="pd-back-btn" @click="startEditSig">✎ 编辑签名</button>
-          <button class="pd-back-btn" @click="clearAndClosePwdModal(); showPwdModal = true">⚙ 修改密码</button>
+          <button class="pd-back-btn pd-action-btn" @click="startEditSig">
+            <span class="pd-roman">Ⅱ</span><span class="pd-action-sep">·</span><span class="pd-action-label">题刻</span>
+          </button>
+          <button class="pd-back-btn pd-action-btn" @click="clearAndClosePwdModal(); showPwdModal = true">
+            <span class="pd-roman">Ⅲ</span><span class="pd-action-sep">·</span><span class="pd-action-label">密钥</span>
+          </button>
+          <button class="pd-back-btn pd-action-btn pd-logout-trigger" @click="showLogoutModal = true">
+            <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">离开</span>
+          </button>
         </div>
       </header>
 
@@ -33,6 +42,10 @@
             <span class="pd-gold-sep">◆</span>
             <span>加入星空 {{ daysAgo }} 天</span>
             <span class="pd-gold-sep">◆</span>
+          </div>
+          <div class="pd-hero-email">
+            <span class="pd-gold-sep">◆</span>
+            <span>{{ user?.email || '未绑定邮箱（无法找回密钥）' }}</span>
           </div>
         </div>
         <div class="pd-scroll-hint">
@@ -300,6 +313,26 @@
               {{ pwdLoading ? '修改中...' : '确认修改' }}
             </button>
           </footer>
+          <p class="pwd-forgot-link" @click="goForgotPassword">忘了旧密码？去 HomePage 找回</p>
+        </div>
+      </div>
+
+      <!-- 退出登录确认弹窗 -->
+      <div v-if="showLogoutModal" class="pd-modal-mask" @click.self="showLogoutModal = false">
+        <div class="pd-modal-panel pd-modal-sm">
+          <header class="pd-modal-head">
+            <h3>· 确认离开星穹 ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="showLogoutModal = false">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <p class="pd-modal-hint">退出后需重新登录才能查看你的故事与星座。<br />未保存的草稿将随星风消散。</p>
+          </main>
+          <footer class="pd-modal-foot">
+            <button type="button" class="pd-back-btn" @click="showLogoutModal = false">留在星空</button>
+            <button type="button" class="pd-btn-danger" @click="handleLogout" :disabled="logoutLoading">
+              {{ logoutLoading ? '正在离开...' : '确认退出' }}
+            </button>
+          </footer>
         </div>
       </div>
 
@@ -376,6 +409,7 @@ import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
+import { useAuth, authFetch } from '../stores/auth'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
 
@@ -384,6 +418,7 @@ const VISIBLE_STEP = 5
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const { logout } = useAuth()
 // 解构出 pause/resume：卡片 hover 时暂停 canvas，把主线程完整让给 CSS transition 跑 0.5s
 const { pause: pauseSky, resume: resumeSky } = useParticleSky(canvasRef)
 // hover 计数器（防止鼠标在多张卡片间快速移动时 canvas 被反复 pause/resume）
@@ -402,7 +437,7 @@ interface FavoriteItem {
   createdAt?: string
 }
 const loaded = ref(false)
-const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
+const user = ref<{ id: number; username: string; email: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<FavoriteItem[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
@@ -419,6 +454,28 @@ const pwdError = ref('')
 const oldPwd = ref('')
 const newPwd = ref('')
 const confirmPwd = ref('')
+
+// ─── 退出登录 ───
+const showLogoutModal = ref(false)
+const logoutLoading = ref(false)
+
+async function handleLogout() {
+  logoutLoading.value = true
+  try {
+    await logout()
+  } finally {
+    logoutLoading.value = false
+    showLogoutModal.value = false
+    router.push('/')
+  }
+}
+
+// 忘了旧密码 → 退出后回首页走找回流程
+async function goForgotPassword() {
+  clearAndClosePwdModal()
+  await logout()
+  router.push('/')
+}
 
 async function updatePassword() {
   pwdError.value = ''
@@ -813,11 +870,11 @@ async function loadProfileData() {
   if (!token) { router.push('/'); return }
   try {
     const [meRes, firstPageRes, favRes, linesRes, statsRes] = await Promise.all([
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
@@ -1086,6 +1143,43 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+/* 顶部罗马数字按钮 — 史诗编号风格 */
+.pd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--pd-font-serif);
+  white-space: nowrap;
+}
+.pd-roman {
+  font-family: var(--pd-font-deco);
+  color: var(--pd-gold);
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+}
+.pd-action-sep {
+  color: rgba(255,217,138,0.4);
+  font-size: 0.75rem;
+  margin: 0 1px;
+}
+.pd-action-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+}
+/* 退出按钮微弱警示色调 */
+.pd-logout-trigger:hover {
+  border-color: rgba(255,107,138,0.5);
+  color: #ff8b9e;
+  background: rgba(255,107,138,0.05);
+}
+.pd-logout-trigger:hover .pd-roman {
+  color: #ff8b9e;
+}
+.pd-logout-trigger:hover .pd-action-sep {
+  color: rgba(255,107,138,0.4);
+}
+
 /* ═══ (b) Hero 100vh ═══ */
 .pd-hero {
   position: relative;
@@ -1183,6 +1277,19 @@ onBeforeUnmount(() => {
   color: rgba(255,217,138,0.6);
   font-size: 0.78rem;
   letter-spacing: 0.12em;
+}
+
+/* Hero 邮箱行 — 复用 joined 风格，字号略小 */
+.pd-hero-email {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: rgba(255,217,138,0.45);
+  font-family: var(--pd-font-deco);
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
 }
 
 .pd-gold-sep {
@@ -2053,6 +2160,31 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
   margin: 8px 0 0;
   font-style: italic;
+}
+
+/* 改密码弹窗底部「找回」链接 */
+.pwd-forgot-link {
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgba(255,217,138,0.5);
+  margin-top: 14px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: color 0.2s;
+  font-family: var(--pd-font-serif);
+}
+.pwd-forgot-link:hover { color: var(--pd-gold); }
+
+/* 退出确认小弹窗 */
+.pd-modal-sm { max-width: 380px; }
+.pd-modal-hint {
+  font-family: var(--pd-font-serif);
+  font-size: 0.88rem;
+  line-height: 1.85;
+  color: var(--pd-text-pri);
+  text-align: center;
+  padding: 8px 0;
+  margin: 0;
 }
 
 /* Buttons */

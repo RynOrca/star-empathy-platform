@@ -1,8 +1,11 @@
 import { ref, computed } from 'vue'
+import type { Router } from 'vue-router'
 
 interface User {
   id: number
   username: string
+  email: string
+  signature: string
   createdAt: string
 }
 
@@ -10,6 +13,30 @@ const user = ref<User | null>(null)
 const loading = ref(false)
 
 const isLoggedIn = computed(() => !!localStorage.getItem('token'))
+// 访客账号（体验账号）：username 固定为「星穹访客」
+const isGuest = computed(() => user.value?.username === '星穹访客')
+
+// ─── 401 兜底：token 失效时自动清状态并跳登录页 ───
+let routerInstance: Router | null = null
+export function setAuthRouter(r: Router) { routerInstance = r }
+
+/**
+ * 统一鉴权 fetch：遇到 401 自动清 token + 跳登录页
+ * 用于需要登录的 API 调用，避免 token 失效时页面卡在空数据
+ */
+export async function authFetch(input: RequestInfo, init?: RequestInit) {
+  const res = await fetch(input, init)
+  if (res.status === 401) {
+    localStorage.removeItem('token')
+    user.value = null
+    stopRefreshTimer()
+    if (routerInstance) {
+      const current = routerInstance.currentRoute.value
+      if (current.path !== '/') routerInstance.push('/')
+    }
+  }
+  return res
+}
 
 async function fetchMe() {
   const token = localStorage.getItem('token')
@@ -112,12 +139,21 @@ function stopRefreshTimer() {
   }
 }
 
-function logout() {
+async function logout() {
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch { /* 即使 API 失败也清除本地状态 */ }
+  }
   localStorage.removeItem('token')
   user.value = null
   stopRefreshTimer()
 }
 
 export function useAuth() {
-  return { user, loading, isLoggedIn, fetchMe, login, register, logout, startRefreshTimer, stopRefreshTimer }
+  return { user, loading, isLoggedIn, isGuest, fetchMe, login, register, logout, startRefreshTimer, stopRefreshTimer }
 }

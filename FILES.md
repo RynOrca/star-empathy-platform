@@ -109,7 +109,7 @@
 |---|---|
 | `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板 |
 | `HomePage.vue` | 首页/登录页 |
-| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar + 480px 月亮 Hero + 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片（标题/正文 4 行摘录/恒星 Tag/情绪 5 色标签/共鸣/MM DD 日期）、空态 CTA 前往星空；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线、scrollToStory 自动展开；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；4 Modal 统一换肤（签名/星穹之钥密码/故事详情/摘取确认）+ Gold Flash 成功反馈。响应式 768/380 双断点；Prefers-reduced-motion 全停动画 |
+| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
 
 ### 组件 `src/components/`
 
@@ -178,7 +178,7 @@
 | 文件 | 用途 |
 |---|---|
 | `router/index.ts` | Vue Router 路由配置 |
-| `stores/auth.ts` | 用户认证状态管理（Zustand 风格） |
+| `stores/auth.ts` | 用户认证状态管理（Zustand 风格）。login/register/logout（调后端黑名单 API）/fetchMe/token 自动刷新；导出 `authFetch`（401 兜底清 token 跳登录）、`setAuthRouter`（注入路由实例）、`isGuest`（访客账号判断） |
 
 ### 样式 `src/styles/`
 
