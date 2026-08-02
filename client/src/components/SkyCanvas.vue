@@ -19,6 +19,7 @@ const emit = defineEmits<{
   starHover: [starId: number | null]
   starHoverLong: [starId: number | null]
   planetClick: [name: string, nameCN: string, planetId: number]
+  snapChange: [starId: number | null]
 }>()
 
 onMounted(() => {
@@ -27,6 +28,7 @@ onMounted(() => {
     onStarHover: (starId) => emit('starHover', starId),
     onStarHoverLong: (starId) => emit('starHoverLong', starId),
     onPlanetClick: (name, nameCN, planetId) => emit('planetClick', name, nameCN, planetId),
+    onSnapChange: (starId) => emit('snapChange', starId),
     observerLat: props.observerLat,
     observerLng: props.observerLng,
   })
