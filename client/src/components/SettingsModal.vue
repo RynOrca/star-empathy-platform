@@ -534,6 +534,10 @@ async function clearAmap() {
 /* ─── Transition ─── */
 .modal-fade-enter-active { transition: opacity 0.2s ease-out; }
 .modal-fade-leave-active { transition: opacity 0.15s ease-in; }
+.modal-fade-enter-active .modal-card,
+.modal-fade-leave-active .modal-card {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
 .modal-fade-enter-from { opacity: 0; }
 .modal-fade-leave-to { opacity: 0; }
 .modal-fade-enter-from .modal-card { transform: scale(0.96) translateY(8px); }
@@ -578,12 +582,6 @@ async function clearAmap() {
     max-width: 100%;
     border-radius: 20px 20px 0 0;
     max-height: 85vh;
-    animation: slideUpSettings 0.28s ease-out;
-  }
-
-  @keyframes slideUpSettings {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
   }
 
   .modal-fade-enter-from .modal-card { transform: translateY(100%); }

@@ -22,13 +22,14 @@
             <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">离开</span>
           </button>
         </div>
-        <!-- 移动端：单设置按钮触发弹窗 -->
+        <!-- 移动端：单设置按钮触发弹窗（合并 Ⅱ Ⅲ Ⅳ） -->
         <button class="pd-back-btn pd-action-btn pd-settings-trigger" @click="showSettingsModal = true">
-          <span class="pd-roman">Ⅱ Ⅲ Ⅳ</span>
+          <span class="pd-roman">Ⅱ Ⅲ Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">设置</span>
         </button>
       </header>
 
       <!-- 移动端设置弹窗（题刻/密钥/离开） -->
+      <Transition name="pd-modal">
       <div v-if="showSettingsModal" class="pd-modal-mask" @click.self="showSettingsModal = false">
         <div class="pd-modal-panel pd-modal-sm pd-settings-sheet">
           <header class="pd-modal-head">
@@ -48,6 +49,7 @@
           </main>
         </div>
       </div>
+      </Transition>
 
       <!-- 2. Hero 区 100vh -->
       <section class="pd-hero">
@@ -312,6 +314,7 @@
       </div>
 
       <!-- 修改密码弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="showPwdModal" class="pd-modal-mask" @click.self="clearAndClosePwdModal">
         <div class="pd-modal-panel">
           <header class="pd-modal-head">
@@ -341,8 +344,10 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- 退出登录确认弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="showLogoutModal" class="pd-modal-mask" @click.self="showLogoutModal = false">
         <div class="pd-modal-panel pd-modal-sm">
           <header class="pd-modal-head">
@@ -360,8 +365,10 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- 故事详情弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="activeStory" class="pd-modal-mask" @click.self="activeStory = null">
         <div class="pd-modal-panel pd-story-panel">
           <header class="pd-modal-head">
@@ -399,10 +406,12 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- 删除确认弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="showDeleteConfirm" class="pd-modal-mask" @click.self="showDeleteConfirm = false">
-        <div class="pd-modal-panel" style="width: 400px;">
+        <div class="pd-modal-panel pd-modal-sm">
           <header class="pd-modal-head">
             <h3>· 摘取故事 · REMOVE ·</h3>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="showDeleteConfirm = false">×</button>
@@ -418,6 +427,7 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- Gold flash banner -->
       <Transition name="pd-flash">
@@ -2046,12 +2056,25 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: pd-modal-fade-in 300ms ease-out both;
 }
 
-@keyframes pd-modal-fade-in {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+/* —— Transition：PC 端 fade + scale，移动端从底部丝滑滑入 —— */
+.pd-modal-enter-active,
+.pd-modal-leave-active {
+  transition: opacity 300ms ease;
+}
+.pd-modal-enter-from,
+.pd-modal-leave-to {
+  opacity: 0;
+}
+.pd-modal-enter-active .pd-modal-panel,
+.pd-modal-leave-active .pd-modal-panel {
+  transition: transform 360ms cubic-bezier(.2,.9,.3,1), opacity 300ms ease;
+}
+.pd-modal-enter-from .pd-modal-panel,
+.pd-modal-leave-to .pd-modal-panel {
+  opacity: 0;
+  transform: scale(0.9) translateY(24px);
 }
 
 .pd-modal-panel {
@@ -2479,6 +2502,26 @@ onBeforeUnmount(() => {
   .pd-modal-sm { max-width: 92vw; }
   .pd-modal-hint { font-size: 0.82rem; }
   .pd-settings-item { padding: 12px 16px; font-size: 0.82rem; }
+
+  /* —— 移动端弹窗：底部抽屉式，丝滑滑入/滑出 —— */
+  .pd-modal-mask {
+    align-items: flex-end;
+  }
+  .pd-modal-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 85vh;
+    border-radius: 18px 18px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  /* Transition：移动端从底部滑入，而非 PC 端的 scale+translateY */
+  .pd-modal-enter-from .pd-modal-panel,
+  .pd-modal-leave-to .pd-modal-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
 
   /* Timeline section */
   .pd-timeline-section { padding: 40px 18px 80px; }

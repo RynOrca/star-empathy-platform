@@ -1411,12 +1411,16 @@ for (const s of stars) starById.set(s.id, s)
         return
       }
 
-      // issue #116 移动端准星：吸附状态下点击直接触发吸附星
+      // issue #116 移动端准星：吸附状态下仅点击屏幕下半部分触发进入故事页
+      // 上半部分点击无操作（保留给拖动视角）；下半部分点击进入故事页，拖动视角由 clickDrag 标记区分
       if (isMobile && snappedStarId !== -1) {
-        options?.onStarClick?.(snappedStarId)
+        const snapRect = canvas.getBoundingClientRect()
+        if (e.clientY - snapRect.top > snapRect.height / 2) {
+          options?.onStarClick?.(snappedStarId)
+        }
         return
       }
-      // issue #116：移动端非吸附状态下点击无操作（仅准星选中可触发）
+      // issue #116：移动端非吸附状态下点击无操作（必须先吸附准星）
       if (isMobile) return
 
       // issue #116 修复：用真实点击坐标更新 mouse，确保检测位置准确
