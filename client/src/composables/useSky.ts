@@ -292,6 +292,8 @@ export interface SkyAPI {
   toggleConstellations: () => boolean
   /** issue #34：更新星空显示配置（部分覆盖） */
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
+  /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
+  releaseSnap: () => void
 }
 
 export function useSky(
@@ -301,6 +303,8 @@ export function useSky(
     onStarHover?: (starId: number | null) => void
     onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string, planetId: number) => void
+    /** issue #124：准星吸附状态变化通知（starId=number 表示吸附到该星，null 表示脱吸附） */
+    onSnapChange?: (starId: number | null) => void
     observerLat?: number
     observerLng?: number
     /** 星空显示配置（issue #34）：覆盖默认 STAR_DISPLAY_CONFIG 的任意字段 */
@@ -1131,6 +1135,8 @@ for (const s of stars) starById.set(s.id, s)
       userFov = targetFov
       snapBaseFov = 0
     }
+    // issue #124：通知外部已脱吸附
+    options?.onSnapChange?.(null)
   }
 
   // ═══ 移动端准星 DOM（issue #116） ═══
@@ -1382,6 +1388,8 @@ for (const s of stars) starById.set(s.id, s)
             // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
             hoveredStarId = centerId
             animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+            // issue #124：通知外部已吸附到该星（驱动底部「凝听星语」按钮滑入）
+            options?.onSnapChange?.(centerId)
           } else {
             // 已吸附同一颗星：检查是否移动超过阈值
             const dx = e.clientX - snapStartX
@@ -1411,16 +1419,8 @@ for (const s of stars) starById.set(s.id, s)
         return
       }
 
-      // issue #116 移动端准星：吸附状态下仅点击屏幕下半部分触发进入故事页
-      // 上半部分点击无操作（保留给拖动视角）；下半部分点击进入故事页，拖动视角由 clickDrag 标记区分
-      if (isMobile && snappedStarId !== -1) {
-        const snapRect = canvas.getBoundingClientRect()
-        if (e.clientY - snapRect.top > snapRect.height / 2) {
-          options?.onStarClick?.(snappedStarId)
-        }
-        return
-      }
-      // issue #116：移动端非吸附状态下点击无操作（必须先吸附准星）
+      // issue #124：移动端不再用触屏点击进入故事页，改为吸附后点击底部「凝听星语」按钮
+      // 移动端 pointerup 一律不触发 PC 端 Raycaster 点击逻辑（进入故事由底部按钮驱动）
       if (isMobile) return
 
       // issue #116 修复：用真实点击坐标更新 mouse，确保检测位置准确
@@ -4075,5 +4075,7 @@ for (const s of stars) starById.set(s.id, s)
       texCache.forEach(t => t.dispose())
       texCache.clear()
     },
+    // issue #124：主动释放准星吸附（供外部「凝听星语」按钮点击后调用）
+    releaseSnap,
   }
 }
