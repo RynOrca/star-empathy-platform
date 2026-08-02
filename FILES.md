@@ -35,7 +35,7 @@
 | 文件 | 用途 |
 |---|---|
 | `stars.ts` | 旧版星星路由（`/api/stars`），保留兼容 |
-| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏 |
+| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏；**`POST /api/stories/match-star`**（authRequired，1~300 字校验）调 kernel 为未入新故事寻找 Top3 契合星辰 |
 | `catalog.ts` | 星表恒星路由（`/api/catalog/stars`）。统计、搜索 |
 | `narrative.ts` | **AI 叙事路由**（`/api/catalog/stars/:id/narrative`）。含 `ra`/`dec` 参数用于地平线判断 |
 | `chat.ts` | **古人陪看聊天路由**（`/api/catalog/stars/:id/chat/*`）。古人列表、开场白、SSE 流式聊天 |
@@ -55,7 +55,7 @@
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合） |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
-| `kernel.ts` | 故事内核（情感标签）提取与匹配服务 |
+| `kernel.ts` | 故事内核（情感标签）提取与匹配服务。含 **`findMatchingStarsForContent(title, content, limit)`** 为未落库的新故事寻找 Top3 最契合的星辰（内核 Jaccard 相似度 Top10 + DeepSeek 语义重排给理由 + 匹配不到时降级选亮星）。`getSimilarStars(catalogStarId)` 星 vs 星内核相似度。`generateKernel()` AI 提取内核。 |
 | `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
 | `emailService.ts` | 邮件发送服务 |
@@ -127,7 +127,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板、移动端底部「凝听星语」按钮（吸附星辰后滑入，issue #124） |
+| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板、移动端底部「凝听星语」按钮（吸附星辰后滑入，issue #124）；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail |
 | `HomePage.vue` | 首页/登录页。粒子星空背景 + 左右分栏（品牌意境/登录注册表单），含找回密码、匿名访客体验；移动端可竖向滚动（issue #124） |
 | `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
 
@@ -149,7 +149,7 @@
 | `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
-| `StoryForm.vue` | 投递心事表单 |
+| `StoryForm.vue` | 投递心事表单。两种 `mode` prop：**`bind-star`**（预绑定 catalogStarId，原行为） vs **`auto-match`**（未选星，点「寻找归属星辰」emit `requestMatch` 给父组件，匹配后父组件通过 ref 调 `doSubmit(catalogStarId)` 真正提交）。auto-match 模式下提供 3 步进度遮罩（提取内核 / 夜空寻星 / 判断缘分）。暴露：`defineExpose({ doSubmit, resetForm })` |
 | `SettingsModal.vue` | 设置面板（API Key 管理、显示配置） |
 | `LoadingScreen.vue` | 加载动画 |
 | `LegendToggle.vue` | 图例开关 |
@@ -163,6 +163,7 @@
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
 | `useKernel.ts` | 故事内核（情感标签）提取 |
+| **`useStarMatching.ts`** | **「记录」归属星辰匹配封装**。`matchStars(title, content, limit)` → POST `/api/stories/match-star` → 返回 Top3 `MatchCandidate[]`。`step` 1/2/3 进度自动推进（配合 StoryForm 匹配遮罩）。`reset()` 中断+清状态 |
 | `useSimilarStars.ts` | 相似星星推荐 |
 | `useAreaHighlights.ts` | 天区故事精选 |
 | `useAstroEvents.ts` | 天文事件计算（日月出没、行星可见性） |
@@ -294,6 +295,7 @@
 | 修改行星数据/位置计算 | `client/src/data/planets.ts` |
 | 修改星空显示配置 | `client/src/utils/starDisplayConfig.ts` |
 | 修改定位/城市选择 | `client/src/pages/SkyPage.vue`、`server/src/routes/location.ts` |
+| 修改/新增 **记录 · AI 归属星辰** 功能（写故事 → AI 匹配 Top3 星辰 → 选星挂载 → 飞相机高亮详情） | `server/src/services/kernel.ts`、`server/src/routes/stories.ts`、`client/src/composables/useStarMatching.ts`、`client/src/components/StoryForm.vue`、`client/src/pages/SkyPage.vue` |
 | 添加前端新页面 | `client/src/pages/` 新建，`client/src/router/index.ts` 注册 |
 | 修改 CSS 设计 token | `client/src/styles/variables.css` |
 | 修改部署流程 | `deploy/`、`.github/workflows/deploy.yml` |
