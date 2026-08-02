@@ -631,3 +631,338 @@ export function getUserPreferences(userId: number): UserPreferences {
     storyCount: rows.length,
   }
 }
+
+// ════════════════════════════════════════════════════════════════
+//  新故事 → 寻找最契合的恒星（内核 Jaccard Top10 + AI 语义重排给理由）
+//  返回 Top3 候选星给前端，让用户挑一颗挂上故事
+// ════════════════════════════════════════════════════════════════
+
+export interface MatchCandidate {
+  catalogStarId: number
+  name: string | null
+  constellationCN: string
+  mag: number
+  distance: number | null
+  jaccardScore: number    // 0~1 Jaccard 相似度
+  aiScore: number         // 0~1 AI 语义贴合度
+  finalScore: number      // 加权总分
+  matchReason: string     // AI 写的匹配理由（1~2 句，中文）
+  starEssences: string[]  // 该星现有故事的 Top3 essence（一句话凝练）
+  isFallback: boolean     // 是否为「匹配不到，降级兜底的亮星」
+}
+
+/** 解析 AI 重排的 JSON 结果（兼容 ```json fence、自由文提取） */
+function parseRerankResult(raw: string): Array<{ catalogStarId: number; aiScore: number; matchReason: string }> {
+  const jsonMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
+  const jsonStr = (jsonMatch ? jsonMatch[1] : raw).trim()
+
+  // 尝试直接解析
+  try {
+    const obj = JSON.parse(jsonStr)
+    const items = Array.isArray(obj) ? obj : (Array.isArray(obj.results) ? obj.results : null)
+    if (!items) throw new Error('no array')
+    return items.map((r: any) => ({
+      catalogStarId: typeof r.catalog_star_id === 'number' ? r.catalog_star_id : (parseInt(String(r.catalogStarId ?? r.id ?? 0), 10) || 0),
+      aiScore: typeof r.ai_score === 'number' ? clamp01(r.ai_score) : (clamp01(Number(r.aiScore) || 0)),
+      matchReason: typeof r.match_reason === 'string' ? r.match_reason.trim() : (String(r.matchReason ?? '').trim() || '主题高度契合'),
+    })).filter(r => r.catalogStarId > 0)
+  } catch {
+    // 自由文 fallback：逐行抠出 catalogStarId / score / reason
+    const lines = jsonStr.split(/\n/).map(l => l.trim()).filter(Boolean)
+    const out: Array<{ catalogStarId: number; aiScore: number; matchReason: string }> = []
+    for (const line of lines) {
+      const idMatch = line.match(/(?:catalogStarId|catalog_star_id|id)\s*[:：]?\s*(\d+)/i)
+      const scoreMatch = line.match(/(?:aiScore|ai_score|score)\s*[:：]?\s*(0?\.\d+|1\.0|\d+)/i)
+      const reasonMatch = line.match(/(?:matchReason|match_reason|reason|理由)\s*[:：]\s*(.+)/i)
+      if (idMatch) {
+        out.push({
+          catalogStarId: parseInt(idMatch[1], 10),
+          aiScore: scoreMatch ? clamp01(Number(scoreMatch[1])) : 0.5,
+          matchReason: reasonMatch ? reasonMatch[1].trim().replace(/^["“]|["”，,。\.]+$/g, '') : '主题高度契合',
+        })
+      }
+    }
+    return out
+  }
+}
+
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(1, n))
+}
+
+/**
+ * 为一段还未落库的新故事文本，寻找 Top3 最契合的恒星
+ *
+ * 流程：
+ *  1) generateKernel() 提取新故事的临时内核（不写 DB）
+ *  2) getAllStarKernels() 拿所有有故事的恒星的聚合标签
+ *  3) Jaccard 算每颗星相似度 → 取 Top 10
+ *  4) DeepSeek 把新故事 essence + Top10 星的 essence 做语义重排 + 给每颗星写匹配理由
+ *  5) 加权合并 Jaccard*0.4 + AI*0.6 → 取 Top 3
+ *  6) 若 Top3 最高分 < 0.3 → 降级兜底：挑亮星(mag≤3 且 storyCount<3) Top 3
+ */
+export async function findMatchingStarsForContent(
+  title: string | null,
+  content: string,
+  limit = 3,
+): Promise<{ matches: MatchCandidate[] }> {
+  if (!content || !content.trim()) {
+    return { matches: [] }
+  }
+  const trimmed = content.trim()
+  const trimmedTitle = title?.trim() || null
+
+  // ── Step 1: 提取新故事内核（不落库，临时） ──
+  const newKernel = await generateKernel(trimmed, trimmedTitle)
+  const newEmotions = new Set(newKernel.emotionalTags)
+  const newThemes = new Set(newKernel.themes)
+  const newEssence = newKernel.essence
+
+  // ── Step 2+3: 所有恒星聚合标签 Jaccard → Top 10 ──
+  const allStarKernels = getAllStarKernels()
+  interface JaccardEntry {
+    catalogStarId: number
+    jaccardScore: number
+    sharedEmotions: string[]
+    sharedThemes: string[]
+  }
+  const jaccardList: JaccardEntry[] = []
+  for (const [cid, tags] of allStarKernels) {
+    const emotionSim = jaccardSimilarity(newEmotions, tags.emotionalTags)
+    const themeSim = jaccardSimilarity(newThemes, tags.themes)
+    const score = emotionSim * 0.6 + themeSim * 0.4
+    jaccardList.push({
+      catalogStarId: cid,
+      jaccardScore: Math.round(score * 100) / 100,
+      sharedEmotions: [...newEmotions].filter(t => tags.emotionalTags.has(t)),
+      sharedThemes: [...newThemes].filter(t => tags.themes.has(t)),
+    })
+  }
+  jaccardList.sort((a, b) => b.jaccardScore - a.jaccardScore)
+  const topN = Math.min(10, jaccardList.length)
+  const jaccardTop = jaccardList.slice(0, topN)
+
+  let finalCandidates: MatchCandidate[] = []
+
+  if (jaccardTop.length > 0) {
+    // ── Step 4: AI 重排 + 给理由 ──
+    const { getCatalogStar, getStarDisplay } = await import('./catalogMeta')
+
+    // 为 TopN 每颗星取 essence（展示用）
+    const starEssencesMap = new Map<number, string[]>()
+    for (const e of jaccardTop) {
+      const tags = getAggregatedTags(e.catalogStarId)
+      starEssencesMap.set(e.catalogStarId, tags.essences.slice(0, 3))
+    }
+
+    // 组装 AI 重排 prompt
+    const rerankCandidates = jaccardTop.map(e => {
+      const s = getCatalogStar(e.catalogStarId)
+      const disp = getStarDisplay(e.catalogStarId)
+      return {
+        catalogStarId: e.catalogStarId,
+        starName: disp.starName,
+        constellation: disp.constellation,
+        mag: s?.mag ?? null,
+        jaccardScore: e.jaccardScore,
+        sharedEmotions: e.sharedEmotions.slice(0, 5),
+        sharedThemes: e.sharedThemes.slice(0, 5),
+        starEssences: starEssencesMap.get(e.catalogStarId) ?? [],
+      }
+    })
+
+    const rerankSystem = `你是"星语穹庭"的星辰匹配师。用户写了一段新的心事，需要判断把它挂到夜空中哪几颗星上最有缘分。
+
+你会拿到：
+- 新故事的「内核一句话（essence）」+ 情绪标签 + 主题词
+- Jaccard 相似度初筛出的 10 颗候选星，每颗含：星名、星座、共享情绪/主题、该星下已有故事的内核凝练
+
+请你：
+1. 从「故事内核的情感共振 / 主题呼应 / 文化意象联想」三个维度，为每颗候选星打一个 0~1 的 aiScore（语义贴合度），不要所有分数都一样，要有区分度
+2. 为每颗候选星写一句 matchReason（1~2 句中文，20~50 字），温暖诗意、点出具体的共鸣点，比如「织女一承载千年离别思念，与你写的异地恋故事高度共振」
+3. 只返回 JSON，不要任何其他文字
+
+JSON 格式（数组）：
+[
+  { "catalogStarId": 123, "aiScore": 0.82, "matchReason": "星名承载着XX意象，与你的XX故事高度共振..." },
+  ...
+]
+
+**要求**：
+- 数组里的 catalogStarId 必须严格等于候选星给你的 id，不要编造
+- 返回的数组长度必须等于候选星数量
+- 只输出 JSON，不要前缀后缀，不要 \`\`\`json fence
+- 中文输出`
+
+    const rerankUser = `新故事：
+标题：${trimmedTitle ?? '(无标题)'}
+内核一句话：${newEssence}
+情绪标签：${newKernel.emotionalTags.join('、') || '(无)'}
+主题词：${newKernel.themes.join('、') || '(无)'}
+正文：${trimmed.slice(0, 150)}${trimmed.length > 150 ? '…' : ''}
+
+候选星列表：
+${rerankCandidates.map((c, i) => `${i + 1}. [catalogStarId=${c.catalogStarId}] ${c.starName}（${c.constellation}，视星等 ${c.mag}）
+  Jaccard 相似度：${c.jaccardScore}
+  共享情绪：${c.sharedEmotions.join('、') || '(无)'}
+  共享主题：${c.sharedThemes.join('、') || '(无)'}
+  该星故事内核凝练：${c.starEssences.map(e => `「${e}」`).join(' / ') || '(暂无故事)'}`).join('\n\n')}`
+
+    try {
+      const raw = await deepseekChat(
+        [
+          { role: 'system', content: rerankSystem },
+          { role: 'user', content: rerankUser },
+        ],
+        { temperature: 0.7, maxTokens: 1200, jsonMode: true },
+      )
+      const reranked = parseRerankResult(raw)
+      const aiMap = new Map(reranked.map(r => [r.catalogStarId, r]))
+
+      // Step 5: 加权合并 Jaccard*0.4 + AI*0.6 → Top 3
+      const merged = jaccardTop.map(e => {
+        const ai = aiMap.get(e.catalogStarId) ?? { aiScore: e.jaccardScore, matchReason: '主题情绪高度契合' }
+        const finalScore = clamp01(e.jaccardScore * 0.4 + ai.aiScore * 0.6)
+        const s = getCatalogStar(e.catalogStarId)
+        const disp = getStarDisplay(e.catalogStarId)
+        return {
+          catalogStarId: e.catalogStarId,
+          name: s?.name ?? disp.starName.replace(/^星 #\d+$/, '') || null,
+          constellationCN: disp.constellation,
+          mag: s?.mag ?? 0,
+          distance: s?.dist ?? null,
+          jaccardScore: Math.round(e.jaccardScore * 100) / 100,
+          aiScore: Math.round(ai.aiScore * 100) / 100,
+          finalScore: Math.round(finalScore * 100) / 100,
+          matchReason: ai.matchReason,
+          starEssences: starEssencesMap.get(e.catalogStarId) ?? [],
+          isFallback: false,
+        } satisfies MatchCandidate
+      })
+      merged.sort((a, b) => b.finalScore - a.finalScore)
+      finalCandidates = merged.slice(0, limit)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[match-star] AI 重排失败，降级只用 Jaccard:', msg.slice(0, 200))
+      // AI 重排失败兜底：直接用 Jaccard Top3，理由自动生成
+      const { getCatalogStar, getStarDisplay } = await import('./catalogMeta')
+      finalCandidates = jaccardTop.slice(0, limit).map(e => {
+        const s = getCatalogStar(e.catalogStarId)
+        const disp = getStarDisplay(e.catalogStarId)
+        const tagHint = [...e.sharedEmotions, ...e.sharedThemes].slice(0, 3).join('、')
+        const reason = tagHint ? `共享${tagHint}等情绪主题，与你的故事高度契合` : '与你的故事内核相似度较高'
+        return {
+          catalogStarId: e.catalogStarId,
+          name: s?.name ?? disp.starName.replace(/^星 #\d+$/, '') || null,
+          constellationCN: disp.constellation,
+          mag: s?.mag ?? 0,
+          distance: s?.dist ?? null,
+          jaccardScore: Math.round(e.jaccardScore * 100) / 100,
+          aiScore: Math.round(e.jaccardScore * 100) / 100,
+          finalScore: Math.round(e.jaccardScore * 100) / 100,
+          matchReason: reason,
+          starEssences: getAggregatedTags(e.catalogStarId).essences.slice(0, 3),
+          isFallback: false,
+        }
+      })
+    }
+  }
+
+  // ── Step 6: 降级兜底（最高分 < 0.3 或候选不足 limit） ──
+  const MIN_FINAL = 0.3
+  const needFallback =
+    finalCandidates.length < limit ||
+    (finalCandidates[0]?.finalScore ?? 0) < MIN_FINAL
+
+  if (needFallback) {
+    const { listAllCatalogStars } = await import('./catalogMeta')
+    const allStars = listAllCatalogStars()
+
+    // 拿每颗亮星的 storyCount
+    const storyCounts = new Map<number, number>()
+    try {
+      const rows = db.prepare(`
+        SELECT scs.catalog_star_id, COUNT(DISTINCT scs.story_id) as cnt
+        FROM story_catalog_stars scs
+        GROUP BY scs.catalog_star_id
+      `).all() as Array<{ catalog_star_id: number; cnt: number }>
+      for (const r of rows) storyCounts.set(r.catalog_star_id, r.cnt)
+    } catch { /* ignore */ }
+
+    // 优先：mag ≤ 3 且 storyCount < 3 的亮星（未被充分书写的亮星）
+    let picks = allStars
+      .filter(s => (s.mag ?? 99) <= 3)
+      .map(s => ({ s, cnt: storyCounts.get(s.id) ?? 0 }))
+      .filter(x => x.cnt < 3)
+      .sort((a, b) => (a.s.mag - b.s.mag) || (a.cnt - b.cnt))
+      .slice(0, limit)
+
+    // 次级兜底：只有 3 颗以下，从 Top 20 亮星（mag ≤ 2）按 storyCount ASC 补够
+    if (picks.length < limit) {
+      const already = new Set(picks.map(p => p.s.id))
+      const rest = allStars
+        .filter(s => (s.mag ?? 99) <= 2 && !already.has(s.id))
+        .map(s => ({ s, cnt: storyCounts.get(s.id) ?? 0 }))
+        .sort((a, b) => (a.cnt - b.cnt) || (a.s.mag - b.s.mag))
+      picks = [...picks, ...rest].slice(0, limit)
+    }
+
+    // 为兜底亮星写匹配理由（如果 AI 重排成功了就复用 AI，否则调用一次给理由）
+    let fallReasons: Map<number, string> = new Map()
+    try {
+      const picksInfo = picks.map(({ s }) => {
+        const starName = s.name || `星 #${s.id}`
+        const con = s.constellationCN ? `${s.constellationCN}座` : '未分星座'
+        return { id: s.id, starName, constellation: con, mag: s.mag }
+      })
+      const reasonSys = `你是"星语穹庭"的星辰匹配师。用户的新故事太独特，没有从已有故事的恒星中找到足够贴合的，现在要把它挂到几颗夜空中明亮但故事较少的星上，让用户的故事成为这颗星的第一批温度。
+
+请为每颗候选亮星写一句简短的 matchReason（1 句中文，20~35 字），温柔有诗意，传达「你的故事将点亮这颗星」的感觉，结合星名/星座意象。
+
+返回 JSON 数组，格式：
+[ { "catalogStarId": 123, "matchReason": "这颗明亮的XX星静静等待，你的故事将成为它第一束星光。" }, ... ]
+
+只输出 JSON，不要前缀后缀。`
+      const reasonUser = `新故事内核：${newEssence}
+情绪：${newKernel.emotionalTags.join('、') || '(无)'} / 主题：${newKernel.themes.join('、') || '(无)'}
+
+亮星列表：
+${picksInfo.map(p => `- [catalogStarId=${p.id}] ${p.starName}（${p.constellation}，视星等 ${p.mag}）`).join('\n')}`
+      const raw = await deepseekChat(
+        [{ role: 'system', content: reasonSys }, { role: 'user', content: reasonUser }],
+        { temperature: 0.9, maxTokens: 600, jsonMode: true },
+      )
+      const parsed = parseRerankResult(raw)
+      for (const p of parsed) fallReasons.set(p.catalogStarId, p.matchReason)
+    } catch { /* ignore */ }
+
+    const fallbackCandidates: MatchCandidate[] = picks.map(({ s }) => ({
+      catalogStarId: s.id,
+      name: s.name ?? null,
+      constellationCN: s.constellationCN ? `${s.constellationCN}座` : '未分星座',
+      mag: s.mag,
+      distance: s.dist ?? null,
+      jaccardScore: 0,
+      aiScore: 0,
+      finalScore: 0,
+      matchReason: fallReasons.get(s.id) ?? '这颗明亮的星辰静静等待，你的故事将点亮它的第一束温度。',
+      starEssences: [],
+      isFallback: true,
+    }))
+
+    // 若原候选不足：补降级的到 limit 条；若整体分数太低：全量替换为降级
+    if ((finalCandidates[0]?.finalScore ?? 0) < MIN_FINAL) {
+      finalCandidates = fallbackCandidates
+    } else {
+      const already = new Set(finalCandidates.map(c => c.catalogStarId))
+      for (const f of fallbackCandidates) {
+        if (already.has(f.catalogStarId)) continue
+        finalCandidates.push(f)
+        if (finalCandidates.length >= limit) break
+      }
+    }
+  }
+
+  return { matches: finalCandidates.slice(0, limit) }
+}
