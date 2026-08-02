@@ -206,6 +206,7 @@ function beadSize(v: number) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  flex-shrink: 0;
 }
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
@@ -217,6 +218,7 @@ function beadSize(v: number) {
   gap: 10px;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .panel-wrapper::before {
   content: '';

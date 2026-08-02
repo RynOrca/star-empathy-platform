@@ -129,12 +129,13 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
 }
 @keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致（但不写 min-height:0，避免 narrative-top 里被 flex 压缩折叠） ── */
+/* ── 与 narrative-bottom 中的 panel-wrapper 完全一致（但不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
 .stack-wrap {
   margin: 0 28px 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  flex-shrink: 0;
 }
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
@@ -146,6 +147,7 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   gap: 10px;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .panel-wrapper::before {
   content: '';

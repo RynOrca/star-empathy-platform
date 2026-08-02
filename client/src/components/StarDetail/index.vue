@@ -1715,6 +1715,7 @@ watch(() => props.catalogStarId, () => {
   padding: 20px 28px 22px;
   margin-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
 }
 .narrative-bottom > * {
   height: auto;

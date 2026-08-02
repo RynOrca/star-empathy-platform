@@ -105,10 +105,11 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   background: rgba(255,255,255,0.018);
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
 }
 @keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（但不写 min-height:0，避免 narrative-top 里被 flex 压缩折叠） ── */
+/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（但不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -120,6 +121,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   position: relative;
   overflow: hidden;
   margin: 0 28px 14px;
+  flex-shrink: 0;
 }
 .panel-wrapper::before {
   content: '';
