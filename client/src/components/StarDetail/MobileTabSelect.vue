@@ -1,7 +1,8 @@
 <template>
   <div class="mobile-tab-select">
     <button class="tab-select-trigger" @click="open = !open">
-      <component :is="currentTab.icon" :size="14" />
+      <span v-if="currentTab.roman" class="tab-roman">{{ currentTab.roman }}</span>
+      <component v-else :is="currentTab.icon" :size="14" />
       <span>{{ currentTab.label }}</span>
       <ChevronDown :size="14" class="tab-select-arrow" :class="{ open }" />
     </button>
@@ -14,7 +15,8 @@
           :class="{ active: modelValue === tab.id }"
           @click="select(tab.id)"
         >
-          <component :is="tab.icon" :size="14" />
+          <span v-if="tab.roman" class="tab-roman">{{ tab.roman }}</span>
+          <component v-else :is="tab.icon" :size="14" />
           <span>{{ tab.label }}</span>
         </button>
       </div>
@@ -31,7 +33,7 @@ import { ChevronDown } from 'lucide-vue-next'
 type TabId = string
 
 const props = defineProps<{
-  tabs: { id: TabId; label: string; icon: Component }[]
+  tabs: { id: TabId; label: string; icon: Component; roman?: string }[]
   modelValue: TabId
 }>()
 
@@ -60,7 +62,7 @@ function select(id: TabId) {
 .tab-select-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 14px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -71,6 +73,17 @@ function select(id: TabId) {
   cursor: pointer;
   width: 100%;
   transition: border-color 0.15s;
+}
+
+/* 罗马数字前缀（与设置弹窗风格一致） */
+.tab-roman {
+  font-family: "Cinzel", "Times New Roman", serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  min-width: 14px;
+  text-align: center;
 }
 .tab-select-trigger:hover {
   border-color: var(--rule-hover);

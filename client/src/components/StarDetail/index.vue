@@ -836,10 +836,13 @@ const pcTabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-// 移动端：包含「星信息」
-const mobileTabs: { id: TabId; label: string; icon: Component }[] = [
-  { id: 'info', label: '星信息', icon: Star },
-  ...pcTabs,
+// 移动端：包含「星信息」，下拉框使用罗马数字前缀（与设置弹窗风格一致）
+const mobileTabs: { id: TabId; label: string; roman: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', roman: 'Ⅰ', icon: Star },
+  { id: 'narrative', label: 'AI 叙事', roman: 'Ⅱ', icon: Sparkles },
+  { id: 'history', label: '历史故事', roman: 'Ⅲ', icon: BookOpen },
+  { id: 'all', label: '用户故事', roman: 'Ⅳ', icon: List },
+  { id: 'mine', label: '我的故事', roman: 'Ⅴ', icon: User },
 ]
 // 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
 const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
@@ -1780,23 +1783,28 @@ watch(() => props.catalogStarId, () => {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(4, 4, 18, 0.5);
+  background: rgba(7, 8, 22, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-/* ─── Mobile Sheet ─── */
+/* ─── Mobile Sheet（对齐 SettingsModal 风格） ─── */
 .mobile-sheet {
   width: 100%;
   max-width: 500px;
-  background: rgba(12, 16, 36, 0.98);
-  border: 1px solid rgba(48, 55, 87, 0.4);
-  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  /* 顶部金色边框（与设置弹窗一致） */
+  border-top: 1px solid var(--accent-border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: var(--font);
+  color: var(--ink);
 }
 
 /* 拖拽时高度变化才需要过渡，enter/leave 用 transform 过渡避免冲突 */
@@ -1805,25 +1813,25 @@ watch(() => props.catalogStarId, () => {
   will-change: height;
 }
 
-/* ─── Drag Handle（统一黄色拖拽杠风格） ─── */
+/* ─── Drag Handle（金色拖拽杠，与设置弹窗风格一致） ─── */
 .mobile-handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 0 4px;
+  padding: 10px 0 6px;
   flex-shrink: 0;
   cursor: pointer;
 }
 .mobile-handle::after {
   content: '';
-  width: 36px;
+  width: 40px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 217, 138, 0.3);
+  background: var(--accent-border);
   transition: background 0.2s;
 }
 .mobile-handle:active::after {
-  background: var(--accent, #ffd98a);
+  background: var(--accent);
 }
 
 /* ─── Mobile Top Bar ─── */
@@ -1831,13 +1839,14 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 16px 10px;
+  padding: 8px 18px 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .mobile-close-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1866,7 +1875,7 @@ watch(() => props.catalogStarId, () => {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 0 16px;
+  padding: 16px 18px;
 }
 
 /* ─── Mobile Section (Collapsible) ─── */
