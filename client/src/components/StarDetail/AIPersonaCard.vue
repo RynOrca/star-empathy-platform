@@ -121,7 +121,8 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 </script>
 
 <style scoped>
-/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致（不写 min-height:0；加 flex-shrink:0 避免 narrative-top flex 压缩） ── */
+/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致 ──
+   关键：pw-persona 显式 min-height = 真实态总高度（panel-head 约 32 + persona-body 约 190）*/
 .panel-wrapper {
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -134,7 +135,9 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   overflow: hidden;
   margin: 0 28px 14px;
   flex-shrink: 0;
+  min-height: 222px;     /* ← panel-head + 真实态 body 完整高度 */
 }
+.pw-persona { min-height: 222px; }
 .panel-wrapper::before {
   content: '';
   position: absolute;
@@ -174,10 +177,12 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 
 /* ─── 主体：星象小卡 + 文字 ─── */
 .persona-body {
+  flex: 1;                /* ← 撑满外层 panel-wrapper 剩余所有高度 */
   display: grid;
   grid-template-columns: 150px 1fr;
   gap: 20px;
   align-items: stretch;
+  min-height: 0;
 }
 
 /* 左：星象小卡 */
@@ -307,13 +312,21 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   line-height: 1.75;
 }
 
-/* ─── 空态统一：心事太少 / 生成中 ─── */
+/* ─── 空态统一：心事太少 / 生成中
+   flex:1 → 撑满外层 panel-wrapper 除 panel-head 外的所有内空，
+   这样内层虚线卡和外层 panel-wrapper 边框贴齐，不会吊在中间留空白
+───────────────────────────────────────────────*/
 .persona-empty {
+  width: 100%;
+  flex: 1;               /* ← 关键：撑到外层内容区大小 */
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: center;        /* 水平居中 */
+  justify-content: center;    /* 垂直居中 */
   gap: 10px;
-  padding: 28px 16px 22px;
+  padding: 22px 24px;         /* 内层保留舒适 padding（和边框贴合） */
+  box-sizing: border-box;
   border-radius: 8px;
   background: rgba(255,255,255,0.015);
   border: 1px dashed rgba(255,255,255,0.06);
@@ -353,10 +366,10 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 }
 .pe-sub b { color: rgba(255,255,255,0.45); font-weight: 600; }
 
-/* 生成中骨架线 */
+/* 生成中骨架线 — 横向撑满，留出两侧小边距即可 */
 .skeleton-lines {
   width: 100%;
-  max-width: 320px;
+  max-width: 90%;
   display: flex;
   flex-direction: column;
   gap: 6px;

@@ -263,9 +263,9 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
     }
   }
 
-  // Step 2：persona —— 需要至少 1 条故事
+  // Step 2：persona —— 故事数 ≥ 5 才生成（前端 tooFewStories 对应的后端门槛）
   if (steps.includes('persona')) {
-    if (storyCount >= 1) {
+    if (storyCount >= 5) {
       try {
         const persona = await generatePersona(cid, displayMeta)
         upsertAnalysis(cid, { persona, storyCount, storyHash: hash })
@@ -277,13 +277,13 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
         opts.onProgress?.({ catalogStarId: cid, step: 'persona', ok: false, err: msg })
       }
     } else {
-      opts.onProgress?.({ catalogStarId: cid, step: 'persona', ok: false, err: '故事数<1，跳过' })
+      opts.onProgress?.({ catalogStarId: cid, step: 'persona', ok: false, err: `故事数=${storyCount}<5，跳过` })
     }
   }
 
-  // Step 3：emotion —— 需要至少 1 条故事
+  // Step 3：emotion —— 故事数 ≥ 5 才生成
   if (steps.includes('emotion')) {
-    if (storyCount >= 1) {
+    if (storyCount >= 5) {
       try {
         const emotion = await generateEmotion(cid, displayMeta)
         upsertAnalysis(cid, { emotion, storyCount, storyHash: hash, generatedAt: Date.now() })
@@ -295,7 +295,7 @@ export async function ensureOne(catalogStarId: string | number, opts: EnsureOpts
         opts.onProgress?.({ catalogStarId: cid, step: 'emotion', ok: false, err: msg })
       }
     } else {
-      opts.onProgress?.({ catalogStarId: cid, step: 'emotion', ok: false, err: '故事数<1，跳过' })
+      opts.onProgress?.({ catalogStarId: cid, step: 'emotion', ok: false, err: `故事数=${storyCount}<5，跳过` })
     }
   }
 }

@@ -258,6 +258,9 @@ function beadSize(v: number) {
   overflow: hidden;
   flex-shrink: 0;
 }
+/* 每张卡的 min-height = 真实态的完整高（panel-head ~32 + body） */
+.pw-forest { min-height: 290px; }
+.pw-hour   { min-height: 280px; }
 .panel-wrapper::before {
   content: '';
   position: absolute;
@@ -295,11 +298,17 @@ function beadSize(v: number) {
 }
 
 .pw-body {
+  flex: 1;                /* ← 撑满外层 panel-wrapper 剩余所有高度 */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding-right: 2px;
+  box-sizing: border-box;
 }
+
+/* 旧的高度补丁删除：外层 panel-wrapper 已给 min-height，内层 flex:1 自动拉满对齐 */
+/* （删除 pw-forest / pw-hour > .pw-body / .mini-empty min-height）*/
 
 /* 主题森林内部 */
 .tree-rows {
@@ -446,18 +455,23 @@ function beadSize(v: number) {
   color: rgba(255,255,255,0.48);
 }
 
-/* ─── 双态空态（mini）：心事太少 / 生成中 ─── */
+/* ─── 双态空态（mini）：心事太少 / 生成中
+   flex:1 + min-height:0 → 和真实态 .pw-body 一起完整填满外层 panel-wrapper 内空
+───────────────────────────────────────────────*/
 .mini-empty {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 26px 14px 22px;
+  padding: 22px 16px;
   border-radius: 8px;
   background: rgba(255,255,255,0.015);
   border: 1px dashed rgba(255,255,255,0.06);
-  flex: 1;
   text-align: center;
 }
 .mini-scant {

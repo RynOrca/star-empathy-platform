@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
-import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration } from '../services/kernel';
+import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
 
 const router = Router();
 
@@ -85,6 +85,17 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {
       triggerKernelGeneration((story as { id: number }).id, safeContent, safeTitle);
+    }
+
+    // 异步触发 catalog 级分析自动更新（闭环：新增故事 → 够5条 → AI 卡片内容自动重新生成）
+    const allAffectedIds = catalogStarIds?.length
+      ? catalogStarIds
+      : (catalogStarId != null ? [catalogStarId] : []);
+    if (allAffectedIds.length > 0) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(allAffectedIds); }
+        catch (e) { console.error('[stories/analysis] 自动触发失败:', e); }
+      });
     }
 
     ok(res, '故事已化作星光', story);

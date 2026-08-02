@@ -176,6 +176,9 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   overflow: hidden;
   flex-shrink: 0;
 }
+/* 每张卡的 min-height = 真实态的完整高（panel-head ~32 + body） */
+.pw-emotion { min-height: 260px; }
+.pw-quote   { min-height: 290px; }
 .panel-wrapper::before {
   content: '';
   position: absolute;
@@ -211,13 +214,19 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   letter-spacing: 0.03em;
 }
 
-/* 卡片内部 body */
+/* 卡片内部 body —— 和空态 mini-empty 一起撑满外层 panel-wrapper 的所有内空 */
 .pw-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding-right: 2px;
+  box-sizing: border-box;
 }
+
+/* 旧的高度补丁删除：因为外层 panel-wrapper 已给定 min-height，内层 flex:1 会自动拉满对齐 */
+/* （删除之前 .pw-emotion > { min-height }）*/
 
 /* 情感解构内部 */
 .emotion-orbs {
@@ -347,18 +356,23 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
 .q-author { color: rgba(255,255,255,0.38); font-weight: 500; }
 .q-date { color: rgba(255,255,255,0.22); }
 
-/* ─── 双态空态（mini）：心事太少 / 生成中 ─── */
+/* ─── 双态空态（mini）：心事太少 / 生成中
+   flex:1 + min-height:0 → 和真实态 .pw-body 一样，完整填满外层 panel-wrapper 内空
+───────────────────────────────────────────────*/
 .mini-empty {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 26px 14px 22px;
+  padding: 22px 16px;
   border-radius: 8px;
   background: rgba(255,255,255,0.015);
   border: 1px dashed rgba(255,255,255,0.06);
-  flex: 1;
   text-align: center;
 }
 .mini-scant {
