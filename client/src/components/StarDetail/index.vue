@@ -1698,6 +1698,8 @@ watch(() => props.catalogStarId, () => {
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   display: flex;
   flex-direction: column;
+  padding-top: 20px;
+  box-sizing: border-box;
 }
 .narrative-top::-webkit-scrollbar { width: 5px; }
 .narrative-top::-webkit-scrollbar-track { background: transparent; }

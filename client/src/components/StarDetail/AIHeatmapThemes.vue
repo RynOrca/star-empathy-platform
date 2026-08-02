@@ -1,113 +1,117 @@
 <template>
   <div v-if="!hasData" class="empty-state">
-    <Clock3 :size="11" class="es-ic" />
+    <Clock3 :size="10" class="pw-icon pw-green" style="animation:tw 2.2s ease-in-out infinite" />
     <span>主题与时辰观察生成中…</span>
   </div>
   <div v-else class="stack-wrap">
-    <div class="ai-card forest-card">
-      <div class="card-head">
-        <span class="card-title">主题森林</span>
-        <span class="card-sub">{{ total }} 条故事 · {{ Math.min(8, themes.length) }} 个主题</span>
+    <!-- 1. 主题森林 -->
+    <div class="panel-wrapper pw-forest">
+      <div class="panel-head">
+        <TreeDeciduous :size="10" class="pw-icon pw-green" />
+        <span class="pw-title">主题森林</span>
+        <span class="pw-count">{{ total }} 条 · {{ Math.min(8, themes.length) }} 主题</span>
       </div>
-
-      <div class="tree-rows">
-        <div class="tree-row">
-          <div class="tree" v-for="t in themes.slice(0, 4)" :key="t.name">
-            <svg viewBox="0 0 48 68" class="tree-svg">
-              <rect x="22" :y="68 - t.trunk" width="4" :height="t.trunk" fill="rgba(255,217,138,0.35)" />
-              <polygon v-if="t.h1 > 0"
-                :points="`24,${68 - t.trunk - t.h1} ${24 - t.w1},${68 - t.trunk + 4} ${24 + t.w1},${68 - t.trunk + 4}`"
-                :fill="t.color" opacity="0.92" />
-              <polygon v-if="t.h2 > 0"
-                :points="`24,${68 - t.trunk - t.h1 - t.h2} ${24 - t.w2},${68 - t.trunk - t.h1 + 4} ${24 + t.w2},${68 - t.trunk - t.h1 + 4}`"
-                :fill="t.color" opacity="0.88" />
-              <polygon v-if="t.h3 > 0"
-                :points="`24,${68 - t.trunk - t.h1 - t.h2 - t.h3} ${24 - t.w3},${68 - t.trunk - t.h1 - t.h2 + 4} ${24 + t.w3},${68 - t.trunk - t.h1 - t.h2 + 4}`"
-                :fill="t.color" opacity="0.95" />
-              <circle v-if="t.count >= 120" cx="24" :cy="68 - t.trunk - t.h1 - t.h2 - t.h3 - 4"
-                r="1.6" fill="#ffd98a" />
-            </svg>
-            <div class="tree-meta">
-              <div class="tree-name">{{ t.name }}</div>
-              <div class="tree-count">{{ t.count }}</div>
+      <div class="pw-body">
+        <div class="tree-rows">
+          <div class="tree-row">
+            <div class="tree" v-for="t in themes.slice(0, 4)" :key="t.name">
+              <svg viewBox="0 0 48 68" class="tree-svg">
+                <rect x="22" :y="68 - t.trunk" width="4" :height="t.trunk" fill="rgba(255,217,138,0.35)" />
+                <polygon v-if="t.h1 > 0"
+                  :points="`24,${68 - t.trunk - t.h1} ${24 - t.w1},${68 - t.trunk + 4} ${24 + t.w1},${68 - t.trunk + 4}`"
+                  :fill="t.color" opacity="0.92" />
+                <polygon v-if="t.h2 > 0"
+                  :points="`24,${68 - t.trunk - t.h1 - t.h2} ${24 - t.w2},${68 - t.trunk - t.h1 + 4} ${24 + t.w2},${68 - t.trunk - t.h1 + 4}`"
+                  :fill="t.color" opacity="0.88" />
+                <polygon v-if="t.h3 > 0"
+                  :points="`24,${68 - t.trunk - t.h1 - t.h2 - t.h3} ${24 - t.w3},${68 - t.trunk - t.h1 - t.h2 + 4} ${24 + t.w3},${68 - t.trunk - t.h1 - t.h2 + 4}`"
+                  :fill="t.color" opacity="0.95" />
+                <circle v-if="t.count >= 120" cx="24" :cy="68 - t.trunk - t.h1 - t.h2 - t.h3 - 4"
+                  r="1.6" fill="#ffd98a" />
+              </svg>
+              <div class="tree-meta">
+                <div class="tree-name">{{ t.name }}</div>
+                <div class="tree-count">{{ t.count }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="tree-row tree-row-2" v-if="themes.length > 4">
+            <div class="tree" v-for="t in themes.slice(4, 8)" :key="t.name">
+              <svg viewBox="0 0 48 68" class="tree-svg">
+                <rect x="22" :y="68 - t.trunk" width="4" :height="t.trunk" fill="rgba(255,217,138,0.35)" />
+                <polygon v-if="t.h1 > 0"
+                  :points="`24,${68 - t.trunk - t.h1} ${24 - t.w1},${68 - t.trunk + 4} ${24 + t.w1},${68 - t.trunk + 4}`"
+                  :fill="t.color" opacity="0.92" />
+                <polygon v-if="t.h2 > 0"
+                  :points="`24,${68 - t.trunk - t.h1 - t.h2} ${24 - t.w2},${68 - t.trunk - t.h1 + 4} ${24 + t.w2},${68 - t.trunk - t.h1 + 4}`"
+                  :fill="t.color" opacity="0.88" />
+                <polygon v-if="t.h3 > 0"
+                  :points="`24,${68 - t.trunk - t.h1 - t.h2 - t.h3} ${24 - t.w3},${68 - t.trunk - t.h1 - t.h2 + 4} ${24 + t.w3},${68 - t.trunk - t.h1 - t.h2 + 4}`"
+                  :fill="t.color" opacity="0.95" />
+                <circle v-if="t.count >= 60" cx="24" :cy="68 - t.trunk - t.h1 - t.h2 - t.h3 - 4"
+                  r="1.4" fill="#ffd98a" opacity="0.85" />
+              </svg>
+              <div class="tree-meta">
+                <div class="tree-name">{{ t.name }}</div>
+                <div class="tree-count">{{ t.count }}</div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="tree-row tree-row-2" v-if="themes.length > 4">
-          <div class="tree" v-for="t in themes.slice(4, 8)" :key="t.name">
-            <svg viewBox="0 0 48 68" class="tree-svg">
-              <rect x="22" :y="68 - t.trunk" width="4" :height="t.trunk" fill="rgba(255,217,138,0.35)" />
-              <polygon v-if="t.h1 > 0"
-                :points="`24,${68 - t.trunk - t.h1} ${24 - t.w1},${68 - t.trunk + 4} ${24 + t.w1},${68 - t.trunk + 4}`"
-                :fill="t.color" opacity="0.92" />
-              <polygon v-if="t.h2 > 0"
-                :points="`24,${68 - t.trunk - t.h1 - t.h2} ${24 - t.w2},${68 - t.trunk - t.h1 + 4} ${24 + t.w2},${68 - t.trunk - t.h1 + 4}`"
-                :fill="t.color" opacity="0.88" />
-              <polygon v-if="t.h3 > 0"
-                :points="`24,${68 - t.trunk - t.h1 - t.h2 - t.h3} ${24 - t.w3},${68 - t.trunk - t.h1 - t.h2 + 4} ${24 + t.w3},${68 - t.trunk - t.h1 - t.h2 + 4}`"
-                :fill="t.color" opacity="0.95" />
-              <circle v-if="t.count >= 60" cx="24" :cy="68 - t.trunk - t.h1 - t.h2 - t.h3 - 4"
-                r="1.4" fill="#ffd98a" opacity="0.85" />
-            </svg>
-            <div class="tree-meta">
-              <div class="tree-name">{{ t.name }}</div>
-              <div class="tree-count">{{ t.count }}</div>
-            </div>
+        <div v-if="forestNote" class="forest-note">
+          <Leaf :size="11" class="leaf-ico" />
+          <div class="note-text">
+            <span class="note-lead">AI 观察：</span>
+            <span v-html="forestNote"></span>
           </div>
-        </div>
-      </div>
-
-      <div v-if="forestNote" class="forest-note">
-        <Leaf :size="11" class="leaf-ico" />
-        <div class="note-text">
-          <span class="note-lead">AI 观察：</span>
-          <span v-html="forestNote"></span>
         </div>
       </div>
     </div>
 
-    <div class="ai-card hour-card">
-      <div class="card-head">
-        <span class="card-title">时辰观察</span>
-        <span class="card-sub">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</span>
+    <!-- 2. 时辰观察 -->
+    <div class="panel-wrapper pw-hour">
+      <div class="panel-head">
+        <Clock3 :size="10" class="pw-icon pw-blue" />
+        <span class="pw-title">时辰观察</span>
+        <span class="pw-count">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</span>
       </div>
-
-      <div class="hour-beads">
-        <span
-          v-for="(v, h) in hourly"
-          :key="h"
-          class="bead"
-          :style="{
-            background: beadColor(v),
-            width: beadSize(v) + 'px',
-            height: beadSize(v) + 'px',
-            boxShadow: v > 40 ? `0 0 8px ${beadColor(v)}88` : 'none',
-          }"
-          :title="`${h}:00 — ${v} 条`"
-        ></span>
-      </div>
-      <div class="hour-axis">
-        <span>子</span><span>丑</span><span>寅</span><span>卯</span>
-        <span>辰</span><span>巳</span><span>午</span><span>未</span>
-        <span>申</span><span>酉</span><span>戌</span><span>亥</span>
-      </div>
-
-      <div class="hour-insights">
-        <div class="hi-item" v-if="peakText">
-          <div class="hi-hour hi-peak">
-            <span class="hi-prefix">高峰</span>
-            <span class="hi-time">{{ hourRangeText(peakHour) }}</span>
-            <span class="hi-count">{{ peakPct }}% 投递集中</span>
-          </div>
-          <p class="hi-desc" v-html="peakText"></p>
+      <div class="pw-body">
+        <div class="hour-beads">
+          <span
+            v-for="(v, h) in hourly"
+            :key="h"
+            class="bead"
+            :style="{
+              background: beadColor(v),
+              width: beadSize(v) + 'px',
+              height: beadSize(v) + 'px',
+              boxShadow: v > 40 ? `0 0 8px ${beadColor(v)}88` : 'none',
+            }"
+            :title="`${h}:00 — ${v} 条`"
+          ></span>
         </div>
-        <div class="hi-item" v-if="lowText">
-          <div class="hi-hour hi-low">
-            <span class="hi-prefix">低谷</span>
-            <span class="hi-time">{{ hourRangeText(lowHour) }}</span>
-            <span class="hi-count">仅 {{ lowPct }}% 故事</span>
+        <div class="hour-axis">
+          <span>子</span><span>丑</span><span>寅</span><span>卯</span>
+          <span>辰</span><span>巳</span><span>午</span><span>未</span>
+          <span>申</span><span>酉</span><span>戌</span><span>亥</span>
+        </div>
+        <div class="hour-insights">
+          <div class="hi-item" v-if="peakText">
+            <div class="hi-hour hi-peak">
+              <span class="hi-prefix">高峰</span>
+              <span class="hi-time">{{ hourRangeText(peakHour) }}</span>
+              <span class="hi-count">{{ peakPct }}% 投递集中</span>
+            </div>
+            <p class="hi-desc" v-html="peakText"></p>
           </div>
-          <p class="hi-desc" v-html="lowText"></p>
+          <div class="hi-item" v-if="lowText">
+            <div class="hi-hour hi-low">
+              <span class="hi-prefix">低谷</span>
+              <span class="hi-time">{{ hourRangeText(lowHour) }}</span>
+              <span class="hi-count">仅 {{ lowPct }}% 故事</span>
+            </div>
+            <p class="hi-desc" v-html="lowText"></p>
+          </div>
         </div>
       </div>
     </div>
@@ -183,7 +187,7 @@ function beadSize(v: number) {
 
 <style scoped>
 .empty-state {
-  margin: 0 28px 16px;
+  margin: 0 28px 14px;
   padding: 28px 20px;
   display: flex;
   align-items: center;
@@ -191,52 +195,82 @@ function beadSize(v: number) {
   gap: 8px;
   font-size: 0.72rem;
   color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.012);
+  background: rgba(255,255,255,0.018);
   border-radius: 10px;
-  border: 1px dashed rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.05);
 }
-.es-ic { color: #9ae6b4; animation: tw 2.2s ease-in-out infinite; }
-@keyframes tw { 0%,100%{opacity:.35} 50%{opacity:.9} }
+@keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
 .stack-wrap {
-  margin: 0 28px 16px;
+  margin: 0 28px 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.ai-card {
-  padding: 12px 14px 14px;
-  background: rgba(255,255,255,0.012);
-  border: 1px solid rgba(255,255,255,0.04);
+.panel-wrapper {
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-}
-.card-head {
+  padding: 12px 14px 14px;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px dashed rgba(255,255,255,0.05);
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
 }
-.card-title {
-  font-size: 0.72rem;
+.panel-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+}
+.pw-forest::before {
+  background: linear-gradient(90deg, transparent, rgba(154,230,180,0.42), transparent);
+}
+.pw-hour::before {
+  background: linear-gradient(90deg, transparent, rgba(134,168,255,0.42), transparent);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-green  { color: #9ae6b4; }
+.pw-blue   { color: #86a8ff; }
+.pw-gold   { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-title {
+  font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.62);
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
 }
-.card-sub {
+.pw-count {
   font-size: 0.6rem;
-  color: rgba(255,255,255,0.2);
-  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.03em;
 }
 
-/* 主题森林 */
+.pw-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.pw-body::-webkit-scrollbar { width: 5px; }
+.pw-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 999px; }
+
+/* 主题森林内部 */
 .tree-rows {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 0 8px;
-  margin-bottom: 8px;
+  padding: 2px 0 6px;
   border-bottom: 1px dashed rgba(255,255,255,0.04);
 }
 .tree-row {
@@ -301,13 +335,12 @@ function beadSize(v: number) {
   letter-spacing: 0.04em;
 }
 
-/* 时辰观察 */
+/* 时辰观察内部 */
 .hour-beads {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 2px 6px;
-  margin-bottom: 2px;
 }
 .bead {
   border-radius: 50%;
@@ -322,7 +355,7 @@ function beadSize(v: number) {
   font-size: 0.58rem;
   color: rgba(255,255,255,0.25);
   padding: 0 2px 8px;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   border-bottom: 1px dashed rgba(255,255,255,0.04);
   letter-spacing: 0.08em;
 }

@@ -1,19 +1,13 @@
 <template>
   <div v-if="!hasReal" class="empty-state">
-    <Sparkle :size="11" class="es-ic" />
+    <Sparkle :size="10" class="pw-icon pw-gold" style="animation:tw 2.2s ease-in-out infinite" />
     <span>AI 星格画像生成中…</span>
   </div>
-  <div v-else class="persona-wrap">
-    <!-- AI 徽章头 -->
-    <div class="ai-head">
-      <div class="ai-badge">
-        <Sparkle :size="10" class="ai-spark" />
-        <span>星语 AI · 星格画像</span>
-      </div>
-      <div class="ai-updated">
-        <RefreshCw :size="9" class="refresh-icon" />
-        <span>{{ updatedAt }}</span>
-      </div>
+  <div v-else class="panel-wrapper pw-persona">
+    <div class="panel-head">
+      <Sparkle :size="10" class="pw-icon pw-purple" />
+      <span class="pw-title">星格画像</span>
+      <span class="pw-count">{{ updatedAt }}</span>
     </div>
 
     <div class="persona-body">
@@ -59,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkle, RefreshCw } from 'lucide-vue-next'
+import { Sparkle } from 'lucide-vue-next'
 import { computed } from 'vue'
 import type { PersonaPayload } from '../../composables/useStarAnalysis'
 
@@ -84,11 +78,11 @@ const hasReal = computed(() => {
     && p.hanName?.trim() && p.suggestIntro?.trim())
 })
 
-const hanName      = computed(() => props.persona?.hanName ?? '')
-const personaTags  = computed(() => props.persona?.tags ?? [])
-const paraFirst    = computed(() => props.persona?.paragraphs?.[0] ?? '')
-const paraSecond   = computed(() => props.persona?.paragraphs?.[1] ?? '')
-const suggest      = computed(() => props.persona?.suggestIntro ?? '')
+const hanName     = computed(() => props.persona?.hanName ?? '')
+const personaTags = computed(() => props.persona?.tags ?? [])
+const paraFirst   = computed(() => props.persona?.paragraphs?.[0] ?? '')
+const paraSecond  = computed(() => props.persona?.paragraphs?.[1] ?? '')
+const suggest     = computed(() => props.persona?.suggestIntro ?? '')
 
 const bgStars = Array.from({ length: 26 }, (_, i) => ({
   x: ((i * 31) % 110) + 5,
@@ -100,7 +94,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 
 <style scoped>
 .empty-state {
-  margin: 0 28px 22px;
+  margin: 0 28px 14px;
   padding: 34px 20px;
   display: flex;
   align-items: center;
@@ -108,67 +102,69 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   gap: 8px;
   font-size: 0.74rem;
   color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.012);
+  background: rgba(255,255,255,0.018);
   border-radius: 10px;
-  border: 1px dashed rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.05);
 }
-.es-ic { color: #ffd98a; animation: tw 2.2s ease-in-out infinite; }
-@keyframes tw { 0%,100%{opacity:.35} 50%{opacity:.9} }
+@keyframes tw { 0%,100%{opacity:.4} 50%{opacity:.95} }
 
-.persona-wrap {
-  margin: 0 28px 22px;
-  padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.015);
+/* ── 与内核相似 / 天区精选 的 panel-wrapper 完全一致 ── */
+.panel-wrapper {
+  background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   position: relative;
+  overflow: hidden;
+  min-height: 0;
+  margin: 0 28px 14px;
 }
-.persona-wrap::before {
+.panel-wrapper::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
-  pointer-events: none;
 }
-
-/* ─── 头部徽章 ─── */
-.ai-head {
+.panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
-.ai-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(202,167,255,0.15), rgba(255,217,138,0.1));
-  border: 1px solid rgba(202,167,255,0.25);
-  font-size: 0.68rem;
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-gold   { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-green  { color: #9ae6b4; }
+.pw-blue   { color: #86a8ff; }
+.pw-title {
+  font-size: 0.82rem;
   font-weight: 600;
-  color: #caa7ff;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+}
+.pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.22);
   letter-spacing: 0.03em;
-}
-.ai-spark {
-  color: #ffd98a;
-  animation: twinkle 2.4s ease-in-out infinite;
-}
-@keyframes twinkle {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-.ai-updated {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.6rem;
-  color: rgba(255,255,255,0.22);
-  letter-spacing: 0.03em;
 }
-.refresh-icon { opacity: 0.5; }
+.pw-count svg { opacity: 0.6; }
+.pw-count::before {
+  content: '';
+  display: inline-block;
+  width: 9px; height: 9px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12a9 9 0 1 1 18 0A9 9 0 0 1 3 12z'/><path d='M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18'/></svg>") no-repeat center / cover;
+  animation: spin 6s linear infinite;
+  margin-right: 2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── 主体：星象小卡 + 文字 ─── */
 .persona-body {
@@ -184,7 +180,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   background: linear-gradient(160deg, rgba(20, 10, 48, 0.85), rgba(8, 14, 36, 0.85));
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px;
-  padding: 14px 12px 12px;
+  padding: 12px 12px 10px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -216,7 +212,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .sc-constellation {
   font-size: 0.56rem;
@@ -312,7 +308,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   .pt-suggest { font-size: 0.7rem; }
 }
 @media (max-width: 900px) {
-  .persona-wrap,
-  .empty-state { margin: 0 18px 18px; }
+  .panel-wrapper,
+  .empty-state { margin: 0 18px 14px; }
 }
 </style>
