@@ -716,8 +716,13 @@ const emit = defineEmits<{
 
 const router = useRouter()
 // 访客拦截：体验账号不能收藏/共鸣/写故事/与古人共赏，跳登录页
+// 必须先清 token 再跳转，否则路由守卫（to.path === '/' && token）会重定向回 /sky
 function guestGuard(): boolean {
-  if (props.isGuest) { router.push('/'); return true }
+  if (props.isGuest) {
+    localStorage.removeItem('token')
+    router.push('/')
+    return true
+  }
   return false
 }
 
