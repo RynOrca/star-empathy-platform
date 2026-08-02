@@ -1,5 +1,9 @@
 <template>
-  <div class="persona-wrap">
+  <div v-if="!hasReal" class="empty-state">
+    <Sparkle :size="11" class="es-ic" />
+    <span>AI 星格画像生成中…</span>
+  </div>
+  <div v-else class="persona-wrap">
     <!-- AI 徽章头 -->
     <div class="ai-head">
       <div class="ai-badge">
@@ -26,16 +30,12 @@
         </div>
 
         <svg viewBox="0 0 120 120" class="sc-svg">
-          <!-- 远景小星 -->
           <circle v-for="(s, i) in bgStars" :key="i"
             :cx="s.x" :cy="s.y" :r="s.r" fill="#fff" :opacity="s.opacity" />
-          <!-- 月亮（默认有；如果是满月星的话可以调） -->
           <path d="M82 36 a20 20 0 1 0 0 26 a15 15 0 1 1 0 -26z"
             fill="#ffd98a" opacity="0.88" />
-          <!-- 主星（大光点） -->
           <circle cx="40" cy="74" r="4" fill="#fff" />
           <circle cx="40" cy="74" r="10" :fill="starColor + 'cc'" opacity="0.3" />
-          <!-- 流星 -->
           <path d="M12 18 L44 42" stroke="rgba(255,255,255,0.6)" stroke-width="1" stroke-linecap="round" />
           <circle cx="44" cy="42" r="1.5" fill="#fff" />
         </svg>
@@ -47,20 +47,8 @@
 
       <!-- 右：文字解读（80%） -->
       <div class="persona-text">
-        <p v-if="paraFirst" class="pt-para first" v-html="paraFirst"></p>
-        <p v-else class="pt-para first">
-          这颗 <strong class="star-name-hl">{{ starName }}</strong> 在故事中呈现出一种
-          <strong>{{ tone }}</strong> 的古典气质。它最常被人们在深夜凝望，
-          故事中反复出现「{{ motifA }}」「{{ motifB }}」等意象，
-          是亮星中情感浓度最高的一颗之一。
-        </p>
-        <p v-if="paraSecond" class="pt-para" v-html="paraSecond"></p>
-        <p v-else class="pt-para">
-          人们在这里写下的心事，<strong>{{ emoPct }}%</strong> 与
-          <strong>{{ emoTheme }}</strong> 有关，远高于全库平均的 54%。
-          似乎每一个仰望它的人，都在它的光里看到了某个
-          <strong>{{ seeInLight }}</strong>。
-        </p>
+        <p class="pt-para first" v-html="paraFirst"></p>
+        <p class="pt-para" v-html="paraSecond"></p>
         <div class="pt-suggest-wrap">
           <span class="pt-tip">✨ 如果你也想在这里挂心事</span>
           <span class="pt-suggest">{{ suggest }}</span>
@@ -83,67 +71,25 @@ const props = withDefaults(defineProps<{
   persona?: PersonaPayload
 }>(), {
   updatedAt: '刚刚生成',
-  starName: '织女星',
-  constellationName: '天琴座',
+  starName: '未知星',
+  constellationName: '未知星座',
   starColor: '#ffd98a',
 })
 
-// 如果 persona 有就用服务端数据；否则 fallback 到 seed hash
-const S = props.persona
-
-// 伪随机种子（fallback 时才计算）
-function seedHash(s: string) {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return h
-}
-const hFallback = S ? 0 : seedHash(props.starName + props.constellationName)
-
-const HAN = ['望月听风', '枕星自语', '载梦渡夜', '拾光归墟', '渡云栖梦', '怀川望海', '摘雪煎茶', '听雨寄书']
-const MBTI = ['INFP', 'INFJ', 'ENFP', 'ISFP', 'INTP']
-const TAGS_POOL = [
-  ['治愈系', '高敏感', '怀旧向', '诗意派', '情感共鸣体'],
-  ['清冷挂', '哲思型', '孤独美学', '夜行者', '温柔观察者'],
-  ['热血派', '理想主义', '少年心气', '行动派', '追光者'],
-  ['怀旧者', '念旧人', '旧时光收藏家', '手写信派', '回忆滤镜'],
-]
-const TONE = ['温柔而忧郁', '冷静而深情', '明亮而治愈', '浪漫而诗意', '沉稳而长情']
-const MOTIF_A = ['未说出口的话', '回不去的地方', '追不上的那个人', '熄不灭的少年火']
-const MOTIF_B = ['多年前的自己', '远方的灯火', '奶奶的呼唤', '未寄出的信']
-const EMO_PCT = [72, 78, 83, 85, 69, 64]
-const EMO_THEME = ['亲情、故乡、童年', '爱情、离别、重逢', '理想、成长、选择', '友情、陪伴、告别']
-const SEE_IN = ['再也回不去的夏夜', '多年以后那个转身', '万家灯火中的一盏', '十七岁未说完的话']
-const SUGGEST = [
-  '建议用「给多年前的自己写一封信」的语气开始，AI 会为你匹配最合适的星空位置。',
-  '可以从「今夜看着它，我忽然想起了…」开头，自然会把心流牵出来。',
-  '试着写下一件你从来没跟任何人说过的小事，它会替你保守秘密。',
-  '以「如果那年…」作为开头，它承载了太多类似的「如果」。',
-]
-
-const hanName = computed(() => S?.hanName ?? HAN[hFallback % HAN.length])
-const personaTags = computed(() => S?.tags ?? TAGS_POOL[(hFallback >>> 5) % TAGS_POOL.length])
-
-// 文案：如果 persona 带 paragraphs 就用 paragraphs[i] 且保留星名/tone/意象/emo 注入结构
-// 否则 fallback 到模板句式
-const tone = computed(() => TONE[(hFallback >>> 7) % TONE.length])
-const motifA = computed(() => MOTIF_A[(hFallback >>> 11) % MOTIF_A.length])
-const motifB = computed(() => MOTIF_B[(hFallback >>> 13) % MOTIF_B.length])
-const emoPct = computed(() => EMO_PCT[(hFallback >>> 17) % EMO_PCT.length])
-const emoTheme = computed(() => EMO_THEME[(hFallback >>> 19) % EMO_THEME.length])
-const seeInLight = computed(() => SEE_IN[(hFallback >>> 23) % SEE_IN.length])
-const suggest = computed(() => S?.suggestIntro ?? SUGGEST[(hFallback >>> 2) % SUGGEST.length])
-
-// paragraphs 结构：persona 给了就用 persona 的段落
-const paraFirst = computed(() => {
-  if (S?.paragraphs?.[0]) return S.paragraphs[0]
-  return null // 用模板渲染
-})
-const paraSecond = computed(() => {
-  if (S?.paragraphs?.[1]) return S.paragraphs[1]
-  return null
+const hasReal = computed(() => {
+  const p = props.persona
+  if (!p) return false
+  return !!(p.paragraphs?.[0] && p.paragraphs?.[1]
+    && Array.isArray(p.tags) && p.tags.length >= 3
+    && p.hanName?.trim() && p.suggestIntro?.trim())
 })
 
-// 背景小星位置（伪随机，固定 seed）
+const hanName      = computed(() => props.persona?.hanName ?? '')
+const personaTags  = computed(() => props.persona?.tags ?? [])
+const paraFirst    = computed(() => props.persona?.paragraphs?.[0] ?? '')
+const paraSecond   = computed(() => props.persona?.paragraphs?.[1] ?? '')
+const suggest      = computed(() => props.persona?.suggestIntro ?? '')
+
 const bgStars = Array.from({ length: 26 }, (_, i) => ({
   x: ((i * 31) % 110) + 5,
   y: ((i * 17) % 110) + 4,
@@ -153,6 +99,22 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 </script>
 
 <style scoped>
+.empty-state {
+  margin: 0 28px 22px;
+  padding: 34px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.012);
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.06);
+}
+.es-ic { color: #ffd98a; animation: tw 2.2s ease-in-out infinite; }
+@keyframes tw { 0%,100%{opacity:.35} 50%{opacity:.9} }
+
 .persona-wrap {
   margin: 0 28px 22px;
   padding: 16px 18px;
@@ -238,121 +200,119 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
 /* 四角装饰 */
 .sc-corner {
   position: absolute;
-  width: 8px; height: 8px;
-  border: 1px solid rgba(255,217,138,0.35);
+  width: 9px; height: 9px;
+  border-color: rgba(255,217,138,0.4);
+  border-style: solid;
+  border-width: 0;
 }
-.sc-tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
-.sc-tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
-.sc-bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
-.sc-br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+.sc-tl { top: 6px; left: 6px;  border-top-width: 1px; border-left-width: 1px; }
+.sc-tr { top: 6px; right: 6px; border-top-width: 1px; border-right-width: 1px; }
+.sc-bl { bottom: 6px; left: 6px;  border-bottom-width: 1px; border-left-width: 1px; }
+.sc-br { bottom: 6px; right: 6px; border-bottom-width: 1px; border-right-width: 1px; }
 
-.sc-top { text-align: center; margin-bottom: 6px; z-index: 1; }
+.sc-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
 .sc-constellation {
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
+  font-size: 0.56rem;
   color: rgba(255,255,255,0.38);
-  margin-bottom: 5px;
+  letter-spacing: 0.04em;
 }
 .sc-name-han {
-  font-size: 1rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #ffd98a;
-  letter-spacing: 0.1em;
-  text-shadow: 0 0 10px rgba(255,217,138,0.35);
+  letter-spacing: 0.14em;
+  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  text-shadow: 0 0 8px rgba(255,217,138,0.25);
 }
 .sc-svg {
   width: 100%;
-  display: block;
-  margin: 2px 0 8px;
   flex: 1;
+  min-height: 72px;
+  display: block;
+  position: relative;
   z-index: 1;
 }
 .sc-tags {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  justify-content: center;
-  z-index: 1;
+  margin-top: 6px;
 }
 .sc-tag {
-  font-size: 0.56rem;
   padding: 1px 6px;
+  font-size: 0.52rem;
   border-radius: 3px;
-  background: rgba(255,255,255,0.05);
-  color: rgba(255,255,255,0.55);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(202,167,255,0.08);
+  border: 1px solid rgba(202,167,255,0.18);
+  color: rgba(255,255,255,0.75);
   letter-spacing: 0.03em;
-}
-.sc-tag-gold {
-  background: rgba(255,217,138,0.15);
-  border-color: rgba(255,217,138,0.3);
-  color: #ffd98a;
-  font-weight: 700;
+  white-space: nowrap;
 }
 
 /* 右：文字解读 */
 .persona-text {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 4px 6px 0 0;
+  gap: 10px;
+  min-width: 0;
 }
 .pt-para {
-  font-size: 0.8rem;
-  line-height: 1.85;
-  color: rgba(255, 255, 255, 0.78);
-  letter-spacing: 0.02em;
   margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.85;
+  color: rgba(255,255,255,0.72);
   text-align: justify;
-}
-.pt-para :deep(em),
-.pt-para :deep(b),
-.pt-para :deep(strong) {
-  color: rgba(255, 255, 255, 0.94);
-  font-weight: 600;
-  font-style: normal;
-}
-.star-name-hl {
-  color: rgba(255, 255, 255, 0.96);
-  font-weight: 700;
-  letter-spacing: 0.02em;
 }
 .pt-para.first {
-  text-align: justify;
+  color: rgba(255,255,255,0.82);
+  line-height: 1.9;
+  padding: 0;
 }
-.pt-drop-cap {
-  float: left;
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1;
-  color: rgba(255, 217, 138, 0.92);
-  padding: 3px 6px 0 0;
-  font-family: 'Noto Serif SC', Georgia, serif;
-}
+.star-name-hl { color: #ffd98a; font-weight: 700; }
+
+/* 挂心事引导 */
 .pt-suggest-wrap {
-  margin-top: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255,255,255,0.05);
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
 }
 .pt-tip {
-  font-size: 0.72rem;
-  color: rgba(255, 217, 138, 0.78);
-  letter-spacing: 0.02em;
-  line-height: 1.6;
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  color: #ffd98a;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  background: rgba(255,217,138,0.07);
+  border: 1px solid rgba(255,217,138,0.18);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .pt-suggest {
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.8;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.75;
 }
 
-@media (max-width: 768px) {
-  .persona-wrap { margin: 0 18px 20px; }
-  .persona-body {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .star-card { max-width: 220px; margin: 0 auto; width: 100%; }
+/* 响应式 */
+@media (max-width: 1000px) {
+  .persona-body { grid-template-columns: 130px 1fr; gap: 14px; }
+  .pt-tip { padding: 2px 7px; font-size: 0.6rem; }
+  .pt-suggest { font-size: 0.7rem; }
+}
+@media (max-width: 900px) {
+  .persona-wrap,
+  .empty-state { margin: 0 18px 18px; }
 }
 </style>

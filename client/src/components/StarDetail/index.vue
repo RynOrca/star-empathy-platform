@@ -24,33 +24,6 @@
           <template v-if="activeTab === 'narrative'">
             <div class="narrative-layout">
               <div class="narrative-top">
-                <!-- A. 星语数据条 -->
-                <div v-if="catalogStats" class="story-stats-bar">
-                  <div class="stat-item">
-                    <EyeIcon :size="14" class="stat-icon stat-icon-eye" />
-                    <div class="stat-info">
-                      <div class="stat-num">{{ catalogStats.starViews?.toLocaleString() ?? 0 }}</div>
-                      <div class="stat-label">凝望次数</div>
-                    </div>
-                  </div>
-                  <div class="stat-divider"></div>
-                  <div class="stat-item">
-                    <BookOpen :size="14" class="stat-icon stat-icon-story" />
-                    <div class="stat-info">
-                      <div class="stat-num">{{ catalogStats.storyCount ?? 0 }}</div>
-                      <div class="stat-label">心事总数</div>
-                    </div>
-                  </div>
-                  <div class="stat-divider"></div>
-                  <div class="stat-item">
-                    <HeartIcon :size="14" class="stat-icon stat-icon-heart" />
-                    <div class="stat-info">
-                      <div class="stat-num">{{ catalogStats.totalResonance?.toLocaleString() ?? 0 }}</div>
-                      <div class="stat-label">共鸣总数</div>
-                    </div>
-                  </div>
-                </div>
-
                 <!-- 🧠 AI 分析模块（1）星格画像 -->
                 <AIPersonaCard
                   :updatedAt="analysisUpdatedText || '刚刚生成'"

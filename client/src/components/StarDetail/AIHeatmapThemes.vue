@@ -1,16 +1,15 @@
 <template>
-  <div class="stack-wrap">
-    <!-- 1. 主题森林 -->
+  <div v-if="!hasData" class="empty-state">
+    <Clock3 :size="11" class="es-ic" />
+    <span>主题与时辰观察生成中…</span>
+  </div>
+  <div v-else class="stack-wrap">
     <div class="ai-card forest-card">
-      <div class="ai-head">
-        <div class="ai-badge ai-badge-green">
-          <TreeDeciduous :size="10" class="ai-spark" />
-          <span>星语 AI · 主题森林</span>
-        </div>
-        <div class="ai-sub">{{ total }} 条故事 · {{ Math.min(8, themes.length) }} 个主题</div>
+      <div class="card-head">
+        <span class="card-title">主题森林</span>
+        <span class="card-sub">{{ total }} 条故事 · {{ Math.min(8, themes.length) }} 个主题</span>
       </div>
 
-      <!-- 8 棵小树苗：上排 4，下排 4 -->
       <div class="tree-rows">
         <div class="tree-row">
           <div class="tree" v-for="t in themes.slice(0, 4)" :key="t.name">
@@ -58,32 +57,21 @@
         </div>
       </div>
 
-      <!-- AI 文字点评 -->
-      <div class="forest-note">
+      <div v-if="forestNote" class="forest-note">
         <Leaf :size="11" class="leaf-ico" />
         <div class="note-text">
           <span class="note-lead">AI 观察：</span>
-          <span v-if="themeHour?.forestNote" v-html="themeHour.forestNote"></span>
-          <span v-else>
-            「<em class="hi-gold">{{ topThemeName }}</em>」主题树木最粗壮，故事量占全星
-            <em class="hi-gold">{{ topThemePct }}%</em>；
-            其余主题虽是小树，但构成这颗星完整的情感森林。
-          </span>
+          <span v-html="forestNote"></span>
         </div>
       </div>
     </div>
 
-    <!-- 2. 时辰观察 -->
     <div class="ai-card hour-card">
-      <div class="ai-head">
-        <div class="ai-badge ai-badge-blue">
-          <Clock3 :size="10" class="ai-spark" />
-          <span>星语 AI · 时辰观察</span>
-        </div>
-        <div class="ai-sub">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</div>
+      <div class="card-head">
+        <span class="card-title">时辰观察</span>
+        <span class="card-sub">高峰 {{ peakHour }}:00 · 低谷 {{ lowHour }}:00</span>
       </div>
 
-      <!-- 顶部念珠状 24 小时小圆 -->
       <div class="hour-beads">
         <span
           v-for="(v, h) in hourly"
@@ -104,32 +92,22 @@
         <span>申</span><span>酉</span><span>戌</span><span>亥</span>
       </div>
 
-      <!-- AI 时辰解读 -->
       <div class="hour-insights">
-        <div class="hi-item">
+        <div class="hi-item" v-if="peakText">
           <div class="hi-hour hi-peak">
             <span class="hi-prefix">高峰</span>
             <span class="hi-time">{{ hourRangeText(peakHour) }}</span>
             <span class="hi-count">{{ peakPct }}% 投递集中</span>
           </div>
-          <p class="hi-desc" v-if="themeHour?.peakText" v-html="themeHour.peakText"></p>
-          <p class="hi-desc" v-else>
-            {{ peakHour }} 时是人们最愿意向它倾诉的时刻。口吻最柔软，"想你""对不起""没关系"
-            这类软词出现频次显著升高。
-          </p>
+          <p class="hi-desc" v-html="peakText"></p>
         </div>
-
-        <div class="hi-item">
+        <div class="hi-item" v-if="lowText">
           <div class="hi-hour hi-low">
             <span class="hi-prefix">低谷</span>
             <span class="hi-time">{{ hourRangeText(lowHour) }}</span>
             <span class="hi-count">仅 {{ lowPct }}% 故事</span>
           </div>
-          <p class="hi-desc" v-if="themeHour?.lowText" v-html="themeHour.lowText"></p>
-          <p class="hi-desc" v-else>
-            {{ lowHour }} 时故事虽少，读起来却最轻盈。故事结尾以"释然""没关系""向前看"收尾的比例，
-            明显高于其他时段。
-          </p>
+          <p class="hi-desc" v-html="lowText"></p>
         </div>
       </div>
     </div>
@@ -145,27 +123,21 @@ const props = withDefaults(defineProps<{
   themeHour?: ThemeHourPayload
 }>(), {})
 
-// Fallback 假数据
-const FALLBACK: ThemeHourPayload = {
-  themes: [
-    { name: '思乡亲情', count: 248, color: '#ffd98a' },
-    { name: '深夜独处', count: 192, color: '#86a8ff' },
-    { name: '爱情离别', count: 156, color: '#ff8b7d' },
-    { name: '成长困惑', count: 128, color: '#caa7ff' },
-    { name: '童年回忆', count: 97,  color: '#9ae6b4' },
-    { name: '城市漂泊', count: 76,  color: '#fbb6ce' },
-    { name: '梦想坚持', count: 58,  color: '#93c5fd' },
-    { name: '平凡日常', count: 41,  color: '#a7f3d0' },
-  ],
-  hourly: [3, 2, 1, 1, 0, 1, 2, 7, 11, 14, 13, 17, 15, 12, 10, 9, 11, 18, 27, 41, 57, 63, 48, 21],
-  peakHour: 21,
-  lowHour: 4,
-}
+const hasData = computed(() => {
+  const t = props.themeHour
+  if (!t) return false
+  if (!Array.isArray(t.themes) || t.themes.length < 2) return false
+  if (!Array.isArray(t.hourly) || t.hourly.length !== 24) return false
+  return true
+})
 
-const rawThemes = computed(() => props.themeHour?.themes?.length ? props.themeHour.themes : FALLBACK.themes)
-const hourly     = computed(() => props.themeHour?.hourly?.length === 24 ? props.themeHour.hourly : FALLBACK.hourly)
-const peakHour   = computed(() => props.themeHour?.peakHour ?? FALLBACK.peakHour)
-const lowHour    = computed(() => props.themeHour?.lowHour  ?? FALLBACK.lowHour)
+const rawThemes = computed(() => props.themeHour?.themes ?? [])
+const hourly     = computed(() => props.themeHour?.hourly ?? [])
+const peakHour   = computed(() => props.themeHour?.peakHour ?? 0)
+const lowHour    = computed(() => props.themeHour?.lowHour  ?? 0)
+const forestNote = computed(() => props.themeHour?.forestNote?.trim())
+const peakText   = computed(() => props.themeHour?.peakText?.trim())
+const lowText    = computed(() => props.themeHour?.lowText?.trim())
 
 const maxCount = computed(() => Math.max(...rawThemes.value.map(t => t.count), 1))
 const total    = computed(() => rawThemes.value.reduce((a, b) => a + b.count, 0))
@@ -181,14 +153,6 @@ const themes   = computed(() => rawThemes.value.slice(0, 8).map(t => {
   return { ...t, h1, h2, h3, w1, w2, w3, trunk }
 }))
 
-// AI 观察 fallback 动态文案
-const topThemeName = computed(() => themes.value[0]?.name ?? '—')
-const topThemePct  = computed(() => {
-  if (!total.value) return 0
-  return Math.round((themes.value[0]?.count ?? 0) / total.value * 100)
-})
-
-// 时辰解读辅助
 const hourSum = computed(() => Math.max(1, hourly.value.reduce((a, b) => a + b, 0)))
 const peakPct = computed(() => Math.max(1, Math.round(hourly.value[peakHour.value] / hourSum.value * 100)))
 const lowPct  = computed(() => Math.max(0.1, Math.round(hourly.value[lowHour.value] / hourSum.value * 100 * 10) / 10))
@@ -205,7 +169,6 @@ function hourRangeText(h: number) {
   return `${d}时 · ${pad(h)}-${pad(end)}`
 }
 
-// 24 小时珠子颜色 + 尺寸
 function beadColor(v: number) {
   if (v < 3) return 'rgba(255,255,255,0.12)'
   if (v < 10) return 'rgba(134,168,255,0.35)'
@@ -219,67 +182,52 @@ function beadSize(v: number) {
 </script>
 
 <style scoped>
+.empty-state {
+  margin: 0 28px 16px;
+  padding: 28px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.012);
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.06);
+}
+.es-ic { color: #9ae6b4; animation: tw 2.2s ease-in-out infinite; }
+@keyframes tw { 0%,100%{opacity:.35} 50%{opacity:.9} }
+
 .stack-wrap {
   margin: 0 28px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 .ai-card {
-  padding: 16px 18px 18px;
-  background: rgba(255,255,255,0.015);
-  border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 12px;
-  position: relative;
+  padding: 12px 14px 14px;
+  background: rgba(255,255,255,0.012);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 10px;
 }
-.ai-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
-  pointer-events: none;
-}
-
-/* 头：徽章 + 右侧说明 */
-.ai-head {
+.card-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(255,255,255,0.05);
 }
-.ai-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.68rem;
+.card-title {
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.62);
 }
-.ai-badge-green {
-  background: linear-gradient(135deg, rgba(154,230,180,0.18), rgba(255,217,138,0.08));
-  border: 1px solid rgba(154,230,180,0.3);
-  color: #9ae6b4;
-}
-.ai-badge-blue {
-  background: linear-gradient(135deg, rgba(134,168,255,0.2), rgba(202,167,255,0.08));
-  border: 1px solid rgba(134,168,255,0.32);
-  color: #86a8ff;
-}
-.ai-spark {
-  color: #ffd98a;
-  animation: twinkle 2.4s ease-in-out infinite;
-}
-@keyframes twinkle {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
-}
-.ai-sub {
+.card-sub {
   font-size: 0.6rem;
-  color: rgba(255,255,255,0.22);
-  letter-spacing: 0.03em;
+  color: rgba(255,255,255,0.2);
+  letter-spacing: 0.02em;
 }
 
 /* 主题森林 */
@@ -287,9 +235,9 @@ function beadSize(v: number) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 0 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px dashed rgba(255,255,255,0.05);
+  padding: 6px 0 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed rgba(255,255,255,0.04);
 }
 .tree-row {
   display: grid;
@@ -328,8 +276,8 @@ function beadSize(v: number) {
 .forest-note {
   display: flex;
   gap: 9px;
-  padding: 10px 11px;
-  background: rgba(154,230,180,0.04);
+  padding: 9px 10px;
+  background: rgba(154,230,180,0.035);
   border-radius: 6px;
   border-left: 2px solid rgba(154,230,180,0.35);
   align-items: flex-start;
@@ -341,20 +289,17 @@ function beadSize(v: number) {
   flex-shrink: 0;
 }
 .note-text {
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   line-height: 1.75;
   color: rgba(255,255,255,0.5);
 }
 .note-lead {
-  font-size: 0.66rem;
+  font-size: 0.65rem;
   color: #9ae6b4;
   font-weight: 700;
   margin-right: 4px;
   letter-spacing: 0.04em;
 }
-.hi-gold   { color: #ffd98a; font-style: normal; font-weight: 700; }
-.hi-purple { color: #caa7ff; font-style: normal; font-weight: 700; }
-.hi-blue   { color: #86a8ff; font-style: normal; font-weight: 700; }
 
 /* 时辰观察 */
 .hour-beads {
@@ -376,15 +321,15 @@ function beadSize(v: number) {
   text-align: center;
   font-size: 0.58rem;
   color: rgba(255,255,255,0.25);
-  padding: 0 2px 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px dashed rgba(255,255,255,0.05);
+  padding: 0 2px 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed rgba(255,255,255,0.04);
   letter-spacing: 0.08em;
 }
 .hour-insights {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 9px;
 }
 .hi-item {
   display: flex;
@@ -424,17 +369,16 @@ function beadSize(v: number) {
 }
 .hi-desc {
   margin: 0;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 6px;
-  background: rgba(255,255,255,0.022);
+  background: rgba(255,255,255,0.02);
   font-size: 0.72rem;
   line-height: 1.8;
   color: rgba(255,255,255,0.48);
 }
 
 @media (max-width: 900px) {
-  .stack-wrap {
-    margin: 0 18px 16px;
-  }
+  .stack-wrap { margin: 0 18px 14px; grid-template-columns: 1fr; }
+  .empty-state { margin: 0 18px 14px; }
 }
 </style>
