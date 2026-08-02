@@ -10,7 +10,8 @@
           <span class="pd-roman">Ⅰ</span><span class="pd-action-sep">·</span><span class="pd-action-label">返航</span>
         </button>
         <div class="pd-brand">STARRY · DOME</div>
-        <div class="pd-actions">
+        <!-- PC 端：4 个独立按钮 -->
+        <div class="pd-actions pd-actions-pc">
           <button class="pd-back-btn pd-action-btn" @click="startEditSig">
             <span class="pd-roman">Ⅱ</span><span class="pd-action-sep">·</span><span class="pd-action-label">题刻</span>
           </button>
@@ -21,7 +22,32 @@
             <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">离开</span>
           </button>
         </div>
+        <!-- 移动端：单设置按钮触发弹窗 -->
+        <button class="pd-back-btn pd-action-btn pd-settings-trigger" @click="showSettingsModal = true">
+          <span class="pd-roman">Ⅱ Ⅲ Ⅳ</span>
+        </button>
       </header>
+
+      <!-- 移动端设置弹窗（题刻/密钥/离开） -->
+      <div v-if="showSettingsModal" class="pd-modal-mask" @click.self="showSettingsModal = false">
+        <div class="pd-modal-panel pd-modal-sm pd-settings-sheet">
+          <header class="pd-modal-head">
+            <h3>· STELLAR SETTINGS ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="showSettingsModal = false">×</button>
+          </header>
+          <main class="pd-modal-body pd-settings-list">
+            <button class="pd-settings-item" @click="showSettingsModal = false; startEditSig()">
+              <span class="pd-roman">Ⅱ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">题刻签名</span>
+            </button>
+            <button class="pd-settings-item" @click="showSettingsModal = false; clearAndClosePwdModal(); showPwdModal = true">
+              <span class="pd-roman">Ⅲ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">重铸密钥</span>
+            </button>
+            <button class="pd-settings-item pd-settings-leave" @click="showSettingsModal = false; showLogoutModal = true">
+              <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">离开星穹</span>
+            </button>
+          </main>
+        </div>
+      </div>
 
       <!-- 2. Hero 区 100vh -->
       <section class="pd-hero">
@@ -458,6 +484,8 @@ const confirmPwd = ref('')
 // ─── 退出登录 ───
 const showLogoutModal = ref(false)
 const logoutLoading = ref(false)
+// 移动端设置弹窗
+const showSettingsModal = ref(false)
 
 async function handleLogout() {
   logoutLoading.value = true
@@ -1179,6 +1207,49 @@ onBeforeUnmount(() => {
 .pd-logout-trigger:hover .pd-action-sep {
   color: rgba(255,107,138,0.4);
 }
+
+/* 移动端设置按钮 — 默认隐藏，768px 以下显示 */
+.pd-settings-trigger { display: none; }
+
+/* 移动端设置弹窗列表项 */
+.pd-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px;
+}
+.pd-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,217,138,0.2);
+  color: #b9b4d6;
+  padding: 14px 18px;
+  font-family: var(--pd-font-serif);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+.pd-settings-item:hover {
+  border-color: rgba(255,217,138,0.5);
+  color: var(--pd-gold);
+  background: rgba(255,217,138,0.05);
+}
+.pd-settings-item-label { flex: 1; text-align: left; }
+.pd-settings-leave {
+  border-color: rgba(255,107,138,0.25);
+  color: #d6a0ad;
+}
+.pd-settings-leave:hover {
+  border-color: rgba(255,107,138,0.5);
+  color: #ff8b9e;
+  background: rgba(255,107,138,0.05);
+}
+.pd-settings-leave:hover .pd-roman { color: #ff8b9e; }
 
 /* ═══ (b) Hero 100vh ═══ */
 .pd-hero {
@@ -2405,6 +2476,9 @@ onBeforeUnmount(() => {
     gap: 12px;
   }
   .pd-brand { display: none; }
+  /* 移动端：隐藏 PC 三按钮，显示单设置按钮 */
+  .pd-actions-pc { display: none; }
+  .pd-settings-trigger { display: inline-flex; }
   .pd-actions { gap: 6px; }
   .pd-back-btn { padding: 7px 12px; font-size: 0.72rem; letter-spacing: 0.05em; }
 
@@ -2414,8 +2488,15 @@ onBeforeUnmount(() => {
   .pd-hero-role { font-size: 0.6rem; letter-spacing: 0.3em; margin-bottom: 14px; }
   .pd-hero-band { padding: 8px 20px; font-size: 0.78rem; }
   .pd-hero-joined { font-size: 0.66rem; gap: 8px; margin-top: 18px; }
+  .pd-hero-email { font-size: 0.6rem; gap: 8px; margin-top: 8px; }
   .pd-scroll-hint { bottom: 36px; font-size: 0.6rem; gap: 10px; }
   .pd-scroll-line { height: 30px; }
+
+  /* 退出/设置弹窗自适应 */
+  .pd-modal-sm { max-width: 92vw; }
+  .pd-modal-hint { font-size: 0.82rem; }
+  .pwd-forgot-link { font-size: 0.72rem; }
+  .pd-settings-item { padding: 12px 16px; font-size: 0.82rem; }
 
   /* Timeline section */
   .pd-timeline-section { padding: 40px 18px 80px; }
@@ -2512,6 +2593,7 @@ onBeforeUnmount(() => {
   .pd-moon { width: 260px; height: 260px; }
   .pd-hero-name { font-size: 1.9rem; }
   .pd-hero-band { padding: 6px 14px; font-size: 0.7rem; }
+  .pd-hero-email { font-size: 0.54rem; }
   .pd-stat .stat-num { font-size: 2rem; }
   .pd-stat .stat-label { font-size: 0.55rem; letter-spacing: 0.08em; }
   .pd-t-card { padding: 16px 14px; }
@@ -2520,5 +2602,8 @@ onBeforeUnmount(() => {
   .pd-gal-img { height: 60px; font-size: 1.8rem; }
   .pd-gal-name { font-size: 0.72rem; }
   .pd-gal-sub { font-size: 0.55rem; }
+  /* 极窄屏弹窗按钮纵向堆叠 */
+  .pd-modal-foot { flex-direction: column; }
+  .pd-modal-foot button { width: 100%; }
 }
 </style>
