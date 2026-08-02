@@ -89,6 +89,8 @@
 | `migrate-origin.ts` | 数据迁移脚本（旧 origin 字段迁移） |
 | `seed_user_stories.ts` | 用户故事种子数据 |
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
+| **`AGENT_CONTROL.md`** | **Agent 控制手册**。Key 配置、冷启动、agent:kernels、agent:analyze 参数、幂等&安全、常见 401/429 排查、自动再生闭环、部署自检清单（**部署必读**） |
+| `fix-cids.mjs` | 修复 catalog_star_id 脏数据（历史迁移，异常场景才用） |
 
 ### AI 分析 Agent `src/agents/`
 
