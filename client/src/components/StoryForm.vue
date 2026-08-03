@@ -111,9 +111,9 @@
 
             <!-- 匿名 -->
             <div class="sf-field">
-              <label class="sf-check">
-                <span class="sf-check-box" :class="{ on: isAnonymous }">
-                  <Check :size="10" class="sf-check-mark" />
+              <label class="sf-check" @click.prevent="isAnonymous = !isAnonymous">
+                <span class="sf-check-box" :class="{ on: isAnonymous }" aria-hidden="true">
+                  <Check :size="11" class="sf-check-mark" />
                 </span>
                 <span class="sf-check-text">
                   匿名投递
