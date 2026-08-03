@@ -134,7 +134,14 @@
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
                 <div class="pd-t-foot">
-                  <span v-if="s.tag" class="pd-t-tag" :style="tagStyle(s.tag)">{{ s.tag }}</span>
+                  <template v-if="displayStoryTags(s).length">
+                    <span
+                      v-for="t in displayStoryTags(s)"
+                      :key="'tag-' + s.id + '-' + t"
+                      class="pd-t-tag"
+                      :style="tagStyle(t)"
+                    >{{ t }}</span>
+                  </template>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -374,7 +381,14 @@
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <span v-if="activeStory.tag" class="pd-t-tag" :style="tagStyle(activeStory.tag)">{{ activeStory.tag }}</span>
+              <template v-if="displayStoryTags(activeStory).length">
+                <span
+                  v-for="t in displayStoryTags(activeStory)"
+                  :key="'atag-' + activeStory.id + '-' + t"
+                  class="pd-t-tag"
+                  :style="tagStyle(t)"
+                >{{ t }}</span>
+              </template>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -465,6 +479,14 @@ function tagStyle(tag: string | null | undefined): Record<string, string> {
   const border = `hsla(${h}, 62%, 74%, 0.30)`
   const bg = `hsla(${h}, 62%, 74%, 0.05)`
   return { color, borderColor: border, backgroundColor: bg, border: '1px solid ' + border }
+}
+
+/** 故事展示用：统一取 tags[]，空时退回 tag 单列（旧数据兼容），最多 5 条 */
+function displayStoryTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
 }
 
 const PAGE_SIZE = 20

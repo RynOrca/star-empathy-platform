@@ -41,7 +41,7 @@ router.get('/:storyId', (req: Request, res: Response) => {
 // 投递故事（需登录）
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, isAnonymous, imageUrl } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, tags, isAnonymous, imageUrl } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -49,8 +49,8 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     }
 
     const trimmed = content.trim();
-    if (trimmed.length === 0 || trimmed.length > 300) {
-      return badRequest(res, 'content 长度需在 1~300 字之间');
+    if (trimmed.length === 0 || trimmed.length > 2000) {
+      return badRequest(res, 'content 长度需在 1~2000 字之间');
     }
 
     const catalogStarId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
@@ -78,9 +78,10 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     const safeContent = esc(trimmed);
     const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
     const safeTag = typeof tag === 'string' ? tag : undefined;
+    const safeTags: string[] | undefined = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string') : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {

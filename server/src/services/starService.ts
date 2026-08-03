@@ -17,6 +17,40 @@ export interface Star {
   view_count: number;
   origin: string | null;
   image_url: string | null;
+  tag: string | null;
+  tags: string | null; // JSON array string e.g. '["思念","等待"]' or null
+}
+
+// 把 tags(JSON string) + tag(老单列) 合并出前端可直接消费的 tags 数组，
+// 同时保留 is_anonymous 等后续字段会由 attachCatalogStarIds 继续透传
+function normalizeTagsForStories(stories: any[]): any[] {
+  return stories.map((s) => {
+    let tagsArr: string[] = [];
+    if (typeof s.tags === 'string' && s.tags.length > 0) {
+      try {
+        const parsed = JSON.parse(s.tags);
+        if (Array.isArray(parsed)) {
+          tagsArr = parsed.filter((t) => typeof t === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t));
+        }
+      } catch {
+        // 非法 JSON：回退为空
+      }
+    }
+    // 兜底：若 tags 列没值但老 tag 单列有，仍放进去保持兼容
+    if (tagsArr.length === 0 && typeof s.tag === 'string' && s.tag.trim()) {
+      tagsArr = [s.tag.trim()];
+    }
+    // 去重
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const t of tagsArr) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        deduped.push(t);
+      }
+    }
+    return { ...s, tags: deduped };
+  });
 }
 
 // 为故事附加 catalogStarIds（从 story_catalog_stars 连接表读取多对多绑定）
@@ -34,7 +68,8 @@ function attachCatalogStarIds(stories: any[]): any[] {
     map.get(b.story_id)!.push(b.catalog_star_id);
   }
 
-  return stories.map((s: any) => ({
+  const withTags = normalizeTagsForStories(stories);
+  return withTags.map((s: any) => ({
     ...s,
     catalogStarIds: map.get(s.id) || (s.catalog_star_id != null ? [s.catalog_star_id] : []),
   }));
@@ -42,7 +77,7 @@ function attachCatalogStarIds(stories: any[]): any[] {
 
 // 获取所有星星（含用户名、用户 ID 和标签）
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[] })[] {
+export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[] {
   const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
@@ -55,7 +90,7 @@ export function getAllStars(): (Star & { username: string | null; tag: string | 
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[] })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[];
   total: number;
   page: number;
   limit: number;
@@ -92,18 +127,42 @@ export function createStar(
   isAnonymous?: boolean,
   imageUrl?: string,
   catalogStarIds?: number[],
-): Star & { username: string | null; userId: number | null } {
+  tags?: string[],
+): Star & { username: string | null; userId: number | null; tags: string[] } {
   const pos = generatePosition();
-  // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长；兼容旧 5 个白名单
+  // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长
   const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/;
-  const safeTag = typeof tag === 'string' && tag.trim() && TAG_RE.test(tag.trim()) ? tag.trim() : null;
+  const cleanTag = (t: unknown): string | null =>
+    typeof t === 'string' && t.trim() && TAG_RE.test(t.trim()) ? t.trim() : null;
+  const safeTag = cleanTag(tag);
+
+  // 处理多标签 tags[]：去重，最多 5 个；每个都过 TAG_RE
+  const seen = new Set<string>();
+  const safeTags: string[] = [];
+  if (Array.isArray(tags) && tags.length > 0) {
+    for (const t of tags) {
+      const v = cleanTag(t);
+      if (!v) continue;
+      if (seen.has(v)) continue;
+      seen.add(v);
+      safeTags.push(v);
+      if (safeTags.length >= 5) break;
+    }
+  }
+  // 兜底：若 tags[] 为空但老 tag 有值，作为 tags[0] 写回，保证展示链路一致
+  if (safeTags.length === 0 && safeTag) {
+    safeTags.push(safeTag);
+  }
+  const tagsJson = safeTags.length ? JSON.stringify(safeTags) : null;
+  // 主 tag 列：优先取 safeTags[0]，其次老的 safeTag
+  const primaryTag = safeTags[0] ?? safeTag;
 
   // 主星：优先取 catalogStarId，否则取 catalogStarIds 第一个
   const effectiveCatalogStarId = catalogStarId ?? (catalogStarIds?.length ? catalogStarIds[0] : undefined);
 
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -113,9 +172,10 @@ export function createStar(
     location?.lat ?? null,
     location?.lng ?? null,
     userId ?? null,
-    safeTag,
+    primaryTag,
     isAnonymous ? 1 : 0,
     imageUrl ?? null,
+    tagsJson,
   );
 
   const storyId = result.lastInsertRowid as number;
@@ -131,13 +191,35 @@ export function createStar(
     }
   }
 
-  return db.prepare(`
+  const row = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     WHERE s.id = ?
   `).get(storyId) as unknown as Star & { username: string | null; userId: number | null };
+  const normalized = normalizeTagsForStories([row])[0];
+  return { ...normalized, catalogStarIds: effectiveCatalogStarId != null ? [effectiveCatalogStarId] : [] };
+}
+
+/** 单条 getStoryById 专用包装：保持和 attachCatalogStarIds 相同的 tags 规范化语义 */
+function normalizeRowSingle(row: any): any {
+  if (!row) return row;
+  const list = normalizeTagsForStories([row]);
+  const withIds = attachCatalogStarIds(list);
+  return withIds[0];
+}
+
+export function getStoryById(id: number): any | null {
+  const row = db.prepare(`
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.id = ?
+  `).get(id);
+  if (!row) return null;
+  return normalizeRowSingle(row);
 }
 
 // 共鸣 +1（支持去重）
@@ -266,41 +348,32 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
   return { starCount: starRow.cnt, userCount: userRow.cnt, totalResonance: resRow.cnt };
 }
 
-// 单条故事详情
-export function getStoryById(storyId: number): (Star & { username: string | null; tag: string | null }) | null {
-  const row = db.prepare(`
-    SELECT s.*, u.username
-    FROM stars s
-    LEFT JOIN users u ON s.user_id = u.id
-    WHERE s.id = ?
-  `).get(storyId) as unknown as (Star & { username: string | null; tag: string | null }) | undefined;
-  return row ?? null;
-}
-
 // 单星下的所有故事（通过连接表多对多查询）
-export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null })[] {
-  return db.prepare(`
-    SELECT s.*, u.username
+export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
+  const rows = db.prepare(`
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     JOIN story_catalog_stars scs ON s.id = scs.story_id
     LEFT JOIN users u ON s.user_id = u.id
     WHERE scs.catalog_star_id = ?
     ORDER BY s.created_at DESC
-  `).all(catalogStarId) as unknown as (Star & { username: string | null; tag: string | null })[];
+  `).all(catalogStarId);
+  return attachCatalogStarIds(rows);
 }
 
 // 我的故事
-export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null; catalogStarIds?: number[] })[] {
+export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
   const rows = db.prepare(`
     SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
-  `).all(userId) as unknown as (Star & { username: string | null; tag: string | null })[];
+  `).all(userId);
   return attachCatalogStarIds(rows);
 }
 
 export function getUserStoriesPaged(userId: number, page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null; catalogStarIds?: number[] })[];
+  items: (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[];
   total: number;
   page: number;
   limit: number;
@@ -319,7 +392,7 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(userId, l, offset) as unknown as (Star & { username: string | null; tag: string | null })[];
+  `).all(userId, l, offset);
 
   return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
 }

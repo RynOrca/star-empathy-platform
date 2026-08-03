@@ -14,7 +14,12 @@
       <template v-if="variant === 'all'">
         <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
-        <span v-if="story.tag" class="story-tag" :style="tagStyle(story.tag)">{{ story.tag }}</span>
+        <span
+          v-for="t in displayTags"
+          :key="'tag-' + t"
+          class="story-tag"
+          :style="tagStyle(t)"
+        >{{ t }}</span>
         <button
           class="resonate-btn"
           :class="{ done: isResonated }"
@@ -70,12 +75,13 @@
 
 <script setup lang="ts">
 import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { computed } from 'vue'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
 
-defineProps<{
+const props = defineProps<{
   story: {
     id: number
     title: string | null
@@ -83,6 +89,7 @@ defineProps<{
     origin: string | null
     username: string | null
     tag: string | null
+    tags?: string[] | null
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -99,6 +106,13 @@ defineEmits<{
   click: []
   resonate: []
 }>()
+
+/** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
+const displayTags = computed<string[]>(() => {
+  const arr = Array.isArray(props.story.tags) ? props.story.tags.filter((t) => !!t) : []
+  if (arr.length) return arr.slice(0, 5)
+  return props.story.tag ? [props.story.tag] : []
+})
 
 /** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
 function hashCode(s: string): number {

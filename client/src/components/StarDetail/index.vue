@@ -139,8 +139,13 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <div class="card-tags" v-if="s.tag">
-                          <span class="story-tag" :style="storyTagStyle(s.tag)">#{{ s.tag }}</span>
+                        <div class="card-tags" v-if="storyDisplayTags(s).length">
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'card-' + s.id + '-' + t"
+                            class="story-tag"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
                         </div>
                       </div>
                     </div>
@@ -708,8 +713,15 @@
                             <div class="card-meta">
                               <ClockIcon :size="10" class="meta-clock" />
                               <span>{{ formatTime(s.createdAt) }}</span>
-                              <span class="meta-sep">·</span>
-                              <span class="story-tag">#{{ s.tag }}</span>
+                              <template v-if="storyDisplayTags(s).length">
+                                <span class="meta-sep">·</span>
+                                <span
+                                  v-for="t in storyDisplayTags(s)"
+                                  :key="'l-' + s.id + '-' + t"
+                                  class="story-tag"
+                                  :style="storyTagStyle(t)"
+                                >#{{ t }}</span>
+                              </template>
                             </div>
                           </div>
                         </div>
@@ -918,6 +930,13 @@ function storyTagStyle(tag: string): Record<string, string> {
     borderColor: border,
     border: '0.5px solid ' + border,
   }
+}
+/** 标签展示数组：优先 tags[]，空时退回 tag 单列（老数据兼容），最多 5 条、去重 */
+function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
 }
 /** Star 详情展示区的标签（type = emotion/theme/custom 都用） */
 function infoTagStyle(tag: string, type: 'emotion' | 'theme' | 'custom'): Record<string, string> {

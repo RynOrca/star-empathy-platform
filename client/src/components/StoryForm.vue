@@ -252,10 +252,10 @@ const emit = defineEmits<{
     catalogStarId: number; catalogStarIds?: number[]; createdAt: string
     locationLat: number | null; locationLng: number | null; type: string
     viewCount: number; origin: string | null; username: string | null
-    tag: string | null; userId: number | null; imageUrl: string | null
+    tag: string | null; tags?: string[]; userId: number | null; imageUrl: string | null
   }]
   requestMatch: [payload: {
-    title: string; content: string; tag: string | null
+    title: string; content: string; tag: string | null; tags: string[]
     isAnonymous: boolean
   }]
 }>()
@@ -367,6 +367,7 @@ function onPrimaryClick() {
       title: trimmedTitle,
       content: trimmed,
       tag: firstTag.value,
+      tags: selectedTags.value.slice(),
       isAnonymous: isAnonymous.value,
     })
   } else {
@@ -407,6 +408,7 @@ async function doSubmit(
       content: trimmed,
       location: userLocation.value,
       tag: firstTag.value,
+      tags: selectedTags.value.slice(),
       isAnonymous: isAnonymous.value,
     }
     const res = await fetch('/api/stories', {
@@ -416,6 +418,10 @@ async function doSubmit(
     })
     const json = await res.json()
     if (res.ok) {
+      // tags 数组：优先用后端返回的 tags[]（已规范化），否则退回选中的
+      const submittedTagsArr: string[] = Array.isArray(json.data?.tags) && json.data.tags.length
+        ? json.data.tags
+        : selectedTags.value.slice()
       const submittedStory = {
         id: json.data.id,
         title: json.data.title,
@@ -431,6 +437,7 @@ async function doSubmit(
         origin: null,
         username: json.data.username ?? null,
         tag: json.data.tag ?? firstTag.value,
+        tags: submittedTagsArr,
         userId: json.data.userId ?? null,
         imageUrl: null,
       }
