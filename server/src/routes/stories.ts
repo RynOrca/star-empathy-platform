@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
-import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
+import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent } from '../services/kernel';
 
 const router = Router();
 
@@ -182,6 +182,39 @@ router.patch('/:storyId/kernel', (req: Request, res: Response) => {
     ok(res, '内核已更新', updated);
   } catch (error) {
     console.error('PATCH /api/stories/:storyId/kernel error:', error);
+    serverError(res);
+  }
+});
+
+// 为一段新故事（尚未落库）寻找 Top3 最契合的星辰
+// Body: { title?: string, content: string, limit?: number }
+router.post('/match-star', authRequired, async (req: Request, res: Response) => {
+  try {
+    const { title, content } = req.body;
+    if (!content || typeof content !== 'string') {
+      return badRequest(res, 'content 不能为空');
+    }
+    const trimmed = content.trim();
+    if (trimmed.length < 1 || trimmed.length > 300) {
+      return badRequest(res, 'content 长度需在 1~300 字之间');
+    }
+    const limit = typeof req.body.limit === 'number'
+      ? Math.max(1, Math.min(10, Math.floor(req.body.limit)))
+      : 3;
+
+    const result = await findMatchingStarsForContent(
+      typeof title === 'string' && title.trim() ? title.trim() : null,
+      trimmed,
+      limit,
+    );
+    ok(res, 'success', result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('POST /api/stories/match-star error:', msg);
+    // API Key 类错误不要抛 500，返回明确信息
+    if (msg.includes('DEEPSEEK_API_KEY') || msg.includes('未设置')) {
+      return badRequest(res, 'AI 服务未配置，请先在设置中填入 API Key');
+    }
     serverError(res);
   }
 });

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -66,6 +66,10 @@
         <!-- 定位 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
+        </button>
+        <!-- 记录：AI 匹配星辰写故事 -->
+        <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
+          <PenLine :size="18" />
         </button>
         <!-- 设置 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
@@ -316,6 +320,118 @@
         @close="showForm = false"
       />
 
+      <!-- ═══ 记录：auto-match 模式表单 + 候选星面板 ═══ -->
+      <StoryForm
+        v-if="showRecordForm"
+        ref="recordFormRef"
+        mode="auto-match"
+        star-name=""
+        :catalog-star-id="-1"
+        :matching="recordMatching.matching.value"
+        :matching-step="recordMatching.step.value"
+        :match-error="recordMatching.error.value"
+        @request-match="onRecordRequestMatch"
+        @submitted="onRecordStorySubmitted"
+        @close="closeRecordForm"
+      />
+
+      <Transition name="candidates-fade">
+        <div v-if="showMatchCandidates" class="cb-backdrop" @click.self="closeMatchCandidates">
+          <div class="cb-sheet" role="dialog" aria-modal="true" aria-labelledby="cb-title">
+            <!-- HEADER · 纯居中，无分隔线 -->
+            <header class="cb-header">
+              <button class="cb-close" @click="closeMatchCandidates" aria-label="关闭">
+                <X :size="12" />
+              </button>
+              <div class="cb-title-group">
+                <h2 id="cb-title" class="cb-title">为你找到这些契合的星辰</h2>
+                <p class="cb-subtitle">共 {{ matchCandidates.length }} 颗 · 选一颗，挂上你的故事</p>
+              </div>
+            </header>
+
+            <!-- 3 张候选内容卡：横向等宽，极简信息分层 -->
+            <div class="cb-list">
+              <article
+                v-for="(c, idx) in matchCandidates"
+                :key="c.catalogStarId"
+                class="cb-card"
+                :class="{
+                  gold: !c.isFallback,
+                  purple: c.isFallback,
+                  submitting: submittingCandidateId === c.catalogStarId
+                }"
+              >
+                <!-- 卡头：排名圆徽 + 星名星座 -->
+                <header class="cb-card-head">
+                  <div class="cb-rank" :class="{ gold: !c.isFallback, purple: c.isFallback }">{{ idx + 1 }}</div>
+                  <div class="cb-star">
+                    <h3 class="cb-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</h3>
+                    <span class="cb-star-const">{{ c.constellationCN }}</span>
+                  </div>
+                  <span v-if="c.isFallback" class="cb-flag-purple">等待点亮</span>
+                </header>
+
+                <!-- 元信息：极小字 chips，在一行内 -->
+                <div v-if="Number.isFinite(c.mag) || c.distance != null" class="cb-meta">
+                  <span v-if="Number.isFinite(c.mag)" class="cb-meta-item">m{{ c.mag.toFixed(1) }}</span>
+                  <span v-if="c.distance != null" class="cb-meta-item">{{ c.distance }} 光年</span>
+                </div>
+
+                <!-- 契合度：标签 + 条 + 数字 -->
+                <div class="cb-score">
+                  <div class="cb-score-label">契合度</div>
+                  <div class="cb-score-body">
+                    <div class="cb-score-bar" aria-hidden="true">
+                      <div
+                        class="cb-score-fill"
+                        :class="{ purple: c.isFallback }"
+                        :style="{ width: Math.round(c.finalScore * 100) + '%' }"
+                      ></div>
+                    </div>
+                    <span class="cb-score-num" :class="{ purple: c.isFallback }">
+                      {{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- AI 匹配理由：极简左竖线引用 -->
+                <blockquote class="cb-reason" :class="{ purple: c.isFallback }">
+                  {{ c.matchReason }}
+                </blockquote>
+
+                <!-- 故事内核：小标签 + chips，无装饰 -->
+                <div v-if="c.starEssences.length" class="cb-kernels">
+                  <div class="cb-kernels-label">故事内核</div>
+                  <div class="cb-kernels-chips">
+                    <span v-for="(e, i) in c.starEssences" :key="i" class="cb-kernel-chip" :class="{ purple: c.isFallback }">
+                      {{ e }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 选星按钮：和 StoryForm 同款 -->
+                <button
+                  class="cb-btn"
+                  :class="{ gold: !c.isFallback, purple: c.isFallback }"
+                  :disabled="submittingCandidateId === c.catalogStarId"
+                  @click="pickCandidate(c)"
+                >
+                  <template v-if="submittingCandidateId === c.catalogStarId">
+                    <span class="cb-btn-spinner"></span>
+                    <span>正在挂上星星…</span>
+                  </template>
+                  <template v-else>
+                    <Star :size="13" />
+                    <span>选这颗星</span>
+                  </template>
+                </button>
+              </article>
+            </div>
+          </div>
+        </div>
+      </Transition>
+      <!-- ═══ 记录 结束 ═══ -->
+
       <SettingsModal
         :visible="showSettings"
         @close="showSettings = false"
@@ -338,7 +454,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -348,6 +464,7 @@ import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
 import { useLocation } from '../composables/useLocation'
+import { useStarMatching, type MatchCandidate } from '../composables/useStarMatching'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
@@ -1046,6 +1163,109 @@ const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
 const showSettings = ref(false)
+
+// ─── 记录 · AI 归属星辰匹配 ───
+const showRecordForm = ref(false)
+const recordFormRef = ref<InstanceType<typeof StoryForm> | null>(null)
+const recordMatching = useStarMatching()
+const showMatchCandidates = ref(false)
+const matchCandidates = ref<MatchCandidate[]>([])
+const submittingCandidateId = ref<number | null>(null)
+
+/** 暂存待提交的表单数据（匹配成功后，用户选星时直接用） */
+const pendingRecordPayload = ref<{
+  title: string
+  content: string
+  tag: string | null
+  isAnonymous: boolean
+} | null>(null)
+
+function openRecordForm() {
+  if (isGuest.value) { goLogin(); return }
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  submittingCandidateId.value = null
+  showRecordForm.value = true
+  nextTick(() => recordFormRef.value?.resetForm())
+}
+
+function closeRecordForm() {
+  if (recordMatching.matching.value || submittingCandidateId.value != null) return
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  showRecordForm.value = false
+}
+
+function closeMatchCandidates() {
+  if (submittingCandidateId.value != null) return
+  showMatchCandidates.value = false
+  matchCandidates.value = []
+}
+
+/** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
+async function onRecordRequestMatch(payload: {
+  title: string; content: string; tag: string | null; isAnonymous: boolean
+}) {
+  if (isGuest.value) { goLogin(); return }
+  // 暂存表单，选完候选星后再真提交
+  pendingRecordPayload.value = payload
+  try {
+    const list = await recordMatching.matchStars(payload.title, payload.content, 3)
+    if (list.length === 0) {
+      throw new Error('未找到合适的星辰')
+    }
+    matchCandidates.value = list
+    showMatchCandidates.value = true
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    // 不自动清空 form，用户可重试
+    console.warn('[record-match] 匹配失败:', msg)
+  }
+}
+
+/** 用户点「选这颗星」→ doSubmit 真正入库 → 飞相机 → 开详情 */
+async function pickCandidate(c: MatchCandidate) {
+  if (!pendingRecordPayload.value || !recordFormRef.value) return
+  submittingCandidateId.value = c.catalogStarId
+  try {
+    const res = await recordFormRef.value.doSubmit(c.catalogStarId, [c.catalogStarId])
+    if (!res?.ok) {
+      // StoryForm 内部已经给 error 字段赋值，这里只清 candidate 提交态
+      submittingCandidateId.value = null
+      return
+    }
+    // 成功：onRecordStorySubmitted 已经先通过 emitted 更新了数据
+    // 这里做额外 UI 动作（飞相机 + 开详情）
+    submittingCandidateId.value = null
+    showMatchCandidates.value = false
+    matchCandidates.value = []
+    showRecordForm.value = false
+    pendingRecordPayload.value = null
+    recordMatching.reset()
+
+    // 相机飞到这颗星 + 高亮 + 打开 StarDetail
+    const star = catalogStarLookup.get(c.catalogStarId)
+    if (star) {
+      skyRef.value?.sky?.focusOnStar(star.x, star.y, star.z)
+      setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1000)
+    }
+    nextTick(() => onStarClick(c.catalogStarId))
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[record-match] 挂载故事失败:', msg)
+    submittingCandidateId.value = null
+  }
+}
+
+/** record 表单 submitted 事件（复用 onStorySubmitted 的数据更新逻辑） */
+function onRecordStorySubmitted(story: any) {
+  onStorySubmitted(story)
+  showRecordForm.value = false
+}
 
 function onStarClick(starId: number) {
   const star = catalogStarLookup.get(starId); if (!star) return
@@ -2268,5 +2488,407 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   .story-enter-leave-active {
     transition: none;
   }
+}
+
+/* ════════════════════════════════════════════════ */
+/*  记录 · 归属星辰匹配（导航栏按钮 + 候选星面板） */
+/* ════════════════════════════════════════════════ */
+.nav-record-btn {
+  color: #ffe5a8 !important;
+  border-color: rgba(255, 217, 138, 0.28) !important;
+  background: rgba(255, 217, 138, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.06), inset 0 0 12px rgba(255, 217, 138, 0.05);
+  transition: all 0.2s ease !important;
+}
+.nav-record-btn:hover {
+  color: #fff !important;
+  border-color: rgba(255, 217, 138, 0.55) !important;
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.18), rgba(255, 176, 96, 0.1)) !important;
+  box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
+}
+
+/* ═══════════════════════════════════════════════
+   候选星面板 · 纯苹果 macOS sheet
+   零装饰 · 极致留白 · 严格层级
+   ═══════════════════════════════════════════════ */
+
+.cb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 16, 0.58);
+  backdrop-filter: blur(9px) saturate(160%);
+  -webkit-backdrop-filter: blur(9px) saturate(160%);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cb-fadein .22s ease-out;
+}
+@keyframes cb-fadein { from { opacity: 0 } to { opacity: 1 } }
+.candidates-fade-enter-active, .candidates-fade-leave-active { transition: opacity .28s ease }
+.candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0 }
+
+/* Sheet */
+.cb-sheet {
+  width: min(1060px, 96vw);
+  max-height: 88vh;
+  background: rgba(28, 29, 44, 0.82);
+  backdrop-filter: blur(38px) saturate(200%);
+  -webkit-backdrop-filter: blur(38px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  box-shadow:
+    0 34px 92px rgba(0, 0, 0, 0.60),
+    0 0 0 0.5px rgba(255,255,255,0.03) inset;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: cb-sheetin .32s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cb-sheetin {
+  from { opacity: 0; transform: translateY(14px) scale(0.986) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
+}
+
+/* HEADER：无分隔线，纯居中 */
+.cb-header {
+  position: relative;
+  padding: 22px 40px 10px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.cb-close {
+  position: absolute;
+  top: 17px;
+  left: 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  border: none;
+  color: rgba(255, 255, 255, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  padding: 0;
+}
+.cb-close:hover {
+  background: rgba(255, 85, 85, 0.18);
+  color: #ffd5cf;
+  transform: translateY(-0.5px);
+}
+.cb-title-group { padding: 4px 0 0 }
+.cb-title {
+  margin: 0 0 5px;
+  font-size: 21px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.005em;
+}
+.cb-subtitle {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.015em;
+}
+
+/* 卡片列表 */
+.cb-list {
+  padding: 12px 40px 30px;
+  display: flex;
+  gap: 18px;
+  overflow-y: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,217,138,0.12) transparent;
+  flex: 1;
+  min-height: 0;
+}
+.cb-list::-webkit-scrollbar { height: 5px; width: 5px }
+.cb-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.12);
+  border-radius: 10px;
+}
+
+/* 卡片：纯字段组 */
+.cb-card {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 16px 18px;
+  background: rgba(255, 255, 255, 0.032);
+  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  transition: all .22s cubic-bezier(.22, 1, .36, 1);
+  min-height: 0;
+}
+.cb-card:hover { transform: translateY(-2px) }
+.cb-card.gold:hover {
+  background: rgba(255, 217, 138, 0.050);
+  border-color: rgba(255, 217, 138, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(255, 217, 138, 0.06);
+}
+.cb-card.purple:hover {
+  background: rgba(160, 196, 255, 0.040);
+  border-color: rgba(160, 196, 255, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(160, 196, 255, 0.06);
+}
+.cb-card.submitting {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* 卡头：排名圆徽 + 星名 + 等待点亮旗 */
+.cb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.cb-rank {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8.5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.cb-rank.gold {
+  background: rgba(255, 217, 138, 0.12);
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
+  color: #ffe5a8;
+}
+.cb-rank.purple {
+  background: rgba(160, 196, 255, 0.10);
+  border: 0.5px solid rgba(160, 196, 255, 0.26);
+  color: #d4deff;
+}
+.cb-star {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cb-star-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+}
+.cb-star-const {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.44);
+  letter-spacing: 0.02em;
+}
+.cb-flag-purple {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.085);
+  color: #d9c7ff;
+  border: 0.5px solid rgba(202, 167, 255, 0.20);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* 元信息：极小字一行 */
+.cb-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cb-meta-item {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.03em;
+}
+
+/* 契合度：标签在上，条+数字在下，严格 section 级 */
+.cb-score {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-score-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.cb-score-body {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.cb-score-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 2.5px;
+  overflow: hidden;
+}
+.cb-score-fill {
+  height: 100%;
+  border-radius: 2.5px;
+  background: linear-gradient(90deg, #ffd98a, #ffb060);
+  transition: width .55s cubic-bezier(.22, 1, .36, 1);
+}
+.cb-score-fill.purple {
+  background: linear-gradient(90deg, #a0c4ff, #b8a6ff);
+}
+.cb-score-num {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffe5a8;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cb-score-num.purple { color: #d4deff }
+
+/* AI 匹配理由：极简竖线引用 */
+.cb-reason {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 12px;
+  line-height: 1.72;
+  color: rgba(255, 255, 255, 0.74);
+  text-align: justify;
+  background: rgba(255, 217, 138, 0.030);
+  border-left: 2px solid rgba(255, 217, 138, 0.28);
+  border-radius: 0 9px 9px 0;
+  letter-spacing: 0.004em;
+}
+.cb-reason.purple {
+  background: rgba(160, 196, 255, 0.028);
+  border-left-color: rgba(160, 196, 255, 0.28);
+}
+
+/* 故事内核：小标签 + chips */
+.cb-kernels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-kernels-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.cb-kernels-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.cb-kernel-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: rgba(255, 217, 138, 0.88);
+  background: rgba(255, 217, 138, 0.06);
+  letter-spacing: 0.004em;
+}
+.cb-kernel-chip.purple {
+  color: rgba(217, 199, 255, 0.92);
+  background: rgba(202, 167, 255, 0.065);
+}
+
+/* 选星按钮：和 StoryForm 同款 */
+.cb-btn {
+  width: 100%;
+  margin-top: auto;
+  padding: 12.5px 0;
+  border-radius: 13px;
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: all .18s ease, transform .1s ease;
+}
+.cb-btn.gold {
+  background: rgba(255, 217, 138, 0.12);
+  color: #ffe5a8;
+  border-color: rgba(255, 217, 138, 0.26);
+}
+.cb-btn.purple {
+  background: rgba(202, 167, 255, 0.10);
+  color: #e5d6ff;
+  border-color: rgba(202, 167, 255, 0.26);
+}
+.cb-btn:hover:not(:disabled) { transform: translateY(-0.5px) }
+.cb-btn.gold:hover:not(:disabled) {
+  background: rgba(255, 217, 138, 0.20);
+  border-color: rgba(255, 217, 138, 0.44);
+}
+.cb-btn.purple:hover:not(:disabled) {
+  background: rgba(202, 167, 255, 0.20);
+  border-color: rgba(202, 167, 255, 0.44);
+  color: #fff;
+}
+.cb-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.996);
+  filter: brightness(0.96);
+}
+.cb-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+.cb-btn-spinner {
+  width: 13px; height: 13px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: cb-spin 0.8s linear infinite;
+}
+@keyframes cb-spin { to { transform: rotate(360deg) } }
+
+/* 移动端 */
+@media (max-width: 720px) {
+  .cb-backdrop { padding: 0; align-items: flex-end }
+  .cb-sheet {
+    max-height: 94vh;
+    width: 100%;
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+    animation: cb-sheetin-mobile .36s cubic-bezier(.22, 1, .36, 1);
+  }
+  @keyframes cb-sheetin-mobile {
+    from { opacity: 0; transform: translateY(28%) }
+    to   { opacity: 1; transform: translateY(0) }
+  }
+  .cb-header { padding: 20px 26px 8px }
+  .cb-title { font-size: 18px }
+  .cb-close { top: 16px; left: 16px }
+  .cb-list {
+    padding: 10px 18px 24px;
+    flex-direction: column;
+    gap: 13px;
+  }
+  .cb-card { padding: 15px 15px 17px; gap: 12px }
 }
 </style>
