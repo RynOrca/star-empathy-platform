@@ -44,7 +44,7 @@
             <div class="sf-field">
               <div class="sf-label-row">
                 <label class="sf-label">故事</label>
-                <span class="sf-count" :class="{ warn: content.length >= 280 }">{{ content.length }}/300</span>
+                <span class="sf-count" :class="{ warn: content.length >= 1850 }">{{ content.length }}/2000</span>
               </div>
               <textarea
                 v-model="content"
@@ -52,8 +52,8 @@
                 :placeholder="mode === 'auto-match'
                   ? '此刻你想起了什么？写下你的心事…'
                   : '此刻你在这颗星下想起了什么？写下你的心事吧…'"
-                maxlength="300"
-                rows="6"
+                maxlength="2000"
+                rows="12"
                 ref="textareaRef"
               ></textarea>
             </div>
@@ -366,19 +366,20 @@ defineExpose({ doSubmit, resetForm })
 }
 @keyframes sf-fadein { from { opacity: 0 } to { opacity: 1 } }
 
-/* ── Sheet：苹果毛玻璃，22px 圆角，极细 0.5px 边 ── */
+/* ── Sheet：正式窗口，760px 宽，充足留白 ── */
 .sf-sheet {
   position: relative;
-  width: 500px;
+  width: 760px;
   max-width: 100%;
+  min-height: 620px;
   max-height: calc(100vh - 40px);
-  background: rgba(28, 29, 44, 0.82);
+  background: rgba(28, 29, 44, 0.85);
   backdrop-filter: blur(38px) saturate(200%);
   -webkit-backdrop-filter: blur(38px) saturate(200%);
-  border: 0.5px solid rgba(255, 255, 255, 0.11);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 22px;
   box-shadow:
-    0 32px 88px rgba(0, 0, 0, 0.58),
+    0 36px 96px rgba(0, 0, 0, 0.60),
     0 0 0 0.5px rgba(255,255,255,0.03) inset;
   animation: sf-sheetin .3s cubic-bezier(.22, 1, .36, 1);
   overflow: hidden;
@@ -390,19 +391,19 @@ defineExpose({ doSubmit, resetForm })
   to   { opacity: 1; transform: translateY(0) scale(1) }
 }
 
-/* ═══════ HEADER：纯居中，无分隔线 ═══════ */
+/* ═══════ HEADER：纯居中，无分隔线，正式窗口尺度 ═══════ */
 .sf-header {
   position: relative;
-  padding: 22px 36px 10px;
+  padding: 28px 48px 14px;
   text-align: center;
   flex-shrink: 0;
 }
 .sf-close {
   position: absolute;
-  top: 16px;
-  left: 18px;
-  width: 24px;
-  height: 24px;
+  top: 22px;
+  left: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.055);
   border: none;
@@ -420,30 +421,30 @@ defineExpose({ doSubmit, resetForm })
   transform: translateY(-0.5px);
 }
 .sf-title-group {
-  padding: 4px 0 0;
+  padding: 6px 0 0;
 }
-/* 大标题：21px / 700 */
+/* 大标题：23px / 700 — 正式窗口感 */
 .sf-title {
-  margin: 0 0 5px;
-  font-size: 21px;
+  margin: 0 0 7px;
+  font-size: 23px;
   font-weight: 700;
   color: #fff;
   letter-spacing: 0.005em;
 }
-/* 副标题：11.5px / 400 / 45% 白 */
+/* 副标题：12px / 400 / 45% 白 */
 .sf-subtitle {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.45);
   letter-spacing: 0.015em;
 }
 
-/* ═══════ BODY · group 包裹字段组 ═══════ */
+/* ═══════ BODY · group 包裹字段组，统一高度 ═══════ */
 .sf-body {
-  padding: 12px 36px 28px;
+  padding: 16px 48px 32px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,217,138,0.12) transparent;
@@ -456,24 +457,27 @@ defineExpose({ doSubmit, resetForm })
   border-radius: 10px;
 }
 
-/* 字段组卡片：纯苹果 inset grouped table 风 */
+/* 字段组卡片：纯苹果 inset grouped table 风 — 统一 420px min 高度 */
 .sf-group {
   background: rgba(255, 255, 255, 0.032);
   border: 0.5px solid rgba(255, 255, 255, 0.05);
   border-radius: 14px;
   overflow: hidden;
-}
-.sf-field {
-  padding: 13px 16px 14px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
 }
-/* 极细分隔：field 之间，仅 0.5px，左右 16px 缩进 */
+.sf-field {
+  padding: 16px 20px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 极细分隔：field 之间，仅 0.5px，左右 20px 缩进 */
 .sf-sep {
   height: 0.5px;
   background: rgba(255, 255, 255, 0.055);
-  margin-left: 16px;
+  margin-left: 20px;
 }
 
 /* 字段标签：10.5px / uppercase / 40% 白 —— 绝对层级差 */
@@ -505,7 +509,7 @@ defineExpose({ doSubmit, resetForm })
 }
 .sf-count.warn { color: rgba(232, 168, 76, 0.82) }
 
-/* 输入：无边框纯透明底，14.5px，无聚焦光晕 */
+/* 输入：无边框纯透明底，15px，无聚焦光晕 */
 .sf-input {
   width: 100%;
   box-sizing: border-box;
@@ -514,8 +518,8 @@ defineExpose({ doSubmit, resetForm })
   border: none;
   color: rgba(255, 255, 255, 0.94);
   font-family: inherit;
-  font-size: 14.5px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   outline: none;
 }
 .sf-input::placeholder {
@@ -523,14 +527,15 @@ defineExpose({ doSubmit, resetForm })
 }
 .sf-input-title {
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 16.5px;
   letter-spacing: 0.005em;
 }
 .sf-textarea {
   resize: vertical;
-  min-height: 138px;
-  line-height: 1.7;
+  min-height: 300px;
+  line-height: 1.8;
   letter-spacing: 0.004em;
+  padding-top: 2px;
 }
 
 /* 星名徽章：小胶囊 */
@@ -548,24 +553,24 @@ defineExpose({ doSubmit, resetForm })
   letter-spacing: 0.01em;
 }
 
-/* iOS Segmented Control */
+/* iOS Segmented Control — 放大版 */
 .sf-seg {
-  padding: 2.5px;
+  padding: 3px;
   background: rgba(255, 255, 255, 0.03);
   border: 0.5px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+  border-radius: 11px;
   display: flex;
   gap: 0;
 }
 .sf-seg-btn {
   flex: 1;
-  padding: 7px 2px;
+  padding: 9px 2px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 9px;
   color: rgba(255, 255, 255, 0.5);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all .18s cubic-bezier(.22, 1, .36, 1);
@@ -581,17 +586,17 @@ defineExpose({ doSubmit, resetForm })
     0 0 0 0.5px rgba(255, 217, 138, 0.30);
 }
 
-/* Checkbox：极简方角 */
+/* Checkbox：极简方角 — 放大 */
 .sf-check {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
 }
 .sf-check-box {
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5.5px;
   background: rgba(255, 255, 255, 0.045);
   border: 0.5px solid rgba(255, 255, 255, 0.12);
   display: flex;
@@ -599,7 +604,7 @@ defineExpose({ doSubmit, resetForm })
   justify-content: center;
   transition: all .18s ease;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 0;
 }
 .sf-check-box.on {
   background: linear-gradient(180deg, #ffd98a, #e9c378);
@@ -609,16 +614,16 @@ defineExpose({ doSubmit, resetForm })
 .sf-check-mark { color: transparent; stroke-width: 4; transition: color .18s ease }
 .sf-check-box.on .sf-check-mark { color: #2a1f0c }
 .sf-check-text {
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.86);
   line-height: 1.45;
   letter-spacing: 0.004em;
 }
 .sf-check-sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.36);
-  margin-top: 1px;
+  margin-top: 2px;
   letter-spacing: 0;
   font-weight: 400;
 }
@@ -627,13 +632,13 @@ defineExpose({ doSubmit, resetForm })
 .sf-back {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   background: none;
   border: none;
-  padding: 1px 3px;
+  padding: 1px 4px;
   color: rgba(255, 217, 138, 0.78);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   align-self: flex-start;
@@ -644,39 +649,40 @@ defineExpose({ doSubmit, resetForm })
   transform: translateX(-1px);
 }
 
-/* 错误提示：极简 */
+/* 错误提示：极简 — 放大 */
 .sf-error {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
-  padding: 9px 14px;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 11px 16px;
+  font-size: 13px;
+  line-height: 1.55;
   color: #ff9e90;
   background: rgba(255, 139, 125, 0.07);
   border: 0.5px solid rgba(255, 139, 125, 0.20);
   border-radius: 10px;
 }
 
-/* Primary 按钮：纯苹果风格 */
+/* Primary 按钮：纯苹果风格 — 放大版 */
 .sf-primary {
   width: 100%;
-  padding: 13.5px 0;
-  border-radius: 13px;
+  padding: 15px 0;
+  border-radius: 14px;
   border: 0.5px solid rgba(255, 217, 138, 0.26);
   background: rgba(255, 217, 138, 0.12);
   color: #ffe5a8;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.008em;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   transition: all .18s ease, transform .1s ease;
+  margin-top: auto;
 }
 .sf-primary:hover:not(:disabled) {
   background: rgba(255, 217, 138, 0.20);
@@ -696,33 +702,33 @@ defineExpose({ doSubmit, resetForm })
   color: #fff3cd;
 }
 
-/* ══════════ 匹配遮罩 ══════════ */
+/* ══════════ 匹配遮罩 — 放大版 ══════════ */
 .sf-fade-enter-active, .sf-fade-leave-active { transition: opacity .26s ease }
 .sf-fade-enter-from, .sf-fade-leave-to { opacity: 0 }
 
 .sf-mask {
   position: absolute;
   inset: 0;
-  background: rgba(8, 7, 18, 0.70);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(8, 7, 18, 0.72);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 5;
-  padding: 24px;
+  padding: 32px;
 }
 .sf-match {
   width: 100%;
-  max-width: 340px;
-  padding: 26px 24px 24px;
-  background: rgba(30, 31, 48, 0.90);
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
+  max-width: 420px;
+  padding: 34px 32px 30px;
+  background: rgba(30, 31, 48, 0.92);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   border: 0.5px solid rgba(255, 255, 255, 0.09);
-  border-radius: 18px;
+  border-radius: 20px;
   text-align: center;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.52);
   animation: sf-matchin .32s cubic-bezier(.22, 1, .36, 1);
 }
 @keyframes sf-matchin {
@@ -733,9 +739,9 @@ defineExpose({ doSubmit, resetForm })
 /* Progress Ring */
 .sf-ring {
   position: relative;
-  width: 58px;
-  height: 58px;
-  margin: 2px auto 14px;
+  width: 72px;
+  height: 72px;
+  margin: 4px auto 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -744,23 +750,23 @@ defineExpose({ doSubmit, resetForm })
 .sf-ring-track {
   fill: none;
   stroke: rgba(255, 255, 255, 0.07);
-  stroke-width: 2.8;
+  stroke-width: 3.2;
 }
 .sf-ring-fill {
   fill: none;
   stroke: #ffd98a;
-  stroke-width: 2.8;
+  stroke-width: 3.2;
   stroke-linecap: round;
-  stroke-dasharray: 170;
-  stroke-dashoffset: 30;
+  stroke-dasharray: 214;
+  stroke-dashoffset: 40;
   animation: sf-ring-rotate 2.4s cubic-bezier(.55, 0, .45, 1) infinite;
-  filter: drop-shadow(0 0 6px rgba(255, 217, 138, 0.40));
+  filter: drop-shadow(0 0 8px rgba(255, 217, 138, 0.42));
   transform-origin: 50% 50%;
 }
 @keyframes sf-ring-rotate {
-  0%   { stroke-dashoffset: 170; transform: rotate(0deg) }
-  45%  { stroke-dashoffset: 30;  transform: rotate(180deg) }
-  100% { stroke-dashoffset: 170; transform: rotate(540deg) }
+  0%   { stroke-dashoffset: 214; transform: rotate(0deg) }
+  45%  { stroke-dashoffset: 40;  transform: rotate(180deg) }
+  100% { stroke-dashoffset: 214; transform: rotate(540deg) }
 }
 .sf-ring-icon {
   position: absolute;
@@ -772,35 +778,36 @@ defineExpose({ doSubmit, resetForm })
   50%      { opacity: 1;    transform: scale(1.1) }
 }
 .sf-match-title {
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 600;
   color: #fff;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   letter-spacing: 0.008em;
 }
 .sf-match-desc {
-  font-size: 12px;
-  line-height: 1.72;
-  color: rgba(255, 255, 255, 0.52);
+  font-size: 13px;
+  line-height: 1.78;
+  color: rgba(255, 255, 255, 0.54);
   margin: 0;
-  padding: 0 8px;
+  padding: 0 10px;
 }
 .sf-match-error {
-  margin-top: 12px;
-  padding: 8px 12px;
-  font-size: 12px;
-  line-height: 1.5;
+  margin-top: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
   color: #ff9e90;
   background: rgba(255, 139, 125, 0.07);
   border: 0.5px solid rgba(255, 139, 125, 0.20);
-  border-radius: 9px;
+  border-radius: 10px;
 }
 
 /* 移动端 */
 @media (max-width: 640px) {
   .sf-overlay { padding: 0; align-items: flex-end }
   .sf-sheet {
-    max-height: 92vh;
+    min-height: 0;
+    max-height: 94vh;
     width: 100%;
     border-radius: 22px 22px 0 0;
     border-bottom: none;
@@ -810,12 +817,17 @@ defineExpose({ doSubmit, resetForm })
     from { opacity: 0; transform: translateY(28%) }
     to   { opacity: 1; transform: translateY(0) }
   }
-  .sf-header { padding: 18px 24px 8px }
+  .sf-header { padding: 18px 24px 10px }
   .sf-title { font-size: 19px }
   .sf-close { left: 14px; top: 14px }
-  .sf-body { padding: 10px 24px 26px; gap: 16px }
-  .sf-seg-btn { font-size: 12px; padding: 7px 2px }
-  .sf-primary { padding: 13px 0; font-size: 14px }
-  .sf-match { padding: 22px 20px 22px }
+  .sf-body { padding: 10px 24px 24px; gap: 16px }
+  .sf-group { min-height: 0 }
+  .sf-field { padding: 14px 18px 15px }
+  .sf-sep { margin-left: 18px }
+  .sf-textarea { min-height: 220px }
+  .sf-seg-btn { font-size: 12.5px; padding: 8px 2px }
+  .sf-primary { padding: 14px 0; font-size: 14.5px; margin-top: 0 }
+  .sf-match { max-width: 100%; padding: 26px 22px 24px }
+  .sf-ring { width: 60px; height: 60px }
 }
 </style>
