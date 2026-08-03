@@ -260,34 +260,32 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .story-sender.is-anon { color: #5a5580; }
 
-/* ── 开放标签通用样式（正文下方、meta 上方） ── */
+/* ── 开放标签通用样式（正文下方、meta 上方，紧凑分隔带） ── */
 .story-tag {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 2px 9px;
+  border-radius: 11px;
   font-size: 0.68rem;
   font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
   transition: transform .15s ease, filter .15s ease, opacity .15s ease;
   border: 0.5px solid transparent;
 }
 .story-tag:hover {
   filter: brightness(1.06);
-  transform: translateY(-0.5px);
+  transform: translateY(-0.3px);
 }
 .story-tag-inline:first-child { margin-left: 0; }
 .story-tags-row {
   display: flex; flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  padding: 4px 2px;
-  border-top: 1px dashed var(--rule);
-  border-bottom: 1px dashed var(--rule);
-  padding-top: 9px;
-  padding-bottom: 9px;
+  gap: 4px 7px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  padding: 6px 2px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
 }
 
 /* ─── Story Image ─── */

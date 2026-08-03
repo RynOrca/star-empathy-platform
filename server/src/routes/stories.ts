@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
-import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent } from '../services/kernel';
+import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent, extractSuggestedTagsForContent } from '../services/kernel';
 
 const router = Router();
 
@@ -183,6 +183,33 @@ router.patch('/:storyId/kernel', (req: Request, res: Response) => {
     ok(res, '内核已更新', updated);
   } catch (error) {
     console.error('PATCH /api/stories/:storyId/kernel error:', error);
+    serverError(res);
+  }
+});
+
+// 为一段新故事（尚未落库）仅生成 AI 建议标签，轻量接口（不做星星匹配）
+// Body: { title?: string, content: string }
+router.post('/ai-tags', authOptional, async (req: Request, res: Response) => {
+  try {
+    const { title, content } = req.body;
+    if (!content || typeof content !== 'string') {
+      return badRequest(res, 'content 不能为空');
+    }
+    const trimmed = content.trim();
+    if (trimmed.length < 1 || trimmed.length > 2000) {
+      return badRequest(res, 'content 长度需在 1~2000 字之间');
+    }
+    const result = await extractSuggestedTagsForContent(
+      typeof title === 'string' && title.trim() ? title.trim() : null,
+      trimmed,
+    );
+    ok(res, 'success', result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('POST /api/stories/ai-tags error:', msg);
+    if (msg.includes('DEEPSEEK_API_KEY') || msg.includes('未设置')) {
+      return badRequest(res, 'AI 服务未配置，请先在设置中填入 API Key');
+    }
     serverError(res);
   }
 });

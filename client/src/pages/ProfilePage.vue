@@ -1693,13 +1693,13 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Card foot：标签在左、共鸣在右，不混在一起；结构独立更清爽 */
+/* Card foot：标签在左、共鸣在右，不混在一起；紧凑分隔 */
 .pd-t-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-top: 14px;
+  gap: 8px;
+  padding-top: 9px;
   border-top: 1px solid rgba(255,217,138,0.1);
   font-size: 0.72rem;
   color: rgba(255,217,138,0.6);
@@ -1707,10 +1707,7 @@ onBeforeUnmount(() => {
 /* 独立标签行：标签胶囊左侧对齐，右侧保留共鸣数；flex-wrap 避免窄屏溢出 */
 .pd-t-foot {
   flex-wrap: wrap;
-  padding-bottom: 2px;
-}
-.pd-t-foot .pd-t-tag {
-  /* 沿用胶囊样式 */
+  padding-bottom: 0;
 }
 .pd-t-sep { flex: 1; }
 .pd-t-res {
@@ -1718,28 +1715,28 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 
-/* 开放标签胶囊样式：圆角 12px，取消方角 2px；独立视觉不硬贴 border */
+/* 开放标签胶囊样式：圆角 11px，compact */
 .pd-t-tag {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 2px 9px;
+  border-radius: 11px;
   border: 0.5px solid transparent; /* 真正的色值走 tagStyle() 内联 */
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
   transition: transform .15s ease, filter .15s ease;
 }
-.pd-t-tag:hover { filter: brightness(1.06); transform: translateY(-0.5px); }
+.pd-t-tag:hover { filter: brightness(1.06); transform: translateY(-0.3px); }
 
-/* 详情弹窗正文下方的标签行：上下虚线分隔，和卡片细节一致 */
+/* 详情弹窗正文下方的标签行：紧凑上下虚线分隔 */
 .pd-story-tags {
-  display: flex; flex-wrap: wrap; gap: 6px 8px;
+  display: flex; flex-wrap: wrap; gap: 4px 7px;
   align-items: center;
-  padding: 10px 2px;
-  margin-top: 20px;
-  border-top: 1px dashed var(--pd-rule);
-  border-bottom: 1px dashed var(--pd-rule);
+  padding: 6px 2px;
+  margin-top: 12px;
+  border-top: 0.5px dashed var(--pd-rule);
+  border-bottom: 0.5px dashed var(--pd-rule);
 }
 
 /* Tag 开放染色 — 旧 5 色保留作向后兼容，但新标签统一走内联 tagStyle() */

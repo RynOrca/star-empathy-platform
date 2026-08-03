@@ -89,13 +89,23 @@
               <div class="sf-sep"></div>
             </template>
 
-            <!-- 情绪 / 标签：AI 建议 chips + 多选 + 自定义输入 -->
+              <!-- 情绪 / 标签：AI 建议 chips + 多选 + 自定义输入 -->
             <div class="sf-field">
               <div class="sf-label-row">
                 <label class="sf-label">
-                  {{ mode === 'auto-match' && props.suggestedTags?.length ? 'AI 建议标签' : '标签' }}
+                  {{ hasLiveSuggestions ? 'AI 建议标签' : '标签' }}
                 </label>
                 <span class="sf-label-sub">最多选 {{ MAX_TAGS }} 个 · 2-6 字</span>
+                <button
+                  type="button"
+                  class="sf-refresh-tags"
+                  :disabled="aiSuggestLoading || !canRequestSuggestions"
+                  :title="canRequestSuggestions ? '重新生成标签' : '先写点内容再生成'"
+                  @click.stop.prevent="refreshAiTags(true)"
+                >
+                  <RefreshCw :size="11" :class="{ spin: aiSuggestLoading }" />
+                  <span>{{ aiSuggestLoading ? '生成中…' : 'AI 推荐' }}</span>
+                </button>
               </div>
 
               <!-- 已选标签（带 × 关闭） -->
@@ -118,13 +128,13 @@
                 </span>
               </div>
 
-              <!-- AI 建议标签（未选中的可点击添加） -->
+              <!-- AI 建议标签（两种模式都展示：外部 props.suggestedTags + 内部实时 aiSuggestedTags，未选中的可点击添加） -->
               <div
-                v-if="mode === 'auto-match' && props.suggestedTags?.length"
+                v-if="allSuggestedTagsUnpicked.length"
                 class="sf-chips sf-chips-suggest"
               >
                 <button
-                  v-for="t in props.suggestedTags.filter(x => !selectedTags.includes(x))"
+                  v-for="t in allSuggestedTagsUnpicked"
                   :key="'sug-' + t"
                   type="button"
                   class="sf-chip suggest"
@@ -136,6 +146,10 @@
                   <span>{{ t }}</span>
                 </button>
               </div>
+              <p v-if="aiSuggestError" class="sf-tag-error">
+                <AlertCircle :size="11" />
+                <span>{{ aiSuggestError }}</span>
+              </p>
 
               <!-- 自定义输入 -->
               <div class="sf-custom">
@@ -225,7 +239,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick } from 'vue'
-import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus } from 'lucide-vue-next'
+import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus, RefreshCw } from 'lucide-vue-next'
 import { useLocation } from '../composables/useLocation'
 
 const props = withDefaults(defineProps<{
@@ -342,6 +356,138 @@ function chipStyle(tag: string) {
     background,
   } as const
 }
+
+/* ════════════════════════════════════════════════════════════
+   LIVE AI TAG SUGGEST · 实时 AI 标签推荐（600ms debounce）
+   ════════════════════════════════════════════════════════════ */
+const aiSuggestedTags = ref<string[]>([])
+const aiSuggestLoading = ref(false)
+const aiSuggestError = ref('')
+let _suggestTimer: ReturnType<typeof setTimeout> | null = null
+let _suggestReqSeq = 0
+let _suggestedAtLeastOnce = false
+/** 用户最少多少内容才触发 AI：避免标题十几个字的时候瞎猜浪费请求。 */
+const canRequestSuggestions = computed<boolean>(() => {
+  const tLen = title.value.trim().length
+  const cLen = content.value.trim().length
+  return (tLen + cLen) >= 20
+})
+/** 合并两种来源的 AI 建议：外部 props.suggestedTags（AI 匹配接口回传的）
+ *  + 本组件内部实时建议），去重、过滤不合规的，最多展示 8 条。*/
+const allSuggestedTags = computed<string[]>(() => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const sources = [
+    ...(props.suggestedTags ?? []),
+    ...aiSuggestedTags.value,
+  ]
+  for (const raw of sources) {
+    if (!raw || typeof raw !== 'string') continue
+    const v = raw.trim()
+    if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(v)) continue
+    if (seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+    if (out.length >= 8) break
+  }
+  return out
+})
+const allSuggestedTagsUnpicked = computed<string[]>(() =>
+  allSuggestedTags.value.filter((t) => !selectedTags.value.includes(t))
+)
+const hasLiveSuggestions = computed<boolean>(() => allSuggestedTags.value.length > 0)
+
+/** 调用 AI 取标签：独立接口 /api/stories/ai-tags
+   失败不阻塞任何其他业务。外部 props.suggestedTags 是候选；
+   有后端还没暴露独立接口时 fallback 去调了复用 /api/match-star，从返回里取 suggestedTags 字段 */
+async function refreshAiTags(force: boolean = false) {
+  const trimmedTitle = title.value.trim()
+  const trimmed = content.value.trim()
+  if (!canRequestSuggestions.value) {
+    aiSuggestedTags.value = []
+    aiSuggestError.value = ''
+    return
+  }
+  clearTimeout(_suggestTimer!)
+  _suggestTimer = null
+  _suggestReqSeq += 1
+  const seq = _suggestReqSeq
+  aiSuggestLoading.value = true
+  aiSuggestError.value = ''
+  try {
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    // 优先走 /api/stories/ai-tags（轻量仅 tag）；404 时退化到 /api/stories/match-star，从返回里取 suggestedTags
+    let tags: string[] = []
+    const r1 = await fetch('/api/stories/ai-tags', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ title: trimmedTitle, content: trimmed }),
+    })
+    if (r1.ok) {
+      const j = await r1.json()
+      tags = Array.isArray(j?.data?.tags) ? j.data.tags : []
+    } else if (r1.status === 404) {
+      const r2 = await fetch('/api/stories/match-star', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title: trimmedTitle, content: trimmed, top: 3 }),
+      })
+      if (r2.ok) {
+        const j2 = await r2.json()
+        tags = Array.isArray(j2?.data?.suggestedTags) ? j2.data.suggestedTags : []
+      } else {
+        aiSuggestLoading.value = false
+        return
+      }
+    } else {
+      aiSuggestLoading.value = false
+      return
+    }
+    if (_suggestReqSeq !== seq) return /* 过期请求丢弃 */
+    // 规范化：TAG_RE 过滤、去重、最多 8 条
+    const seen = new Set<string>()
+    const clean: string[] = []
+    for (const raw of tags) {
+      if (typeof raw !== 'string') continue
+      const v = raw.trim()
+      if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(v)) continue
+      if (seen.has(v)) continue
+      seen.add(v); clean.push(v)
+      if (clean.length >= 8) break
+    }
+    aiSuggestedTags.value = clean
+    _suggestedAtLeastOnce = true
+    if (!clean.length && force) aiSuggestError.value = '这次没什么合适的标签，继续写点内容再试试吧~'
+  } catch (e) {
+    if (_suggestReqSeq !== seq) return
+    if (force) aiSuggestError.value = 'AI 暂时无法生成标签，请稍后手动添加'
+  } finally {
+    if (_suggestReqSeq === seq) aiSuggestLoading.value = false
+  }
+}
+
+/* 防抖调用：标题 / 正文变化 600ms 后触发；只有进入 step 2 才真正发请求；内容不足时清空建议 */
+function scheduleAiTagsRefresh() {
+  clearTimeout(_suggestTimer!)
+  if (!canRequestSuggestions.value) {
+    if (_suggestedAtLeastOnce) aiSuggestedTags.value = []
+    return
+  }
+  _suggestTimer = setTimeout(() => {
+    _suggestTimer = null
+    if (step.value === 2) refreshAiTags(false)
+  }, 600)
+}
+watch([title, content], scheduleAiTagsRefresh, { flush: 'post' })
+watch(step, (ns, os) => {
+  if (ns === 2 && os !== 2) {
+    // 进入 step 2 立即触发 1 次
+    nextTick(() => refreshAiTags(false))
+  }
+})
+onBeforeUnmount(() => { if (_suggestTimer) clearTimeout(_suggestTimer) })
 
 const stepProgress = computed(() => props.matchingStep || 0)
 
@@ -639,8 +785,11 @@ defineExpose({ doSubmit, resetForm })
 .sf-label-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
 }
+.sf-label-row .sf-label { margin-right: auto; }
 .sf-label-sub {
   font-size: 10.5px;
   color: rgba(255, 255, 255, 0.26);
@@ -655,6 +804,46 @@ defineExpose({ doSubmit, resetForm })
   font-variant-numeric: tabular-nums;
 }
 .sf-count.warn { color: rgba(232, 168, 76, 0.82) }
+/* AI 标签推荐按钮（sf-label-row 最右） */
+.sf-refresh-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 100px;
+  border: 0.5px solid rgba(255,217,138,0.20);
+  background: rgba(255,217,138,0.05);
+  color: #ffe5a8;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background .15s ease, filter .15s ease, transform .15s ease, opacity .15s ease;
+}
+.sf-refresh-tags:hover:not(:disabled) {
+  background: rgba(255,217,138,0.085);
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.sf-refresh-tags:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+.sf-refresh-tags .spin {
+  animation: sf-spin 0.9s linear infinite;
+}
+@keyframes sf-spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+/* AI 生成失败的标签提示（轻量、不抢视觉） */
+.sf-tag-error {
+  margin: 4px 0 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: rgba(255, 160, 140, 0.72);
+  opacity: 0.86;
+}
 
 /* 输入：无边框纯透明底，15px，无聚焦光晕 */
 .sf-input {

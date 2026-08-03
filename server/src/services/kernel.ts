@@ -763,6 +763,37 @@ function extractSuggestedTags(
   return out.slice(0, 5);
 }
 
+/** 轻量版：仅为一段尚未落库的正文/标题生成 3-5 个 AI 建议标签
+ *  避免走完整的星星匹配（Jaccard+AI重排），用于「发故事时实时标签推荐」场景。
+ *  流程：generateKernel() → extractSuggestedTags()，失败时退化为情绪词典纯本地命中。
+ */
+export async function extractSuggestedTagsForContent(
+  title: string | null,
+  content: string,
+): Promise<{ tags: string[] }> {
+  if (!content || !content.trim()) {
+    return { tags: [] }
+  }
+  const trimmed = content.trim()
+  const trimmedTitle = title?.trim() || null
+
+  let emotions: string[] = []
+  let themes: string[] = []
+  try {
+    const kernel = await generateKernel(trimmed, trimmedTitle)
+    emotions = kernel.emotionalTags
+    themes = kernel.themes
+  } catch (err) {
+    // AI 生成失败：降级为本地纯词典命中，保证 UI 仍有结果
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[ai-tags] generateKernel 失败，降级为本地词典:', msg.slice(0, 160))
+    emotions = []
+    themes = []
+  }
+  const tags = extractSuggestedTags(emotions, themes, trimmedTitle, trimmed)
+  return { tags }
+}
+
 export async function findMatchingStarsForContent(
   title: string | null,
   content: string,

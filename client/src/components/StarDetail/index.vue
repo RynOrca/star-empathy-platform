@@ -2149,37 +2149,36 @@ watch(() => props.catalogStarId, () => {
 .meta-user {
   color: rgba(255, 255, 255, 0.35);
 }
-/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更规整 */
+/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更紧凑 */
 .card-tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  padding: 8px 2px;
-  border-top: 1px dashed var(--rule);
-  border-bottom: 1px dashed var(--rule);
+  gap: 4px 7px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding: 5px 1px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
 }
-/* meta 行内嵌式标签（如共鸣榜 Top 卡原来的形式）：保持独立容器更统一，
-   这里保留 class 不删向后兼容，但视觉走 card-tags */
+/* meta 行内嵌式标签（向后兼容但不作为默认视觉） */
 .card-tags-inline {
   /* 复用默认 card-tags 样式，不额外覆盖 */
 }
 /* story-tag 基础形态：彩色胶囊 + 内描边 0.5px + 色值来自 storyTagStyle() */
 .story-tag {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.64rem;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 0.62rem;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  line-height: 1.5;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
   transition: transform .15s ease, filter .15s ease;
 }
 .story-tag:hover {
   filter: brightness(1.06);
-  transform: translateY(-0.5px);
+  transform: translateY(-0.3px);
 }
 .story-tag-inline:first-child { margin-left: 0; }
 

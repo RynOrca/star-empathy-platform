@@ -275,20 +275,20 @@ function tagStyle(tag: string): Record<string, string> {
 .detail-tags {
   display: flex; flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  margin-top: 18px;
+  gap: 4px 7px;
+  margin-top: 12px;
   margin-bottom: 0;
-  padding: 10px 2px;
-  border-top: 1px dashed var(--rule);
-  border-bottom: 1px dashed var(--rule);
+  padding: 6px 2px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
 }
 .detail-tag {
-  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  display: inline-block; padding: 2px 9px; border-radius: 11px;
   font-size: 0.68rem; font-weight: 500;
-  line-height: 1.5; letter-spacing: 0.02em;
+  line-height: 1.45; letter-spacing: 0.01em;
   transition: transform .15s ease, filter .15s ease, opacity .15s ease;
 }
-.detail-tag:hover { filter: brightness(1.08); transform: translateY(-0.5px); }
+.detail-tag:hover { filter: brightness(1.08); transform: translateY(-0.3px); }
 
 .detail-body {
   flex: 1;
