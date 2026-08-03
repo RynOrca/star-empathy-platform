@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -963,10 +963,36 @@ interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
   catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
-  username: string | null; tag: string | null; userId: number | null
+  username: string | null; tag: string | null; tags?: string[] | null; userId: number | null
   imageUrl: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null }
+
+/** 统一 tags 字段归一化：tags[] 存在(且数组)→ 最多 5 条/去重；否则回退 tag 单列；最后兜底空数组
+ *  避免任何端上出现 undefined/null → displayTags 兜底能保证显示，但是 SkyPage 主动构造 StoryData 时
+ *  把 s.tags 可能是 JSON 字符串/数组/undefined 的 3 种形态全部归一化成 string[]。*/
+function normalizeStoryTags(s: { tag?: string | null; tags?: unknown } | null | undefined): string[] {
+  if (!s) return []
+  // 1) tags 是数组 → 过滤 string 非空
+  if (Array.isArray(s.tags)) {
+    const arr = s.tags.filter((t) => typeof t === 'string' && t.trim().length > 0 && /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t.trim())) as string[]
+    if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  }
+  // 2) tags 是字符串：可能是 JSON 串（后端没走 convertKeys parse 的异常场景），也可能是旧逗号拼
+  if (typeof s.tags === 'string' && s.tags.length) {
+    try {
+      const p = JSON.parse(s.tags)
+      if (Array.isArray(p)) {
+        const arr = p.filter((t) => typeof t === 'string' && t.trim().length > 0 && /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t.trim())) as string[]
+        if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+      }
+    } catch { /* 不是 JSON：继续往下兜底单 tag */ }
+  }
+  // 3) 最后兜底老 tag 列
+  if (typeof s.tag === 'string' && s.tag.trim()) return [s.tag.trim()]
+  return []
+}
+
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -987,7 +1013,7 @@ function mergeStoriesIntoMap(
       createdAt: s.createdAt || '',
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
-      username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
+      username: s.username ?? null, tag: s.tag ?? null, tags: normalizeStoryTags(s), userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
     }
     for (const cid of cids) {
@@ -1271,6 +1297,7 @@ const pendingRecordPayload = ref<{
   title: string
   content: string
   tag: string | null
+  tags: string[]
   isAnonymous: boolean
 } | null>(null)
 
@@ -1303,11 +1330,11 @@ function closeMatchCandidates() {
 
 /** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
 async function onRecordRequestMatch(payload: {
-  title: string; content: string; tag: string | null; isAnonymous: boolean
+  title: string; content: string; tag: string | null; tags: string[]; isAnonymous: boolean
 }) {
   if (isGuest.value) { goLogin(); return }
   // 暂存表单，选完候选星后再真提交
-  pendingRecordPayload.value = payload
+  pendingRecordPayload.value = { ...payload, tags: payload.tags ? [...payload.tags] : [] }
   try {
     const res = await recordMatching.matchStars(payload.title, payload.content, 3)
     if (!res.candidates.length) {
@@ -1347,7 +1374,12 @@ async function pickCandidate(c: MatchCandidate) {
   if (!pendingRecordPayload.value || !recordFormRef.value) return
   submittingCandidateId.value = c.catalogStarId
   try {
-    const res = await recordFormRef.value.doSubmit(c.catalogStarId, [c.catalogStarId])
+    const res = await recordFormRef.value.doSubmit(
+      c.catalogStarId,
+      [c.catalogStarId],
+      // 用「用户点匹配按钮那一刻的快照标签」覆盖，避免用户在匹配完成前/后改了表单 selectedTags
+      pendingRecordPayload.value.tags ?? [],
+    )
     if (!res?.ok) {
       submittingCandidateId.value = null
       return
@@ -1366,7 +1398,11 @@ async function pickRandomCandidate() {
   const catalogStarId = randomCandidate.value.catalogStarId
   submittingCandidateId.value = -(catalogStarId + 1)
   try {
-    const res = await recordFormRef.value.doSubmit(catalogStarId, [catalogStarId])
+    const res = await recordFormRef.value.doSubmit(
+      catalogStarId,
+      [catalogStarId],
+      pendingRecordPayload.value.tags ?? [],
+    )
     if (!res?.ok) {
       submittingCandidateId.value = null
       return

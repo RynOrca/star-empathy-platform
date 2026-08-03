@@ -389,6 +389,11 @@ watch(() => [props.mode, props.starName] as const, () => {
 async function doSubmit(
   targetCatalogStarId: number,
   targetCatalogStarIds?: number[],
+  /** 外部可覆盖要写入的多标签；用于 auto-match 场景：
+   *  用户在匹配流程中暂存于 SkyPage pendingRecordPayload.tags 的选中结果，
+   *  能确保哪怕中途被 UI 重置（比如 resetForm / step 切换副作用）也不会丢多标签，
+   *  避免用户填了 N 个标签结果 DB 只写了 1 个（selectedTags 为空时 fallback 到 tag 单列）。 */
+  overrideTags?: string[] | null | undefined,
 ): Promise<{ ok: boolean; story?: any; errorMsg?: string }> {
   const trimmedTitle = title.value.trim()
   const trimmed = content.value.trim()
@@ -397,6 +402,20 @@ async function doSubmit(
   }
   submitting.value = true
   error.value = ''
+  // 多标签：overrideTags 优先（匹配链路由 SkyPage 传入的暂存值），否则用当前表单 selectedTags
+  const finalTags: string[] = (() => {
+    const raw = Array.isArray(overrideTags) && overrideTags.length
+      ? overrideTags
+      : selectedTags.value.slice()
+    // 过滤空 / 不符合规则的异常词
+    return raw
+      .map((t) => (typeof t === 'string' ? t.trim() : ''))
+      .filter((t) => /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t))
+      .filter((t, i, arr) => arr.indexOf(t) === i)
+      .slice(0, 5)
+  })()
+  // 主情绪标签：取 finalTags[0]；否则保留 firstTag（selectedTags[0]）
+  const effectivePrimaryTag = finalTags[0] ?? firstTag.value ?? null
   try {
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -407,8 +426,8 @@ async function doSubmit(
       title: trimmedTitle,
       content: trimmed,
       location: userLocation.value,
-      tag: firstTag.value,
-      tags: selectedTags.value.slice(),
+      tag: effectivePrimaryTag,
+      tags: finalTags,
       isAnonymous: isAnonymous.value,
     }
     const res = await fetch('/api/stories', {
@@ -418,10 +437,10 @@ async function doSubmit(
     })
     const json = await res.json()
     if (res.ok) {
-      // tags 数组：优先用后端返回的 tags[]（已规范化），否则退回选中的
+      // tags 数组：优先用后端返回的 tags[]（已规范化），否则退回 finalTags
       const submittedTagsArr: string[] = Array.isArray(json.data?.tags) && json.data.tags.length
         ? json.data.tags
-        : selectedTags.value.slice()
+        : finalTags.slice()
       const submittedStory = {
         id: json.data.id,
         title: json.data.title,
@@ -436,7 +455,7 @@ async function doSubmit(
         viewCount: 0,
         origin: null,
         username: json.data.username ?? null,
-        tag: json.data.tag ?? firstTag.value,
+        tag: json.data.tag ?? effectivePrimaryTag,
         tags: submittedTagsArr,
         userId: json.data.userId ?? null,
         imageUrl: null,
