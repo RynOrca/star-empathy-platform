@@ -14,7 +14,7 @@
       <template v-if="variant === 'all'">
         <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
-        <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
+        <span v-if="story.tag" class="story-tag" :style="tagStyle(story.tag)">{{ story.tag }}</span>
         <button
           class="resonate-btn"
           :class="{ done: isResonated }"
@@ -99,6 +99,23 @@ defineEmits<{
   click: []
   resonate: []
 }>()
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+function tagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.24)`
+  const bg = `hsla(${h}, 62%, 74%, 0.07)`
+  return { color, borderColor: border, backgroundColor: bg, border: '0.5px solid ' + border }
+}
 </script>
 
 <style scoped>
@@ -222,17 +239,13 @@ defineEmits<{
 }
 .story-sender.is-anon { color: #5a5580; }
 
-/* ── 情绪标签色 ── */
+/* ── 开放标签通用样式（旧 5 色保留向后兼容，但不再单独写 class） ── */
 .story-tag {
   display: inline-block; padding: 2px 8px; border-radius: 10px;
   font-size: 0.7rem; font-weight: 500; margin-left: 4px;
-  background: var(--overlay-08); color: var(--muted-light);
+  line-height: 1.4;
+  transition: all .15s ease;
 }
-.story-tag.tag-思念 { color: #ff8b7d; }
-.story-tag.tag-等待 { color: #86a8ff; }
-.story-tag.tag-离别 { color: #caa7ff; }
-.story-tag.tag-愿望 { color: #ffd98a; }
-.story-tag.tag-孤独 { color: #95f0c0; }
 
 /* ─── Story Image ─── */
 .story-image {

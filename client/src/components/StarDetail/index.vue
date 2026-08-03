@@ -140,7 +140,7 @@
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
                         <div class="card-tags" v-if="s.tag">
-                          <span class="story-tag">#{{ s.tag }}</span>
+                          <span class="story-tag" :style="storyTagStyle(s.tag)">#{{ s.tag }}</span>
                         </div>
                       </div>
                     </div>
@@ -370,6 +370,7 @@
                   'tag-theme': t.type === 'theme',
                   'tag-custom': t.custom,
                 }"
+                :style="infoTagStyle(t.tag, t.custom ? 'custom' : t.type)"
               >
                 {{ t.tag }}
                 <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
@@ -894,6 +895,47 @@ function storySummary(content: string): string {
     .replace(/\s+/g, ' ')
     .trim()
   return text.length > 26 ? text.slice(0, 26) + '…' : text
+}
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function _tagHashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 故事卡片 story-tag 的染色（用在 userStories / top 卡片内） */
+function storyTagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(_tagHashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.22)`
+  const bg = `hsla(${h}, 62%, 74%, 0.06)`
+  return {
+    color,
+    backgroundColor: bg,
+    borderColor: border,
+    border: '0.5px solid ' + border,
+  }
+}
+/** Star 详情展示区的标签（type = emotion/theme/custom 都用） */
+function infoTagStyle(tag: string, type: 'emotion' | 'theme' | 'custom'): Record<string, string> {
+  if (type === 'custom') {
+    // custom：沿用故事 tag 的颜色
+    const h = Math.abs(_tagHashCode(tag)) % 360
+    const color = `hsl(${h} 62% 74%)`
+    return {
+      color,
+      borderColor: `hsla(${h}, 62%, 74%, 0.26)`,
+      backgroundColor: `hsla(${h}, 62%, 74%, 0.06)`,
+    }
+  }
+  // emotion/theme：统一用原设计（金/紫弱区），不做强染色，保持 StarDetail 原有味道
+  if (type === 'emotion') {
+    return { color: '#ffe5a8', borderColor: 'rgba(255,217,138,0.22)', backgroundColor: 'rgba(255,217,138,0.05)' }
+  }
+  return { color: '#d9c6ff', borderColor: 'rgba(202,167,255,0.22)', backgroundColor: 'rgba(202,167,255,0.05)' }
 }
 import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })

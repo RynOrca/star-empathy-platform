@@ -89,21 +89,71 @@
               <div class="sf-sep"></div>
             </template>
 
-            <!-- 情绪：iOS Segmented -->
+            <!-- 情绪 / 标签：AI 建议 chips + 多选 + 自定义输入 -->
             <div class="sf-field">
               <div class="sf-label-row">
-                <label class="sf-label">情绪标签</label>
-                <span class="sf-label-sub">可选</span>
+                <label class="sf-label">
+                  {{ mode === 'auto-match' && props.suggestedTags?.length ? 'AI 建议标签' : '标签' }}
+                </label>
+                <span class="sf-label-sub">最多选 {{ MAX_TAGS }} 个 · 2-6 字</span>
               </div>
-              <div class="sf-seg">
+
+              <!-- 已选标签（带 × 关闭） -->
+              <div v-if="selectedTags.length" class="sf-chips sf-chips-selected">
+                <span
+                  v-for="t in selectedTags"
+                  :key="'sel-' + t"
+                  class="sf-chip on"
+                  :style="chipStyle(t)"
+                >
+                  <span>{{ t }}</span>
+                  <button
+                    type="button"
+                    class="sf-chip-x"
+                    aria-label="移除"
+                    @click.stop.prevent="removeTag(t)"
+                  >
+                    <X :size="10" />
+                  </button>
+                </span>
+              </div>
+
+              <!-- AI 建议标签（未选中的可点击添加） -->
+              <div
+                v-if="mode === 'auto-match' && props.suggestedTags?.length"
+                class="sf-chips sf-chips-suggest"
+              >
                 <button
-                  v-for="t in tagOptions"
-                  :key="t"
-                  class="sf-seg-btn"
-                  :class="{ active: selectedTag === t }"
+                  v-for="t in props.suggestedTags.filter(x => !selectedTags.includes(x))"
+                  :key="'sug-' + t"
                   type="button"
-                  @click="selectedTag = selectedTag === t ? null : t"
-                >{{ t }}</button>
+                  class="sf-chip suggest"
+                  :disabled="selectedTags.length >= MAX_TAGS"
+                  :style="chipStyle(t)"
+                  @click.stop.prevent="toggleTag(t)"
+                >
+                  <Sparkles :size="10" class="sf-chip-spark" />
+                  <span>{{ t }}</span>
+                </button>
+              </div>
+
+              <!-- 自定义输入 -->
+              <div class="sf-custom">
+                <input
+                  v-model="customTagInput"
+                  class="sf-input sf-input-custom"
+                  placeholder="自定义标签，回车添加（2-6 字）…"
+                  maxlength="6"
+                  @keydown.enter.prevent="addCustomTag"
+                />
+                <button
+                  type="button"
+                  class="sf-custom-add"
+                  :disabled="!canAddCustom"
+                  @click.stop.prevent="addCustomTag"
+                >
+                  <Plus :size="12" />
+                </button>
               </div>
             </div>
 
@@ -175,7 +225,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick } from 'vue'
-import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle } from 'lucide-vue-next'
+import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus } from 'lucide-vue-next'
 import { useLocation } from '../composables/useLocation'
 
 const props = withDefaults(defineProps<{
@@ -186,11 +236,13 @@ const props = withDefaults(defineProps<{
   matchingStep?: 0 | 1 | 2 | 3
   matching?: boolean
   matchError?: string
+  suggestedTags?: string[]
 }>(), {
   mode: 'bind-star',
   matchingStep: 0,
   matching: false,
   matchError: '',
+  suggestedTags: () => [],
 })
 
 const emit = defineEmits<{
@@ -219,9 +271,77 @@ const userLocation = computed(() => {
   const la = loc.lat.value, ln = loc.lng.value
   return la != null && ln != null ? { lat: la, lng: ln } : null
 })
-const selectedTag = ref<string | null>(null)
+/** 已选标签（多选，上限 5；DB 目前只存第一个为主标签，其余留作 UI/未来扩展） */
+const selectedTags = ref<string[]>([])
 const isAnonymous = ref(false)
-const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
+const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/
+const customTagInput = ref('')
+const MAX_TAGS = 5
+
+function toggleTag(t: string) {
+  const i = selectedTags.value.indexOf(t)
+  if (i >= 0) {
+    selectedTags.value.splice(i, 1)
+  } else {
+    if (selectedTags.value.length >= MAX_TAGS) return
+    selectedTags.value.push(t)
+  }
+}
+function addCustomTag() {
+  const v = customTagInput.value.trim()
+  if (!v) return
+  if (!TAG_RE.test(v)) {
+    customTagInput.value = ''
+    return
+  }
+  if (selectedTags.value.includes(v)) {
+    customTagInput.value = ''
+    return
+  }
+  if (selectedTags.value.length >= MAX_TAGS) {
+    customTagInput.value = ''
+    return
+  }
+  selectedTags.value.push(v)
+  customTagInput.value = ''
+}
+function removeTag(t: string) {
+  const i = selectedTags.value.indexOf(t)
+  if (i >= 0) selectedTags.value.splice(i, 1)
+}
+const firstTag = computed(() => selectedTags.value[0] ?? null)
+
+/** 自定义按钮：2-6 字、未重复、不满 5 个，才能加 */
+const canAddCustom = computed(() => {
+  const v = customTagInput.value.trim()
+  if (!v) return false
+  if (!TAG_RE.test(v)) return false
+  if (selectedTags.value.includes(v)) return false
+  return selectedTags.value.length < MAX_TAGS
+})
+
+/** 开放标签 hash 染色：基于字符串 hash 出稳定色相，统一调为柔色系  */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 返回 { color, borderColor, backgroundColor } 用于 style 绑定 */
+function chipStyle(tag: string) {
+  const h = Math.abs(hashCode(tag)) % 360
+  // HSL 统一：saturation 55%，light 65% 柔和，透明度靠 rgba
+  const color = `hsl(${h} 62% 74%)`
+  const borderColor = `hsla(${h}, 62%, 74%, 0.30)`
+  const background = `hsla(${h}, 62%, 74%, 0.09)`
+  return {
+    color,
+    borderColor,
+    background,
+  } as const
+}
 
 const stepProgress = computed(() => props.matchingStep || 0)
 
@@ -246,7 +366,7 @@ function onPrimaryClick() {
     emit('requestMatch', {
       title: trimmedTitle,
       content: trimmed,
-      tag: selectedTag.value,
+      tag: firstTag.value,
       isAnonymous: isAnonymous.value,
     })
   } else {
@@ -286,7 +406,7 @@ async function doSubmit(
       title: trimmedTitle,
       content: trimmed,
       location: userLocation.value,
-      tag: selectedTag.value,
+      tag: firstTag.value,
       isAnonymous: isAnonymous.value,
     }
     const res = await fetch('/api/stories', {
@@ -310,7 +430,7 @@ async function doSubmit(
         viewCount: 0,
         origin: null,
         username: json.data.username ?? null,
-        tag: json.data.tag ?? selectedTag.value,
+        tag: json.data.tag ?? firstTag.value,
         userId: json.data.userId ?? null,
         imageUrl: null,
       }
@@ -335,10 +455,11 @@ function resetForm() {
   title.value = ''
   content.value = ''
   step.value = 1
-  selectedTag.value = null
+  selectedTags.value = []
   isAnonymous.value = false
   error.value = ''
   submitting.value = false
+  customTagInput.value = ''
 }
 
 defineExpose({ doSubmit, resetForm })
@@ -553,37 +674,116 @@ defineExpose({ doSubmit, resetForm })
   letter-spacing: 0.01em;
 }
 
-/* iOS Segmented Control — 放大版 */
-.sf-seg {
-  padding: 3px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
-  border-radius: 11px;
+/* ═══════ 开放标签 · AI 建议 chips + 多选 + 自定义 ═══════ */
+.sf-chips {
   display: flex;
-  gap: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.sf-seg-btn {
-  flex: 1;
-  padding: 9px 2px;
-  border: none;
-  background: transparent;
-  border-radius: 9px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: inherit;
-  font-size: 13.5px;
+.sf-chips-selected { margin-bottom: 2px }
+.sf-chips-suggest {
+  padding-top: 2px;
+  border-top: 0.5px dashed rgba(255,255,255,0.06);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.sf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px 6px 12px;
+  border-radius: 100px;
+  border: 0.5px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.035);
+  color: rgba(255,255,255,0.70);
+  font-size: 12.5px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all .18s cubic-bezier(.22, 1, .36, 1);
   letter-spacing: 0.005em;
+  line-height: 1;
+  transition: all .18s cubic-bezier(.22, 1, .36, 1);
+  cursor: pointer;
 }
-.sf-seg-btn:hover { color: rgba(255, 255, 255, 0.8) }
-.sf-seg-btn.active {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffe5a8;
+.sf-chip:hover:not(:disabled) { transform: translateY(-0.5px) }
+.sf-chip:disabled { opacity: .34; cursor: not-allowed }
+
+/* 已选 chip：hash 染色 + 选中态  */
+.sf-chip.on {
   font-weight: 600;
-  box-shadow:
-    0 0.5px 1.5px rgba(0, 0, 0, 0.28),
-    0 0 0 0.5px rgba(255, 217, 138, 0.30);
+  padding-left: 12px;
+  padding-right: 6px;
+}
+.sf-chip-x {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: all .15s ease;
+}
+.sf-chip-x:hover { background: rgba(255,255,255,0.16); opacity: 1 }
+
+/* AI 建议 chip：前缀 Sparkles 金色  */
+.sf-chip.suggest {
+  background: rgba(255,217,138,0.05);
+  border-color: rgba(255,217,138,0.18);
+}
+.sf-chip-spark {
+  color: #ffe5a8;
+  opacity: 0.8;
+}
+
+/* 自定义输入框  */
+.sf-custom {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 9px 14px;
+  background: rgba(255,255,255,0.028);
+  border: 0.5px solid rgba(255,255,255,0.05);
+  border-radius: 11px;
+  transition: all .18s ease;
+}
+.sf-custom:focus-within {
+  border-color: rgba(255,217,138,0.28);
+  background: rgba(255,217,138,0.035);
+}
+.sf-input-custom {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px !important;
+  letter-spacing: 0.004em;
+}
+.sf-input-custom::placeholder { color: rgba(255,255,255,0.24) }
+.sf-custom-add {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(255,217,138,0.10);
+  border: 0.5px solid rgba(255,217,138,0.22);
+  color: #ffe5a8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all .15s ease;
+  flex-shrink: 0;
+}
+.sf-custom-add:hover:not(:disabled) {
+  background: rgba(255,217,138,0.20);
+  border-color: rgba(255,217,138,0.42);
+}
+.sf-custom-add:disabled {
+  opacity: .30;
+  cursor: not-allowed;
 }
 
 /* Checkbox：极简方角 — 放大 */

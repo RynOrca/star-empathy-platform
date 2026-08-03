@@ -134,7 +134,7 @@
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
                 <div class="pd-t-foot">
-                  <span v-if="s.tag" class="pd-t-tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
+                  <span v-if="s.tag" class="pd-t-tag" :style="tagStyle(s.tag)">{{ s.tag }}</span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -374,7 +374,7 @@
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <span v-if="activeStory.tag" class="pd-t-tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
+              <span v-if="activeStory.tag" class="pd-t-tag" :style="tagStyle(activeStory.tag)">{{ activeStory.tag }}</span>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -447,6 +447,25 @@ import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
+
+/** 开放标签 hash 染色工具 */
+function _hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 供模板调用：tag → { color, borderColor, backgroundColor, border } */
+function tagStyle(tag: string | null | undefined): Record<string, string> {
+  if (!tag) return {}
+  const h = Math.abs(_hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.30)`
+  const bg = `hsla(${h}, 62%, 74%, 0.05)`
+  return { color, borderColor: border, backgroundColor: bg, border: '1px solid ' + border }
+}
 
 const PAGE_SIZE = 20
 const VISIBLE_STEP = 5
@@ -1668,7 +1687,7 @@ onBeforeUnmount(() => {
   font-size: 0.7rem;
 }
 
-/* Tag 配色 — 严格对齐 style-d.html */
+/* Tag 开放染色 — 旧 5 色保留作向后兼容，但新标签统一走内联 tagStyle() */
 .tag-思念, .tag-miss { color: #ff9eb8; border-color: rgba(255,158,184,0.3); background: rgba(255,158,184,0.05); }
 .tag-愿望, .tag-wish { color: var(--pd-gold); border-color: rgba(255,217,138,0.3); background: rgba(255,217,138,0.05); }
 .tag-孤独, .tag-lonely { color: #95f0c0; border-color: rgba(149,240,192,0.3); background: rgba(149,240,192,0.05); }

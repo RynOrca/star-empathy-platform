@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -330,6 +330,7 @@
         :matching="recordMatching.matching.value"
         :matching-step="recordMatching.step.value"
         :match-error="recordMatching.error.value"
+        :suggested-tags="recordMatching.suggestedTags.value"
         @request-match="onRecordRequestMatch"
         @submitted="onRecordStorySubmitted"
         @close="closeRecordForm"
@@ -1214,11 +1215,11 @@ async function onRecordRequestMatch(payload: {
   // 暂存表单，选完候选星后再真提交
   pendingRecordPayload.value = payload
   try {
-    const list = await recordMatching.matchStars(payload.title, payload.content, 3)
-    if (list.length === 0) {
+    const res = await recordMatching.matchStars(payload.title, payload.content, 3)
+    if (!res.candidates.length) {
       throw new Error('未找到合适的星辰')
     }
-    matchCandidates.value = list
+    matchCandidates.value = res.candidates
     showMatchCandidates.value = true
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

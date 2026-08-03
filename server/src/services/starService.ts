@@ -94,8 +94,9 @@ export function createStar(
   catalogStarIds?: number[],
 ): Star & { username: string | null; userId: number | null } {
   const pos = generatePosition();
-  const validTags = ['思念', '等待', '离别', '愿望', '孤独'];
-  const safeTag = tag && validTags.includes(tag) ? tag : null;
+  // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长；兼容旧 5 个白名单
+  const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/;
+  const safeTag = typeof tag === 'string' && tag.trim() && TAG_RE.test(tag.trim()) ? tag.trim() : null;
 
   // 主星：优先取 catalogStarId，否则取 catalogStarIds 第一个
   const effectiveCatalogStarId = catalogStarId ?? (catalogStarIds?.length ? catalogStarIds[0] : undefined);

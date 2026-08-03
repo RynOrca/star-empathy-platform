@@ -195,8 +195,8 @@ router.post('/match-star', authRequired, async (req: Request, res: Response) => 
       return badRequest(res, 'content 不能为空');
     }
     const trimmed = content.trim();
-    if (trimmed.length < 1 || trimmed.length > 300) {
-      return badRequest(res, 'content 长度需在 1~300 字之间');
+    if (trimmed.length < 1 || trimmed.length > 2000) {
+      return badRequest(res, 'content 长度需在 1~2000 字之间');
     }
     const limit = typeof req.body.limit === 'number'
       ? Math.max(1, Math.min(10, Math.floor(req.body.limit)))

@@ -702,13 +702,74 @@ function clamp01(n: number): number {
  *  5) 加权合并 Jaccard*0.4 + AI*0.6 → 取 Top 3
  *  6) 若 Top3 最高分 < 0.3 → 降级兜底：挑亮星(mag≤3 且 storyCount<3) Top 3
  */
+/**
+ * 从新故事的标题/正文中提取 3-5 个建议标签（AI选标签 / 开放标签系统）
+ *
+ * 优先顺序：
+ *   1) 新故事内核 generateKernel() 产出的 emotion / 主题词（AI关键词最准）
+ *   2) 常见情绪词词典命中（中英文都支持，最终都转中文）
+ *   3) 去重 + 长度裁剪到 2-6 字（和 createStar TAG_RE 一致）
+ */
+function extractSuggestedTags(
+  newEmotions: string[],
+  newThemes: string[],
+  title: string | null,
+  content: string,
+): string[] {
+  const all = `${title ?? ''} ${content}`;
+  const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (t: string) => {
+    if (!t) return;
+    const v = t.trim();
+    if (!TAG_RE.test(v)) return;
+    if (seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+  };
+
+  // 1) Kernel 产出的情绪词（AI 最懂）— 直接采纳
+  for (const e of newEmotions) push(e);
+  // 2) Kernel 产出的主题词，按 2-6 字筛选
+  for (const th of newThemes) push(th);
+
+  // 3) 常用情绪词典命中（兜底，当内核提取少或空时生效）
+  const emoDict: Array<[string, RegExp]> = [
+    ['思念', /思念|想念|相思|挂念|惦记|想你|怀念/],
+    ['等待', /等待|等候|等你|守候|期待|盼/],
+    ['离别', /离别|分开|分手|告别|告别|离开|分别/],
+    ['愿望', /愿望|心愿|希望|想要|梦想|祈祷|许愿/],
+    ['孤独', /孤独|寂寞|孤单|一个人|独处|冷清/],
+    ['暗恋', /暗恋|喜欢|心动|偷偷|在意|心仪/],
+    ['遗憾', /遗憾|后悔|可惜|错过|惋惜/],
+    ['乡愁', /乡愁|故乡|家乡|老家|想家|游子/],
+    ['成长', /成长|长大|蜕变|坚持|努力|奋斗|磨练/],
+    ['勇气', /勇气|勇敢|坚强|无畏|加油/],
+    ['释然', /释然|放下|释怀|看开|淡了/],
+    ['感谢', /感谢|谢谢|感恩|感激|遇见/],
+    ['难过', /难过|伤心|痛苦|悲伤|崩溃|哭|委屈/],
+    ['治愈', /治愈|温暖|温柔|希望|光|阳光/],
+    ['晚安', /晚安|夜|夜晚|凌晨|失眠|睡不着/],
+    ['友情', /朋友|闺蜜|兄弟|友情|同窗|发小/],
+    ['亲情', /家人|父母|妈妈|爸爸|亲情|家人/],
+    ['初恋', /初恋|告白|表白|青涩/],
+  ];
+  for (const [word, re] of emoDict) {
+    if (re.test(all)) push(word);
+  }
+
+  // 4) 取前 5 个
+  return out.slice(0, 5);
+}
+
 export async function findMatchingStarsForContent(
   title: string | null,
   content: string,
   limit = 3,
-): Promise<{ matches: MatchCandidate[] }> {
+): Promise<{ matches: MatchCandidate[]; suggestedTags: string[] }> {
   if (!content || !content.trim()) {
-    return { matches: [] }
+    return { matches: [], suggestedTags: [] }
   }
   const trimmed = content.trim()
   const trimmedTitle = title?.trim() || null
@@ -718,6 +779,14 @@ export async function findMatchingStarsForContent(
   const newEmotions = new Set(newKernel.emotionalTags)
   const newThemes = new Set(newKernel.themes)
   const newEssence = newKernel.essence
+
+  // AI 建议标签（基于内核 + 情绪词典命中）
+  const suggestedTags = extractSuggestedTags(
+    newKernel.emotionalTags,
+    newKernel.themes,
+    trimmedTitle,
+    trimmed,
+  )
 
   // ── Step 2+3: 所有恒星聚合标签 Jaccard → Top 10 ──
   const allStarKernels = getAllStarKernels()
@@ -964,5 +1033,5 @@ ${picksInfo.map(p => `- [catalogStarId=${p.id}] ${p.starName}（${p.constellatio
     }
   }
 
-  return { matches: finalCandidates.slice(0, limit) }
+  return { matches: finalCandidates.slice(0, limit), suggestedTags }
 }
