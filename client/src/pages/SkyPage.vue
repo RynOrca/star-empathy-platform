@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -350,7 +350,7 @@
               </div>
             </header>
 
-            <!-- 3 张候选内容卡：横向等宽，极简信息分层 -->
+            <!-- 3 张 AI 候选 + 1 张随机挂，横向等宽 -->
             <div class="cb-list">
               <article
                 v-for="(c, idx) in matchCandidates"
@@ -427,6 +427,69 @@
                   </template>
                 </button>
               </article>
+
+              <!-- 第 4 卡 · 随机挂：AI 并列的独立选项 -->
+              <article
+                v-if="randomCandidate"
+                class="cb-card cb-card-random"
+                :class="{ submitting: submittingCandidateId === -(randomCandidate.catalogStarId + 1) }"
+              >
+                <header class="cb-card-head">
+                  <div class="cb-rank random">
+                    <Shuffle :size="11" />
+                  </div>
+                  <div class="cb-star">
+                    <h3 class="cb-star-name">随机挂 · {{ randomCandidate.name || `星 #${randomCandidate.catalogStarId}` }}</h3>
+                    <span class="cb-star-const">{{ randomCandidate.constellationCN }}</span>
+                  </div>
+                  <span class="cb-flag-silver">任意星</span>
+                </header>
+
+                <div v-if="Number.isFinite(randomCandidate.mag) || randomCandidate.distance != null" class="cb-meta">
+                  <span v-if="Number.isFinite(randomCandidate.mag)" class="cb-meta-item">m{{ randomCandidate.mag.toFixed(1) }}</span>
+                  <span v-if="randomCandidate.distance != null" class="cb-meta-item">{{ randomCandidate.distance }} 光年</span>
+                </div>
+
+                <div class="cb-score">
+                  <div class="cb-score-label">随机缘分</div>
+                  <div class="cb-score-body">
+                    <div class="cb-score-bar" aria-hidden="true">
+                      <div class="cb-score-fill random" style="width:100%"></div>
+                    </div>
+                    <span class="cb-score-num random">100%</span>
+                  </div>
+                </div>
+
+                <blockquote class="cb-reason random">
+                  不做刻意寻觅，把故事交给今夜的风，让星穹自己选一颗接住你。
+                </blockquote>
+
+                <!-- 换一颗随机：按钮 -->
+                <button
+                  type="button"
+                  class="cb-random-switch"
+                  :disabled="submittingCandidateId != null"
+                  @click.stop="refreshRandomCandidate()"
+                >
+                  <RefreshCw :size="12" />
+                  <span>换一颗随机</span>
+                </button>
+
+                <button
+                  class="cb-btn random"
+                  :disabled="submittingCandidateId != null"
+                  @click="pickRandomCandidate()"
+                >
+                  <template v-if="submittingCandidateId === -(randomCandidate.catalogStarId + 1)">
+                    <span class="cb-btn-spinner"></span>
+                    <span>正在挂上星星…</span>
+                  </template>
+                  <template v-else>
+                    <Sparkles :size="13" />
+                    <span>就挂这颗</span>
+                  </template>
+                </button>
+              </article>
             </div>
           </div>
         </div>
@@ -455,7 +518,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -1173,6 +1236,36 @@ const showMatchCandidates = ref(false)
 const matchCandidates = ref<MatchCandidate[]>([])
 const submittingCandidateId = ref<number | null>(null)
 
+/** 「随机挂」候选（和 AI Top3 并列的第 4 选项，前端本地随机取 catalog 星） */
+interface RandomCandidate {
+  catalogStarId: number
+  name: string | null
+  constellationCN: string
+  mag: number
+  distance: number | null
+}
+const randomCandidate = ref<RandomCandidate | null>(null)
+/** 为避免和上一颗完全相同：记录上一次 catalogStarId，最多尝试 8 次 */
+let _lastRandomId = -1
+function refreshRandomCandidate() {
+  const all = catalogData.stars as Array<{ id: number; name?: string | null; con?: string; mag: number; ra: number; dec: number }>
+  if (!all.length) { randomCandidate.value = null; return }
+  let star: typeof all[number] | undefined
+  for (let i = 0; i < 8; i++) {
+    const pick = all[Math.floor(Math.random() * all.length)]
+    if (pick.id !== _lastRandomId) { star = pick; break }
+  }
+  if (!star) star = all[Math.floor(Math.random() * all.length)]
+  _lastRandomId = star.id
+  randomCandidate.value = {
+    catalogStarId: star.id,
+    name: star.name || null,
+    constellationCN: star.con ? (constellationNames[star.con] || star.con) : '未命名',
+    mag: star.mag,
+    distance: starDistances[star.id] ?? null,
+  }
+}
+
 /** 暂存待提交的表单数据（匹配成功后，用户选星时直接用） */
 const pendingRecordPayload = ref<{
   title: string
@@ -1205,6 +1298,7 @@ function closeMatchCandidates() {
   if (submittingCandidateId.value != null) return
   showMatchCandidates.value = false
   matchCandidates.value = []
+  randomCandidate.value = null
 }
 
 /** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
@@ -1220,12 +1314,32 @@ async function onRecordRequestMatch(payload: {
       throw new Error('未找到合适的星辰')
     }
     matchCandidates.value = res.candidates
+    // 同步生成「随机挂」的第一颗
+    refreshRandomCandidate()
     showMatchCandidates.value = true
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     // 不自动清空 form，用户可重试
     console.warn('[record-match] 匹配失败:', msg)
   }
+}
+
+/** 抽一个公共完成路径：成功后清空状态 + 飞相机 + 开 StarDetail */
+function afterPickSuccess(catalogStarId: number) {
+  submittingCandidateId.value = null
+  showMatchCandidates.value = false
+  matchCandidates.value = []
+  randomCandidate.value = null
+  showRecordForm.value = false
+  pendingRecordPayload.value = null
+  recordMatching.reset()
+
+  const star = catalogStarLookup.get(catalogStarId)
+  if (star) {
+    skyRef.value?.sky?.focusOnStar(star.x, star.y, star.z)
+    setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1000)
+  }
+  nextTick(() => onStarClick(catalogStarId))
 }
 
 /** 用户点「选这颗星」→ doSubmit 真正入库 → 飞相机 → 开详情 */
@@ -1235,29 +1349,32 @@ async function pickCandidate(c: MatchCandidate) {
   try {
     const res = await recordFormRef.value.doSubmit(c.catalogStarId, [c.catalogStarId])
     if (!res?.ok) {
-      // StoryForm 内部已经给 error 字段赋值，这里只清 candidate 提交态
       submittingCandidateId.value = null
       return
     }
-    // 成功：onRecordStorySubmitted 已经先通过 emitted 更新了数据
-    // 这里做额外 UI 动作（飞相机 + 开详情）
-    submittingCandidateId.value = null
-    showMatchCandidates.value = false
-    matchCandidates.value = []
-    showRecordForm.value = false
-    pendingRecordPayload.value = null
-    recordMatching.reset()
-
-    // 相机飞到这颗星 + 高亮 + 打开 StarDetail
-    const star = catalogStarLookup.get(c.catalogStarId)
-    if (star) {
-      skyRef.value?.sky?.focusOnStar(star.x, star.y, star.z)
-      setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1000)
-    }
-    nextTick(() => onStarClick(c.catalogStarId))
+    afterPickSuccess(c.catalogStarId)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.warn('[record-match] 挂载故事失败:', msg)
+    submittingCandidateId.value = null
+  }
+}
+
+/** 用户选「随机挂」卡片：完全复用 doSubmit 链路，submitting 标志用负数避免和 AI 卡冲突 */
+async function pickRandomCandidate() {
+  if (!randomCandidate.value || !pendingRecordPayload.value || !recordFormRef.value) return
+  const catalogStarId = randomCandidate.value.catalogStarId
+  submittingCandidateId.value = -(catalogStarId + 1)
+  try {
+    const res = await recordFormRef.value.doSubmit(catalogStarId, [catalogStarId])
+    if (!res?.ok) {
+      submittingCandidateId.value = null
+      return
+    }
+    afterPickSuccess(catalogStarId)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[record-match] 随机挂载故事失败:', msg)
     submittingCandidateId.value = null
   }
 }
@@ -2643,6 +2760,19 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     0 14px 30px rgba(0, 0, 0, 0.34),
     0 0 0 0.5px rgba(160, 196, 255, 0.06);
 }
+/* 随机挂卡片：银白系独立主题 */
+.cb-card.cb-card-random {
+  background: linear-gradient(180deg, rgba(225,235,255,0.034), rgba(255,255,255,0.028));
+  border-color: rgba(205, 215, 240, 0.14);
+}
+.cb-card.cb-card-random:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(225,235,255,0.052), rgba(255,255,255,0.038));
+  border-color: rgba(205, 215, 240, 0.30);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(205, 215, 240, 0.08);
+}
 .cb-card.submitting {
   opacity: 0.72;
   pointer-events: none;
@@ -2672,6 +2802,12 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border: 0.5px solid rgba(160, 196, 255, 0.26);
   color: #d4deff;
 }
+/* 随机挂 rank：银白主题，Shuffle 图标 */
+.cb-rank.random {
+  background: rgba(205, 215, 240, 0.10);
+  border: 0.5px solid rgba(205, 215, 240, 0.24);
+  color: #e4e9f5;
+}
 .cb-star {
   flex: 1;
   min-width: 0;
@@ -2699,6 +2835,16 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(202, 167, 255, 0.085);
   color: #d9c7ff;
   border: 0.5px solid rgba(202, 167, 255, 0.20);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.cb-flag-silver {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(205, 215, 240, 0.08);
+  color: #e0e5f3;
+  border: 0.5px solid rgba(205, 215, 240, 0.22);
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
@@ -2762,6 +2908,10 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   font-variant-numeric: tabular-nums;
 }
 .cb-score-num.purple { color: #d4deff }
+.cb-score-num.random { color: #dfe5f3 }
+.cb-score-fill.random {
+  background: linear-gradient(90deg, #dfe6f5, #ffffff);
+}
 
 /* AI 匹配理由：极简竖线引用 */
 .cb-reason {
@@ -2779,6 +2929,12 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .cb-reason.purple {
   background: rgba(160, 196, 255, 0.028);
   border-left-color: rgba(160, 196, 255, 0.28);
+}
+.cb-reason.random {
+  background: rgba(205, 215, 240, 0.030);
+  border-left: 2px solid rgba(205, 215, 240, 0.28);
+  color: rgba(232, 236, 248, 0.72);
+  font-style: italic;
 }
 
 /* 故事内核：小标签 + chips */
@@ -2813,6 +2969,28 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(202, 167, 255, 0.065);
 }
 
+/* 随机挂：换一颗随机 + 选星按钮 */
+.cb-random-switch {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 0;
+  border-radius: 10px;
+  background: rgba(205, 215, 240, 0.048);
+  border: 0.5px solid rgba(205, 215, 240, 0.18);
+  color: #dfe5f3;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .18s ease;
+}
+.cb-random-switch:hover:not(:disabled) {
+  background: rgba(205, 215, 240, 0.08);
+  border-color: rgba(205, 215, 240, 0.30);
+}
+.cb-random-switch:active:not(:disabled) { transform: scale(0.99); filter: brightness(0.96) }
+.cb-random-switch:disabled { opacity: 0.30; cursor: not-allowed }
+
 /* 选星按钮：和 StoryForm 同款 */
 .cb-btn {
   width: 100%;
@@ -2841,6 +3019,11 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   color: #e5d6ff;
   border-color: rgba(202, 167, 255, 0.26);
 }
+.cb-btn.random {
+  background: rgba(205, 215, 240, 0.12);
+  color: #f3f5fb;
+  border-color: rgba(205, 215, 240, 0.28);
+}
 .cb-btn:hover:not(:disabled) { transform: translateY(-0.5px) }
 .cb-btn.gold:hover:not(:disabled) {
   background: rgba(255, 217, 138, 0.20);
@@ -2850,6 +3033,10 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(202, 167, 255, 0.20);
   border-color: rgba(202, 167, 255, 0.44);
   color: #fff;
+}
+.cb-btn.random:hover:not(:disabled) {
+  background: rgba(205, 215, 240, 0.22);
+  border-color: rgba(205, 215, 240, 0.48);
 }
 .cb-btn:active:not(:disabled) {
   transform: translateY(0) scale(0.996);
