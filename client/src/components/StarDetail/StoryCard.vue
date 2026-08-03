@@ -38,33 +38,22 @@
       </button>
     </div>
 
-    <!-- 标签行：三种 variant 都显示（空时隐藏），all 放右侧，其余放内容下 -->
-    <div
-      v-if="displayTags.length && variant !== 'all'"
-      class="story-tags-row story-tags-row-block"
-    >
-      <span
-        v-for="t in displayTags"
-        :key="'row-' + t"
-        class="story-tag story-tag-inline"
-        :style="tagStyle(t)"
-      >#{{ t }}</span>
-    </div>
-    <div
-      v-if="displayTags.length && variant === 'all'"
-      class="story-tags-row story-tags-row-head"
-    >
-      <span
-        v-for="t in displayTags"
-        :key="'row-' + t"
-        class="story-tag story-tag-inline"
-        :style="tagStyle(t)"
-      >#{{ t }}</span>
-    </div>
-
     <div class="story-body">
       <div class="story-excerpt" v-html="renderedContent"></div>
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
+    </div>
+
+    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <div
+      v-if="displayTags.length"
+      class="story-tags-row"
+    >
+      <span
+        v-for="t in displayTags"
+        :key="'tag-' + story.id + '-' + t"
+        class="story-tag story-tag-inline"
+        :style="tagStyle(t)"
+      >#{{ t }}</span>
     </div>
 
     <div class="story-meta">
@@ -271,29 +260,34 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .story-sender.is-anon { color: #5a5580; }
 
-/* ── 开放标签通用样式（旧 5 色保留向后兼容，但不再单独写 class） ── */
+/* ── 开放标签通用样式（正文下方、meta 上方） ── */
 .story-tag {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 0.7rem; font-weight: 500; margin-left: 4px;
-  line-height: 1.4;
-  transition: all .15s ease;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+  border: 0.5px solid transparent;
+}
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.5px);
 }
 .story-tag-inline:first-child { margin-left: 0; }
 .story-tags-row {
   display: flex; flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  font-size: 0; /* 消除 inline 空白造成的跳动：标签本身靠 gap 控制 */
-}
-.story-tags-row-head {
-  margin: -4px 0 6px;
-  padding: 0 0 8px;
+  gap: 6px 8px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 4px 2px;
+  border-top: 1px dashed var(--rule);
   border-bottom: 1px dashed var(--rule);
-  justify-content: flex-end;
-}
-.story-tags-row-block {
-  margin: 2px 0 10px;
-  justify-content: flex-start;
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 
 /* ─── Story Image ─── */

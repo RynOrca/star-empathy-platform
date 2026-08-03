@@ -43,18 +43,18 @@
             <span class="detail-sender is-anon">匿名星语</span>
           </template>
         </div>
-        <!-- 标签行：优先 tags[]，空时退回 tag 单列，空时隐藏 -->
-        <div v-if="displayTags.length" class="detail-tags">
-          <span
-            v-for="t in displayTags"
-            :key="'d-' + t"
-            class="detail-tag"
-            :style="tagStyle(t)"
-          >#{{ t }}</span>
-        </div>
         <div class="detail-body">
           <div class="detail-content" v-html="renderedContent"></div>
           <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
+        </div>
+        <!-- 标签行：正文下方、统一视觉结构，空时隐藏 -->
+        <div v-if="displayTags.length" class="detail-tags">
+          <span
+            v-for="t in displayTags"
+            :key="'d-' + story.id + '-' + t"
+            class="detail-tag"
+            :style="tagStyle(t)"
+          >#{{ t }}</span>
         </div>
       </div>
     </Transition>
@@ -271,20 +271,22 @@ function tagStyle(tag: string): Record<string, string> {
 .meta-near { color: var(--accent); font-weight: 500; }
 .meta-sep { opacity: 0.4; }
 
-/* ─── 详情标签行 ─── */
+/* ─── 详情标签行（正文下方，结构与 StoryCard 一致） ─── */
 .detail-tags {
   display: flex; flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 2px 0 14px;
-  margin-bottom: 8px;
+  gap: 6px 8px;
+  margin-top: 18px;
+  margin-bottom: 0;
+  padding: 10px 2px;
+  border-top: 1px dashed var(--rule);
   border-bottom: 1px dashed var(--rule);
 }
 .detail-tag {
   display: inline-block; padding: 3px 10px; border-radius: 12px;
-  font-size: 0.72rem; font-weight: 500;
-  line-height: 1.5;
-  transition: transform .15s ease, filter .15s ease;
+  font-size: 0.68rem; font-weight: 500;
+  line-height: 1.5; letter-spacing: 0.02em;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
 }
 .detail-tag:hover { filter: brightness(1.08); transform: translateY(-0.5px); }
 

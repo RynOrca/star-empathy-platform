@@ -98,20 +98,23 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
+                        <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'top-' + s.id + '-' + t"
+                            class="story-tag story-tag-inline"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
+                        </div>
                         <div class="card-meta">
                           <HeartIcon :size="10" />
                           <span>{{ getDisplayResonance(s) }} 共鸣</span>
                           <span v-if="s.username" class="meta-sep">·</span>
                           <span v-if="s.username" class="meta-user">{{ s.username }}</span>
-                          <template v-if="storyDisplayTags(s).length">
-                            <span class="meta-sep">·</span>
-                            <span
-                              v-for="t in storyDisplayTags(s)"
-                              :key="'top-' + s.id + '-' + t"
-                              class="story-tag"
-                              :style="storyTagStyle(t)"
-                            >#{{ t }}</span>
-                          </template>
                         </div>
                       </div>
                     </div>
@@ -148,11 +151,15 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <div class="card-tags" v-if="storyDisplayTags(s).length">
+                        <!-- 标签行：正文下方、meta 上方；空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
                           <span
                             v-for="t in storyDisplayTags(s)"
                             :key="'card-' + s.id + '-' + t"
-                            class="story-tag"
+                            class="story-tag story-tag-inline"
                             :style="storyTagStyle(t)"
                           >#{{ t }}</span>
                         </div>
@@ -691,20 +698,23 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'topm-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
                             <div class="card-meta">
                               <HeartIcon :size="10" />
                               <span>{{ getDisplayResonance(s) }} 共鸣</span>
                               <span v-if="s.username" class="meta-sep">·</span>
                               <span v-if="s.username" class="meta-user">{{ s.username }}</span>
-                              <template v-if="storyDisplayTags(s).length">
-                                <span class="meta-sep">·</span>
-                                <span
-                                  v-for="t in storyDisplayTags(s)"
-                                  :key="'topm-' + s.id + '-' + t"
-                                  class="story-tag"
-                                  :style="storyTagStyle(t)"
-                                >#{{ t }}</span>
-                              </template>
                             </div>
                           </div>
                         </div>
@@ -728,18 +738,21 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'l-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
                             <div class="card-meta">
                               <ClockIcon :size="10" class="meta-clock" />
                               <span>{{ formatTime(s.createdAt) }}</span>
-                              <template v-if="storyDisplayTags(s).length">
-                                <span class="meta-sep">·</span>
-                                <span
-                                  v-for="t in storyDisplayTags(s)"
-                                  :key="'l-' + s.id + '-' + t"
-                                  class="story-tag"
-                                  :style="storyTagStyle(t)"
-                                >#{{ t }}</span>
-                              </template>
                             </div>
                           </div>
                         </div>
@@ -2136,17 +2149,39 @@ watch(() => props.catalogStarId, () => {
 .meta-user {
   color: rgba(255, 255, 255, 0.35);
 }
+/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更规整 */
 .card-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 8px 2px;
+  border-top: 1px dashed var(--rule);
+  border-bottom: 1px dashed var(--rule);
 }
+/* meta 行内嵌式标签（如共鸣榜 Top 卡原来的形式）：保持独立容器更统一，
+   这里保留 class 不删向后兼容，但视觉走 card-tags */
+.card-tags-inline {
+  /* 复用默认 card-tags 样式，不额外覆盖 */
+}
+/* story-tag 基础形态：彩色胶囊 + 内描边 0.5px + 色值来自 storyTagStyle() */
 .story-tag {
-  font-size: 0.62rem;
-  color: var(--accent);
-  opacity: 0.7;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.64rem;
+  font-weight: 500;
   letter-spacing: 0.02em;
+  line-height: 1.5;
+  transition: transform .15s ease, filter .15s ease;
 }
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.5px);
+}
+.story-tag-inline:first-child { margin-left: 0; }
 
 @media (max-width: 768px) {
   .story-stats-bar {

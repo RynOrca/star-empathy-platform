@@ -140,8 +140,9 @@
                       :key="'tag-' + s.id + '-' + t"
                       class="pd-t-tag"
                       :style="tagStyle(t)"
-                    >{{ t }}</span>
+                    >#{{ t }}</span>
                   </template>
+                  <span class="pd-t-sep" v-if="displayStoryTags(s).length && (s.resonanceCount || 0) > 0"></span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -381,14 +382,6 @@
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <template v-if="displayStoryTags(activeStory).length">
-                <span
-                  v-for="t in displayStoryTags(activeStory)"
-                  :key="'atag-' + activeStory.id + '-' + t"
-                  class="pd-t-tag"
-                  :style="tagStyle(t)"
-                >{{ t }}</span>
-              </template>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -412,6 +405,15 @@
             <div class="pd-story-content">
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
+            </div>
+            <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
+            <div v-if="displayStoryTags(activeStory).length" class="pd-story-tags">
+              <span
+                v-for="t in displayStoryTags(activeStory)"
+                :key="'dtag-' + activeStory.id + '-' + t"
+                class="pd-t-tag"
+                :style="tagStyle(t)"
+              >#{{ t }}</span>
             </div>
           </main>
           <footer class="pd-modal-foot">
@@ -1691,22 +1693,53 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Card foot */
+/* Card foot：标签在左、共鸣在右，不混在一起；结构独立更清爽 */
 .pd-t-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding-top: 14px;
   border-top: 1px solid rgba(255,217,138,0.1);
   font-size: 0.72rem;
   color: rgba(255,217,138,0.6);
 }
+/* 独立标签行：标签胶囊左侧对齐，右侧保留共鸣数；flex-wrap 避免窄屏溢出 */
+.pd-t-foot {
+  flex-wrap: wrap;
+  padding-bottom: 2px;
+}
+.pd-t-foot .pd-t-tag {
+  /* 沿用胶囊样式 */
+}
+.pd-t-sep { flex: 1; }
+.pd-t-res {
+  flex-shrink: 0;
+  margin-left: auto;
+}
 
+/* 开放标签胶囊样式：圆角 12px，取消方角 2px；独立视觉不硬贴 border */
 .pd-t-tag {
+  display: inline-block;
   padding: 3px 10px;
-  border-radius: 2px;
-  border: 1px solid;
-  font-size: 0.7rem;
+  border-radius: 12px;
+  border: 0.5px solid transparent; /* 真正的色值走 tagStyle() 内联 */
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  transition: transform .15s ease, filter .15s ease;
+}
+.pd-t-tag:hover { filter: brightness(1.06); transform: translateY(-0.5px); }
+
+/* 详情弹窗正文下方的标签行：上下虚线分隔，和卡片细节一致 */
+.pd-story-tags {
+  display: flex; flex-wrap: wrap; gap: 6px 8px;
+  align-items: center;
+  padding: 10px 2px;
+  margin-top: 20px;
+  border-top: 1px dashed var(--pd-rule);
+  border-bottom: 1px dashed var(--pd-rule);
 }
 
 /* Tag 开放染色 — 旧 5 色保留作向后兼容，但新标签统一走内联 tagStyle() */
