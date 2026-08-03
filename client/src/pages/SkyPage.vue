@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -336,99 +336,96 @@
       />
 
       <Transition name="candidates-fade">
-        <div v-if="showMatchCandidates" class="candidates-backdrop" @click.self="closeMatchCandidates">
-          <div class="candidates-sheet">
-            <!-- ═══ Header：panel-wrapper 风格 ═══ -->
-            <div class="candidates-header panel-wrapper pw-sheet-head">
-              <div class="panel-head">
-                <Sparkles :size="10" class="pw-icon pw-gold" />
-                <span class="pw-title">为你找到这些契合的星辰</span>
-                <span class="pw-count">共 {{ matchCandidates.length }} 颗 · 选一颗挂上你的故事</span>
+        <div v-if="showMatchCandidates" class="cb-backdrop" @click.self="closeMatchCandidates">
+          <div class="cb-sheet" role="dialog" aria-modal="true" aria-labelledby="cb-title">
+            <!-- HEADER · 纯居中，无分隔线 -->
+            <header class="cb-header">
+              <button class="cb-close" @click="closeMatchCandidates" aria-label="关闭">
+                <X :size="12" />
+              </button>
+              <div class="cb-title-group">
+                <h2 id="cb-title" class="cb-title">为你找到这些契合的星辰</h2>
+                <p class="cb-subtitle">共 {{ matchCandidates.length }} 颗 · 选一颗，挂上你的故事</p>
               </div>
-              <button class="candidates-close" @click="closeMatchCandidates"><X :size="15" /></button>
-            </div>
+            </header>
 
-            <!-- ═══ 卡片列表 ═══ -->
-            <div class="candidates-list">
-              <div
+            <!-- 3 张候选内容卡：横向等宽，极简信息分层 -->
+            <div class="cb-list">
+              <article
                 v-for="(c, idx) in matchCandidates"
                 :key="c.catalogStarId"
-                class="panel-wrapper candidate-card pw-candidate"
+                class="cb-card"
                 :class="{
-                  'is-gold': !c.isFallback,
-                  'is-purple': c.isFallback,
+                  gold: !c.isFallback,
+                  purple: c.isFallback,
                   submitting: submittingCandidateId === c.catalogStarId
                 }"
               >
-                <!-- 卡片 Head：排名 + 星名 + 星座 + 徽标 -->
-                <div class="panel-head candidate-panel-head">
-                  <div class="candidate-rank-badge" :class="{ gold: !c.isFallback, purple: c.isFallback }">
-                    {{ idx + 1 }}
+                <!-- 卡头：排名圆徽 + 星名星座 -->
+                <header class="cb-card-head">
+                  <div class="cb-rank" :class="{ gold: !c.isFallback, purple: c.isFallback }">{{ idx + 1 }}</div>
+                  <div class="cb-star">
+                    <h3 class="cb-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</h3>
+                    <span class="cb-star-const">{{ c.constellationCN }}</span>
                   </div>
-                  <div class="candidate-star-meta">
-                    <span class="candidate-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</span>
-                    <span class="candidate-constellation">{{ c.constellationCN }}</span>
-                  </div>
-                  <div class="candidate-head-tags">
-                    <span v-if="Number.isFinite(c.mag)" class="candidate-chip">m{{ c.mag.toFixed(1) }}</span>
-                    <span v-if="c.distance != null" class="candidate-chip">{{ c.distance }}ly</span>
-                    <span v-if="c.isFallback" class="candidate-chip chip-purple">等待点亮</span>
-                  </div>
+                  <span v-if="c.isFallback" class="cb-flag-purple">等待点亮</span>
+                </header>
+
+                <!-- 元信息：极小字 chips，在一行内 -->
+                <div v-if="Number.isFinite(c.mag) || c.distance != null" class="cb-meta">
+                  <span v-if="Number.isFinite(c.mag)" class="cb-meta-item">m{{ c.mag.toFixed(1) }}</span>
+                  <span v-if="c.distance != null" class="cb-meta-item">{{ c.distance }} 光年</span>
                 </div>
 
-                <!-- 卡片 Body -->
-                <div class="candidate-body">
-                  <!-- 契合度 -->
-                  <div class="candidate-score-row">
-                    <span class="score-label">契合度</span>
-                    <div class="score-bar">
+                <!-- 契合度：标签 + 条 + 数字 -->
+                <div class="cb-score">
+                  <div class="cb-score-label">契合度</div>
+                  <div class="cb-score-body">
+                    <div class="cb-score-bar" aria-hidden="true">
                       <div
-                        class="score-bar-fill"
-                        :style="{
-                          width: Math.round(c.finalScore * 100) + '%',
-                          background: c.isFallback
-                            ? 'linear-gradient(90deg, #a0c4ff, #b8a6ff)'
-                            : 'linear-gradient(90deg, #ffd98a, #ffb060)'
-                        }"
+                        class="cb-score-fill"
+                        :class="{ purple: c.isFallback }"
+                        :style="{ width: Math.round(c.finalScore * 100) + '%' }"
                       ></div>
                     </div>
-                    <span class="score-num" :class="{ purple: c.isFallback }">
+                    <span class="cb-score-num" :class="{ purple: c.isFallback }">
                       {{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}
                     </span>
                   </div>
-
-                  <!-- AI 理由 -->
-                  <p class="candidate-reason" :class="{ purple: c.isFallback }">{{ c.matchReason }}</p>
-
-                  <!-- 故事内核 -->
-                  <div v-if="c.starEssences.length" class="candidate-essences">
-                    <Search :size="11" class="essence-search-icon" />
-                    <span class="essence-title">该星的故事内核</span>
-                    <div class="essence-chips">
-                      <span v-for="(e, i) in c.starEssences" :key="i" class="essence-chip" :class="{ purple: c.isFallback }">
-                        {{ e }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- 选择按钮 -->
-                  <button
-                    class="candidate-pick-btn"
-                    :class="{ gold: !c.isFallback, purple: c.isFallback }"
-                    :disabled="submittingCandidateId === c.catalogStarId"
-                    @click="pickCandidate(c)"
-                  >
-                    <template v-if="submittingCandidateId === c.catalogStarId">
-                      <span class="pick-btn-spinner"></span>
-                      <span>正在挂上星星…</span>
-                    </template>
-                    <template v-else>
-                      <Star :size="14" />
-                      <span>选这颗星</span>
-                    </template>
-                  </button>
                 </div>
-              </div>
+
+                <!-- AI 匹配理由：极简左竖线引用 -->
+                <blockquote class="cb-reason" :class="{ purple: c.isFallback }">
+                  {{ c.matchReason }}
+                </blockquote>
+
+                <!-- 故事内核：小标签 + chips，无装饰 -->
+                <div v-if="c.starEssences.length" class="cb-kernels">
+                  <div class="cb-kernels-label">故事内核</div>
+                  <div class="cb-kernels-chips">
+                    <span v-for="(e, i) in c.starEssences" :key="i" class="cb-kernel-chip" :class="{ purple: c.isFallback }">
+                      {{ e }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 选星按钮：和 StoryForm 同款 -->
+                <button
+                  class="cb-btn"
+                  :class="{ gold: !c.isFallback, purple: c.isFallback }"
+                  :disabled="submittingCandidateId === c.catalogStarId"
+                  @click="pickCandidate(c)"
+                >
+                  <template v-if="submittingCandidateId === c.catalogStarId">
+                    <span class="cb-btn-spinner"></span>
+                    <span>正在挂上星星…</span>
+                  </template>
+                  <template v-else>
+                    <Star :size="13" />
+                    <span>选这颗星</span>
+                  </template>
+                </button>
+              </article>
             </div>
           </div>
         </div>
@@ -1181,8 +1178,6 @@ const pendingRecordPayload = ref<{
   content: string
   tag: string | null
   isAnonymous: boolean
-  imageFile: File | null
-  imageUrl: string | null
 } | null>(null)
 
 function openRecordForm() {
@@ -1213,7 +1208,7 @@ function closeMatchCandidates() {
 
 /** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
 async function onRecordRequestMatch(payload: {
-  title: string; content: string; tag: string | null; isAnonymous: boolean; imageFile: File | null; imageUrl: string | null
+  title: string; content: string; tag: string | null; isAnonymous: boolean
 }) {
   if (isGuest.value) { goLogin(); return }
   // 暂存表单，选完候选星后再真提交
@@ -2512,427 +2507,388 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
 }
 
-/* ═══════════════════════════════════════
-   候选星面板 · 对齐 StarDetail panel-wrapper
-   ═══════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   候选星面板 · 纯苹果 macOS sheet
+   零装饰 · 极致留白 · 严格层级
+   ═══════════════════════════════════════════════ */
 
-/* ── Backdrop：星空氛围感，背景提亮 + 左上金/右上紫径向光斑 ── */
-.candidates-backdrop {
+.cb-backdrop {
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(255,217,138,0.10), transparent 70%),
-    radial-gradient(ellipse 55% 38% at 85% 18%, rgba(202,167,255,0.10), transparent 70%),
-    rgba(7, 8, 22, 0.38);
-  backdrop-filter: blur(10px);
+  background: rgba(4, 5, 16, 0.58);
+  backdrop-filter: blur(9px) saturate(160%);
+  -webkit-backdrop-filter: blur(9px) saturate(160%);
   z-index: 210;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  animation: cb-fadein .22s ease-out;
 }
-.candidates-fade-enter-active, .candidates-fade-leave-active {
-  transition: opacity 0.28s ease;
-}
-.candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0; }
+@keyframes cb-fadein { from { opacity: 0 } to { opacity: 1 } }
+.candidates-fade-enter-active, .candidates-fade-leave-active { transition: opacity .28s ease }
+.candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0 }
 
-/* ── Sheet：整体容器（不再是纯黑） ── */
-.candidates-sheet {
-  width: min(1080px, 96vw);
+/* Sheet */
+.cb-sheet {
+  width: min(1060px, 96vw);
   max-height: 88vh;
-  background:
-    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,217,138,0.05), transparent 70%),
-    var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  background: rgba(28, 29, 44, 0.82);
+  backdrop-filter: blur(38px) saturate(200%);
+  -webkit-backdrop-filter: blur(38px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  box-shadow:
+    0 34px 92px rgba(0, 0, 0, 0.60),
+    0 0 0 0.5px rgba(255,255,255,0.03) inset;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: sheetRise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: cb-sheetin .32s cubic-bezier(.22, 1, .36, 1);
 }
-@keyframes sheetRise {
-  from { opacity: 0; transform: translateY(16px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes cb-sheetin {
+  from { opacity: 0; transform: translateY(14px) scale(0.986) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
 }
 
-/* ── Header：panel-wrapper 风格 ── */
-.candidates-header {
+/* HEADER：无分隔线，纯居中 */
+.cb-header {
   position: relative;
-  padding: 16px 22px;
-  margin: 18px 22px 0;
+  padding: 22px 40px 10px;
+  text-align: center;
   flex-shrink: 0;
 }
-.pw-sheet-head {
-  position: relative;
-}
-.pw-sheet-head::before {
-  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.35), rgba(202,167,255,0.35), transparent);
-}
-.candidates-header .panel-head {
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-}
-.candidates-close {
+.cb-close {
   position: absolute;
-  top: 14px;
-  right: 16px;
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  background: none;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  color: var(--muted);
+  top: 17px;
+  left: 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  border: none;
+  color: rgba(255, 255, 255, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all .15s ease;
   padding: 0;
 }
-.candidates-close:hover {
+.cb-close:hover {
+  background: rgba(255, 85, 85, 0.18);
+  color: #ffd5cf;
+  transform: translateY(-0.5px);
+}
+.cb-title-group { padding: 4px 0 0 }
+.cb-title {
+  margin: 0 0 5px;
+  font-size: 21px;
+  font-weight: 700;
   color: #fff;
-  background: rgba(255, 139, 125, 0.08);
-  border-color: rgba(255, 139, 125, 0.25);
-  transform: translateY(-1px);
+  letter-spacing: 0.005em;
+}
+.cb-subtitle {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.015em;
 }
 
-/* ═══ panel-wrapper 基础样式（与 StarDetail 保持一致） ═══ */
-.panel-wrapper {
-  position: relative;
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 12px 14px 14px;
-  box-sizing: border-box;
-}
-.panel-wrapper::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
-}
-.panel-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.pw-icon { opacity: 0.85; flex-shrink: 0; }
-.pw-gold   { color: #ffd98a; }
-.pw-purple { color: #caa7ff; }
-.pw-green  { color: #9ae6b4; }
-.pw-blue   { color: #86a8ff; }
-.pw-title {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-  flex: 1;
-  letter-spacing: 0.01em;
-}
-.pw-count {
-  font-size: 0.6rem;
-  color: rgba(255, 255, 255, 0.32);
-  letter-spacing: 0.03em;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-/* ── 候选星列表：放大卡片，横向均匀铺开 ── */
-.candidates-list {
-  padding: 20px 22px 24px;
+/* 卡片列表 */
+.cb-list {
+  padding: 12px 40px 30px;
   display: flex;
   gap: 18px;
   overflow-y: auto;
   flex-wrap: nowrap;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.08) transparent;
+  scrollbar-color: rgba(255,217,138,0.12) transparent;
   flex: 1;
   min-height: 0;
 }
-.candidates-list::-webkit-scrollbar { height: 6px; width: 6px; }
-.candidates-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 217, 138, 0.14);
+.cb-list::-webkit-scrollbar { height: 5px; width: 5px }
+.cb-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.12);
   border-radius: 10px;
 }
 
-/* ═══ 候选星卡片：panel-wrapper 独立卡片，无左边黄竖线！ ═══ */
-.pw-candidate {
+/* 卡片：纯字段组 */
+.cb-card {
   flex: 1;
   min-width: 0;
-  padding: 14px 16px 16px;
-  transition: all 0.22s ease;
+  padding: 16px 16px 18px;
+  background: rgba(255, 255, 255, 0.032);
+  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
   display: flex;
   flex-direction: column;
+  gap: 13px;
+  transition: all .22s cubic-bezier(.22, 1, .36, 1);
   min-height: 0;
 }
-/* 顶部渐变线：金卡=金色系，紫卡=紫色系 */
-.pw-candidate.is-gold::before {
-  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.45), rgba(255,176,96,0.35), transparent);
+.cb-card:hover { transform: translateY(-2px) }
+.cb-card.gold:hover {
+  background: rgba(255, 217, 138, 0.050);
+  border-color: rgba(255, 217, 138, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(255, 217, 138, 0.06);
 }
-.pw-candidate.is-purple::before {
-  background: linear-gradient(90deg, transparent, rgba(160,196,255,0.45), rgba(202,167,255,0.4), transparent);
+.cb-card.purple:hover {
+  background: rgba(160, 196, 255, 0.040);
+  border-color: rgba(160, 196, 255, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(160, 196, 255, 0.06);
 }
-.pw-candidate:hover {
-  transform: translateY(-2px);
-}
-.pw-candidate.is-gold:hover {
-  border-color: rgba(255, 217, 138, 0.22);
-  background: rgba(255, 217, 138, 0.028);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,217,138,0.06);
-}
-.pw-candidate.is-purple:hover {
-  border-color: rgba(160, 196, 255, 0.22);
-  background: rgba(160, 196, 255, 0.025);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.28), 0 0 0 1px rgba(160,196,255,0.06);
-}
-.pw-candidate.submitting {
+.cb-card.submitting {
   opacity: 0.72;
   pointer-events: none;
 }
 
-/* candidate 专属 panel-head：排名徽章 + 星名/星座 + 头部 chips */
-.candidate-panel-head {
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-  gap: 10px;
-  flex-wrap: wrap;
+/* 卡头：排名圆徽 + 星名 + 等待点亮旗 */
+.cb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
 }
-.candidate-rank-badge {
-  width: 26px; height: 26px;
+.cb-rank {
+  width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 8px;
-  font-size: 0.76rem;
+  border-radius: 8.5px;
+  font-size: 12.5px;
   font-weight: 700;
   flex-shrink: 0;
 }
-.candidate-rank-badge.gold {
-  color: #ffe5a8;
+.cb-rank.gold {
   background: rgba(255, 217, 138, 0.12);
-  border: 1px solid rgba(255, 217, 138, 0.28);
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
+  color: #ffe5a8;
 }
-.candidate-rank-badge.purple {
-  color: #cfd8ff;
+.cb-rank.purple {
   background: rgba(160, 196, 255, 0.10);
-  border: 1px solid rgba(160, 196, 255, 0.26);
+  border: 0.5px solid rgba(160, 196, 255, 0.26);
+  color: #d4deff;
 }
-.candidate-star-meta {
+.cb-star {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-width: 0;
 }
-.candidate-star-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1.2;
-}
-.candidate-constellation {
-  font-size: 0.72rem;
-  color: var(--muted);
-  letter-spacing: 0.01em;
-}
-.candidate-head-tags {
-  display: flex;
-  gap: 5px;
-  flex-shrink: 0;
-}
-.candidate-chip {
-  font-size: 0.68rem;
-  color: var(--muted);
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(255,255,255,0.035);
-  border: 1px solid rgba(255,255,255,0.05);
-  letter-spacing: 0.01em;
-}
-.candidate-chip.chip-purple {
-  color: #caa7ff;
-  background: rgba(202,167,255,0.08);
-  border-color: rgba(202,167,255,0.18);
-}
-
-/* ── candidate body ── */
-.candidate-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-/* 契合度：左边加文字标签，对齐 panel 风格 */
-.candidate-score-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.score-label {
-  font-size: 0.72rem;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-.score-bar {
-  flex: 1;
-  height: 5px;
-  background: rgba(255,255,255,0.055);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.score-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.score-num {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #ffe5a8;
-  min-width: 38px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.score-num.purple { color: #cfd8ff; }
-
-/* AI 理由：用 panel-wrapper 里的 info-section 风格（浅底+浅左条） */
-.candidate-reason {
+.cb-star-name {
   margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.78);
-  text-align: justify;
-  padding: 10px 12px;
-  background: rgba(255, 217, 138, 0.035);
-  border-left: 2px solid rgba(255, 217, 138, 0.28);
-  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.2;
+  letter-spacing: 0.005em;
 }
-.candidate-reason.purple {
-  background: rgba(160, 196, 255, 0.03);
-  border-left-color: rgba(160, 196, 255, 0.28);
+.cb-star-const {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.44);
+  letter-spacing: 0.02em;
+}
+.cb-flag-purple {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.085);
+  color: #d9c7ff;
+  border: 0.5px solid rgba(202, 167, 255, 0.20);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
-/* 故事内核：带搜索小图标 */
-.candidate-essences {
+/* 元信息：极小字一行 */
+.cb-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cb-meta-item {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.03em;
+}
+
+/* 契合度：标签在上，条+数字在下，严格 section 级 */
+.cb-score {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.candidate-essences > span:first-of-type {
-  display: contents;
+.cb-score-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1;
 }
-.essence-search-icon {
-  color: var(--muted-light);
-  opacity: 0.8;
-  vertical-align: -1px;
-  margin-right: 4px;
-}
-.essence-title {
-  font-size: 0.72rem;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-  display: inline-flex;
+.cb-score-body {
+  display: flex;
   align-items: center;
+  gap: 9px;
 }
-.essence-chips {
+.cb-score-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 2.5px;
+  overflow: hidden;
+}
+.cb-score-fill {
+  height: 100%;
+  border-radius: 2.5px;
+  background: linear-gradient(90deg, #ffd98a, #ffb060);
+  transition: width .55s cubic-bezier(.22, 1, .36, 1);
+}
+.cb-score-fill.purple {
+  background: linear-gradient(90deg, #a0c4ff, #b8a6ff);
+}
+.cb-score-num {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffe5a8;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cb-score-num.purple { color: #d4deff }
+
+/* AI 匹配理由：极简竖线引用 */
+.cb-reason {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 12px;
+  line-height: 1.72;
+  color: rgba(255, 255, 255, 0.74);
+  text-align: justify;
+  background: rgba(255, 217, 138, 0.030);
+  border-left: 2px solid rgba(255, 217, 138, 0.28);
+  border-radius: 0 9px 9px 0;
+  letter-spacing: 0.004em;
+}
+.cb-reason.purple {
+  background: rgba(160, 196, 255, 0.028);
+  border-left-color: rgba(160, 196, 255, 0.28);
+}
+
+/* 故事内核：小标签 + chips */
+.cb-kernels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-kernels-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.cb-kernels-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding-left: 15px; /* 对齐 essence-title 缩进（图标+字） */
 }
-.essence-chip {
-  font-size: 0.72rem;
+.cb-kernel-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
   color: rgba(255, 217, 138, 0.88);
   background: rgba(255, 217, 138, 0.06);
-  padding: 3px 9px;
-  border-radius: 8px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.004em;
 }
-.essence-chip.purple {
-  color: rgba(202, 167, 255, 0.9);
-  background: rgba(202, 167, 255, 0.06);
+.cb-kernel-chip.purple {
+  color: rgba(217, 199, 255, 0.92);
+  background: rgba(202, 167, 255, 0.065);
 }
 
-/* 选这颗星按钮：对齐 StarDetail .empty-login-btn（金边浅底金字） */
-.candidate-pick-btn {
+/* 选星按钮：和 StoryForm 同款 */
+.cb-btn {
+  width: 100%;
   margin-top: auto;
-  padding: 10px 0;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-subtle);
-  color: var(--accent);
-  font-size: 0.84rem;
-  font-weight: 600;
+  padding: 12.5px 0;
+  border-radius: 13px;
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
   font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
   cursor: pointer;
-  transition: all 0.18s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  letter-spacing: 0.01em;
+  transition: all .18s ease, transform .1s ease;
 }
-.candidate-pick-btn.gold {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 60%),
-    var(--accent-subtle);
+.cb-btn.gold {
+  background: rgba(255, 217, 138, 0.12);
+  color: #ffe5a8;
+  border-color: rgba(255, 217, 138, 0.26);
 }
-.candidate-pick-btn.purple {
-  border-color: rgba(202, 167, 255, 0.32);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 60%),
-    rgba(202, 167, 255, 0.08);
+.cb-btn.purple {
+  background: rgba(202, 167, 255, 0.10);
   color: #e5d6ff;
+  border-color: rgba(202, 167, 255, 0.26);
 }
-.candidate-pick-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+.cb-btn:hover:not(:disabled) { transform: translateY(-0.5px) }
+.cb-btn.gold:hover:not(:disabled) {
+  background: rgba(255, 217, 138, 0.20);
+  border-color: rgba(255, 217, 138, 0.44);
 }
-.candidate-pick-btn.gold:hover:not(:disabled) {
-  background: var(--accent-bg);
-  box-shadow: 0 6px 16px rgba(255, 217, 138, 0.15);
-}
-.candidate-pick-btn.purple:hover:not(:disabled) {
-  background: rgba(202, 167, 255, 0.16);
-  border-color: rgba(202, 167, 255, 0.5);
+.cb-btn.purple:hover:not(:disabled) {
+  background: rgba(202, 167, 255, 0.20);
+  border-color: rgba(202, 167, 255, 0.44);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(202, 167, 255, 0.18);
 }
-.candidate-pick-btn:disabled {
-  opacity: 0.6;
+.cb-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.996);
+  filter: brightness(0.96);
+}
+.cb-btn:disabled {
+  opacity: 0.32;
   cursor: not-allowed;
 }
-.pick-btn-spinner {
-  width: 14px; height: 14px;
+.cb-btn-spinner {
+  width: 13px; height: 13px;
   border: 2px solid rgba(255,255,255,0.2);
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: cb-spin 0.8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes cb-spin { to { transform: rotate(360deg) } }
 
-/* 移动端适配 */
+/* 移动端 */
 @media (max-width: 720px) {
-  .candidates-backdrop { padding: 10px; }
-  .candidates-sheet {
+  .cb-backdrop { padding: 0; align-items: flex-end }
+  .cb-sheet {
     max-height: 94vh;
-    width: 96vw;
-    border-radius: 14px;
+    width: 100%;
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+    animation: cb-sheetin-mobile .36s cubic-bezier(.22, 1, .36, 1);
   }
-  .candidates-header {
-    margin: 14px 14px 0;
-    padding: 12px 14px;
+  @keyframes cb-sheetin-mobile {
+    from { opacity: 0; transform: translateY(28%) }
+    to   { opacity: 1; transform: translateY(0) }
   }
-  .pw-sheet-head .pw-title { font-size: 0.78rem; }
-  .pw-sheet-head .pw-count { display: none; }
-  .candidates-close { top: 10px; right: 10px; }
-  .candidates-list {
-    padding: 16px 14px 18px;
+  .cb-header { padding: 20px 26px 8px }
+  .cb-title { font-size: 18px }
+  .cb-close { top: 16px; left: 16px }
+  .cb-list {
+    padding: 10px 18px 24px;
     flex-direction: column;
-    gap: 14px;
+    gap: 13px;
   }
-  .candidate-panel-head { flex-wrap: wrap; }
-  .candidate-head-tags { order: 3; width: 100%; padding-left: 36px; }
+  .cb-card { padding: 15px 15px 17px; gap: 12px }
 }
 </style>
