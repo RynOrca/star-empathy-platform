@@ -103,6 +103,15 @@
                           <span>{{ getDisplayResonance(s) }} 共鸣</span>
                           <span v-if="s.username" class="meta-sep">·</span>
                           <span v-if="s.username" class="meta-user">{{ s.username }}</span>
+                          <template v-if="storyDisplayTags(s).length">
+                            <span class="meta-sep">·</span>
+                            <span
+                              v-for="t in storyDisplayTags(s)"
+                              :key="'top-' + s.id + '-' + t"
+                              class="story-tag"
+                              :style="storyTagStyle(t)"
+                            >#{{ t }}</span>
+                          </template>
                         </div>
                       </div>
                     </div>
@@ -687,6 +696,15 @@
                               <span>{{ getDisplayResonance(s) }} 共鸣</span>
                               <span v-if="s.username" class="meta-sep">·</span>
                               <span v-if="s.username" class="meta-user">{{ s.username }}</span>
+                              <template v-if="storyDisplayTags(s).length">
+                                <span class="meta-sep">·</span>
+                                <span
+                                  v-for="t in storyDisplayTags(s)"
+                                  :key="'topm-' + s.id + '-' + t"
+                                  class="story-tag"
+                                  :style="storyTagStyle(t)"
+                                >#{{ t }}</span>
+                              </template>
                             </div>
                           </div>
                         </div>

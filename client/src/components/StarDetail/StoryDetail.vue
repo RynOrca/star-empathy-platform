@@ -34,6 +34,23 @@
           <span v-if="formattedTime">{{ formattedTime }}</span>
           <span v-if="formattedTime && formattedDistance?.text">·</span>
           <span v-if="formattedDistance?.text" class="detail-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
+          <template v-if="story.username">
+            <span class="meta-sep">·</span>
+            <span class="detail-sender">by {{ story.username }}</span>
+          </template>
+          <template v-else-if="story.userId == null || (currentUserId != null && story.userId !== currentUserId)">
+            <span class="meta-sep">·</span>
+            <span class="detail-sender is-anon">匿名星语</span>
+          </template>
+        </div>
+        <!-- 标签行：优先 tags[]，空时退回 tag 单列，空时隐藏 -->
+        <div v-if="displayTags.length" class="detail-tags">
+          <span
+            v-for="t in displayTags"
+            :key="'d-' + t"
+            class="detail-tag"
+            :style="tagStyle(t)"
+          >#{{ t }}</span>
         </div>
         <div class="detail-body">
           <div class="detail-content" v-html="renderedContent"></div>
@@ -46,18 +63,22 @@
 
 <script setup lang="ts">
 import { ArrowLeft, Sparkles, Check, Trash2 } from 'lucide-vue-next'
+import { computed } from 'vue'
 
 const ArrowLeftIcon = ArrowLeft
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const Trash2Icon = Trash2
 
-defineProps<{
+const props = defineProps<{
   story: {
     id: number
     title: string | null
     imageUrl: string | null
     userId: number | null
+    username: string | null
+    tag: string | null
+    tags?: string[] | null
   }
   backLabel: string
   renderedContent: string
@@ -75,6 +96,30 @@ defineEmits<{
   resonate: []
   delete: []
 }>()
+
+/** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
+const displayTags = computed<string[]>(() => {
+  const arr = Array.isArray(props.story.tags) ? props.story.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return props.story.tag ? [props.story.tag] : []
+})
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+function tagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.24)`
+  const bg = `hsla(${h}, 62%, 74%, 0.09)`
+  return { color, borderColor: border, backgroundColor: bg, border: '0.5px solid ' + border }
+}
 </script>
 
 <style scoped>
@@ -220,8 +265,29 @@ defineEmits<{
   gap: 6px;
 }
 .detail-info-bar span:nth-child(1n+3) { color: var(--star-blue); }
+.detail-sender { color: #7a8cc0; opacity: 0.8; }
+.detail-sender.is-anon { color: #5a5580; }
 .detail-dist { color: var(--star-blue); }
 .meta-near { color: var(--accent); font-weight: 500; }
+.meta-sep { opacity: 0.4; }
+
+/* ─── 详情标签行 ─── */
+.detail-tags {
+  display: flex; flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 14px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed var(--rule);
+}
+.detail-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 0.72rem; font-weight: 500;
+  line-height: 1.5;
+  transition: transform .15s ease, filter .15s ease;
+}
+.detail-tag:hover { filter: brightness(1.08); transform: translateY(-0.5px); }
+
 .detail-body {
   flex: 1;
   color: var(--ink-secondary);

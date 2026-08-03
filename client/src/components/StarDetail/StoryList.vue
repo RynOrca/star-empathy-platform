@@ -91,6 +91,7 @@ const props = defineProps<{
     origin: string | null
     username: string | null
     tag: string | null
+    tags?: string[] | null
   }>
   variant: 'history' | 'all' | 'mine'
   searchQuery?: string

@@ -10,16 +10,10 @@
       <!-- 历史故事：来源标签 -->
       <span v-if="variant === 'history' && story.origin" class="story-origin">{{ story.origin }}</span>
 
-      <!-- 所有故事：发送者 + 情绪标签 + 共鸣按钮 -->
+      <!-- 所有故事：发送者 + 共鸣按钮 -->
       <template v-if="variant === 'all'">
         <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
-        <span
-          v-for="t in displayTags"
-          :key="'tag-' + t"
-          class="story-tag"
-          :style="tagStyle(t)"
-        >{{ t }}</span>
         <button
           class="resonate-btn"
           :class="{ done: isResonated }"
@@ -42,6 +36,30 @@
         <component :is="isResonated ? CheckIcon : SparklesIcon" :size="13" />
         <span>{{ isResonated ? '已共鸣' : '共鸣' }}</span>
       </button>
+    </div>
+
+    <!-- 标签行：三种 variant 都显示（空时隐藏），all 放右侧，其余放内容下 -->
+    <div
+      v-if="displayTags.length && variant !== 'all'"
+      class="story-tags-row story-tags-row-block"
+    >
+      <span
+        v-for="t in displayTags"
+        :key="'row-' + t"
+        class="story-tag story-tag-inline"
+        :style="tagStyle(t)"
+      >#{{ t }}</span>
+    </div>
+    <div
+      v-if="displayTags.length && variant === 'all'"
+      class="story-tags-row story-tags-row-head"
+    >
+      <span
+        v-for="t in displayTags"
+        :key="'row-' + t"
+        class="story-tag story-tag-inline"
+        :style="tagStyle(t)"
+      >#{{ t }}</span>
     </div>
 
     <div class="story-body">
@@ -259,6 +277,23 @@ function tagStyle(tag: string): Record<string, string> {
   font-size: 0.7rem; font-weight: 500; margin-left: 4px;
   line-height: 1.4;
   transition: all .15s ease;
+}
+.story-tag-inline:first-child { margin-left: 0; }
+.story-tags-row {
+  display: flex; flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0; /* 消除 inline 空白造成的跳动：标签本身靠 gap 控制 */
+}
+.story-tags-row-head {
+  margin: -4px 0 6px;
+  padding: 0 0 8px;
+  border-bottom: 1px dashed var(--rule);
+  justify-content: flex-end;
+}
+.story-tags-row-block {
+  margin: 2px 0 10px;
+  justify-content: flex-start;
 }
 
 /* ─── Story Image ─── */
