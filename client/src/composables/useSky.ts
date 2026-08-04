@@ -228,6 +228,11 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 // ═══════════════════════════════════════════
 export interface ObserverLoc { lat: number; lon: number }
 
+// issue #134：准星吸附目标（区分恒星/行星）
+export type SnapTarget =
+  | { type: 'star'; starId: number }
+  | { type: 'planet'; planetName: string; planetNameCN: string; planetId: number }
+
 export interface SkyAPI {
   camera: PerspectiveCamera
   zoomIn: () => void
@@ -303,8 +308,8 @@ export function useSky(
     onStarHover?: (starId: number | null) => void
     onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string, planetId: number) => void
-    /** issue #124：准星吸附状态变化通知（starId=number 表示吸附到该星，null 表示脱吸附） */
-    onSnapChange?: (starId: number | null) => void
+    /** issue #134：准星吸附状态变化通知（吸附目标对象，null 表示脱吸附） */
+    onSnapChange?: (target: SnapTarget | null) => void
     observerLat?: number
     observerLng?: number
     /** 星空显示配置（issue #34）：覆盖默认 STAR_DISPLAY_CONFIG 的任意字段 */
@@ -1095,7 +1100,9 @@ for (const s of stars) starById.set(s.id, s)
   let isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
   let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
   let crosshairStyle: HTMLStyleElement | null = null
-  let snappedStarId = -1                            // 当前吸附的星 ID，-1 = 未吸附
+  let snappedStarId = -1                            // 当前吸附的恒星 ID，-1 = 未吸附恒星
+  // issue #134：当前吸附的行星信息（与 snappedStarId 互斥；非 null 表示正吸附在行星上）
+  let snappedPlanet: { name: string; nameCN: string; planetId: number } | null = null
   let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
@@ -1103,6 +1110,8 @@ for (const s of stars) starById.set(s.id, s)
   const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
   const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
   const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
+  // issue #134：屏幕中心 NDC 复用向量（避免每帧 new Vector2）
+  const _centerNDC = new Vector2(0, 0)
 
   /**
    * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
@@ -1124,8 +1133,9 @@ for (const s of stars) starById.set(s.id, s)
 
   /** 释放准星吸附：清状态、还原准星视觉、隐藏 tooltip、FOV 缩回 */
   function releaseSnap() {
-    if (snappedStarId === -1) return
+    if (snappedStarId === -1 && snappedPlanet === null) return
     snappedStarId = -1
+    snappedPlanet = null
     if (crosshairEl) crosshairEl.classList.remove('snapped')
     tooltipInner.style.opacity = '0'
     hoverGlowTargetOpacity = 0
@@ -1256,6 +1266,37 @@ for (const s of stars) starById.set(s.id, s)
       tooltipLabel.position.set(_w.x, _w.y, _w.z)
       hoverGlow.position.set(_w.x, _w.y, _w.z)
     }
+    // issue #134：行星吸附 tooltip（移动端准星吸附行星时显示行星名 + 统计清零）
+    function updateTooltipContentForPlanet(name: string, nameCN: string) {
+      const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+      nameEl.textContent = nameCN
+      nameEl.style.textShadow = '0 0 8px rgba(255,217,138,0.5)'
+      vals[0].textContent = '0'
+      vals[1].textContent = '0'
+      vals[2].textContent = '0'
+      vals[3].textContent = '0'
+      _lastStatsKey = `planet:${name}`
+      const updater = planetUpdaters.find(u => u.bodyName === name)
+      if (updater) {
+        const pos = updater.tiltGroup.position
+        _w.set(pos.x, pos.y, pos.z).applyMatrix4(skyGroup.matrixWorld)
+        tooltipLabel.position.set(_w.x, _w.y, _w.z)
+        hoverGlow.position.set(_w.x, _w.y, _w.z)
+      }
+      tooltipInner.style.opacity = '1'
+      hoverGlow.visible = true
+      hoverGlowTargetOpacity = 0.95
+    }
+    // issue #134：行星 tooltip 位置实时更新（行星会随天球运动）
+    function updateTooltipPositionForPlanet(name: string) {
+      const updater = planetUpdaters.find(u => u.bodyName === name)
+      if (!updater) return
+      const pos = updater.tiltGroup.position
+      _w.set(pos.x, pos.y, pos.z).applyMatrix4(skyGroup.matrixWorld)
+      tooltipLabel.position.set(_w.x, _w.y, _w.z)
+      hoverGlow.position.set(_w.x, _w.y, _w.z)
+    }
     function refreshTooltipStats(starId: number) {
       const stats = statsCache.get(starId)
       const key = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
@@ -1369,14 +1410,30 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
 
-      // ─── issue #116 移动端准星吸附 ───
+      // ─── issue #116 移动端准星吸附（issue #134 扩展：支持行星吸附） ───
       // 仅移动端 + 非行星特写模式启用；拖拽时也运行（拖拽瞄准是核心交互）
       if (isMobile && closeupState === 'IDLE') {
-        const { id: centerId, dist: centerDist } = detectStarByProjection(0, 0)
-        if (centerId !== -1 && centerDist < SNAP_THRESHOLD) {
-          if (snappedStarId !== centerId) {
-            // 新吸附：锁定目标 + 呼吸动画 + tooltip + FOV 放大
-            snappedStarId = centerId
+        // issue #134：先用 Raycaster 检测屏幕中心是否命中行星（优先级：行星 > 恒星，与 PC 端点击一致）
+        let centerPlanet: { planetName: string; planetNameCN: string; planetId: number } | null = null
+        if (planetMeshes.length) {
+          skyGroup.updateMatrixWorld()
+          camera.updateMatrixWorld()
+          camera.updateProjectionMatrix()
+          const planetRay = new Raycaster()
+          planetRay.setFromCamera(_centerNDC, camera)
+          const planetHits = planetRay.intersectObjects(planetMeshes)
+          if (planetHits.length) {
+            const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
+            if (pd.planetName) centerPlanet = { planetName: pd.planetName, planetNameCN: pd.planetNameCN, planetId: pd.planetId }
+          }
+        }
+
+        if (centerPlanet) {
+          // 命中行星
+          if (!snappedPlanet || snappedPlanet.name !== centerPlanet.planetName) {
+            // 新吸附行星（从恒星或其他行星切换）：先清恒星吸附态
+            snappedStarId = -1
+            snappedPlanet = { name: centerPlanet.planetName, nameCN: centerPlanet.planetNameCN, planetId: centerPlanet.planetId }
             snapStartX = e.clientX
             snapStartY = e.clientY
             if (snapBaseFov === 0) {
@@ -1384,26 +1441,59 @@ for (const s of stars) starById.set(s.id, s)
               snapBaseFov = camera.fov
             }
             if (crosshairEl) crosshairEl.classList.add('snapped')
-            updateTooltipContent(centerId)
-            // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
-            hoveredStarId = centerId
+            updateTooltipContentForPlanet(centerPlanet.planetName, centerPlanet.planetNameCN)
+            // 同步 hoveredStarId = -1，避免下一帧 hover 逻辑覆盖准星 tooltip
+            hoveredStarId = -1
             animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
-            // issue #124：通知外部已吸附到该星（驱动底部「凝听星语」按钮滑入）
-            options?.onSnapChange?.(centerId)
+            // issue #134：通知外部已吸附到该行星（驱动底部「凝听星语」按钮滑入）
+            options?.onSnapChange?.({ type: 'planet', planetName: centerPlanet.planetName, planetNameCN: centerPlanet.planetNameCN, planetId: centerPlanet.planetId })
           } else {
-            // 已吸附同一颗星：检查是否移动超过阈值
+            // 已吸附同一行星：检查是否移动超过阈值
             const dx = e.clientX - snapStartX
             const dy = e.clientY - snapStartY
             if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
               releaseSnap()
             } else {
-              // 维持吸附：刷新 tooltip 位置（skyGroup 可能已旋转）
-              updateTooltipPosition(centerId)
+              // 维持吸附：刷新 tooltip 位置（行星随天球运动）
+              updateTooltipPositionForPlanet(centerPlanet.planetName)
             }
           }
-        } else if (snappedStarId !== -1) {
-          // 中心无星或超出范围：释放吸附
-          releaseSnap()
+        } else {
+          // 未命中行星 → 检测恒星
+          const { id: centerId, dist: centerDist } = detectStarByProjection(0, 0)
+          if (centerId !== -1 && centerDist < SNAP_THRESHOLD) {
+            if (snappedStarId !== centerId) {
+              // 新吸附恒星（从行星或其他恒星切换）：先清行星吸附态
+              snappedPlanet = null
+              snappedStarId = centerId
+              snapStartX = e.clientX
+              snapStartY = e.clientY
+              if (snapBaseFov === 0) {
+                cancelAnimationFrame(snapFovRafId)
+                snapBaseFov = camera.fov
+              }
+              if (crosshairEl) crosshairEl.classList.add('snapped')
+              updateTooltipContent(centerId)
+              // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
+              hoveredStarId = centerId
+              animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+              // issue #124：通知外部已吸附到该星（驱动底部「凝听星语」按钮滑入）
+              options?.onSnapChange?.({ type: 'star', starId: centerId })
+            } else {
+              // 已吸附同一颗星：检查是否移动超过阈值
+              const dx = e.clientX - snapStartX
+              const dy = e.clientY - snapStartY
+              if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
+                releaseSnap()
+              } else {
+                // 维持吸附：刷新 tooltip 位置（skyGroup 可能已旋转）
+                updateTooltipPosition(centerId)
+              }
+            }
+          } else if (snappedStarId !== -1 || snappedPlanet !== null) {
+            // 中心无星/行星且超出范围：释放吸附
+            releaseSnap()
+          }
         }
       }
     }, { signal: abortController.signal })

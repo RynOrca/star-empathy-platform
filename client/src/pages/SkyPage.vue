@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -272,16 +272,16 @@
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
-    <!-- issue #124：移动端吸附星辰后的「凝听星语」按钮（替代触屏点击进入故事） -->
+    <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
     <Transition name="story-enter" appear>
       <button
-        v-if="isMobile && snappedStarId !== null && !selectedStarInfo"
+        v-if="isMobile && snappedTarget !== null && !selectedStarInfo"
         class="story-enter-btn"
         type="button"
         @click="onStoryEnterClick"
       >
         <span class="story-enter-main">凝听星语</span>
-        <span v-if="snappedStarName" class="story-enter-sub">{{ snappedStarName }}</span>
+        <span v-if="snappedLabel" class="story-enter-sub">{{ snappedLabel }}</span>
       </button>
     </Transition>
 
@@ -456,7 +456,7 @@ import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
-import type { SkyAPI } from '../composables/useSky'
+import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail/index.vue'
 import StoryForm from '../components/StoryForm.vue'
@@ -1072,28 +1072,37 @@ function formatStarName(s: CatalogStar): string {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
 
-// issue #124：准星吸附状态（驱动移动端底部「凝听星语」按钮显示）
-const snappedStarId = ref<number | null>(null)
-const snappedStarName = ref<string>('')
+// issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
+const snappedTarget = ref<SnapTarget | null>(null)
+const snappedLabel = ref<string>('')
 
-function onSnapChange(starId: number | null) {
-  if (starId === null) {
-    snappedStarId.value = null
-    snappedStarName.value = ''
+function onSnapChange(target: SnapTarget | null) {
+  if (target === null) {
+    snappedTarget.value = null
+    snappedLabel.value = ''
     return
   }
-  const star = catalogStarLookup.get(starId)
-  snappedStarId.value = starId
-  snappedStarName.value = star ? formatStarName(star) : ''
+  snappedTarget.value = target
+  if (target.type === 'star') {
+    const star = catalogStarLookup.get(target.starId)
+    snappedLabel.value = star ? formatStarName(star) : ''
+  } else {
+    snappedLabel.value = target.planetNameCN
+  }
 }
 
-// issue #124：点击「凝听星语」按钮 → 进入故事详情并释放吸附
+// issue #124/#134：点击「凝听星语」按钮 → 进入故事详情并释放吸附
+// 行星分支不进入特写模式（issue #134：移动端暂不进入行星特写，仅打开故事面板）
 function onStoryEnterClick() {
-  const id = snappedStarId.value
-  if (id === null) return
+  const target = snappedTarget.value
+  if (!target) return
   // 先释放吸附（同步触发 onSnapChange(null) 清状态），再打开故事
   skyRef.value?.sky?.releaseSnap?.()
-  onStarClick(id)
+  if (target.type === 'star') {
+    onStarClick(target.starId)
+  } else {
+    onPlanetClick(target.planetName, target.planetNameCN, target.planetId, false)
+  }
 }
 
 // 当 SkyCanvas 渲染完成后，传入等待的统计数据
@@ -1305,7 +1314,7 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   // 'HaleBopp': { color: '#d8e8f8', conName: '海尔-波普彗星' },
 }
 
-async function onPlanetClick(name: string, nameCN: string, planetId: number) {
+async function onPlanetClick(name: string, nameCN: string, planetId: number, enterCloseup = true) {
   const info = PLANET_INFO[name]
   const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
@@ -1332,8 +1341,11 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   selectedCatalogStarId.value = planetId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
-  // 进入行星特写模式（物理直径比例下小天体需相机距离补偿）
-  skyRef.value?.sky?.focusOnPlanet(name)
+  // issue #134：enterCloseup=false 时（移动端「凝听星语」按钮入口）只打开故事面板，不进入行星特写
+  if (enterCloseup) {
+    // 进入行星特写模式（物理直径比例下小天体需相机距离补偿）
+    skyRef.value?.sky?.focusOnPlanet(name)
+  }
 }
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
