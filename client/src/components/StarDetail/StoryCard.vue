@@ -43,19 +43,18 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 合集行：正文下方、tag行之上，单独一行（极简线性风+Library图标） -->
-    <div v-if="collectionName" class="story-coll-row" :title="`所属合集：${collectionName}`">
-      <span class="story-cr-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
-      <Library :size="11" />
-      <span class="story-cr-name">{{ shortCollName(collectionName) }}</span>
-    </div>
-
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <!-- 缩略信息行：合集信息 + #标签 同一行紧凑显示（不单独占高，就是缩略行） -->
     <div
-      v-if="displayTags.length"
+      v-if="collectionName || displayTags.length"
       class="story-tags-wrap"
     >
       <div class="story-tags-row">
+        <!-- 合集信息（缩略行左侧，和标签并列） -->
+        <span v-if="collectionName" class="story-coll-inline" :title="`所属合集：${collectionName}`">
+          <span class="story-cr-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
+          <Library :size="10" />
+          <span class="story-cr-name">{{ shortCollName(collectionName) }}</span>
+        </span>
         <span
           v-for="t in displayTags"
           :key="'tag-' + story.id + '-' + t"
@@ -304,20 +303,23 @@ function shortCollName(name: string | null | undefined, max = 8): string {
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
 }
-.story-coll-row {
+/* 合集信息：与 #标签 同一行（缩略行紧凑，不单独占高） */
+.story-coll-inline {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin: 2px 0 10px;
-  padding: 3px 10px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
   background: rgba(202, 167, 255, 0.04);
+  border: 0.5px solid rgba(202, 167, 255, 0.12);
   font-size: 0.68rem;
   color: rgba(242,236,255,0.78);
-  max-width: 260px;
+  max-width: 220px;
+  line-height: 1.3;
+  vertical-align: middle;
 }
 .story-cr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.story-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
 .meta-sep { opacity: 0.35; }
 .story-tags-row {
   display: flex; flex-wrap: wrap;
