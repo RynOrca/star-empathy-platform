@@ -55,7 +55,7 @@
           <template v-if="story.userId != null && story.userId === currentUserId && collectionName">
             <span class="meta-sep">·</span>
             <span class="detail-collection" :style="{ color: collectionColor || '#caa7ff' }" :title="`合集：${collectionName}`">
-              🎒 {{ collectionName }}
+              <FolderOpen :size="11" class="detail-collection-icon" /> {{ collectionName }}
             </span>
           </template>
         </div>

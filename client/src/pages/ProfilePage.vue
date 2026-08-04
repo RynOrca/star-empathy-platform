@@ -134,15 +134,23 @@
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
                 <div class="pd-t-foot">
-                  <template v-if="displayStoryTags(s).length">
-                    <span
-                      v-for="t in displayStoryTags(s)"
-                      :key="'tag-' + s.id + '-' + t"
-                      class="pd-t-tag"
-                      :style="tagStyle(t)"
-                    >#{{ t }}</span>
-                  </template>
-                  <span class="pd-t-sep" v-if="displayStoryTags(s).length && (s.resonanceCount || 0) > 0"></span>
+                  <div class="pd-t-foot-left">
+                    <template v-if="getStoryCollection(s)">
+                      <span class="pd-t-coll" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                        <span class="pd-t-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                        <span class="pd-t-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                      </span>
+                    </template>
+                    <template v-if="displayStoryTags(s).length">
+                      <span
+                        v-for="t in displayStoryTags(s)"
+                        :key="'tag-' + s.id + '-' + t"
+                        class="pd-t-tag"
+                        :style="tagStyle(t)"
+                      >#{{ t }}</span>
+                    </template>
+                  </div>
+                  <span class="pd-t-sep" v-if="(getStoryCollection(s) || displayStoryTags(s).length) && (s.resonanceCount || 0) > 0"></span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -272,9 +280,11 @@
         <h3 class="pd-favorites-title">FAVORITES · GALLERY · 私人星展</h3>
         <template v-if="favorites.length === 0">
           <div class="pd-empty">
-            <div class="pd-empty-orb" aria-hidden="true">♡</div>
+            <div class="pd-empty-orb" aria-hidden="true">
+              <Heart :size="32" stroke-width="1.6" />
+            </div>
             <h4 class="pd-empty-title">还没有收藏的恒星，</h4>
-            <p class="pd-empty-sub">在时间轴上点 ❤ 收藏一颗星，它会出现在这里。</p>
+            <p class="pd-empty-sub">在时间轴上点 <Heart :size="11" fill="#ff6b9e" stroke="#ff6b9e" class="pd-inline-heart" /> 收藏一颗星，它会出现在这里。</p>
           </div>
         </template>
         <template v-else>
@@ -341,7 +351,9 @@
         </template>
         <template v-else-if="collections.list.value.length === 0">
           <div class="pd-empty">
-            <div class="pd-empty-orb" aria-hidden="true">🎒</div>
+            <div class="pd-empty-orb" aria-hidden="true">
+              <FolderKanban :size="36" stroke-width="1.6" />
+            </div>
             <h4 class="pd-empty-title">还没有合集，</h4>
             <p class="pd-empty-sub">写故事时选择「新建合集」，故事就会自动归类到这里。</p>
           </div>
@@ -585,7 +597,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Bookmark, FolderPlus, Trash2, AlertCircle } from 'lucide-vue-next'
+import { Star, Bookmark, FolderPlus, FolderKanban, Trash2, AlertCircle, Heart } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
@@ -617,6 +629,24 @@ function displayStoryTags(s: { tag?: string | null; tags?: string[] | null } | n
   const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
   if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
   return s.tag ? [s.tag] : []
+}
+
+/** 根据 story.collection_id 从我的合集列表找合集元信息，返回 name+coverColor 或 null */
+function getStoryCollection(s: any): { name: string; coverColor: string } | null {
+  if (!s || s.collection_id == null) return null
+  const cid = Number(s.collection_id)
+  if (!cid || !Array.isArray(collections.list.value)) return null
+  const c = collections.list.value.find((x) => x.id === cid)
+  if (!c) return null
+  return { name: c.name || '未命名合集', coverColor: c.coverColor || '#caa7ff' }
+}
+
+/** 合集名截断：超过 max 加省略号 */
+function shortCollName(name: string | null | undefined, max = 8): string {
+  if (!name) return ''
+  const n = name.trim()
+  if (n.length <= max) return n
+  return n.slice(0, max) + '…'
 }
 
 const PAGE_SIZE = 20
@@ -1883,6 +1913,39 @@ onBeforeUnmount(() => {
 .pd-t-res {
   flex-shrink: 0;
   margin-left: auto;
+}
+.pd-t-foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.pd-t-coll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.07);
+  border: 1px solid rgba(202, 167, 255, 0.22);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  color: rgba(242, 236, 255, 0.84);
+  max-width: 170px;
+  white-space: nowrap;
+}
+.pd-t-coll-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
+}
+.pd-t-coll-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 开放标签胶囊样式：圆角 11px，compact */

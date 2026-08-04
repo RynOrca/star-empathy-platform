@@ -41,7 +41,7 @@
         <p class="pt-para first" v-html="paraFirst"></p>
         <p class="pt-para" v-html="paraSecond"></p>
         <div class="pt-suggest-wrap">
-          <span class="pt-tip">✨ 如果你也想在这里挂心事</span>
+          <span class="pt-tip"><Sparkle :size="11" class="pt-tip-icon" /> 如果你也想在这里挂心事</span>
           <span class="pt-suggest">{{ suggest }}</span>
         </div>
       </div>

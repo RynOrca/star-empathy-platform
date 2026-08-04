@@ -20,8 +20,8 @@
       <div class="cd-hero-glow" :style="heroGlowStyle"></div>
       <div v-if="heroLoading" class="cd-hero-placeholder">加载中…</div>
       <template v-else-if="collection && statsOk">
-        <div class="cd-hero-ribbon" v-if="!isOwner && collection.isPublic" aria-label="公开合集">🌐 公开合集</div>
-        <div class="cd-hero-ribbon cd-ribbon-draft" v-else-if="isOwner && !collection.isPublic" aria-label="私密合集">🔒 仅限自己可见</div>
+        <div class="cd-hero-ribbon" v-if="!isOwner && collection.isPublic" aria-label="公开合集"><Globe :size="12" /> 公开合集</div>
+        <div class="cd-hero-ribbon cd-ribbon-draft" v-else-if="isOwner && !collection.isPublic" aria-label="私密合集"><Lock :size="12" /> 仅限自己可见</div>
         <p class="cd-hero-eyebrow" v-if="collection?.isDefault">· DEFAULT · COLLECTION ·</p>
         <p class="cd-hero-eyebrow" v-else>· COLLECTION ·</p>
         <h1 class="cd-hero-title">{{ collection.name }}</h1>
@@ -114,12 +114,18 @@
               <h3 class="cd-story-title">{{ s.title || '未命名故事' }}</h3>
               <p class="cd-story-content">{{ s.content }}</p>
               <div class="cd-story-foot">
-                <span v-if="s.tags && s.tags.length" class="cd-story-tags">
-                  <span v-for="t in s.tags.slice(0,4)" :key="t" class="cd-story-tag" :style="tagStyle(t)">#{{ t }}</span>
-                </span>
+                <div class="cd-story-foot-left">
+                  <span v-if="collection" class="cd-story-coll" :title="`所属合集：${collection.name}`">
+                    <span class="cd-story-coll-dot" :style="{ background: collection.coverColor || '#caa7ff' }"></span>
+                    <span class="cd-story-coll-name">{{ shortCollName(collection.name) }}</span>
+                  </span>
+                  <span v-if="s.tags && s.tags.length" class="cd-story-tags">
+                    <span v-for="t in s.tags.slice(0,4)" :key="t" class="cd-story-tag" :style="tagStyle(t)">#{{ t }}</span>
+                  </span>
+                </div>
                 <span class="cd-story-meta">
-                  <em>💫 {{ s.resonanceCount }}</em>
-                  <em>👁 {{ s.viewCount }}</em>
+                  <em><Sparkles :size="10" class="cd-story-meta-icon" /> {{ s.resonanceCount }}</em>
+                  <em><Eye :size="10" class="cd-story-meta-icon" /> {{ s.viewCount }}</em>
                   <em>{{ formatMD(s.createdAt) }}</em>
                 </span>
               </div>
@@ -133,7 +139,10 @@
               title="移动到其他合集"
               aria-label="移动到其他合集"
             >
-              {{ movingId === s.id ? '移动中…' : '🎒 移动' }}
+              {{ movingId === s.id ? '移动中…' : '' }}
+              <template v-if="movingId !== s.id">
+                <FolderKanban :size="12" /> <span>移动</span>
+              </template>
             </button>
           </article>
         </nav>
@@ -206,8 +215,8 @@
             <span v-for="t in activeStory.tags" :key="t" class="pd-t-tag" :style="tagStyle(t)">#{{ t }}</span>
           </div>
           <div class="pd-story-metrics">
-            <span>💫 共鸣 {{ activeStory.resonanceCount }}</span>
-            <span>👁 浏览 {{ activeStory.viewCount }}</span>
+            <span><Sparkles :size="12" class="cd-metric-icon" /> 共鸣 {{ activeStory.resonanceCount }}</span>
+            <span><Eye :size="11" class="cd-metric-icon" /> 浏览 {{ activeStory.viewCount }}</span>
           </div>
         </main>
         <footer class="pd-modal-foot">
@@ -219,7 +228,10 @@
             :disabled="movingId === activeStory.id"
             @click="openMovePicker(activeStory); activeStory = null"
           >
-            {{ movingId === activeStory.id ? '移动中…' : '🎒 移动到合集' }}
+            {{ movingId === activeStory.id ? '移动中…' : '' }}
+            <template v-if="movingId !== activeStory.id">
+              <FolderKanban :size="12" /> <span>移动到合集</span>
+            </template>
           </button>
         </footer>
       </div>
@@ -262,7 +274,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bookmark } from 'lucide-vue-next'
+import { Sparkles, Eye, FolderKanban, Bookmark, Globe, Lock } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth } from '../stores/auth'
 import {
@@ -311,6 +323,12 @@ function formatDateTime(iso?: string | null): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+function shortCollName(name: string | null | undefined, max = 8): string {
+  if (!name) return ''
+  const n = name.trim()
+  if (n.length <= max) return n
+  return n.slice(0, max) + '…'
 }
 
 const route = useRoute()
@@ -844,7 +862,24 @@ onMounted(async () => {
   letter-spacing: 0.05em;
 }
 .cd-story-meta { display: inline-flex; gap: 14px; font-size: 0.7rem; color: rgba(202,167,255,0.55); letter-spacing: 0.08em; }
-.cd-story-meta em { font-style: normal; }
+.cd-story-meta em { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
+.cd-story-meta-icon { flex-shrink: 0; }
+.cd-story-foot-left { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.cd-story-coll {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.08);
+  border: 1px solid rgba(202, 167, 255, 0.22);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  color: rgba(242, 236, 255, 0.82);
+  max-width: 180px;
+}
+.cd-story-coll-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 8px rgba(255, 255, 255, 0.35); }
+.cd-story-coll-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .cd-move-btn {
   padding: 8px 14px;
