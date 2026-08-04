@@ -88,40 +88,6 @@
                   @story-click="onStoryClick"
                 />
               </template>
-
-              <!-- ═══ 合集列表 Tab（仅 owner） ═══ -->
-              <template v-else-if="activeTab === 'collections'">
-                <div class="collections-tab">
-                  <div class="collections-tab-bar">
-                    <span class="collections-tab-count">共 {{ collections.length }} 个星笺</span>
-                  </div>
-                  <div v-if="collections.length === 0" class="empty-state">
-                    <component :is="BookMarked" :size="22" class="empty-icon" />
-                    <p>你还没有创建星笺</p>
-                  </div>
-                  <div v-else class="collections-tab-list">
-                    <article
-                      v-for="c in collections"
-                      :key="c.id"
-                      class="collection-row"
-                      :class="{ active: c.id === collectionId }"
-                      @click="onCollectionSwitch(c)"
-                    >
-                      <span class="collection-row-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
-                      <div class="collection-row-info">
-                        <div class="collection-row-name">
-                          {{ c.name }}
-                          <span v-if="c.visibility === 'private'" class="collection-row-private">
-                            <Lock :size="9" />
-                          </span>
-                        </div>
-                        <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则故事 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
-                      </div>
-                      <ChevronRight v-if="c.id === collectionId" :size="14" class="collection-row-arrow" />
-                    </article>
-                  </div>
-                </div>
-              </template>
             </template>
           </div>
         </div>
@@ -245,6 +211,46 @@
                   class="info-tag"
                   :style="infoTagStyle(t.tag)"
                 >#{{ t.tag }}<em>{{ t.count }}</em></span>
+              </div>
+            </div>
+
+            <!-- 其他星笺（owner 可切换；从原 tab 移至此处，懒加载） -->
+            <div
+              v-if="isOwner && detail && collections.length > 1"
+              ref="otherCollectionsRef"
+              class="info-section info-section-collections"
+            >
+              <div class="info-label">
+                <Library :size="11" class="info-label-icon" />
+                <span>其他星笺</span>
+                <span class="info-label-sub">{{ collections.length }} 个</span>
+              </div>
+              <!-- 懒加载：进入视口后才渲染列表 -->
+              <div v-if="otherCollectionsVisible" class="info-collections-list">
+                <article
+                  v-for="c in collections"
+                  :key="c.id"
+                  class="collection-row"
+                  :class="{ active: c.id === collectionId }"
+                  @click="onCollectionSwitch(c)"
+                >
+                  <span class="collection-row-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
+                  <div class="collection-row-info">
+                    <div class="collection-row-name">
+                      {{ c.name }}
+                      <span v-if="c.visibility === 'private'" class="collection-row-private">
+                        <Lock :size="9" />
+                      </span>
+                    </div>
+                    <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
+                  </div>
+                  <ChevronRight v-if="c.id === collectionId" :size="14" class="collection-row-arrow" />
+                </article>
+              </div>
+              <!-- 占位骨架：未进入视口时显示，避免长列表一次性渲染 -->
+              <div v-else class="info-collections-skeleton">
+                <span class="skeleton-shimmer"></span>
+                <span class="skeleton-hint">滚动至此处加载星笺列表…</span>
               </div>
             </div>
           </div>
@@ -429,6 +435,44 @@
                     >#{{ t.tag }}<em>{{ t.count }}</em></span>
                   </div>
                 </div>
+
+                <!-- 其他星笺（owner 可切换；懒加载） -->
+                <div
+                  v-if="isOwner && collections.length > 1"
+                  ref="otherCollectionsMobileRef"
+                  class="info-section info-section-collections"
+                >
+                  <div class="info-label">
+                    <Library :size="11" class="info-label-icon" />
+                    <span>其他星笺</span>
+                    <span class="info-label-sub">{{ collections.length }} 个</span>
+                  </div>
+                  <div v-if="otherCollectionsVisible" class="info-collections-list">
+                    <article
+                      v-for="c in collections"
+                      :key="c.id"
+                      class="collection-row"
+                      :class="{ active: c.id === collectionId }"
+                      @click="onCollectionSwitch(c)"
+                    >
+                      <span class="collection-row-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
+                      <div class="collection-row-info">
+                        <div class="collection-row-name">
+                          {{ c.name }}
+                          <span v-if="c.visibility === 'private'" class="collection-row-private">
+                            <Lock :size="9" />
+                          </span>
+                        </div>
+                        <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
+                      </div>
+                      <ChevronRight v-if="c.id === collectionId" :size="14" class="collection-row-arrow" />
+                    </article>
+                  </div>
+                  <div v-else class="info-collections-skeleton">
+                    <span class="skeleton-shimmer"></span>
+                    <span class="skeleton-hint">滚动至此处加载星笺列表…</span>
+                  </div>
+                </div>
               </div>
             </template>
 
@@ -466,40 +510,6 @@
                 :stories="detail.stories"
                 @story-click="onStoryClick"
               />
-            </template>
-
-            <!-- ═══ 合集列表 Tab（仅 owner） ═══ -->
-            <template v-else-if="activeTab === 'collections'">
-              <div class="collections-tab">
-                <div class="collections-tab-bar">
-                  <span class="collections-tab-count">共 {{ collections.length }} 个星笺</span>
-                </div>
-                <div v-if="collections.length === 0" class="empty-state">
-                  <component :is="BookMarked" :size="22" class="empty-icon" />
-                  <p>你还没有创建星笺</p>
-                </div>
-                <div v-else class="collections-tab-list">
-                  <article
-                    v-for="c in collections"
-                    :key="c.id"
-                    class="collection-row"
-                    :class="{ active: c.id === collectionId }"
-                    @click="onCollectionSwitch(c)"
-                  >
-                    <span class="collection-row-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
-                    <div class="collection-row-info">
-                      <div class="collection-row-name">
-                        {{ c.name }}
-                        <span v-if="c.visibility === 'private'" class="collection-row-private">
-                          <Lock :size="9" />
-                        </span>
-                      </div>
-                      <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
-                    </div>
-                    <ChevronRight v-if="c.id === collectionId" :size="14" class="collection-row-arrow" />
-                  </article>
-                </div>
-              </div>
             </template>
           </template>
         </div>
@@ -559,10 +569,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, nextTick, type Component } from 'vue'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, watch, nextTick, type Component } from 'vue'
 import {
   X, Lock, Globe, BookOpen, BookMarked, Heart, Eye, Clock, Pencil, Trash2,
-  ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Activity, Tag, Hash,
+  ChevronRight, ChevronDown, AlertCircle, Library, Sparkles, Activity, Tag, Hash,
   BarChart3, Star,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
@@ -616,26 +626,19 @@ const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-wid
 const activeTab = ref<TabId>('analysis')
 
 const pcTabs = computed<{ id: TabId; label: string; icon: Component }[]>(() => {
-  const tabs: { id: TabId; label: string; icon: Component }[] = [
+  // 合集列表已移至右栏「其他星笺」区，不再作为独立 tab
+  return [
     { id: 'analysis', label: 'AI 解读', icon: Sparkles },
     { id: 'stories', label: '故事列表', icon: BookOpen },
   ]
-  if (props.isOwner) {
-    tabs.push({ id: 'collections', label: '合集列表', icon: List })
-  }
-  return tabs
 })
 
 const mobileTabs = computed(() => {
-  const tabs: { id: string; label: string; roman: string; icon: Component }[] = [
+  return [
     { id: 'analysis', label: 'AI 解读', roman: 'Ⅰ', icon: Sparkles },
     { id: 'stories', label: '故事列表', roman: 'Ⅱ', icon: BookOpen },
     { id: 'info', label: '星笺信息', roman: 'Ⅲ', icon: Library },
   ]
-  if (props.isOwner) {
-    tabs.push({ id: 'collections', label: '合集列表', roman: 'Ⅳ', icon: List })
-  }
-  return tabs
 })
 
 // ─── 故事详情（内联）───
@@ -702,6 +705,47 @@ function onTouchEnd() {
 const totalResonance = computed(() =>
   detail.value?.stories.reduce((sum, s) => sum + getDisplayResonance(s), 0) ?? 0
 )
+
+// ─── 其他星笺懒加载：IntersectionObserver 监听进入视口 ───
+const otherCollectionsRef = ref<HTMLElement | null>(null)
+const otherCollectionsMobileRef = ref<HTMLElement | null>(null)
+const otherCollectionsVisible = ref(false)
+let collectionsObserver: IntersectionObserver | null = null
+
+function setupCollectionsObserver() {
+  if (typeof IntersectionObserver === 'undefined') {
+    // 不支持时直接显示
+    otherCollectionsVisible.value = true
+    return
+  }
+  collectionsObserver?.disconnect()
+  collectionsObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        otherCollectionsVisible.value = true
+        collectionsObserver?.disconnect()
+        collectionsObserver = null
+        break
+      }
+    }
+  }, { root: null, rootMargin: '100px', threshold: 0.01 })
+  // 观察两个 ref（PC / 移动端各一），任一进入视口即加载
+  nextTick(() => {
+    if (otherCollectionsRef.value) collectionsObserver?.observe(otherCollectionsRef.value)
+    if (otherCollectionsMobileRef.value) collectionsObserver?.observe(otherCollectionsMobileRef.value)
+  })
+}
+
+// detail 加载完成或切换合集后，重置懒加载状态并重新观察
+watch([detail, () => props.isOwner], () => {
+  otherCollectionsVisible.value = false
+  if (detail.value && props.isOwner && props.collections.length > 1) {
+    setupCollectionsObserver()
+  }
+}, { flush: 'post' })
+
+onBeforeUnmount(() => { collectionsObserver?.disconnect() })
+
 const totalViews = computed(() =>
   detail.value?.stories.reduce((sum, s) => sum + (s.viewCount ?? 0), 0) ?? 0
 )
@@ -1496,6 +1540,53 @@ function infoTagStyle(tag: string): Record<string, string> {
   margin-top: 2px;
 }
 .collection-row-arrow { color: var(--accent); flex-shrink: 0; }
+
+/* ─── 其他星笺区（右栏底部，懒加载） ─── */
+.info-section-collections {
+  /* 不限高：完整展示所有星笺，但通过懒加载避免一次性渲染 */
+}
+.info-collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* 列表内的 collection-row 比原 tab 更紧凑 */
+.info-collections-list .collection-row {
+  padding: 9px 12px;
+  animation: none;
+}
+.info-collections-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.012);
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.skeleton-shimmer {
+  width: 100%;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-hint {
+  font-size: 0.62rem;
+  color: var(--muted-light);
+  letter-spacing: 0.04em;
+}
 
 /* ─── Delete Confirm Modal ─── */
 .delete-confirm-overlay {
