@@ -44,7 +44,7 @@
             <div class="sf-field">
               <div class="sf-label-row">
                 <label class="sf-label">故事</label>
-                <span class="sf-count" :class="{ warn: content.length >= 280 }">{{ content.length }}/300</span>
+                <span class="sf-count" :class="{ warn: content.length >= 1850 }">{{ content.length }}/2000</span>
               </div>
               <textarea
                 v-model="content"
@@ -52,8 +52,8 @@
                 :placeholder="mode === 'auto-match'
                   ? '此刻你想起了什么？写下你的心事…'
                   : '此刻你在这颗星下想起了什么？写下你的心事吧…'"
-                maxlength="300"
-                rows="6"
+                maxlength="2000"
+                rows="12"
                 ref="textareaRef"
               ></textarea>
             </div>
@@ -89,21 +89,85 @@
               <div class="sf-sep"></div>
             </template>
 
-            <!-- 情绪：iOS Segmented -->
+              <!-- 情绪 / 标签：AI 建议 chips + 多选 + 自定义输入 -->
             <div class="sf-field">
               <div class="sf-label-row">
-                <label class="sf-label">情绪标签</label>
-                <span class="sf-label-sub">可选</span>
-              </div>
-              <div class="sf-seg">
+                <label class="sf-label">
+                  {{ hasLiveSuggestions ? 'AI 建议标签' : '标签' }}
+                </label>
+                <span class="sf-label-sub">最多选 {{ MAX_TAGS }} 个 · 2-6 字</span>
                 <button
-                  v-for="t in tagOptions"
-                  :key="t"
-                  class="sf-seg-btn"
-                  :class="{ active: selectedTag === t }"
                   type="button"
-                  @click="selectedTag = selectedTag === t ? null : t"
-                >{{ t }}</button>
+                  class="sf-refresh-tags"
+                  :disabled="aiSuggestLoading || !canRequestSuggestions"
+                  :title="canRequestSuggestions ? '重新生成标签' : '先写点内容再生成'"
+                  @click.stop.prevent="refreshAiTags(true)"
+                >
+                  <RefreshCw :size="11" :class="{ spin: aiSuggestLoading }" />
+                  <span>{{ aiSuggestLoading ? '生成中…' : 'AI 推荐' }}</span>
+                </button>
+              </div>
+
+              <!-- 已选标签（带 × 关闭） -->
+              <div v-if="selectedTags.length" class="sf-chips sf-chips-selected">
+                <span
+                  v-for="t in selectedTags"
+                  :key="'sel-' + t"
+                  class="sf-chip on"
+                  :style="chipStyle(t)"
+                >
+                  <span>{{ t }}</span>
+                  <button
+                    type="button"
+                    class="sf-chip-x"
+                    aria-label="移除"
+                    @click.stop.prevent="removeTag(t)"
+                  >
+                    <X :size="10" />
+                  </button>
+                </span>
+              </div>
+
+              <!-- AI 建议标签（两种模式都展示：外部 props.suggestedTags + 内部实时 aiSuggestedTags，未选中的可点击添加） -->
+              <div
+                v-if="allSuggestedTagsUnpicked.length"
+                class="sf-chips sf-chips-suggest"
+              >
+                <button
+                  v-for="t in allSuggestedTagsUnpicked"
+                  :key="'sug-' + t"
+                  type="button"
+                  class="sf-chip suggest"
+                  :disabled="selectedTags.length >= MAX_TAGS"
+                  :style="chipStyle(t)"
+                  @click.stop.prevent="toggleTag(t)"
+                >
+                  <Sparkles :size="10" class="sf-chip-spark" />
+                  <span>{{ t }}</span>
+                </button>
+              </div>
+              <p v-if="aiSuggestError" class="sf-tag-error">
+                <AlertCircle :size="11" />
+                <span>{{ aiSuggestError }}</span>
+              </p>
+
+              <!-- 自定义输入 -->
+              <div class="sf-custom">
+                <input
+                  v-model="customTagInput"
+                  class="sf-input sf-input-custom"
+                  placeholder="自定义标签，回车添加（2-6 字）…"
+                  maxlength="6"
+                  @keydown.enter.prevent="addCustomTag"
+                />
+                <button
+                  type="button"
+                  class="sf-custom-add"
+                  :disabled="!canAddCustom"
+                  @click.stop.prevent="addCustomTag"
+                >
+                  <Plus :size="12" />
+                </button>
               </div>
             </div>
 
@@ -111,9 +175,9 @@
 
             <!-- 匿名 -->
             <div class="sf-field">
-              <label class="sf-check">
-                <span class="sf-check-box" :class="{ on: isAnonymous }">
-                  <Check :size="10" class="sf-check-mark" />
+              <label class="sf-check" @click.prevent="isAnonymous = !isAnonymous">
+                <span class="sf-check-box" :class="{ on: isAnonymous }" aria-hidden="true">
+                  <Check :size="11" class="sf-check-mark" />
                 </span>
                 <span class="sf-check-text">
                   匿名投递
@@ -175,7 +239,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick } from 'vue'
-import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle } from 'lucide-vue-next'
+import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus, RefreshCw } from 'lucide-vue-next'
 import { useLocation } from '../composables/useLocation'
 
 const props = withDefaults(defineProps<{
@@ -186,11 +250,13 @@ const props = withDefaults(defineProps<{
   matchingStep?: 0 | 1 | 2 | 3
   matching?: boolean
   matchError?: string
+  suggestedTags?: string[]
 }>(), {
   mode: 'bind-star',
   matchingStep: 0,
   matching: false,
   matchError: '',
+  suggestedTags: () => [],
 })
 
 const emit = defineEmits<{
@@ -200,10 +266,10 @@ const emit = defineEmits<{
     catalogStarId: number; catalogStarIds?: number[]; createdAt: string
     locationLat: number | null; locationLng: number | null; type: string
     viewCount: number; origin: string | null; username: string | null
-    tag: string | null; userId: number | null; imageUrl: string | null
+    tag: string | null; tags?: string[]; userId: number | null; imageUrl: string | null
   }]
   requestMatch: [payload: {
-    title: string; content: string; tag: string | null
+    title: string; content: string; tag: string | null; tags: string[]
     isAnonymous: boolean
   }]
 }>()
@@ -219,9 +285,209 @@ const userLocation = computed(() => {
   const la = loc.lat.value, ln = loc.lng.value
   return la != null && ln != null ? { lat: la, lng: ln } : null
 })
-const selectedTag = ref<string | null>(null)
+/** 已选标签（多选，上限 5；DB 目前只存第一个为主标签，其余留作 UI/未来扩展） */
+const selectedTags = ref<string[]>([])
 const isAnonymous = ref(false)
-const tagOptions = ['思念', '等待', '离别', '愿望', '孤独']
+const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/
+const customTagInput = ref('')
+const MAX_TAGS = 5
+
+function toggleTag(t: string) {
+  const i = selectedTags.value.indexOf(t)
+  if (i >= 0) {
+    selectedTags.value.splice(i, 1)
+  } else {
+    if (selectedTags.value.length >= MAX_TAGS) return
+    selectedTags.value.push(t)
+  }
+}
+function addCustomTag() {
+  const v = customTagInput.value.trim()
+  if (!v) return
+  if (!TAG_RE.test(v)) {
+    customTagInput.value = ''
+    return
+  }
+  if (selectedTags.value.includes(v)) {
+    customTagInput.value = ''
+    return
+  }
+  if (selectedTags.value.length >= MAX_TAGS) {
+    customTagInput.value = ''
+    return
+  }
+  selectedTags.value.push(v)
+  customTagInput.value = ''
+}
+function removeTag(t: string) {
+  const i = selectedTags.value.indexOf(t)
+  if (i >= 0) selectedTags.value.splice(i, 1)
+}
+const firstTag = computed(() => selectedTags.value[0] ?? null)
+
+/** 自定义按钮：2-6 字、未重复、不满 5 个，才能加 */
+const canAddCustom = computed(() => {
+  const v = customTagInput.value.trim()
+  if (!v) return false
+  if (!TAG_RE.test(v)) return false
+  if (selectedTags.value.includes(v)) return false
+  return selectedTags.value.length < MAX_TAGS
+})
+
+/** 开放标签 hash 染色：基于字符串 hash 出稳定色相，统一调为柔色系  */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 返回 { color, borderColor, backgroundColor } 用于 style 绑定 */
+function chipStyle(tag: string) {
+  const h = Math.abs(hashCode(tag)) % 360
+  // HSL 统一：saturation 55%，light 65% 柔和，透明度靠 rgba
+  const color = `hsl(${h} 62% 74%)`
+  const borderColor = `hsla(${h}, 62%, 74%, 0.30)`
+  const background = `hsla(${h}, 62%, 74%, 0.09)`
+  return {
+    color,
+    borderColor,
+    background,
+  } as const
+}
+
+/* ════════════════════════════════════════════════════════════
+   LIVE AI TAG SUGGEST · 实时 AI 标签推荐（600ms debounce）
+   ════════════════════════════════════════════════════════════ */
+const aiSuggestedTags = ref<string[]>([])
+const aiSuggestLoading = ref(false)
+const aiSuggestError = ref('')
+let _suggestTimer: ReturnType<typeof setTimeout> | null = null
+let _suggestReqSeq = 0
+let _suggestedAtLeastOnce = false
+/** 用户最少多少内容才触发 AI：避免标题十几个字的时候瞎猜浪费请求。 */
+const canRequestSuggestions = computed<boolean>(() => {
+  const tLen = title.value.trim().length
+  const cLen = content.value.trim().length
+  return (tLen + cLen) >= 20
+})
+/** 合并两种来源的 AI 建议：外部 props.suggestedTags（AI 匹配接口回传的）
+ *  + 本组件内部实时建议），去重、过滤不合规的，最多展示 8 条。*/
+const allSuggestedTags = computed<string[]>(() => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const sources = [
+    ...(props.suggestedTags ?? []),
+    ...aiSuggestedTags.value,
+  ]
+  for (const raw of sources) {
+    if (!raw || typeof raw !== 'string') continue
+    const v = raw.trim()
+    if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(v)) continue
+    if (seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+    if (out.length >= 8) break
+  }
+  return out
+})
+const allSuggestedTagsUnpicked = computed<string[]>(() =>
+  allSuggestedTags.value.filter((t) => !selectedTags.value.includes(t))
+)
+const hasLiveSuggestions = computed<boolean>(() => allSuggestedTags.value.length > 0)
+
+/** 调用 AI 取标签：独立接口 /api/stories/ai-tags
+   失败不阻塞任何其他业务。外部 props.suggestedTags 是候选；
+   有后端还没暴露独立接口时 fallback 去调了复用 /api/match-star，从返回里取 suggestedTags 字段 */
+async function refreshAiTags(force: boolean = false) {
+  const trimmedTitle = title.value.trim()
+  const trimmed = content.value.trim()
+  if (!canRequestSuggestions.value) {
+    aiSuggestedTags.value = []
+    aiSuggestError.value = ''
+    return
+  }
+  clearTimeout(_suggestTimer!)
+  _suggestTimer = null
+  _suggestReqSeq += 1
+  const seq = _suggestReqSeq
+  aiSuggestLoading.value = true
+  aiSuggestError.value = ''
+  try {
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    // 优先走 /api/stories/ai-tags（轻量仅 tag）；404 时退化到 /api/stories/match-star，从返回里取 suggestedTags
+    let tags: string[] = []
+    const r1 = await fetch('/api/stories/ai-tags', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ title: trimmedTitle, content: trimmed }),
+    })
+    if (r1.ok) {
+      const j = await r1.json()
+      tags = Array.isArray(j?.data?.tags) ? j.data.tags : []
+    } else if (r1.status === 404) {
+      const r2 = await fetch('/api/stories/match-star', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title: trimmedTitle, content: trimmed, top: 3 }),
+      })
+      if (r2.ok) {
+        const j2 = await r2.json()
+        tags = Array.isArray(j2?.data?.suggestedTags) ? j2.data.suggestedTags : []
+      } else {
+        aiSuggestLoading.value = false
+        return
+      }
+    } else {
+      aiSuggestLoading.value = false
+      return
+    }
+    if (_suggestReqSeq !== seq) return /* 过期请求丢弃 */
+    // 规范化：TAG_RE 过滤、去重、最多 8 条
+    const seen = new Set<string>()
+    const clean: string[] = []
+    for (const raw of tags) {
+      if (typeof raw !== 'string') continue
+      const v = raw.trim()
+      if (!/^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(v)) continue
+      if (seen.has(v)) continue
+      seen.add(v); clean.push(v)
+      if (clean.length >= 8) break
+    }
+    aiSuggestedTags.value = clean
+    _suggestedAtLeastOnce = true
+    if (!clean.length && force) aiSuggestError.value = '这次没什么合适的标签，继续写点内容再试试吧~'
+  } catch (e) {
+    if (_suggestReqSeq !== seq) return
+    if (force) aiSuggestError.value = 'AI 暂时无法生成标签，请稍后手动添加'
+  } finally {
+    if (_suggestReqSeq === seq) aiSuggestLoading.value = false
+  }
+}
+
+/* 防抖调用：标题 / 正文变化 600ms 后触发；只有进入 step 2 才真正发请求；内容不足时清空建议 */
+function scheduleAiTagsRefresh() {
+  clearTimeout(_suggestTimer!)
+  if (!canRequestSuggestions.value) {
+    if (_suggestedAtLeastOnce) aiSuggestedTags.value = []
+    return
+  }
+  _suggestTimer = setTimeout(() => {
+    _suggestTimer = null
+    if (step.value === 2) refreshAiTags(false)
+  }, 600)
+}
+watch([title, content], scheduleAiTagsRefresh, { flush: 'post' })
+watch(step, (ns, os) => {
+  if (ns === 2 && os !== 2) {
+    // 进入 step 2 立即触发 1 次
+    nextTick(() => refreshAiTags(false))
+  }
+})
+onBeforeUnmount(() => { if (_suggestTimer) clearTimeout(_suggestTimer) })
 
 const stepProgress = computed(() => props.matchingStep || 0)
 
@@ -246,7 +512,8 @@ function onPrimaryClick() {
     emit('requestMatch', {
       title: trimmedTitle,
       content: trimmed,
-      tag: selectedTag.value,
+      tag: firstTag.value,
+      tags: selectedTags.value.slice(),
       isAnonymous: isAnonymous.value,
     })
   } else {
@@ -268,6 +535,11 @@ watch(() => [props.mode, props.starName] as const, () => {
 async function doSubmit(
   targetCatalogStarId: number,
   targetCatalogStarIds?: number[],
+  /** 外部可覆盖要写入的多标签；用于 auto-match 场景：
+   *  用户在匹配流程中暂存于 SkyPage pendingRecordPayload.tags 的选中结果，
+   *  能确保哪怕中途被 UI 重置（比如 resetForm / step 切换副作用）也不会丢多标签，
+   *  避免用户填了 N 个标签结果 DB 只写了 1 个（selectedTags 为空时 fallback 到 tag 单列）。 */
+  overrideTags?: string[] | null | undefined,
 ): Promise<{ ok: boolean; story?: any; errorMsg?: string }> {
   const trimmedTitle = title.value.trim()
   const trimmed = content.value.trim()
@@ -276,6 +548,20 @@ async function doSubmit(
   }
   submitting.value = true
   error.value = ''
+  // 多标签：overrideTags 优先（匹配链路由 SkyPage 传入的暂存值），否则用当前表单 selectedTags
+  const finalTags: string[] = (() => {
+    const raw = Array.isArray(overrideTags) && overrideTags.length
+      ? overrideTags
+      : selectedTags.value.slice()
+    // 过滤空 / 不符合规则的异常词
+    return raw
+      .map((t) => (typeof t === 'string' ? t.trim() : ''))
+      .filter((t) => /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t))
+      .filter((t, i, arr) => arr.indexOf(t) === i)
+      .slice(0, 5)
+  })()
+  // 主情绪标签：取 finalTags[0]；否则保留 firstTag（selectedTags[0]）
+  const effectivePrimaryTag = finalTags[0] ?? firstTag.value ?? null
   try {
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -286,7 +572,8 @@ async function doSubmit(
       title: trimmedTitle,
       content: trimmed,
       location: userLocation.value,
-      tag: selectedTag.value,
+      tag: effectivePrimaryTag,
+      tags: finalTags,
       isAnonymous: isAnonymous.value,
     }
     const res = await fetch('/api/stories', {
@@ -296,6 +583,10 @@ async function doSubmit(
     })
     const json = await res.json()
     if (res.ok) {
+      // tags 数组：优先用后端返回的 tags[]（已规范化），否则退回 finalTags
+      const submittedTagsArr: string[] = Array.isArray(json.data?.tags) && json.data.tags.length
+        ? json.data.tags
+        : finalTags.slice()
       const submittedStory = {
         id: json.data.id,
         title: json.data.title,
@@ -310,7 +601,8 @@ async function doSubmit(
         viewCount: 0,
         origin: null,
         username: json.data.username ?? null,
-        tag: json.data.tag ?? selectedTag.value,
+        tag: json.data.tag ?? effectivePrimaryTag,
+        tags: submittedTagsArr,
         userId: json.data.userId ?? null,
         imageUrl: null,
       }
@@ -335,10 +627,11 @@ function resetForm() {
   title.value = ''
   content.value = ''
   step.value = 1
-  selectedTag.value = null
+  selectedTags.value = []
   isAnonymous.value = false
   error.value = ''
   submitting.value = false
+  customTagInput.value = ''
 }
 
 defineExpose({ doSubmit, resetForm })
@@ -366,19 +659,20 @@ defineExpose({ doSubmit, resetForm })
 }
 @keyframes sf-fadein { from { opacity: 0 } to { opacity: 1 } }
 
-/* ── Sheet：苹果毛玻璃，22px 圆角，极细 0.5px 边 ── */
+/* ── Sheet：正式窗口，760px 宽，充足留白 ── */
 .sf-sheet {
   position: relative;
-  width: 500px;
+  width: 760px;
   max-width: 100%;
+  min-height: 620px;
   max-height: calc(100vh - 40px);
-  background: rgba(28, 29, 44, 0.82);
+  background: rgba(28, 29, 44, 0.85);
   backdrop-filter: blur(38px) saturate(200%);
   -webkit-backdrop-filter: blur(38px) saturate(200%);
-  border: 0.5px solid rgba(255, 255, 255, 0.11);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 22px;
   box-shadow:
-    0 32px 88px rgba(0, 0, 0, 0.58),
+    0 36px 96px rgba(0, 0, 0, 0.60),
     0 0 0 0.5px rgba(255,255,255,0.03) inset;
   animation: sf-sheetin .3s cubic-bezier(.22, 1, .36, 1);
   overflow: hidden;
@@ -390,19 +684,19 @@ defineExpose({ doSubmit, resetForm })
   to   { opacity: 1; transform: translateY(0) scale(1) }
 }
 
-/* ═══════ HEADER：纯居中，无分隔线 ═══════ */
+/* ═══════ HEADER：纯居中，无分隔线，正式窗口尺度 ═══════ */
 .sf-header {
   position: relative;
-  padding: 22px 36px 10px;
+  padding: 28px 48px 14px;
   text-align: center;
   flex-shrink: 0;
 }
 .sf-close {
   position: absolute;
-  top: 16px;
-  left: 18px;
-  width: 24px;
-  height: 24px;
+  top: 22px;
+  left: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.055);
   border: none;
@@ -420,30 +714,30 @@ defineExpose({ doSubmit, resetForm })
   transform: translateY(-0.5px);
 }
 .sf-title-group {
-  padding: 4px 0 0;
+  padding: 6px 0 0;
 }
-/* 大标题：21px / 700 */
+/* 大标题：23px / 700 — 正式窗口感 */
 .sf-title {
-  margin: 0 0 5px;
-  font-size: 21px;
+  margin: 0 0 7px;
+  font-size: 23px;
   font-weight: 700;
   color: #fff;
   letter-spacing: 0.005em;
 }
-/* 副标题：11.5px / 400 / 45% 白 */
+/* 副标题：12px / 400 / 45% 白 */
 .sf-subtitle {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.45);
   letter-spacing: 0.015em;
 }
 
-/* ═══════ BODY · group 包裹字段组 ═══════ */
+/* ═══════ BODY · group 包裹字段组，统一高度 ═══════ */
 .sf-body {
-  padding: 12px 36px 28px;
+  padding: 16px 48px 32px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,217,138,0.12) transparent;
@@ -456,24 +750,27 @@ defineExpose({ doSubmit, resetForm })
   border-radius: 10px;
 }
 
-/* 字段组卡片：纯苹果 inset grouped table 风 */
+/* 字段组卡片：纯苹果 inset grouped table 风 — 统一 420px min 高度 */
 .sf-group {
   background: rgba(255, 255, 255, 0.032);
   border: 0.5px solid rgba(255, 255, 255, 0.05);
   border-radius: 14px;
   overflow: hidden;
-}
-.sf-field {
-  padding: 13px 16px 14px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
 }
-/* 极细分隔：field 之间，仅 0.5px，左右 16px 缩进 */
+.sf-field {
+  padding: 16px 20px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 极细分隔：field 之间，仅 0.5px，左右 20px 缩进 */
 .sf-sep {
   height: 0.5px;
   background: rgba(255, 255, 255, 0.055);
-  margin-left: 16px;
+  margin-left: 20px;
 }
 
 /* 字段标签：10.5px / uppercase / 40% 白 —— 绝对层级差 */
@@ -488,8 +785,11 @@ defineExpose({ doSubmit, resetForm })
 .sf-label-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
 }
+.sf-label-row .sf-label { margin-right: auto; }
 .sf-label-sub {
   font-size: 10.5px;
   color: rgba(255, 255, 255, 0.26);
@@ -504,8 +804,48 @@ defineExpose({ doSubmit, resetForm })
   font-variant-numeric: tabular-nums;
 }
 .sf-count.warn { color: rgba(232, 168, 76, 0.82) }
+/* AI 标签推荐按钮（sf-label-row 最右） */
+.sf-refresh-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 100px;
+  border: 0.5px solid rgba(255,217,138,0.20);
+  background: rgba(255,217,138,0.05);
+  color: #ffe5a8;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background .15s ease, filter .15s ease, transform .15s ease, opacity .15s ease;
+}
+.sf-refresh-tags:hover:not(:disabled) {
+  background: rgba(255,217,138,0.085);
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.sf-refresh-tags:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+.sf-refresh-tags .spin {
+  animation: sf-spin 0.9s linear infinite;
+}
+@keyframes sf-spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+/* AI 生成失败的标签提示（轻量、不抢视觉） */
+.sf-tag-error {
+  margin: 4px 0 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: rgba(255, 160, 140, 0.72);
+  opacity: 0.86;
+}
 
-/* 输入：无边框纯透明底，14.5px，无聚焦光晕 */
+/* 输入：无边框纯透明底，15px，无聚焦光晕 */
 .sf-input {
   width: 100%;
   box-sizing: border-box;
@@ -514,8 +854,8 @@ defineExpose({ doSubmit, resetForm })
   border: none;
   color: rgba(255, 255, 255, 0.94);
   font-family: inherit;
-  font-size: 14.5px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   outline: none;
 }
 .sf-input::placeholder {
@@ -523,14 +863,15 @@ defineExpose({ doSubmit, resetForm })
 }
 .sf-input-title {
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 16.5px;
   letter-spacing: 0.005em;
 }
 .sf-textarea {
   resize: vertical;
-  min-height: 138px;
-  line-height: 1.7;
+  min-height: 300px;
+  line-height: 1.8;
   letter-spacing: 0.004em;
+  padding-top: 2px;
 }
 
 /* 星名徽章：小胶囊 */
@@ -548,50 +889,129 @@ defineExpose({ doSubmit, resetForm })
   letter-spacing: 0.01em;
 }
 
-/* iOS Segmented Control */
-.sf-seg {
-  padding: 2.5px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+/* ═══════ 开放标签 · AI 建议 chips + 多选 + 自定义 ═══════ */
+.sf-chips {
   display: flex;
-  gap: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.sf-seg-btn {
-  flex: 1;
-  padding: 7px 2px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: inherit;
+.sf-chips-selected { margin-bottom: 2px }
+.sf-chips-suggest {
+  padding-top: 2px;
+  border-top: 0.5px dashed rgba(255,255,255,0.06);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.sf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px 6px 12px;
+  border-radius: 100px;
+  border: 0.5px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.035);
+  color: rgba(255,255,255,0.70);
   font-size: 12.5px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all .18s cubic-bezier(.22, 1, .36, 1);
   letter-spacing: 0.005em;
+  line-height: 1;
+  transition: all .18s cubic-bezier(.22, 1, .36, 1);
+  cursor: pointer;
 }
-.sf-seg-btn:hover { color: rgba(255, 255, 255, 0.8) }
-.sf-seg-btn.active {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffe5a8;
+.sf-chip:hover:not(:disabled) { transform: translateY(-0.5px) }
+.sf-chip:disabled { opacity: .34; cursor: not-allowed }
+
+/* 已选 chip：hash 染色 + 选中态  */
+.sf-chip.on {
   font-weight: 600;
-  box-shadow:
-    0 0.5px 1.5px rgba(0, 0, 0, 0.28),
-    0 0 0 0.5px rgba(255, 217, 138, 0.30);
+  padding-left: 12px;
+  padding-right: 6px;
+}
+.sf-chip-x {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: all .15s ease;
+}
+.sf-chip-x:hover { background: rgba(255,255,255,0.16); opacity: 1 }
+
+/* AI 建议 chip：前缀 Sparkles 金色  */
+.sf-chip.suggest {
+  background: rgba(255,217,138,0.05);
+  border-color: rgba(255,217,138,0.18);
+}
+.sf-chip-spark {
+  color: #ffe5a8;
+  opacity: 0.8;
 }
 
-/* Checkbox：极简方角 */
+/* 自定义输入框  */
+.sf-custom {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 9px 14px;
+  background: rgba(255,255,255,0.028);
+  border: 0.5px solid rgba(255,255,255,0.05);
+  border-radius: 11px;
+  transition: all .18s ease;
+}
+.sf-custom:focus-within {
+  border-color: rgba(255,217,138,0.28);
+  background: rgba(255,217,138,0.035);
+}
+.sf-input-custom {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px !important;
+  letter-spacing: 0.004em;
+}
+.sf-input-custom::placeholder { color: rgba(255,255,255,0.24) }
+.sf-custom-add {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(255,217,138,0.10);
+  border: 0.5px solid rgba(255,217,138,0.22);
+  color: #ffe5a8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all .15s ease;
+  flex-shrink: 0;
+}
+.sf-custom-add:hover:not(:disabled) {
+  background: rgba(255,217,138,0.20);
+  border-color: rgba(255,217,138,0.42);
+}
+.sf-custom-add:disabled {
+  opacity: .30;
+  cursor: not-allowed;
+}
+
+/* Checkbox：极简方角 — 放大 */
 .sf-check {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
 }
 .sf-check-box {
-  width: 17px;
-  height: 17px;
-  border-radius: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5.5px;
   background: rgba(255, 255, 255, 0.045);
   border: 0.5px solid rgba(255, 255, 255, 0.12);
   display: flex;
@@ -599,7 +1019,7 @@ defineExpose({ doSubmit, resetForm })
   justify-content: center;
   transition: all .18s ease;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 0;
 }
 .sf-check-box.on {
   background: linear-gradient(180deg, #ffd98a, #e9c378);
@@ -609,16 +1029,16 @@ defineExpose({ doSubmit, resetForm })
 .sf-check-mark { color: transparent; stroke-width: 4; transition: color .18s ease }
 .sf-check-box.on .sf-check-mark { color: #2a1f0c }
 .sf-check-text {
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.86);
   line-height: 1.45;
   letter-spacing: 0.004em;
 }
 .sf-check-sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.36);
-  margin-top: 1px;
+  margin-top: 2px;
   letter-spacing: 0;
   font-weight: 400;
 }
@@ -627,13 +1047,13 @@ defineExpose({ doSubmit, resetForm })
 .sf-back {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   background: none;
   border: none;
-  padding: 1px 3px;
+  padding: 1px 4px;
   color: rgba(255, 217, 138, 0.78);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   align-self: flex-start;
@@ -644,39 +1064,40 @@ defineExpose({ doSubmit, resetForm })
   transform: translateX(-1px);
 }
 
-/* 错误提示：极简 */
+/* 错误提示：极简 — 放大 */
 .sf-error {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
-  padding: 9px 14px;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 11px 16px;
+  font-size: 13px;
+  line-height: 1.55;
   color: #ff9e90;
   background: rgba(255, 139, 125, 0.07);
   border: 0.5px solid rgba(255, 139, 125, 0.20);
   border-radius: 10px;
 }
 
-/* Primary 按钮：纯苹果风格 */
+/* Primary 按钮：纯苹果风格 — 放大版 */
 .sf-primary {
   width: 100%;
-  padding: 13.5px 0;
-  border-radius: 13px;
+  padding: 15px 0;
+  border-radius: 14px;
   border: 0.5px solid rgba(255, 217, 138, 0.26);
   background: rgba(255, 217, 138, 0.12);
   color: #ffe5a8;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.008em;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   transition: all .18s ease, transform .1s ease;
+  margin-top: auto;
 }
 .sf-primary:hover:not(:disabled) {
   background: rgba(255, 217, 138, 0.20);
@@ -696,33 +1117,33 @@ defineExpose({ doSubmit, resetForm })
   color: #fff3cd;
 }
 
-/* ══════════ 匹配遮罩 ══════════ */
+/* ══════════ 匹配遮罩 — 放大版 ══════════ */
 .sf-fade-enter-active, .sf-fade-leave-active { transition: opacity .26s ease }
 .sf-fade-enter-from, .sf-fade-leave-to { opacity: 0 }
 
 .sf-mask {
   position: absolute;
   inset: 0;
-  background: rgba(8, 7, 18, 0.70);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(8, 7, 18, 0.72);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 5;
-  padding: 24px;
+  padding: 32px;
 }
 .sf-match {
   width: 100%;
-  max-width: 340px;
-  padding: 26px 24px 24px;
-  background: rgba(30, 31, 48, 0.90);
-  backdrop-filter: blur(26px);
-  -webkit-backdrop-filter: blur(26px);
+  max-width: 420px;
+  padding: 34px 32px 30px;
+  background: rgba(30, 31, 48, 0.92);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   border: 0.5px solid rgba(255, 255, 255, 0.09);
-  border-radius: 18px;
+  border-radius: 20px;
   text-align: center;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.52);
   animation: sf-matchin .32s cubic-bezier(.22, 1, .36, 1);
 }
 @keyframes sf-matchin {
@@ -733,9 +1154,9 @@ defineExpose({ doSubmit, resetForm })
 /* Progress Ring */
 .sf-ring {
   position: relative;
-  width: 58px;
-  height: 58px;
-  margin: 2px auto 14px;
+  width: 72px;
+  height: 72px;
+  margin: 4px auto 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -744,23 +1165,23 @@ defineExpose({ doSubmit, resetForm })
 .sf-ring-track {
   fill: none;
   stroke: rgba(255, 255, 255, 0.07);
-  stroke-width: 2.8;
+  stroke-width: 3.2;
 }
 .sf-ring-fill {
   fill: none;
   stroke: #ffd98a;
-  stroke-width: 2.8;
+  stroke-width: 3.2;
   stroke-linecap: round;
-  stroke-dasharray: 170;
-  stroke-dashoffset: 30;
+  stroke-dasharray: 214;
+  stroke-dashoffset: 40;
   animation: sf-ring-rotate 2.4s cubic-bezier(.55, 0, .45, 1) infinite;
-  filter: drop-shadow(0 0 6px rgba(255, 217, 138, 0.40));
+  filter: drop-shadow(0 0 8px rgba(255, 217, 138, 0.42));
   transform-origin: 50% 50%;
 }
 @keyframes sf-ring-rotate {
-  0%   { stroke-dashoffset: 170; transform: rotate(0deg) }
-  45%  { stroke-dashoffset: 30;  transform: rotate(180deg) }
-  100% { stroke-dashoffset: 170; transform: rotate(540deg) }
+  0%   { stroke-dashoffset: 214; transform: rotate(0deg) }
+  45%  { stroke-dashoffset: 40;  transform: rotate(180deg) }
+  100% { stroke-dashoffset: 214; transform: rotate(540deg) }
 }
 .sf-ring-icon {
   position: absolute;
@@ -772,35 +1193,36 @@ defineExpose({ doSubmit, resetForm })
   50%      { opacity: 1;    transform: scale(1.1) }
 }
 .sf-match-title {
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 600;
   color: #fff;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   letter-spacing: 0.008em;
 }
 .sf-match-desc {
-  font-size: 12px;
-  line-height: 1.72;
-  color: rgba(255, 255, 255, 0.52);
+  font-size: 13px;
+  line-height: 1.78;
+  color: rgba(255, 255, 255, 0.54);
   margin: 0;
-  padding: 0 8px;
+  padding: 0 10px;
 }
 .sf-match-error {
-  margin-top: 12px;
-  padding: 8px 12px;
-  font-size: 12px;
-  line-height: 1.5;
+  margin-top: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
   color: #ff9e90;
   background: rgba(255, 139, 125, 0.07);
   border: 0.5px solid rgba(255, 139, 125, 0.20);
-  border-radius: 9px;
+  border-radius: 10px;
 }
 
 /* 移动端 */
 @media (max-width: 640px) {
   .sf-overlay { padding: 0; align-items: flex-end }
   .sf-sheet {
-    max-height: 92vh;
+    min-height: 0;
+    max-height: 94vh;
     width: 100%;
     border-radius: 22px 22px 0 0;
     border-bottom: none;
@@ -810,12 +1232,17 @@ defineExpose({ doSubmit, resetForm })
     from { opacity: 0; transform: translateY(28%) }
     to   { opacity: 1; transform: translateY(0) }
   }
-  .sf-header { padding: 18px 24px 8px }
+  .sf-header { padding: 18px 24px 10px }
   .sf-title { font-size: 19px }
   .sf-close { left: 14px; top: 14px }
-  .sf-body { padding: 10px 24px 26px; gap: 16px }
-  .sf-seg-btn { font-size: 12px; padding: 7px 2px }
-  .sf-primary { padding: 13px 0; font-size: 14px }
-  .sf-match { padding: 22px 20px 22px }
+  .sf-body { padding: 10px 24px 24px; gap: 16px }
+  .sf-group { min-height: 0 }
+  .sf-field { padding: 14px 18px 15px }
+  .sf-sep { margin-left: 18px }
+  .sf-textarea { min-height: 220px }
+  .sf-seg-btn { font-size: 12.5px; padding: 8px 2px }
+  .sf-primary { padding: 14px 0; font-size: 14.5px; margin-top: 0 }
+  .sf-match { max-width: 100%; padding: 26px 22px 24px }
+  .sf-ring { width: 60px; height: 60px }
 }
 </style>

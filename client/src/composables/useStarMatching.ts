@@ -23,12 +23,19 @@ export interface MatchCandidate {
   isFallback: boolean
 }
 
+export interface MatchResult {
+  candidates: MatchCandidate[]
+  suggestedTags: string[]
+}
+
 export function useStarMatching() {
   const matching = ref(false)
   /** 0=未开始 1=提取内核 2=夜空寻星 3=AI缘分判断 */
   const step = ref<0 | 1 | 2 | 3>(0)
   const error = ref('')
   const candidates = ref<MatchCandidate[]>([])
+  /** AI 基于用户故事推荐的 3-5 个建议标签（供 StoryForm 展示） */
+  const suggestedTags = ref<string[]>([])
   const aborted = ref(false)
 
   let stepTimers: ReturnType<typeof setTimeout>[] = []
@@ -39,7 +46,6 @@ export function useStarMatching() {
   }
 
   function advanceStepsEstimated(totalEstimatedMs: number) {
-    // 把 UI 的 step 1/2/3 均分到总时长里，给用户稳定的进度反馈
     clearStepTimers()
     const t1 = Math.round(totalEstimatedMs * 0.28)
     const t2 = Math.round(totalEstimatedMs * 0.58)
@@ -54,14 +60,14 @@ export function useStarMatching() {
     title: string | null,
     content: string,
     limit = 3,
-  ): Promise<MatchCandidate[]> {
+  ): Promise<MatchResult> {
     matching.value = true
     step.value = 0
     error.value = ''
     candidates.value = []
+    suggestedTags.value = []
     aborted.value = false
 
-    // 先按 6s 估算（内核+Jaccard 快 + AI 重排慢），API 返回后 step 直接到 3
     advanceStepsEstimated(6000)
 
     try {
@@ -86,8 +92,12 @@ export function useStarMatching() {
 
       step.value = 3
       const list: MatchCandidate[] = Array.isArray(json.data?.matches) ? json.data.matches : []
+      const tags: string[] = Array.isArray(json.data?.suggestedTags)
+        ? json.data.suggestedTags.filter((t: unknown) => typeof t === 'string')
+        : []
       candidates.value = list
-      return list
+      suggestedTags.value = tags
+      return { candidates: list, suggestedTags: tags }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       error.value = msg
@@ -106,6 +116,7 @@ export function useStarMatching() {
     step.value = 0
     error.value = ''
     candidates.value = []
+    suggestedTags.value = []
   }
 
   return {
@@ -113,6 +124,7 @@ export function useStarMatching() {
     step,
     error,
     candidates,
+    suggestedTags,
     matchStars,
     reset,
   }

@@ -47,7 +47,8 @@ db.exec(`
     origin          TEXT,
     user_id         INTEGER REFERENCES users(id),
     tag             TEXT,
-    image_url       TEXT
+    image_url       TEXT,
+    tags            TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
   CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
@@ -182,6 +183,8 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_vis
 try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 // 兼容旧数据库：stars 加 image_url 列
 try { db.exec('ALTER TABLE stars ADD COLUMN image_url TEXT'); } catch {}
+// 兼容旧数据库：stars 加 tags JSON 列（多标签数组）
+try { db.exec('ALTER TABLE stars ADD COLUMN tags TEXT'); } catch {}
 
 // 兼容旧数据库：迁移 story_catalog_stars 连接表（幂等）
 try {

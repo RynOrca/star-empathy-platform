@@ -34,13 +34,15 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/stars` | 获取所有星星 |
-| POST | `/api/stars/story` | 投递心事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`） |
+| POST | `/api/stars/story` | 投递心事（必填 `content` 1~2000 字，可选 `catalog_star_id`/`title`/`location`/`tags` JSON 数组） |
 | POST | `/api/stars/:id/resonate` | 共鸣 +1 |
 | GET | `/api/stars/:id/stats` | 获取某星表的聚合统计 |
 | POST | `/api/stars/:id/visit` | 记录恒星浏览 |
 | POST | `/api/stars/story/:id/view` | 记录故事浏览 |
 | POST | `/api/stars/:id/favorite` | 收藏 |
 | DELETE | `/api/stars/:id/favorite` | 取消收藏 |
+| POST | `/api/stories/ai-tags` | **仅标签推荐（轻量）**：标题+正文 → 3~5 个 AI 建议标签，不触发星星匹配 |
+| POST | `/api/stories/match-star` | AI 归属星辰匹配：标题+正文 → Top 3 契合星辰 + suggestedTags（带匹配理由） |
 
 响应统一格式：`{ code: 200|400|404|500, message: "...", data: ... }`
 

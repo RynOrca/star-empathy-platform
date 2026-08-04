@@ -10,11 +10,10 @@
       <!-- 历史故事：来源标签 -->
       <span v-if="variant === 'history' && story.origin" class="story-origin">{{ story.origin }}</span>
 
-      <!-- 所有故事：发送者 + 情绪标签 + 共鸣按钮 -->
+      <!-- 所有故事：发送者 + 共鸣按钮 -->
       <template v-if="variant === 'all'">
         <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
-        <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
         <button
           class="resonate-btn"
           :class="{ done: isResonated }"
@@ -44,6 +43,19 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
+    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <div
+      v-if="displayTags.length"
+      class="story-tags-row"
+    >
+      <span
+        v-for="t in displayTags"
+        :key="'tag-' + story.id + '-' + t"
+        class="story-tag story-tag-inline"
+        :style="tagStyle(t)"
+      >#{{ t }}</span>
+    </div>
+
     <div class="story-meta">
       <!-- 历史故事元信息 -->
       <template v-if="variant === 'history'">
@@ -70,12 +82,13 @@
 
 <script setup lang="ts">
 import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { computed } from 'vue'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
 
-defineProps<{
+const props = defineProps<{
   story: {
     id: number
     title: string | null
@@ -83,6 +96,7 @@ defineProps<{
     origin: string | null
     username: string | null
     tag: string | null
+    tags?: string[] | null
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -99,6 +113,30 @@ defineEmits<{
   click: []
   resonate: []
 }>()
+
+/** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
+const displayTags = computed<string[]>(() => {
+  const arr = Array.isArray(props.story.tags) ? props.story.tags.filter((t) => !!t) : []
+  if (arr.length) return arr.slice(0, 5)
+  return props.story.tag ? [props.story.tag] : []
+})
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+function tagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.24)`
+  const bg = `hsla(${h}, 62%, 74%, 0.07)`
+  return { color, borderColor: border, backgroundColor: bg, border: '0.5px solid ' + border }
+}
 </script>
 
 <style scoped>
@@ -222,17 +260,33 @@ defineEmits<{
 }
 .story-sender.is-anon { color: #5a5580; }
 
-/* ── 情绪标签色 ── */
+/* ── 开放标签通用样式（正文下方、meta 上方，紧凑分隔带） ── */
 .story-tag {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 0.7rem; font-weight: 500; margin-left: 4px;
-  background: var(--overlay-08); color: var(--muted-light);
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+  border: 0.5px solid transparent;
 }
-.story-tag.tag-思念 { color: #ff8b7d; }
-.story-tag.tag-等待 { color: #86a8ff; }
-.story-tag.tag-离别 { color: #caa7ff; }
-.story-tag.tag-愿望 { color: #ffd98a; }
-.story-tag.tag-孤独 { color: #95f0c0; }
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.story-tag-inline:first-child { margin-left: 0; }
+.story-tags-row {
+  display: flex; flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  padding: 6px 2px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
+}
 
 /* ─── Story Image ─── */
 .story-image {

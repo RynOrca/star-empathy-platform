@@ -98,6 +98,18 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
+                        <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'top-' + s.id + '-' + t"
+                            class="story-tag story-tag-inline"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
+                        </div>
                         <div class="card-meta">
                           <HeartIcon :size="10" />
                           <span>{{ getDisplayResonance(s) }} 共鸣</span>
@@ -139,8 +151,17 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <div class="card-tags" v-if="s.tag">
-                          <span class="story-tag">#{{ s.tag }}</span>
+                        <!-- 标签行：正文下方、meta 上方；空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'card-' + s.id + '-' + t"
+                            class="story-tag story-tag-inline"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
                         </div>
                       </div>
                     </div>
@@ -370,6 +391,7 @@
                   'tag-theme': t.type === 'theme',
                   'tag-custom': t.custom,
                 }"
+                :style="infoTagStyle(t.tag, t.custom ? 'custom' : t.type)"
               >
                 {{ t.tag }}
                 <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
@@ -676,6 +698,18 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'topm-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
                             <div class="card-meta">
                               <HeartIcon :size="10" />
                               <span>{{ getDisplayResonance(s) }} 共鸣</span>
@@ -704,11 +738,21 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'l-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
                             <div class="card-meta">
                               <ClockIcon :size="10" class="meta-clock" />
                               <span>{{ formatTime(s.createdAt) }}</span>
-                              <span class="meta-sep">·</span>
-                              <span class="story-tag">#{{ s.tag }}</span>
                             </div>
                           </div>
                         </div>
@@ -894,6 +938,54 @@ function storySummary(content: string): string {
     .replace(/\s+/g, ' ')
     .trim()
   return text.length > 26 ? text.slice(0, 26) + '…' : text
+}
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function _tagHashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 故事卡片 story-tag 的染色（用在 userStories / top 卡片内） */
+function storyTagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(_tagHashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.22)`
+  const bg = `hsla(${h}, 62%, 74%, 0.06)`
+  return {
+    color,
+    backgroundColor: bg,
+    borderColor: border,
+    border: '0.5px solid ' + border,
+  }
+}
+/** 标签展示数组：优先 tags[]，空时退回 tag 单列（老数据兼容），最多 5 条、去重 */
+function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
+}
+/** Star 详情展示区的标签（type = emotion/theme/custom 都用） */
+function infoTagStyle(tag: string, type: 'emotion' | 'theme' | 'custom'): Record<string, string> {
+  if (type === 'custom') {
+    // custom：沿用故事 tag 的颜色
+    const h = Math.abs(_tagHashCode(tag)) % 360
+    const color = `hsl(${h} 62% 74%)`
+    return {
+      color,
+      borderColor: `hsla(${h}, 62%, 74%, 0.26)`,
+      backgroundColor: `hsla(${h}, 62%, 74%, 0.06)`,
+    }
+  }
+  // emotion/theme：统一用原设计（金/紫弱区），不做强染色，保持 StarDetail 原有味道
+  if (type === 'emotion') {
+    return { color: '#ffe5a8', borderColor: 'rgba(255,217,138,0.22)', backgroundColor: 'rgba(255,217,138,0.05)' }
+  }
+  return { color: '#d9c6ff', borderColor: 'rgba(202,167,255,0.22)', backgroundColor: 'rgba(202,167,255,0.05)' }
 }
 import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })
@@ -2057,17 +2149,38 @@ watch(() => props.catalogStarId, () => {
 .meta-user {
   color: rgba(255, 255, 255, 0.35);
 }
+/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更紧凑 */
 .card-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding: 5px 1px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
 }
+/* meta 行内嵌式标签（向后兼容但不作为默认视觉） */
+.card-tags-inline {
+  /* 复用默认 card-tags 样式，不额外覆盖 */
+}
+/* story-tag 基础形态：彩色胶囊 + 内描边 0.5px + 色值来自 storyTagStyle() */
 .story-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
   font-size: 0.62rem;
-  color: var(--accent);
-  opacity: 0.7;
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  transition: transform .15s ease, filter .15s ease;
 }
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.story-tag-inline:first-child { margin-left: 0; }
 
 @media (max-width: 768px) {
   .story-stats-bar {

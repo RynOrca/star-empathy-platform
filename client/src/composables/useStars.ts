@@ -16,6 +16,7 @@ interface StarData {
   origin: string | null
   username: string | null
   tag: string | null
+  tags?: string[]
   locationLat: number | null
   locationLng: number | null
 }

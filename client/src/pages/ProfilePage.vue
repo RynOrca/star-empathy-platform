@@ -134,7 +134,15 @@
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
                 <div class="pd-t-foot">
-                  <span v-if="s.tag" class="pd-t-tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
+                  <template v-if="displayStoryTags(s).length">
+                    <span
+                      v-for="t in displayStoryTags(s)"
+                      :key="'tag-' + s.id + '-' + t"
+                      class="pd-t-tag"
+                      :style="tagStyle(t)"
+                    >#{{ t }}</span>
+                  </template>
+                  <span class="pd-t-sep" v-if="displayStoryTags(s).length && (s.resonanceCount || 0) > 0"></span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -374,7 +382,6 @@
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <span v-if="activeStory.tag" class="pd-t-tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -398,6 +405,15 @@
             <div class="pd-story-content">
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
+            </div>
+            <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
+            <div v-if="displayStoryTags(activeStory).length" class="pd-story-tags">
+              <span
+                v-for="t in displayStoryTags(activeStory)"
+                :key="'dtag-' + activeStory.id + '-' + t"
+                class="pd-t-tag"
+                :style="tagStyle(t)"
+              >#{{ t }}</span>
             </div>
           </main>
           <footer class="pd-modal-foot">
@@ -447,6 +463,33 @@ import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
+
+/** 开放标签 hash 染色工具 */
+function _hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 供模板调用：tag → { color, borderColor, backgroundColor, border } */
+function tagStyle(tag: string | null | undefined): Record<string, string> {
+  if (!tag) return {}
+  const h = Math.abs(_hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.30)`
+  const bg = `hsla(${h}, 62%, 74%, 0.05)`
+  return { color, borderColor: border, backgroundColor: bg, border: '1px solid ' + border }
+}
+
+/** 故事展示用：统一取 tags[]，空时退回 tag 单列（旧数据兼容），最多 5 条 */
+function displayStoryTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
+}
 
 const PAGE_SIZE = 20
 const VISIBLE_STEP = 5
@@ -1650,25 +1693,53 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Card foot */
+/* Card foot：标签在左、共鸣在右，不混在一起；紧凑分隔 */
 .pd-t-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 14px;
+  gap: 8px;
+  padding-top: 9px;
   border-top: 1px solid rgba(255,217,138,0.1);
   font-size: 0.72rem;
   color: rgba(255,217,138,0.6);
 }
-
-.pd-t-tag {
-  padding: 3px 10px;
-  border-radius: 2px;
-  border: 1px solid;
-  font-size: 0.7rem;
+/* 独立标签行：标签胶囊左侧对齐，右侧保留共鸣数；flex-wrap 避免窄屏溢出 */
+.pd-t-foot {
+  flex-wrap: wrap;
+  padding-bottom: 0;
+}
+.pd-t-sep { flex: 1; }
+.pd-t-res {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
-/* Tag 配色 — 严格对齐 style-d.html */
+/* 开放标签胶囊样式：圆角 11px，compact */
+.pd-t-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  border: 0.5px solid transparent; /* 真正的色值走 tagStyle() 内联 */
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  transition: transform .15s ease, filter .15s ease;
+}
+.pd-t-tag:hover { filter: brightness(1.06); transform: translateY(-0.3px); }
+
+/* 详情弹窗正文下方的标签行：紧凑上下虚线分隔 */
+.pd-story-tags {
+  display: flex; flex-wrap: wrap; gap: 4px 7px;
+  align-items: center;
+  padding: 6px 2px;
+  margin-top: 12px;
+  border-top: 0.5px dashed var(--pd-rule);
+  border-bottom: 0.5px dashed var(--pd-rule);
+}
+
+/* Tag 开放染色 — 旧 5 色保留作向后兼容，但新标签统一走内联 tagStyle() */
 .tag-思念, .tag-miss { color: #ff9eb8; border-color: rgba(255,158,184,0.3); background: rgba(255,158,184,0.05); }
 .tag-愿望, .tag-wish { color: var(--pd-gold); border-color: rgba(255,217,138,0.3); background: rgba(255,217,138,0.05); }
 .tag-孤独, .tag-lonely { color: #95f0c0; border-color: rgba(149,240,192,0.3); background: rgba(149,240,192,0.05); }
