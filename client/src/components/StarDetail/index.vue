@@ -924,8 +924,8 @@ import { useAreaHighlights } from '../../composables/useAreaHighlights'
 import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
 import { useMediaQuery } from '../../composables/useMediaQuery'
-import catalogData from '../../data/stars.json'
 import { constellationNames } from '../../data/starInfo'
+import { getStarNameInfo } from '../../utils/starName'
 import { marked } from 'marked'
 
 // 摘出故事摘要：纯文本 26 字
@@ -1302,22 +1302,18 @@ const analysisUpdatedText = computed(() => {
   return new Date(t).toLocaleDateString('zh-CN')
 })
 
-const catalogLookup = new Map<number, { name: string | null; con: string; color: string }>()
-for (const s of (catalogData as any).stars) {
-  catalogLookup.set(s.id, { name: s.name, con: s.con, color: s.color })
-}
+// 星名/元信息查找走共享工具（合并 stars.json 恒星 + planets.ts 行星），修复行星显示「恒星 #-100」(issue #135)
 function getStarName(catalogStarId: number): string {
-  const s = catalogLookup.get(catalogStarId)
-  return s?.name || s?.con || `恒星 #${catalogStarId}`
+  const info = getStarNameInfo(catalogStarId)
+  return info?.name || `恒星 #${catalogStarId}`
 }
 function getStarColor(catalogStarId: number): string {
-  const s = catalogLookup.get(catalogStarId)
-  return s?.color || '#ffd98a'
+  return getStarNameInfo(catalogStarId)?.color || '#ffd98a'
 }
 function getConstellationName(catalogStarId: number): string {
-  const s = catalogLookup.get(catalogStarId)
-  if (!s?.con) return ''
-  return constellationNames[s.con] || s.con
+  const con = getStarNameInfo(catalogStarId)?.con
+  if (!con) return ''
+  return constellationNames[con] || con
 }
 const currentStarName = computed(() => getStarName(props.catalogStarId))
 const currentConstellation = computed(() => getConstellationName(props.catalogStarId))

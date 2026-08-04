@@ -283,6 +283,8 @@ export interface SkyAPI {
   focusOnStar: (x: number, y: number, z: number) => void
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
+  /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
+  focusOnPlanetSimple: (bodyName: string) => void
   /** 退出特写模式，飞回原点（关闭详情面板时调用） */
   exitCloseup: () => void
   /** 高亮指定恒星位置（短暂 2s） */
@@ -299,6 +301,8 @@ export interface SkyAPI {
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
   /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
   releaseSnap: () => void
+  /** issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示） */
+  snapToPlanet: (bodyName: string) => void
 }
 
 export function useSky(
@@ -1106,6 +1110,9 @@ for (const s of stars) starById.set(s.id, s)
   let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // issue #135：程序化 snap 标志（snapToPlanet 设置），防止 pointermove 自动 release
+  // 仅在用户主动 pointerdown 拖动时才清除此标志，允许正常的拖动释放逻辑生效
+  let programmaticSnap = false
   // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
   const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
   // issue #134：行星吸附阈值（行星视觉上比恒星大，容差放宽；sqrt(0.01)≈0.1 NDC ≈ 54px@1080p）
@@ -1136,6 +1143,7 @@ for (const s of stars) starById.set(s.id, s)
     if (snappedStarId === -1 && snappedPlanet === null) return
     snappedStarId = -1
     snappedPlanet = null
+    programmaticSnap = false  // issue #135：清除程序化 snap 标志
     if (crosshairEl) crosshairEl.classList.remove('snapped')
     tooltipInner.style.opacity = '0'
     hoverGlowTargetOpacity = 0
@@ -1147,6 +1155,39 @@ for (const s of stars) starById.set(s.id, s)
     }
     // issue #124：通知外部已脱吸附
     options?.onSnapChange?.(null)
+  }
+
+  /**
+   * issue #135：主动吸附到指定行星。
+   * 场景：移动端从搜索结果/收藏卡跳转到行星后，相机虽定位但未触发触屏拖动 snap，
+   * 导致「凝听星语」按钮不显示。此方法主动设置 snap 状态并通知外部。
+   * 仅移动端有意义（PC 端无准星无按钮），但调用安全（PC 端 onSnapChange 也会触发，外部 v-if=isMobile 自然不显示按钮）。
+   */
+  function snapToPlanet(bodyName: string) {
+    const found = planetUpdaters.find(u => u.bodyName === bodyName)
+    if (!found) {
+      console.warn('[snapToPlanet] planet not found:', bodyName)
+      return
+    }
+    // nameCN / planetId 存在 mesh.userData（见 createPlanet 内赋值）
+    const ud = found.mesh.userData as { planetNameCN?: string; planetId?: number }
+    const nameCN = ud.planetNameCN || bodyName
+    const planetId = ud.planetId || 0
+    console.log('[snapToPlanet] snapping to', bodyName, 'nameCN=', nameCN, 'planetId=', planetId)
+    // 清恒星吸附态（互斥）
+    snappedStarId = -1
+    snappedPlanet = { name: found.bodyName, nameCN, planetId }
+    programmaticSnap = true  // issue #135：标记程序化 snap，阻止 pointermove 自动 release
+    if (crosshairEl) crosshairEl.classList.add('snapped')
+    // 记录 snapBaseFov 以便 releaseSnap 恢复（若未在拖动 snap 中则用当前 fov）
+    if (snapBaseFov === 0) snapBaseFov = camera.fov
+    // 通知外部驱动「凝听星语」按钮滑入
+    options?.onSnapChange?.({
+      type: 'planet',
+      planetName: found.bodyName,
+      planetNameCN: nameCN,
+      planetId,
+    })
   }
 
   // ═══ 移动端准星 DOM（issue #116） ═══
@@ -1507,7 +1548,14 @@ for (const s of stars) starById.set(s.id, s)
             }
           } else if (snappedStarId !== -1 || snappedPlanet !== null) {
             // 中心无星/行星且超出范围：释放吸附
-            releaseSnap()
+            // issue #135：程序化 snap（搜索/收藏卡跳转）不被 pointermove 自动释放，
+            // 必须等用户主动 pointerdown 拖动（pointerdown handler 会清除 programmaticSnap）
+            if (programmaticSnap) {
+              // 程序化 snap 下 pointermove 不释放，但仍刷新 tooltip 位置（若吸附行星）
+              if (snappedPlanet) updateTooltipPositionForPlanet(snappedPlanet.name)
+            } else {
+              releaseSnap()
+            }
           }
         }
       }
@@ -1609,6 +1657,9 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
       }
+      // issue #135：用户主动拖动时清除程序化 snap 标志，
+      // 让后续 pointermove 的正常 release 逻辑生效（拖动远离行星时释放吸附）
+      programmaticSnap = false
     } else if (activePointers.size === 2) {
       // 双指启用 pinch，禁用旋转
       dragging = false
@@ -4022,6 +4073,16 @@ for (const s of stars) starById.set(s.id, s)
       }
       activeTweenId = requestAnimationFrame(animStep)
     },
+    // ═══ 移动端行星定位：取行星当前坐标复用 focusOnStar 平滑飞行，不进入特写状态机 ═══
+    // 与普通恒星定位体验一致：相机飞向行星附近朝向它，closeupState 保持 IDLE
+    // 关闭面板时 exitCloseup 对 IDLE 状态 no-op（L4028），相机停在定位位置
+    focusOnPlanetSimple(this: SkyAPI, bodyName: string) {
+      const found = planetUpdaters.find(u => u.bodyName === bodyName)
+      if (!found) return
+      const pos = found.tiltGroup.position
+      // 复用 focusOnStar 的平滑飞行（接收 skyGroup 局部坐标，与 planetUpdaters 坐标系一致）
+      this.focusOnStar(pos.x, pos.y, pos.z)
+    },
     // 退出特写：飞回原点 (0,0,0)，FOV 回 DEFAULT_FOV，末态恢复 near/halo → IDLE
     // 触发场景：关闭详情面板
     exitCloseup() {
@@ -4183,5 +4244,7 @@ for (const s of stars) starById.set(s.id, s)
     },
     // issue #124：主动释放准星吸附（供外部「凝听星语」按钮点击后调用）
     releaseSnap,
+    // issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示）
+    snapToPlanet,
   }
 }

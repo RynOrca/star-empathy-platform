@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { ok, serverError } from '../utils/response';
+import { PLANET_MAP } from '../services/narrative';
 
 const router = Router();
 
@@ -54,14 +55,14 @@ router.get('/', (req: Request, res: Response) => {
       return ok(res, 'success', []);
     }
 
-    const results = catalog.stars
+    // 恒星匹配（stars.json，正数 id）
+    const starResults = catalog.stars
       .filter(s => {
         const nameMatch = s.name && s.name.toLowerCase().includes(q);
         const conMatch = s.con.toLowerCase().includes(q);
         const conNameMatch = (conNames[s.con] || '').includes(q);
         return nameMatch || conMatch || conNameMatch;
       })
-      .slice(0, 20)
       .map(s => ({
         id: s.id,
         name: s.name,
@@ -71,6 +72,27 @@ router.get('/', (req: Request, res: Response) => {
         ra: s.ra,
         dec: s.dec,
       }));
+
+    // 行星匹配（PLANET_MAP，负数 id -100~-108）：按中文名 / 英文名匹配
+    const planetResults: Array<{ id: number; name: string | null; con: string; conName: string; mag: number; ra: number; dec: number }> = [];
+    for (const [idStr, planet] of Object.entries(PLANET_MAP)) {
+      const nameCnMatch = planet.nameCN.toLowerCase().includes(q);
+      const nameEnMatch = planet.name.toLowerCase().includes(q);
+      if (nameCnMatch || nameEnMatch) {
+        planetResults.push({
+          id: parseInt(idStr, 10),
+          name: planet.nameCN,
+          con: '',
+          conName: planet.nameCN,
+          mag: 0,
+          ra: 0,
+          dec: 0,
+        });
+      }
+    }
+
+    // 合并 + 截断 Top 20（行星优先置顶，因数量少且匹配精确度高）
+    const results = [...planetResults, ...starResults].slice(0, 20);
 
     ok(res, 'success', results);
   } catch (error) {
