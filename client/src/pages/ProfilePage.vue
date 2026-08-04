@@ -165,6 +165,23 @@
         </div>
       </section>
 
+      <!-- 星笺 Section · 合集管理 -->
+      <section id="pd-collections" class="pd-collections-section" aria-label="我的星笺合集">
+        <div class="pd-section-head">
+          <h2>我的星笺 · FOLIO</h2>
+          <p>—— 把散落的故事收进合集，让它们彼此呼应 ——</p>
+        </div>
+        <CollectionGrid
+          :collections="collections"
+          :loading="collectionsLoading"
+          :error="collectionsError"
+          @create="openCreateCollection"
+          @open="openCollectionDetail"
+          @edit="openEditCollection"
+          @delete="deleteCollectionWithConfirm"
+        />
+      </section>
+
       <section id="pd-constellation" class="pd-constellation-section" aria-label="我的私人星座">
         <div class="pd-const-wrap">
           <p class="pd-const-title">· MY · PERSONAL · CONSTELLATION ·</p>
@@ -406,6 +423,16 @@
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
             </div>
+            <!-- 合集归属：正文下方、标签行上方（与卡片/详情保持一致视觉位） -->
+            <div v-if="activeStory.collectionName" class="pd-story-collection-row">
+              <CollectionBadge
+                :collection-name="activeStory.collectionName"
+                :cover-color="activeStory.collectionCoverColor ?? null"
+                :collection-visibility="activeStory.collectionVisibility ?? null"
+                :clickable="!!activeStory.collectionId"
+                @click.stop="openCollectionFromStory(activeStory)"
+              />
+            </div>
             <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
             <div v-if="displayStoryTags(activeStory).length" class="pd-story-tags">
               <span
@@ -451,6 +478,26 @@
           <span>{{ flash.text }}</span>
         </div>
       </Transition>
+
+      <!-- 星笺编辑/新建弹窗 -->
+      <CollectionEditModal
+        :show="showCollectionEdit"
+        :collection="editingCollection"
+        :submitting="collectionSubmitting"
+        :error="collectionEditError"
+        @close="showCollectionEdit = false"
+        @submit="handleCollectionSubmit"
+      />
+
+      <!-- 星笺详情弹窗（点击合集卡 / 故事 Badge 时打开） -->
+      <CollectionDetailModal
+        :show="showCollectionDetail"
+        :collection-id="collectionDetailId"
+        :is-owner="collectionDetailIsOwner"
+        @close="showCollectionDetail = false"
+        @story-click="onCollectionStoryClick"
+        @edit="handleCollectionDetailEdit"
+      />
     </template>
   </div>
 </template>
@@ -463,6 +510,11 @@ import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
 import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
+import CollectionBadge from '../components/CollectionBadge.vue'
+import CollectionGrid from '../components/CollectionGrid.vue'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
+import CollectionDetailModal from '../components/CollectionDetailModal.vue'
+import { useCollections, type Collection, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
 
 /** 开放标签 hash 染色工具 */
 function _hashCode(s: string): number {
@@ -538,6 +590,112 @@ const showLogoutModal = ref(false)
 const logoutLoading = ref(false)
 // 移动端设置弹窗
 const showSettingsModal = ref(false)
+
+// ─── 星笺（合集）状态 ───
+const {
+  list: collections,
+  loading: collectionsLoading,
+  error: collectionsError,
+  fetchList: fetchCollections,
+  create: createCollection,
+  update: updateCollection,
+  remove: removeCollection,
+} = useCollections()
+const showCollectionEdit = ref(false)
+const editingCollection = ref<Collection | null>(null)
+const collectionSubmitting = ref(false)
+const collectionEditError = ref<string | null>(null)
+const showCollectionDetail = ref(false)
+const collectionDetailId = ref<number | null>(null)
+const collectionDetailIsOwner = ref(false)
+
+async function handleCollectionSubmit(payload: {
+  isEdit: boolean
+  id?: number
+  data: CreateCollectionInput | UpdateCollectionInput
+}) {
+  collectionSubmitting.value = true
+  collectionEditError.value = null
+  try {
+    if (payload.isEdit && payload.id != null) {
+      const ok = await updateCollection(payload.id, payload.data as UpdateCollectionInput)
+      if (!ok) {
+        collectionEditError.value = '保存失败，请重试'
+        return
+      }
+      showFlash('星笺已更新', 'success')
+    } else {
+      const created = await createCollection(payload.data as CreateCollectionInput)
+      if (!created) {
+        collectionEditError.value = '创建失败，请重试'
+        return
+      }
+      showFlash('星笺已创建', 'success')
+    }
+    showCollectionEdit.value = false
+    editingCollection.value = null
+  } finally {
+    collectionSubmitting.value = false
+  }
+}
+
+function openCreateCollection() {
+  editingCollection.value = null
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+}
+
+function openEditCollection(c: Collection) {
+  editingCollection.value = c
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+  // 关闭详情弹窗，避免叠加
+  showCollectionDetail.value = false
+}
+
+async function deleteCollectionWithConfirm(c: Collection) {
+  if (typeof window !== 'undefined' && !window.confirm(`确认删除星笺「${c.name}」？\n合集内的故事会保留，但不再归属此合集。`)) return
+  const ok = await removeCollection(c.id)
+  if (ok) {
+    showFlash('星笺已删除', 'success')
+    // 若正在查看该合集详情，关闭
+    if (collectionDetailId.value === c.id) {
+      showCollectionDetail.value = false
+      collectionDetailId.value = null
+    }
+  } else {
+    showFlash('删除失败，请重试', 'error')
+  }
+}
+
+function openCollectionDetail(c: Collection) {
+  collectionDetailId.value = c.id
+  collectionDetailIsOwner.value = true // ProfilePage 列表中都是自己的合集
+  showCollectionDetail.value = true
+}
+
+/** 从故事卡片的 CollectionBadge 点击进入合集详情 */
+function openCollectionFromStory(story: any) {
+  const cid = story.collectionId
+  if (cid == null) return
+  collectionDetailId.value = cid
+  // 自己的故事合集可能是自己所有（编辑按钮显隐由 CollectionDetailModal 内部判断）
+  collectionDetailIsOwner.value = !!user.value && story.userId === user.value.id
+  showCollectionDetail.value = true
+}
+
+async function handleCollectionDetailEdit(c: any) {
+  // 来自 CollectionDetailModal 的编辑事件：c 已含合集字段
+  openEditCollection(c as Collection)
+}
+
+/** 从星笺详情点击单条故事：关闭星笺弹窗，打开该故事详情 */
+function onCollectionStoryClick(story: any) {
+  showCollectionDetail.value = false
+  // 若故事已在本地 stories 列表，直接复用；否则用接口返回的故事对象打开
+  const local = stories.value.find((s) => s.id === story.id)
+  activeStory.value = local ?? story
+}
 
 async function handleLogout() {
   logoutLoading.value = true
@@ -936,6 +1094,10 @@ async function loadProfileData() {
   loadingMore.value = false
   activeStory.value = null
   visibleCount.value = VISIBLE_STEP
+  showCollectionEdit.value = false
+  showCollectionDetail.value = false
+  collectionDetailId.value = null
+  editingCollection.value = null
 
   const token = getToken()
   if (!token) { router.push('/'); return }
@@ -984,6 +1146,8 @@ async function loadProfileData() {
       stats.value.favoriteCount = favorites.value.length
     }
   } catch (e) { console.error('加载失败', e) }
+  // 星笺列表异步加载，不阻塞首屏
+  fetchCollections().catch((e) => console.error('加载星笺失败', e))
   loaded.value = true
 }
 
@@ -1979,6 +2143,23 @@ onBeforeUnmount(() => {
   animation: pd-story-flash-kf 1.4s ease-out forwards;
 }
 
+/* ═══ (e0) Collections / 星笺 Section ═══ */
+.pd-collections-section {
+  position: relative;
+  z-index: 2;
+  padding: 80px 48px 120px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* 弹窗中故事卡片合集归属行（与卡片/详情视觉位一致） */
+.pd-story-collection-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
 /* ═══ (e) Favorites Section ═══ */
 .pd-favorites-section {
   position: relative;
@@ -2641,6 +2822,8 @@ onBeforeUnmount(() => {
 
   /* Favorites — 移动端严格保持 grid 2 列竖直排布，不被 PC 5 列影响 */
   .pd-favorites-section { padding: 60px 18px 120px; }
+  /* 星笺 — 移动端收紧内边距 */
+  .pd-collections-section { padding: 60px 18px 100px; }
   .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
   .pd-gallery {
     display: grid !important;
