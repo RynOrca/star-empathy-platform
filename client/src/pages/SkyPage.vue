@@ -767,9 +767,8 @@ function focusOnQueryStar() {
     if (!info) return
     const tryFocus = () => {
       if (skyRef.value?.sky) {
-        // 从收藏卡/URL query 跳转：行星可能不在视野，必须 focusOnPlanet 定位
-        // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
-        onPlanetClick(bodyName, info.conName, starId, true)
+        // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
+        onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
       } else {
         setTimeout(tryFocus, 300)
       }
@@ -857,9 +856,8 @@ async function flyToStar(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 从搜索结果跳转：行星可能不在视野，必须 focusOnPlanet 定位
-    // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
-    onPlanetClick(bodyName, info.conName, starId, true)
+    // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
+    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
     return
   }
   const star = catalogStarLookup.get(starId)
@@ -869,11 +867,11 @@ async function flyToStar(starId: number) {
 }
 
 function locateStar(starId: number) {
-  // 负 id = 行星，调 focusOnPlanet 定位（会进入特写，但用户点击了「定位」按钮属预期行为）
+  // 负 id = 行星，调 focusOnPlanetSimple 只定位不进特写（与普通恒星 locateStar 体验一致）
   if (isPlanetId(starId)) {
     const bodyName = getPlanetBodyName(starId)
     if (!bodyName || !skyRef.value?.sky) return
-    skyRef.value.sky.focusOnPlanet(bodyName)
+    skyRef.value.sky.focusOnPlanetSimple(bodyName)
     return
   }
   const star = catalogStarLookup.get(starId)
@@ -1321,9 +1319,8 @@ function onStarClick(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 从 fly-to-star CustomEvent 跳转：行星可能不在视野，必须 focusOnPlanet 定位
-    // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
-    onPlanetClick(bodyName, info.conName, starId, true)
+    // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
+    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
     return
   }
   const star = catalogStarLookup.get(starId); if (!star) return
@@ -1390,10 +1387,13 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
   selectedCatalogStarId.value = planetId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
-  // issue #134：enterCloseup=false 时（移动端「凝听星语」按钮入口）只打开故事面板，不进入行星特写
+  // issue #134：enterCloseup=false 时（移动端入口）只定位不进特写，与普通恒星定位体验一致
   if (enterCloseup) {
-    // 进入行星特写模式（物理直径比例下小天体需相机距离补偿）
+    // PC 端：进入行星特写模式（物理直径比例下小天体需相机距离补偿）
     skyRef.value?.sky?.focusOnPlanet(name)
+  } else {
+    // 移动端：取行星坐标调 focusOnStar 平滑飞行，不进入特写状态机
+    skyRef.value?.sky?.focusOnPlanetSimple(name)
   }
 }
 async function fetchCatalogStats(starId: number) {

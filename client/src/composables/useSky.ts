@@ -283,6 +283,8 @@ export interface SkyAPI {
   focusOnStar: (x: number, y: number, z: number) => void
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
+  /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
+  focusOnPlanetSimple: (bodyName: string) => void
   /** 退出特写模式，飞回原点（关闭详情面板时调用） */
   exitCloseup: () => void
   /** 高亮指定恒星位置（短暂 2s） */
@@ -4021,6 +4023,16 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
       activeTweenId = requestAnimationFrame(animStep)
+    },
+    // ═══ 移动端行星定位：取行星当前坐标复用 focusOnStar 平滑飞行，不进入特写状态机 ═══
+    // 与普通恒星定位体验一致：相机飞向行星附近朝向它，closeupState 保持 IDLE
+    // 关闭面板时 exitCloseup 对 IDLE 状态 no-op（L4028），相机停在定位位置
+    focusOnPlanetSimple(this: SkyAPI, bodyName: string) {
+      const found = planetUpdaters.find(u => u.bodyName === bodyName)
+      if (!found) return
+      const pos = found.tiltGroup.position
+      // 复用 focusOnStar 的平滑飞行（接收 skyGroup 局部坐标，与 planetUpdaters 坐标系一致）
+      this.focusOnStar(pos.x, pos.y, pos.z)
     },
     // 退出特写：飞回原点 (0,0,0)，FOV 回 DEFAULT_FOV，末态恢复 near/halo → IDLE
     // 触发场景：关闭详情面板
