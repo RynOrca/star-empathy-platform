@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -330,10 +330,21 @@
         :collections="userCollections"
         :current-user-id="currentUserId"
         :is-owner="collectionDetailIsOwner"
+        :refresh-nonce="collectionDetailNonce"
         @close="onCollectionDetailClose"
         @collection-switch="onCollectionSwitch"
-        @edit="onCollectionEditOrDelete"
-        @delete="onCollectionEditOrDelete"
+        @edit="onCollectionEdit"
+        @delete="onCollectionDelete"
+      />
+
+      <!-- 星笺编辑模态框（从合集详情的编辑按钮触发） -->
+      <CollectionEditModal
+        :show="showCollectionEdit"
+        :collection="editingCollection"
+        :submitting="collectionSubmitting"
+        :error="collectionEditError"
+        @close="showCollectionEdit = false; editingCollection = null"
+        @submit="handleCollectionSubmit"
       />
 
       <StoryForm
@@ -548,6 +559,7 @@ import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail/index.vue'
 import CollectionDetail from '../components/CollectionDetail/index.vue'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
 import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
@@ -558,7 +570,7 @@ import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
-import { useCollections } from '../composables/useCollections'
+import { useCollections, type Collection, type CollectionDetail as CollectionDetailType, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
 
 const { isMobile } = useMediaQuery()
@@ -572,10 +584,18 @@ const isGuest = computed(() => username.value === '星穹访客')
 const currentUserId = ref<number | null>(null)
 
 // ─── 合集详情 overlay 状态 ───
-const { list: userCollections, fetchList: fetchUserCollections } = useCollections()
+const { list: userCollections, fetchList: fetchUserCollections, update: updateCollection, remove: removeCollection } = useCollections()
 const showCollectionDetail = ref(false)
 const collectionDetailId = ref<number | null>(null)
 const collectionDetailIsOwner = ref(false)
+// 合集详情刷新令牌：编辑后自增以触发 CollectionDetail 重新拉取
+const collectionDetailNonce = ref(0)
+
+// ─── 合集编辑模态框状态 ───
+const showCollectionEdit = ref(false)
+const editingCollection = ref<Collection | null>(null)
+const collectionSubmitting = ref(false)
+const collectionEditError = ref<string | null>(null)
 
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
@@ -1726,10 +1746,51 @@ function onCollectionSwitch(id: number) {
   collectionDetailId.value = id
 }
 
-/** 合集详情内编辑/删除 → 跳转个人主页 */
-function onCollectionEditOrDelete() {
-  showCollectionDetail.value = false
-  router.push('/profile')
+/** 合集详情内编辑 → 打开编辑模态框（不关闭详情，保存后刷新） */
+function onCollectionEdit(c: CollectionDetailType) {
+  editingCollection.value = c as unknown as Collection
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+}
+
+/** 合集详情内删除 → 确认后删除 */
+async function onCollectionDelete(c: CollectionDetailType) {
+  if (typeof window !== 'undefined' && !window.confirm(`确认删除星笺「${c.name}」？\n合集内的故事会保留，但不再归属此星笺。`)) return
+  const ok = await removeCollection(c.id)
+  if (ok) {
+    showCollectionDetail.value = false
+    collectionDetailId.value = null
+    // 刷新合集列表
+    fetchUserCollections()
+  } else {
+    alert('删除失败，请重试')
+  }
+}
+
+/** 编辑模态框提交：更新星笺并刷新详情 */
+async function handleCollectionSubmit(payload: {
+  isEdit: boolean
+  id?: number
+  data: CreateCollectionInput | UpdateCollectionInput
+}) {
+  collectionSubmitting.value = true
+  collectionEditError.value = null
+  try {
+    if (payload.isEdit && payload.id != null) {
+      const ok = await updateCollection(payload.id, payload.data as UpdateCollectionInput)
+      if (!ok) {
+        collectionEditError.value = '保存失败，请重试'
+        return
+      }
+      // 刷新合集列表与详情
+      await fetchUserCollections()
+      collectionDetailNonce.value++
+    }
+    showCollectionEdit.value = false
+    editingCollection.value = null
+  } finally {
+    collectionSubmitting.value = false
+  }
 }
 
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }

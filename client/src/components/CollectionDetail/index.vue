@@ -586,6 +586,8 @@ const props = defineProps<{
   collections: Collection[]
   currentUserId: number | null
   isOwner: boolean
+  /** 刷新令牌：自增时强制重新拉取详情（编辑后刷新用） */
+  refreshNonce?: number
 }>()
 
 // ─── Emits ───
@@ -799,6 +801,12 @@ watch(() => props.collectionId, () => {
   detailStoryId.value = null
   searchQuery.value = ''
   activeTab.value = 'analysis'
+})
+
+// 编辑后刷新：refreshNonce 自增时重新拉取当前合集详情
+watch(() => props.refreshNonce, (n, old) => {
+  if (n == null || n === old) return
+  if (show.value && props.collectionId != null) loadDetail(props.collectionId)
 })
 
 // Tab 切换时清除故事详情
