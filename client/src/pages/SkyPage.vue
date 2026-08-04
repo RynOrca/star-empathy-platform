@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1058,8 +1058,10 @@ interface StoryData {
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; tags?: string[] | null; userId: number | null
   imageUrl: string | null
+  collectionId?: number | null; collectionName?: string | null
+  collectionCoverColor?: string | null; collectionVisibility?: string | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null, collectionId: null, collectionName: null, collectionCoverColor: null, collectionVisibility: null }
 
 /** 统一 tags 字段归一化：tags[] 存在(且数组)→ 最多 5 条/去重；否则回退 tag 单列；最后兜底空数组
  *  避免任何端上出现 undefined/null → displayTags 兜底能保证显示，但是 SkyPage 主动构造 StoryData 时
@@ -1108,6 +1110,8 @@ function mergeStoriesIntoMap(
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, tags: normalizeStoryTags(s), userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
+      collectionId: s.collectionId ?? null, collectionName: s.collectionName ?? null,
+      collectionCoverColor: s.collectionCoverColor ?? null, collectionVisibility: s.collectionVisibility ?? null,
     }
     for (const cid of cids) {
       if (cid == null) continue

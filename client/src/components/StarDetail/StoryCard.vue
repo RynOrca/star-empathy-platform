@@ -43,11 +43,23 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <!-- 合集 + 标签行：合集在左、标签在右，同一行；两者都空时隐藏 -->
     <div
-      v-if="displayTags.length"
+      v-if="story.collectionName || displayTags.length"
       class="story-tags-row"
     >
+      <!-- 合集徽章（左侧） -->
+      <CollectionBadge
+        v-if="story.collectionName"
+        :collection-name="story.collectionName"
+        :cover-color="story.collectionCoverColor ?? null"
+        :collection-visibility="story.collectionVisibility ?? null"
+        :clickable="!!story.collectionId && !!collectionClickable"
+        @click.stop="collectionClickable && $emit('collection-click', story)"
+      />
+      <!-- 分隔点：合集和标签同时存在时 -->
+      <span v-if="story.collectionName && displayTags.length" class="story-tag-sep"></span>
+      <!-- 标签（右侧） -->
       <span
         v-for="t in displayTags"
         :key="'tag-' + story.id + '-' + t"
@@ -83,6 +95,7 @@
 <script setup lang="ts">
 import { Sparkles, Check, Eye } from 'lucide-vue-next'
 import { computed } from 'vue'
+import CollectionBadge from '../CollectionBadge.vue'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
@@ -97,6 +110,10 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -107,11 +124,14 @@ const props = defineProps<{
   formattedTime?: string
   formattedDistance?: { text: string; near: boolean } | null
   index: number
+  /** 合集 Badge 是否可点击打开合集详情；默认 false（仅展示） */
+  collectionClickable?: boolean
 }>()
 
 defineEmits<{
   click: []
   resonate: []
+  'collection-click': [story: any]
 }>()
 
 /** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
@@ -286,6 +306,15 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 6px 2px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
+}
+
+/* 合集与标签之间的竖线分隔 */
+.story-tag-sep {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 
 /* ─── Story Image ─── */

@@ -47,6 +47,16 @@
           <div class="detail-content" v-html="renderedContent"></div>
           <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
         </div>
+        <!-- 合集归属：正文下方、标签行上方（与卡片/弹窗保持一致视觉位） -->
+        <div v-if="story.collectionName" class="detail-collection-row">
+          <CollectionBadge
+            :collection-name="story.collectionName"
+            :cover-color="story.collectionCoverColor ?? null"
+            :collection-visibility="story.collectionVisibility ?? null"
+            :clickable="!!story.collectionId && !!collectionClickable"
+            @click.stop="collectionClickable && $emit('collection-click', story)"
+          />
+        </div>
         <!-- 标签行：正文下方、统一视觉结构，空时隐藏 -->
         <div v-if="displayTags.length" class="detail-tags">
           <span
@@ -64,6 +74,7 @@
 <script setup lang="ts">
 import { ArrowLeft, Sparkles, Check, Trash2 } from 'lucide-vue-next'
 import { computed } from 'vue'
+import CollectionBadge from '../CollectionBadge.vue'
 
 const ArrowLeftIcon = ArrowLeft
 const SparklesIcon = Sparkles
@@ -79,6 +90,10 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
   }
   backLabel: string
   renderedContent: string
@@ -89,12 +104,15 @@ const props = defineProps<{
   currentUserId: number | null
   formattedTime: string
   formattedDistance: { text: string; near: boolean } | null
+  /** 合集 Badge 是否可点击打开合集详情；默认 false（仅展示） */
+  collectionClickable?: boolean
 }>()
 
 defineEmits<{
   back: []
   resonate: []
   delete: []
+  'collection-click': [story: any]
 }>()
 
 /** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
@@ -281,6 +299,14 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 6px 2px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
+}
+
+/* ── 详情合集归属行（正文下方、标签行上方） ── */
+.detail-collection-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 2px;
 }
 .detail-tag {
   display: inline-block; padding: 2px 9px; border-radius: 11px;

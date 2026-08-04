@@ -1060,6 +1060,10 @@ const props = defineProps<{
     tag: string | null
     userId: number | null
     imageUrl: string | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
   }>
   activeIndex: number
   starInfo: { id: number; displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
