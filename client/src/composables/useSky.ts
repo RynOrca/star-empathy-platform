@@ -1110,6 +1110,9 @@ for (const s of stars) starById.set(s.id, s)
   let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // issue #135：程序化 snap 标志（snapToPlanet 设置），防止 pointermove 自动 release
+  // 仅在用户主动 pointerdown 拖动时才清除此标志，允许正常的拖动释放逻辑生效
+  let programmaticSnap = false
   // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
   const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
   // issue #134：行星吸附阈值（行星视觉上比恒星大，容差放宽；sqrt(0.01)≈0.1 NDC ≈ 54px@1080p）
@@ -1140,6 +1143,7 @@ for (const s of stars) starById.set(s.id, s)
     if (snappedStarId === -1 && snappedPlanet === null) return
     snappedStarId = -1
     snappedPlanet = null
+    programmaticSnap = false  // issue #135：清除程序化 snap 标志
     if (crosshairEl) crosshairEl.classList.remove('snapped')
     tooltipInner.style.opacity = '0'
     hoverGlowTargetOpacity = 0
@@ -1161,14 +1165,19 @@ for (const s of stars) starById.set(s.id, s)
    */
   function snapToPlanet(bodyName: string) {
     const found = planetUpdaters.find(u => u.bodyName === bodyName)
-    if (!found) return
+    if (!found) {
+      console.warn('[snapToPlanet] planet not found:', bodyName)
+      return
+    }
     // nameCN / planetId 存在 mesh.userData（见 createPlanet 内赋值）
     const ud = found.mesh.userData as { planetNameCN?: string; planetId?: number }
     const nameCN = ud.planetNameCN || bodyName
     const planetId = ud.planetId || 0
+    console.log('[snapToPlanet] snapping to', bodyName, 'nameCN=', nameCN, 'planetId=', planetId)
     // 清恒星吸附态（互斥）
     snappedStarId = -1
     snappedPlanet = { name: found.bodyName, nameCN, planetId }
+    programmaticSnap = true  // issue #135：标记程序化 snap，阻止 pointermove 自动 release
     if (crosshairEl) crosshairEl.classList.add('snapped')
     // 记录 snapBaseFov 以便 releaseSnap 恢复（若未在拖动 snap 中则用当前 fov）
     if (snapBaseFov === 0) snapBaseFov = camera.fov
@@ -1539,7 +1548,14 @@ for (const s of stars) starById.set(s.id, s)
             }
           } else if (snappedStarId !== -1 || snappedPlanet !== null) {
             // 中心无星/行星且超出范围：释放吸附
-            releaseSnap()
+            // issue #135：程序化 snap（搜索/收藏卡跳转）不被 pointermove 自动释放，
+            // 必须等用户主动 pointerdown 拖动（pointerdown handler 会清除 programmaticSnap）
+            if (programmaticSnap) {
+              // 程序化 snap 下 pointermove 不释放，但仍刷新 tooltip 位置（若吸附行星）
+              if (snappedPlanet) updateTooltipPositionForPlanet(snappedPlanet.name)
+            } else {
+              releaseSnap()
+            }
           }
         }
       }
@@ -1641,6 +1657,9 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
       }
+      // issue #135：用户主动拖动时清除程序化 snap 标志，
+      // 让后续 pointermove 的正常 release 逻辑生效（拖动远离行星时释放吸附）
+      programmaticSnap = false
     } else if (activePointers.size === 2) {
       // 双指启用 pinch，禁用旋转
       dragging = false
