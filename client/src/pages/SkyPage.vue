@@ -749,16 +749,24 @@ function goToCurrentLocation() {
   location.refresh().then(() => {
     if (location.failed.value) {
       locationCityToast.value = ''
+    } else {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
     }
   })
 }
 
 // 模板中使用的 refreshLocation（重新获取定位按钮）
 function refreshLocation() {
+  // 清除悬停计时器：用户点击意图是重新定位，不是切换城市，避免定位期间城市面板误弹
+  clearHoverTimer()
   locationCityToast.value = '正在获取定位...'
   location.refresh().then(() => {
     if (location.failed.value) {
       locationCityToast.value = ''
+    } else {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
     }
   })
 }

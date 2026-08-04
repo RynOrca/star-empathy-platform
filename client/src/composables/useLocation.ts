@@ -7,9 +7,11 @@ export interface LatLng {
 
 const LOCATION_CACHE_KEY = 'star_location_cache'
 const LOCATION_CACHE_TTL = 2 * 60 * 60 * 1000 // 2小时
-const QUICK_TIMEOUT = 3000  // 快速定位3秒超时
-const HIGH_ACC_TIMEOUT = 8000 // 高精度8秒超时
-const MAX_AGE = 5 * 60 * 1000 // 允许使用5分钟内的缓存位置
+const QUICK_TIMEOUT = 3000   // 浏览器低精度定位 3s 超时
+const HARD_TIMEOUT = 4000    // 硬超时 4s：Chrome 权限弹窗下 timeout 不计时，必须手动兜底
+const HIGH_ACC_TIMEOUT = 8000
+const MAX_AGE = 5 * 60 * 1000
+const IP_API_TIMEOUT = 3000  // IP 兜底 API 超时
 
 const lat = ref<number | null>(null)
 const lng = ref<number | null>(null)
@@ -18,6 +20,7 @@ const failed = ref(false)
 const loading = ref(false)
 let requested = false
 let highAccInProgress = false
+let inFlight: Promise<void> | null = null
 
 function getCache(): LatLng | null {
   try {
@@ -44,57 +47,121 @@ function applyLocation(latVal: number, lngVal: number) {
 }
 
 /**
- * 快速定位策略：
- * 1. 先读 localStorage 缓存 → 立即返回（0ms）
- * 2. 用 enableHighAccuracy: false + 3s 超时 → IP/WiFi定位（通常<2秒）
- * 3. 快速定位成功后，后台静默尝试高精度更新（不阻塞UI）
- * 4. 快速定位失败/超时 → 标记failed，但不阻塞UI
+ * 浏览器定位 + 硬超时
+ * 关键：Chrome 等浏览器在权限弹窗显示时，options.timeout 不会开始倒计时，
+ * 导致回调可能永不触发。这里用 Promise.race 加硬超时强制结束。
  */
-async function doRequest() {
-  if (loading.value || requested) return
-  requested = true
-  loading.value = true
-
-  // Step 1: 缓存立即命中
-  const cached = getCache()
-  if (cached) {
-    applyLocation(cached.lat, cached.lng)
-    loading.value = false
-    // 后台静默刷新
-    silentHighAccUpdate()
-    return
-  }
-
-  // Step 2: 快速低精度定位（IP/WiFi，城市级精度足够天文观测）
-  if (!('geolocation' in navigator)) {
-    ready.value = true
-    failed.value = true
-    loading.value = false
-    return
-  }
-
-  const quickPromise = new Promise<LatLng | null>((resolve) => {
+function browserLocate(): Promise<LatLng | null> {
+  if (!('geolocation' in navigator)) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    let settled = false
+    const done = (v: LatLng | null) => {
+      if (!settled) { settled = true; resolve(v) }
+    }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
+      (pos) => done({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => done(null),
       { enableHighAccuracy: false, timeout: QUICK_TIMEOUT, maximumAge: MAX_AGE },
     )
+    // 硬超时兜底：无论浏览器回调是否触发，HARD_TIMEOUT 后必出结果
+    setTimeout(() => done(null), HARD_TIMEOUT)
   })
-
-  const quickResult = await quickPromise
-  if (quickResult) {
-    applyLocation(quickResult.lat, quickResult.lng)
-    // 后台静默尝试高精度
-    silentHighAccUpdate()
-  } else {
-    // 快速定位失败，标记完成（不阻塞），标记失败
-    ready.value = true
-    failed.value = true
-  }
-  loading.value = false
 }
 
-/** 后台静默尝试高精度更新，不阻塞UI，失败不影响已有位置 */
+/**
+ * IP 地理位置兜底（无需权限，城市级精度足够天文观测）
+ * 主：ipapi.co；备：ipwho.is
+ */
+async function ipLocate(): Promise<LatLng | null> {
+  // 主：ipapi.co
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
+    const res = await fetch('https://ipapi.co/json/', { signal: ctrl.signal })
+    clearTimeout(t)
+    if (res.ok) {
+      const d = await res.json()
+      if (typeof d.latitude === 'number' && typeof d.longitude === 'number') {
+        return { lat: d.latitude, lng: d.longitude }
+      }
+    }
+  } catch { /* fallthrough to backup */ }
+  // 备：ipwho.is
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
+    const res = await fetch('https://ipwho.is/', { signal: ctrl.signal })
+    clearTimeout(t)
+    if (res.ok) {
+      const d = await res.json()
+      if (d && d.success && typeof d.latitude === 'number' && typeof d.longitude === 'number') {
+        return { lat: d.latitude, lng: d.longitude }
+      }
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+/**
+ * 统一定位流程：
+ * 1. localStorage 缓存 → 立即命中（0ms）
+ * 2. 浏览器低精度定位（带硬超时，避免权限弹窗卡死）
+ * 3. IP 地理位置兜底（无需权限，城市级精度）
+ * 4. 全部失败 → 标记 failed（除非 preserveOnFail）
+ * 5. 成功后后台静默尝试高精度更新（不阻塞 UI）
+ */
+async function doRequest(opts: { force?: boolean; preserveOnFail?: boolean; skipCache?: boolean } = {}): Promise<void> {
+  const { force = false, preserveOnFail = false, skipCache = false } = opts
+  // 已有请求进行中：force 模式等待当前完成再继续，否则直接返回
+  if (inFlight) {
+    if (!force) return inFlight
+    await inFlight.catch(() => {})
+  }
+  if (requested && !force) return
+  requested = true
+
+  inFlight = (async () => {
+    loading.value = true
+    try {
+      // Step 1: 缓存命中（skipCache 时跳过，强制重新定位）
+      if (!skipCache) {
+        const cached = getCache()
+        if (cached) {
+          applyLocation(cached.lat, cached.lng)
+          silentHighAccUpdate()
+          return
+        }
+      }
+
+      // Step 2: 浏览器定位（硬超时兜底）
+      const browserResult = await browserLocate()
+      if (browserResult) {
+        applyLocation(browserResult.lat, browserResult.lng)
+        silentHighAccUpdate()
+        return
+      }
+
+      // Step 3: IP 兜底
+      const ipResult = await ipLocate()
+      if (ipResult) {
+        applyLocation(ipResult.lat, ipResult.lng)
+        // IP 定位已足够天文观测，不再触发高精度（避免再次权限弹窗）
+        return
+      }
+
+      // Step 4: 全部失败
+      if (preserveOnFail) return  // 已有位置时静默保留
+      ready.value = true
+      failed.value = true
+    } finally {
+      loading.value = false
+      inFlight = null
+    }
+  })()
+  return inFlight
+}
+
+/** 后台静默尝试高精度更新，不阻塞 UI，失败不影响已有位置 */
 function silentHighAccUpdate() {
   if (highAccInProgress) return
   if (!('geolocation' in navigator)) return
@@ -114,12 +181,17 @@ function setManual(latVal: number, lngVal: number) {
   applyLocation(latVal, lngVal)
 }
 
-/** 手动刷新定位（静默，不隐藏已有天空） */
+/**
+ * 手动刷新定位
+ * - 已有位置时：静默重新定位，失败保留旧位置（不隐藏天空）
+ * - 首次失败后：重新尝试，失败重新标记 failed
+ */
 function refresh(): Promise<void> {
-  requested = false
+  const hadLocation = lat.value != null && lng.value != null
   failed.value = false
-  loading.value = true
-  return doRequest()
+  requested = false
+  // skipCache: 强制重新定位，不走缓存（用户点击"重新获取定位"期望真正刷新）
+  return doRequest({ force: true, preserveOnFail: hadLocation, skipCache: true })
 }
 
 /** 初始化：只执行一次 */
