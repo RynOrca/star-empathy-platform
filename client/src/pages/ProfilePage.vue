@@ -396,6 +396,10 @@
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="openNewCollection = false">×</button>
           </header>
           <main class="pd-modal-body">
+            <p v-if="newCollError" class="pd-error-row">
+              <AlertCircle :size="12" />
+              <span>{{ newCollError }}</span>
+            </p>
             <div class="pd-modal-form-row">
               <label class="pd-modal-label">合集名称</label>
               <input
@@ -575,7 +579,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Bookmark, FolderPlus, Trash2 } from 'lucide-vue-next'
+import { Star, Bookmark, FolderPlus, Trash2, AlertCircle } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
@@ -644,27 +648,32 @@ const userIdRef = computed<number | null>(() => user.value?.id ?? null)
 const collections = useCollections(userIdRef)
 const openNewCollection = ref(false)
 const newCollLoading = ref(false)
+const newCollError = ref('')
 const newCollForm = ref<{ name: string; description: string }>({ name: '', description: '' })
 const newCollNameInputRef = ref<HTMLInputElement | null>(null)
 async function doCreateCollection() {
   const name = newCollForm.value.name.trim()
   if (!name) return
   newCollLoading.value = true
+  newCollError.value = ''
   const r = await collections.createCollection({
     name,
     description: newCollForm.value.description.trim() || undefined,
   })
   newCollLoading.value = false
   if (!r.ok) {
-    // 复用 profile 已有的 error 展示：简单 alert（后续可接入统一 toast）
-    alert(r.error)
+    newCollError.value = r.error
     return
   }
   newCollForm.value = { name: '', description: '' }
+  newCollError.value = ''
   openNewCollection.value = false
 }
 watch(openNewCollection, (open) => {
-  if (open) nextTick(() => newCollNameInputRef.value?.focus())
+  if (open) {
+    newCollError.value = ''
+    nextTick(() => newCollNameInputRef.value?.focus())
+  }
 })
 function confirmDeleteCollection(c: Collection) {
   if (c.isDefault) return
@@ -2656,6 +2665,26 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
   margin: 8px 0 0;
   font-style: italic;
+}
+
+/* 合集 / 表单错误行（Modal 内错误提示） */
+.pd-error-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 107, 138, 0.08);
+  border: 1px solid rgba(255, 107, 138, 0.28);
+  color: #ff8fa8;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}
+.pd-error-row svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* 退出确认小弹窗 */
