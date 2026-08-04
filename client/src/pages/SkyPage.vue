@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -300,6 +300,8 @@
         :observer-lat="userLat"
         :observer-lng="userLng"
         :is-guest="isGuest"
+        :is-planet-closeup="isPlanetCloseup"
+        :observe-mode="planetObserveMode"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -313,6 +315,7 @@
         @write-story="onWriteStory"
         @delete-story="onDeleteStory"
         @stories-mutated="onStarDetailStoriesMutated"
+        @toggle-observe="onToggleObserve"
       />
 
       <StoryForm
@@ -1258,6 +1261,8 @@ const snappedLabel = ref<string>('')
 // issue #135：定位结果目标（独立于 snap 机制，解决程序化 snap 后按钮不显示的 bug）
 // 定位/搜索跳转后直接设置此状态驱动按钮显示，不依赖 pointermove snap 触发
 const locatedTarget = ref<SnapTarget | null>(null)
+// issue #136：点击「凝听星语」时保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示
+const lastEnteredTarget = ref<SnapTarget | null>(null)
 
 function onSnapChange(target: SnapTarget | null) {
   console.log('[onSnapChange] target=', target)
@@ -1286,6 +1291,8 @@ function onSnapChange(target: SnapTarget | null) {
 function onStoryEnterClick() {
   const target = locatedTarget.value || snappedTarget.value
   if (!target) return
+  // 保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示（移动端视角没动时按钮应保持可用）
+  lastEnteredTarget.value = target
   // 清除定位目标和吸附状态
   locatedTarget.value = null
   skyRef.value?.sky?.releaseSnap?.()
@@ -1363,6 +1370,12 @@ const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
 const showSettings = ref(false)
+
+// ─── PC 端行星特写 · 观察模式（issue #136）───
+// planetObserveMode=true 时隐藏故事面板和模糊背景，露出 3D 行星特写供用户滚轮/拖拽观察
+const planetObserveMode = ref(false)
+// 是否处于 PC 端行星特写模式（行星 id < 0 且非移动端）；决定 StarDetail overlay 空白点击行为
+const isPlanetCloseup = computed(() => !isMobile.value && selectedCatalogStarId.value < 0)
 
 // ─── 记录 · AI 归属星辰匹配 ───
 const showRecordForm = ref(false)
@@ -1615,6 +1628,8 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
   // issue #134：enterCloseup=false 时（移动端入口）只定位不进特写，与普通恒星定位体验一致
   if (enterCloseup) {
     // PC 端：进入行星特写模式（物理直径比例下小天体需相机距离补偿）
+    // 重置观察模式状态（切换行星时确保从故事界面开始）
+    planetObserveMode.value = false
     skyRef.value?.sky?.focusOnPlanet(name)
   } else {
     // 移动端：取行星坐标调 focusOnStar 平滑飞行，不进入特写状态机
@@ -1624,7 +1639,14 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; planetObserveMode.value = false; skyRef.value?.sky?.setObserveMode(false); skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup(); if (lastEnteredTarget.value && isMobile.value) { locatedTarget.value = lastEnteredTarget.value; lastEnteredTarget.value = null } }
+// PC 端行星特写 · 切换观察模式（issue #136）
+// true：隐藏故事面板露出行星，禁止 hover/点击，只允许拖动/缩放观察
+// false：回到故事界面，恢复正常交互
+function onToggleObserve() {
+  planetObserveMode.value = !planetObserveMode.value
+  skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
+}
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标

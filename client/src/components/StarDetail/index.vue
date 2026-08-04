@@ -1,8 +1,8 @@
 <template>
   <!-- ═══ PC 端布局 ═══ -->
   <Transition name="pc-detail-fade" @after-leave="emit('close')">
-    <div v-if="!isMobile && show" class="overlay" @click.self="handleClose">
-    <div class="detail-wrap">
+    <div v-if="!isMobile && show" class="overlay" :class="{ 'observe-mode': isPlanetCloseup && observeMode }" @click.self="handleClose">
+    <div v-show="!(isPlanetCloseup && observeMode)" class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
@@ -438,6 +438,14 @@
         </div>
       </div>
     </div>
+    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：观察模式切换 -->
+    <button
+      v-if="isPlanetCloseup"
+      class="observe-toggle-btn"
+      @click="emit('toggleObserve')"
+    >
+      {{ observeMode ? '返回' : '观察' }}
+    </button>
   </div>
   </Transition>
 
@@ -1063,6 +1071,10 @@ const props = defineProps<{
   observerLat?: number | null
   observerLng?: number | null
   isGuest?: boolean
+  /** PC 端行星特写模式（selectedCatalogStarId < 0 且 PC 端）：点击 overlay 空白进入观察模式而非关闭 */
+  isPlanetCloseup?: boolean
+  /** 观察模式：隐藏故事面板和模糊背景，露出 3D 行星特写供用户观察 */
+  observeMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -1082,6 +1094,8 @@ const emit = defineEmits<{
    *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
    */
   storiesMutated: [kind: 'new' | 'delete' | 'resonate' | 'kernel-edit']
+  /** PC 端行星特写：点击 overlay 空白切换观察模式（隐藏故事面板露出行星） */
+  toggleObserve: []
 }>()
 
 const router = useRouter()
@@ -1679,6 +1693,42 @@ watch(() => props.catalogStarId, () => {
   animation: fadeIn 0.15s ease-out;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ─── 观察模式（PC 端行星特写）：移除模糊背景，overlay 透传事件让 3D 画布接收滚轮/拖拽 ─── */
+/* 「返回」按钮通过自己的 pointer-events: auto 保持可点击 */
+.overlay.observe-mode {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+/* ─── PC 端行星特写 · 观察/返回按钮（issue #136）─── */
+/* 灰色 + 透明风格，与现有 close-btn 等按钮保持一致 */
+.observe-toggle-btn {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 28px;
+  background: rgba(80, 84, 100, 0.35);
+  border: 1px solid rgba(180, 185, 200, 0.25);
+  border-radius: var(--radius-sm);
+  color: rgba(220, 222, 230, 0.85);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 101;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.observe-toggle-btn:hover {
+  background: rgba(100, 105, 122, 0.5);
+  border-color: rgba(200, 205, 220, 0.4);
+  color: rgba(240, 242, 248, 0.95);
+}
 
 /* ─── Container ─── */
 .detail-wrap {
