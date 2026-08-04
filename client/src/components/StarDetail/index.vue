@@ -101,7 +101,7 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
+                        <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
                         <div
                           v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                           class="card-tags-wrap"
@@ -113,8 +113,10 @@
                               :title="`所属合集：${getStoryCollection(s)!.name}`"
                             >
                               <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                              <FolderOpen :size="11" />
+                              <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
                             </span>
+                            <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
                             <div
                               v-if="storyDisplayTags(s).length"
                               class="card-tags card-tags-inline"
@@ -169,7 +171,7 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方；空时隐藏；左侧展示所属合集 -->
+                        <!-- 标签行：正文下方、meta 上方；空时隐藏；左侧展示所属合集（无胶囊） -->
                         <div
                           v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                           class="card-tags-wrap"
@@ -181,8 +183,10 @@
                               :title="`所属合集：${getStoryCollection(s)!.name}`"
                             >
                               <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                              <FolderOpen :size="11" />
+                              <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
                             </span>
+                            <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
                             <div
                               v-if="storyDisplayTags(s).length"
                               class="card-tags card-tags-inline"
@@ -748,7 +752,7 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
                             <div
                               v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                               class="card-tags-wrap"
@@ -760,8 +764,10 @@
                                   :title="`所属合集：${getStoryCollection(s)!.name}`"
                                 >
                                   <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                                  <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                  <FolderOpen :size="11" />
+                                  <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
                                 </span>
+                                <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
                                 <div
                                   v-if="storyDisplayTags(s).length"
                                   class="card-tags card-tags-inline"
@@ -803,7 +809,7 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
                             <div
                               v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                               class="card-tags-wrap"
@@ -815,8 +821,10 @@
                                   :title="`所属合集：${getStoryCollection(s)!.name}`"
                                 >
                                   <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                                  <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                  <FolderOpen :size="11" />
+                                  <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
                                 </span>
+                                <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
                                 <div
                                   v-if="storyDisplayTags(s).length"
                                   class="card-tags card-tags-inline"
@@ -1014,7 +1022,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Bookmark } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Bookmark, FolderOpen } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -2364,36 +2372,27 @@ watch(() => props.catalogStarId, () => {
 .card-foot-left {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   flex: 1;
   min-width: 0;
+  font-size: 0.68rem;
+  color: rgba(242, 236, 255, 0.75);
 }
 .card-coll {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(202, 167, 255, 0.07);
-  border: 1px solid rgba(202, 167, 255, 0.22);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  color: rgba(242, 236, 255, 0.84);
   max-width: 160px;
   white-space: nowrap;
 }
 .card-coll-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
 }
-.card-coll-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.meta-sep { opacity: 0.35; }
 .card-tags {
   display: flex;
   flex-wrap: wrap;

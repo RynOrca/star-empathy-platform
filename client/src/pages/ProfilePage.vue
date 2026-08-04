@@ -138,9 +138,11 @@
                     <template v-if="getStoryCollection(s)">
                       <span class="pd-t-coll" :title="`所属合集：${getStoryCollection(s)!.name}`">
                         <span class="pd-t-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                        <span class="pd-t-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                        <FolderOpen :size="11" />
+                        <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
                       </span>
                     </template>
+                    <span class="meta-sep" v-if="getStoryCollection(s) && displayStoryTags(s).length">·</span>
                     <template v-if="displayStoryTags(s).length">
                       <span
                         v-for="t in displayStoryTags(s)"
@@ -597,7 +599,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Bookmark, FolderPlus, FolderKanban, Trash2, AlertCircle, Heart } from 'lucide-vue-next'
+import { Star, Bookmark, FolderPlus, FolderOpen, FolderKanban, Trash2, AlertCircle, Heart } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
@@ -1917,36 +1919,27 @@ onBeforeUnmount(() => {
 .pd-t-foot-left {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   flex: 1;
   min-width: 0;
+  font-size: 0.72rem;
+  color: rgba(242, 236, 255, 0.75);
 }
 .pd-t-coll {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(202, 167, 255, 0.07);
-  border: 1px solid rgba(202, 167, 255, 0.22);
-  font-size: 0.64rem;
-  letter-spacing: 0.04em;
-  color: rgba(242, 236, 255, 0.84);
   max-width: 170px;
   white-space: nowrap;
 }
 .pd-t-coll-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
 }
-.pd-t-coll-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.meta-sep { opacity: 0.35; }
 
 /* 开放标签胶囊样式：圆角 11px，compact */
 .pd-t-tag {

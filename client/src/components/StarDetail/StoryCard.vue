@@ -43,7 +43,7 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
+    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊，学meta行风格） -->
     <div
       v-if="displayTags.length || collectionName"
       class="story-tags-wrap"
@@ -52,9 +52,11 @@
         <template v-if="collectionName">
           <span class="story-coll" :title="`所属合集：${collectionName}`">
             <span class="story-coll-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
-            <span class="story-coll-name">{{ shortCollName(collectionName) }}</span>
+            <FolderOpen :size="11" />
+            <span>{{ shortCollName(collectionName) }}</span>
           </span>
         </template>
+        <span class="meta-sep" v-if="collectionName && displayTags.length">·</span>
         <div
           v-if="displayTags.length"
           class="story-tags-row"
@@ -94,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { Sparkles, Check, Eye, FolderOpen } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 const SparklesIcon = Sparkles
@@ -311,36 +313,27 @@ function shortCollName(name: string | null | undefined, max = 8): string {
 .story-foot-left {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   flex: 1;
   min-width: 0;
+  font-size: 0.68rem;
+  color: rgba(242, 236, 255, 0.75);
 }
 .story-coll {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(202, 167, 255, 0.07);
-  border: 1px solid rgba(202, 167, 255, 0.22);
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
-  color: rgba(242, 236, 255, 0.84);
   max-width: 170px;
   white-space: nowrap;
 }
 .story-coll-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
 }
-.story-coll-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.meta-sep { opacity: 0.35; }
 .story-tags-row {
   display: flex; flex-wrap: wrap;
   align-items: center;
