@@ -1071,10 +1071,12 @@ function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | n
   return s.tag ? [s.tag] : []
 }
 
-/** 根据 story.collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null */
+/** 根据 story.collectionId / collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null；兼容 snake_case / camelCase 双字段 */
 function getStoryCollection(s: any): { name: string; coverColor: string } | null {
-  if (!s || s.collection_id == null) return null
-  const cid = Number(s.collection_id)
+  if (!s) return null
+  const cidRaw = s.collectionId ?? s.collection_id
+  if (cidRaw == null) return null
+  const cid = Number(cidRaw)
   if (!cid || !Array.isArray(collections.list.value)) return null
   const c = collections.list.value.find((x) => x.id === cid)
   if (!c) return null
@@ -1469,6 +1471,10 @@ function handleClose() {
 
 onMounted(() => {
   nextTick(() => { show.value = true })
+  // 合集列表懒加载：mount 时如 list 为空则触发一次 fetchList（避免 getStoryCollection 匹配不到）
+  if (Array.isArray(collections.list.value) && collections.list.value.length === 0) {
+    void collections.fetchList()
+  }
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -1553,16 +1559,16 @@ const showMovePicker = ref(false)
 const movingStory = ref<{ id: number; title: string | null } | null>(null)
 const movingStoryCollectionId = ref<number | null>(null)
 
-/** 获取故事详情上显示的合集信息（仅作者可见） */
+/** 获取故事详情上显示的合集信息（公开可见：任何访客都能看到该故事属于哪册合集，类似专栏/超话归属） */
 const detailStoryCollectionInfo = computed<{ name: string; color: string } | null>(() => {
   if (!detailStory.value) return null
-  if (!props.currentUserId || detailStory.value.userId !== props.currentUserId) return null
-  const cid: unknown = (detailStory.value as any).collectionId
-  if (cid == null) {
+  const cidRaw = (detailStory.value as any).collectionId ?? (detailStory.value as any).collection_id
+  if (cidRaw == null) {
     const def = collections.list.value.find((c) => c.isDefault)
     return def ? { name: def.name, color: def.coverColor } : null
   }
-  const c = collections.list.value.find((x) => x.id === (cid as number))
+  const cid = Number(cidRaw)
+  const c = collections.list.value.find((x) => x.id === cid)
   if (c) return { name: c.name, color: c.coverColor }
   return null
 })

@@ -546,6 +546,14 @@
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
             </div>
+            <!-- 合集归属行：正文下方、tag行之上单独一行 -->
+            <template v-if="getStoryCollection(activeStory)">
+              <div class="pd-story-coll-row" :title="`所属合集：${getStoryCollection(activeStory)!.name}`">
+                <span class="pd-scr-dot" :style="{ background: getStoryCollection(activeStory)!.coverColor || '#caa7ff' }"></span>
+                <Library :size="11" />
+                <span class="pd-scr-name">{{ getStoryCollection(activeStory)!.name }}</span>
+              </div>
+            </template>
             <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
             <div v-if="displayStoryTags(activeStory).length" class="pd-story-tags">
               <span
@@ -632,10 +640,12 @@ function displayStoryTags(s: { tag?: string | null; tags?: string[] | null } | n
   return s.tag ? [s.tag] : []
 }
 
-/** 根据 story.collection_id 从我的合集列表找合集元信息，返回 name+coverColor 或 null */
+/** 根据 story.collectionId / collection_id 从我的合集列表找合集元信息，返回 name+coverColor 或 null；兼容 snake_case / camelCase 双字段 */
 function getStoryCollection(s: any): { name: string; coverColor: string } | null {
-  if (!s || s.collection_id == null) return null
-  const cid = Number(s.collection_id)
+  if (!s) return null
+  const cidRaw = s.collectionId ?? s.collection_id
+  if (cidRaw == null) return null
+  const cid = Number(cidRaw)
   if (!cid || !Array.isArray(collections.list.value)) return null
   const c = collections.list.value.find((x) => x.id === cid)
   if (!c) return null
@@ -2659,6 +2669,21 @@ onBeforeUnmount(() => {
   color: var(--pd-text-pri);
   white-space: pre-wrap;
 }
+
+.pd-story-coll-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 16px 0 12px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.7rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 340px;
+}
+.pd-scr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pd-scr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pd-story-image {
   display: block;

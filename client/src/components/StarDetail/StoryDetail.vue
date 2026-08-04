@@ -23,7 +23,7 @@
           @click.stop="$emit('openMoveCollection')"
           title="把这个故事移动到其他合集"
         >
-          <FolderMoveIcon :size="14" />
+          <Library :size="14" />
           <span>{{ movingCollection ? '移动中…' : '移动合集' }}</span>
         </button>
         <button
@@ -52,18 +52,18 @@
             <span class="meta-sep">·</span>
             <span class="detail-sender is-anon">匿名星语</span>
           </template>
-          <template v-if="story.userId != null && story.userId === currentUserId && collectionName">
-            <span class="meta-sep">·</span>
-            <span class="detail-collection" :style="{ color: collectionColor || '#caa7ff' }" :title="`合集：${collectionName}`">
-              <FolderOpen :size="11" class="detail-collection-icon" /> {{ collectionName }}
-            </span>
-          </template>
         </div>
         <div class="detail-body">
           <div class="detail-content" v-html="renderedContent"></div>
           <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
         </div>
-        <!-- 标签行：正文下方、统一视觉结构，空时隐藏 -->
+        <!-- 合集归属行：正文下方、tag行之上单独一行（公开可见，任意访客都能看到） -->
+        <div v-if="collectionName" class="detail-collection-row" :title="`所属合集：${collectionName}`">
+          <span class="dc-row-dot" :style="{ background: collectionColor || '#caa7ff' }"></span>
+          <Library :size="11" />
+          <span class="dc-row-name">{{ collectionName }}</span>
+        </div>
+        <!-- 标签行：统一视觉结构，空时隐藏 -->
         <div v-if="displayTags.length" class="detail-tags">
           <span
             v-for="t in displayTags"
@@ -78,14 +78,13 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Sparkles, Check, Trash2, FolderOpen } from 'lucide-vue-next'
+import { ArrowLeft, Sparkles, Check, Trash2, Library } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 const ArrowLeftIcon = ArrowLeft
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const Trash2Icon = Trash2
-const FolderMoveIcon = FolderOpen
 
 const props = defineProps<{
   story: {
@@ -108,7 +107,7 @@ const props = defineProps<{
   currentUserId: number | null
   formattedTime: string
   formattedDistance: { text: string; near: boolean } | null
-  /** 当前故事所属合集的名字，仅自己的故事显示。空串则隐藏 */
+  /** 当前故事所属合集的名字（公开可见，任何访客都能看到） */
   collectionName?: string | null
   collectionColor?: string | null
 }>()
@@ -265,12 +264,20 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .move-collection-btn:disabled { opacity: 0.5; cursor: wait; }
 
-.detail-collection {
-  font-family: var(--font-serif);
-  letter-spacing: 0.02em;
-  font-size: 0.78rem;
-  opacity: 0.95;
+.detail-collection-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 0 14px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.7rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 340px;
 }
+.dc-row-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dc-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ─── Detail View ─── */
 .detail-view {
