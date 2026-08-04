@@ -1108,10 +1108,10 @@ for (const s of stars) starById.set(s.id, s)
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
   // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
   const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
+  // issue #134：行星吸附阈值（行星视觉上比恒星大，容差放宽；sqrt(0.01)≈0.1 NDC ≈ 54px@1080p）
+  const SNAP_THRESHOLD_PLANET = 0.01
   const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
   const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
-  // issue #134：屏幕中心 NDC 复用向量（避免每帧 new Vector2）
-  const _centerNDC = new Vector2(0, 0)
 
   /**
    * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
@@ -1330,6 +1330,32 @@ for (const s of stars) starById.set(s.id, s)
         }
         return { id: bestId, dist: bestDist }
       }
+      // issue #134：行星投影检测（与恒星同套逻辑，给准星吸附提供容差，Raycaster 精确命中在屏幕中心太难对准）
+      // 遍历 planetMeshes 取世界坐标投影到 NDC，按 planetName 去重，返回最近的行星
+      function detectPlanetByProjection(ndcX: number, ndcY: number): { name: string; nameCN: string; planetId: number; dist: number } | null {
+        skyGroup.updateMatrixWorld()
+        camera.updateMatrixWorld()
+        camera.updateProjectionMatrix()
+        let bestDist = Infinity
+        let best: { name: string; nameCN: string; planetId: number } | null = null
+        const seen = new Set<string>()
+        for (const mesh of planetMeshes) {
+          const ud = mesh.userData as { planetName?: string; planetNameCN?: string; planetId?: number }
+          if (!ud.planetName || seen.has(ud.planetName)) continue
+          seen.add(ud.planetName)
+          mesh.getWorldPosition(_v)
+          _v.project(camera)
+          if (_v.z > 1) continue // 在相机后面
+          const dx = _v.x - ndcX
+          const dy = _v.y - ndcY
+          const d = dx * dx + dy * dy
+          if (d < bestDist) {
+            bestDist = d
+            best = { name: ud.planetName, nameCN: ud.planetNameCN || ud.planetName, planetId: ud.planetId || 0 }
+          }
+        }
+        return best ? { ...best, dist: bestDist } : null
+      }
 
     canvas.addEventListener('pointermove', (e) => {
       // 给拖动标记距离，由 pointerup 判读是否是点击
@@ -1413,27 +1439,16 @@ for (const s of stars) starById.set(s.id, s)
       // ─── issue #116 移动端准星吸附（issue #134 扩展：支持行星吸附） ───
       // 仅移动端 + 非行星特写模式启用；拖拽时也运行（拖拽瞄准是核心交互）
       if (isMobile && closeupState === 'IDLE') {
-        // issue #134：先用 Raycaster 检测屏幕中心是否命中行星（优先级：行星 > 恒星，与 PC 端点击一致）
-        let centerPlanet: { planetName: string; planetNameCN: string; planetId: number } | null = null
-        if (planetMeshes.length) {
-          skyGroup.updateMatrixWorld()
-          camera.updateMatrixWorld()
-          camera.updateProjectionMatrix()
-          const planetRay = new Raycaster()
-          planetRay.setFromCamera(_centerNDC, camera)
-          const planetHits = planetRay.intersectObjects(planetMeshes)
-          if (planetHits.length) {
-            const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-            if (pd.planetName) centerPlanet = { planetName: pd.planetName, planetNameCN: pd.planetNameCN, planetId: pd.planetId }
-          }
-        }
+        // issue #134：投影法检测屏幕中心最近的行星（Raycaster 精确命中在中心太难对准，改用投影距离+容差）
+        // 优先级：行星 > 恒星（与 PC 端点击一致）
+        const centerPlanet = detectPlanetByProjection(0, 0)
 
-        if (centerPlanet) {
+        if (centerPlanet && centerPlanet.dist < SNAP_THRESHOLD_PLANET) {
           // 命中行星
-          if (!snappedPlanet || snappedPlanet.name !== centerPlanet.planetName) {
+          if (!snappedPlanet || snappedPlanet.name !== centerPlanet.name) {
             // 新吸附行星（从恒星或其他行星切换）：先清恒星吸附态
             snappedStarId = -1
-            snappedPlanet = { name: centerPlanet.planetName, nameCN: centerPlanet.planetNameCN, planetId: centerPlanet.planetId }
+            snappedPlanet = { name: centerPlanet.name, nameCN: centerPlanet.nameCN, planetId: centerPlanet.planetId }
             snapStartX = e.clientX
             snapStartY = e.clientY
             if (snapBaseFov === 0) {
@@ -1441,12 +1456,12 @@ for (const s of stars) starById.set(s.id, s)
               snapBaseFov = camera.fov
             }
             if (crosshairEl) crosshairEl.classList.add('snapped')
-            updateTooltipContentForPlanet(centerPlanet.planetName, centerPlanet.planetNameCN)
+            updateTooltipContentForPlanet(centerPlanet.name, centerPlanet.nameCN)
             // 同步 hoveredStarId = -1，避免下一帧 hover 逻辑覆盖准星 tooltip
             hoveredStarId = -1
             animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
             // issue #134：通知外部已吸附到该行星（驱动底部「凝听星语」按钮滑入）
-            options?.onSnapChange?.({ type: 'planet', planetName: centerPlanet.planetName, planetNameCN: centerPlanet.planetNameCN, planetId: centerPlanet.planetId })
+            options?.onSnapChange?.({ type: 'planet', planetName: centerPlanet.name, planetNameCN: centerPlanet.nameCN, planetId: centerPlanet.planetId })
           } else {
             // 已吸附同一行星：检查是否移动超过阈值
             const dx = e.clientX - snapStartX
@@ -1455,7 +1470,7 @@ for (const s of stars) starById.set(s.id, s)
               releaseSnap()
             } else {
               // 维持吸附：刷新 tooltip 位置（行星随天球运动）
-              updateTooltipPositionForPlanet(centerPlanet.planetName)
+              updateTooltipPositionForPlanet(centerPlanet.name)
             }
           }
         } else {
@@ -1620,7 +1635,8 @@ for (const s of stars) starById.set(s.id, s)
         userFov = camera.fov
       }
       // 单指旋转（issue #116：吸附时拖动阻力 1/4 速度，模拟"穿越糖蜜"手感）
-      const dragFactor = (isMobile && snappedStarId !== -1) ? 0.1667 : 1  // 吸附时阻力增大 1.5 倍（1/6 速度）
+      // issue #134：行星吸附同样需要阻力（snappedStarId 或 snappedPlanet 任一非空）
+      const dragFactor = (isMobile && (snappedStarId !== -1 || snappedPlanet !== null)) ? 0.1667 : 1  // 吸附时阻力增大 1.5 倍（1/6 速度）
       rotY += (e.clientX - px) * 0.004 * dragFactor
       rotX += (e.clientY - py) * 0.004 * dragFactor
       rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
