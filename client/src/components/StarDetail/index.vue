@@ -101,20 +101,18 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 合集行：正文下方、tag行之上，单独一行（极简线性风+Library） -->
-                        <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
-                          <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                          <Library :size="11" />
-                          <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                        </div>
+                        <!-- 缩略信息行：合集信息 + #标签 同一行紧凑显示（缩略信息行，不单独占高） -->
                         <div
-                          v-if="storyDisplayTags(s).length"
+                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                           class="card-tags-wrap"
                         >
-                          <div
-                            v-if="storyDisplayTags(s).length"
-                            class="card-tags card-tags-inline"
-                          >
+                          <div class="card-tags card-tags-inline">
+                            <!-- 合集信息：缩略信息行最左侧 -->
+                            <span v-if="getStoryCollection(s)" class="card-coll-inline" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <Library :size="10" />
+                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </span>
                             <span
                               v-for="t in storyDisplayTags(s)"
                               :key="'top-' + s.id + '-' + t"
@@ -164,20 +162,18 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 合集行：正文下方、tag行之上，单独一行 -->
-                        <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
-                          <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                          <Library :size="11" />
-                          <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                        </div>
+                        <!-- 缩略信息行：合集信息 + #标签 同一行紧凑显示（缩略信息行，不单独占高） -->
                         <div
-                          v-if="storyDisplayTags(s).length"
+                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                           class="card-tags-wrap"
                         >
-                          <div
-                            v-if="storyDisplayTags(s).length"
-                            class="card-tags card-tags-inline"
-                          >
+                          <div class="card-tags card-tags-inline">
+                            <!-- 合集信息：缩略信息行最左侧 -->
+                            <span v-if="getStoryCollection(s)" class="card-coll-inline" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <Library :size="10" />
+                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </span>
                             <span
                               v-for="t in storyDisplayTags(s)"
                               :key="'card-' + s.id + '-' + t"
@@ -738,20 +734,18 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 合集行：正文下方、tag行之上，单独一行 -->
-                            <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
-                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <Library :size="11" />
-                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                            </div>
+                            <!-- 缩略信息行：合集信息 + #标签 同一行紧凑显示（缩略信息行，不单独占高） -->
                             <div
-                              v-if="storyDisplayTags(s).length"
+                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                               class="card-tags-wrap"
                             >
-                              <div
-                                v-if="storyDisplayTags(s).length"
-                                class="card-tags card-tags-inline"
-                              >
+                              <div class="card-tags card-tags-inline">
+                                <!-- 合集信息：缩略信息行最左侧 -->
+                                <span v-if="getStoryCollection(s)" class="card-coll-inline" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                                  <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                                  <Library :size="10" />
+                                  <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                </span>
                                 <span
                                   v-for="t in storyDisplayTags(s)"
                                   :key="'topm-' + s.id + '-' + t"
@@ -788,20 +782,18 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 合集行：正文下方、tag行之上，单独一行 -->
-                            <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
-                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <Library :size="11" />
-                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                            </div>
+                            <!-- 缩略信息行：合集信息 + #标签 同一行紧凑显示（缩略信息行，不单独占高） -->
                             <div
-                              v-if="storyDisplayTags(s).length"
+                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
                               class="card-tags-wrap"
                             >
-                              <div
-                                v-if="storyDisplayTags(s).length"
-                                class="card-tags card-tags-inline"
-                              >
+                              <div class="card-tags card-tags-inline">
+                                <!-- 合集信息：缩略信息行最左侧 -->
+                                <span v-if="getStoryCollection(s)" class="card-coll-inline" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                                  <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                                  <Library :size="10" />
+                                  <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                </span>
                                 <span
                                   v-for="t in storyDisplayTags(s)"
                                   :key="'l-' + s.id + '-' + t"
@@ -1071,14 +1063,14 @@ function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | n
   return s.tag ? [s.tag] : []
 }
 
-/** 根据 story.collectionId / collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null；兼容 snake_case / camelCase 双字段 */
+/** 根据 story.collectionId / collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null；兼容 snake_case / camelCase 双字段 + 宽松类型匹配（id可能是string/number） */
 function getStoryCollection(s: any): { name: string; coverColor: string } | null {
   if (!s) return null
   const cidRaw = s.collectionId ?? s.collection_id
   if (cidRaw == null) return null
   const cid = Number(cidRaw)
   if (!cid || !Array.isArray(collections.list.value)) return null
-  const c = collections.list.value.find((x) => x.id === cid)
+  const c = collections.list.value.find((x) => Number(x.id) === cid)
   if (!c) return null
   return { name: c.name || '未命名合集', coverColor: c.coverColor || '#caa7ff' }
 }
@@ -1568,7 +1560,7 @@ const detailStoryCollectionInfo = computed<{ name: string; color: string } | nul
     return def ? { name: def.name, color: def.coverColor } : null
   }
   const cid = Number(cidRaw)
-  const c = collections.list.value.find((x) => x.id === cid)
+  const c = collections.list.value.find((x) => Number(x.id) === cid)
   if (c) return { name: c.name, color: c.coverColor }
   return null
 })
@@ -2347,20 +2339,23 @@ watch(() => props.catalogStarId, () => {
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
 }
-.card-coll-row {
+/* 合集信息：与 #标签 同一行紧凑显示（缩略信息行，不单独占高，和 StoryCard 视觉统一） */
+.card-coll-inline {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin: 2px 0 10px;
-  padding: 3px 10px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
   background: rgba(202, 167, 255, 0.04);
+  border: 0.5px solid rgba(202, 167, 255, 0.12);
   font-size: 0.68rem;
   color: rgba(242,236,255,0.78);
-  max-width: 240px;
+  max-width: 220px;
+  line-height: 1.3;
+  vertical-align: middle;
 }
 .card-cr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.card-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
 .meta-sep { opacity: 0.35; }
 .card-tags {
   display: flex;
