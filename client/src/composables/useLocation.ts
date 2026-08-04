@@ -110,8 +110,8 @@ async function ipLocate(): Promise<LatLng | null> {
  * 4. 全部失败 → 标记 failed（除非 preserveOnFail）
  * 5. 成功后后台静默尝试高精度更新（不阻塞 UI）
  */
-async function doRequest(opts: { force?: boolean; preserveOnFail?: boolean } = {}): Promise<void> {
-  const { force = false, preserveOnFail = false } = opts
+async function doRequest(opts: { force?: boolean; preserveOnFail?: boolean; skipCache?: boolean } = {}): Promise<void> {
+  const { force = false, preserveOnFail = false, skipCache = false } = opts
   // 已有请求进行中：force 模式等待当前完成再继续，否则直接返回
   if (inFlight) {
     if (!force) return inFlight
@@ -123,12 +123,14 @@ async function doRequest(opts: { force?: boolean; preserveOnFail?: boolean } = {
   inFlight = (async () => {
     loading.value = true
     try {
-      // Step 1: 缓存命中
-      const cached = getCache()
-      if (cached) {
-        applyLocation(cached.lat, cached.lng)
-        silentHighAccUpdate()
-        return
+      // Step 1: 缓存命中（skipCache 时跳过，强制重新定位）
+      if (!skipCache) {
+        const cached = getCache()
+        if (cached) {
+          applyLocation(cached.lat, cached.lng)
+          silentHighAccUpdate()
+          return
+        }
       }
 
       // Step 2: 浏览器定位（硬超时兜底）
@@ -188,7 +190,8 @@ function refresh(): Promise<void> {
   const hadLocation = lat.value != null && lng.value != null
   failed.value = false
   requested = false
-  return doRequest({ force: true, preserveOnFail: hadLocation })
+  // skipCache: 强制重新定位，不走缓存（用户点击"重新获取定位"期望真正刷新）
+  return doRequest({ force: true, preserveOnFail: hadLocation, skipCache: true })
 }
 
 /** 初始化：只执行一次 */
