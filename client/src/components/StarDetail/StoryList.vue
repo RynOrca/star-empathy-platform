@@ -49,6 +49,8 @@
         :resonating="resonating"
         :formattedTime="variant !== 'history' && formattedTime ? formattedTime(story) : undefined"
         :formattedDistance="variant !== 'history' && formattedDistance ? formattedDistance(story) : undefined"
+        :collectionName="getStoryCollection(story)?.name || null"
+        :collectionCoverColor="getStoryCollection(story)?.coverColor || null"
         :index="index"
         @click="$emit('story-click', story)"
         @resonate="$emit('resonate', story)"
@@ -70,9 +72,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeUnmount, type Component } from 'vue'
+import { ref, onBeforeUnmount, onMounted, computed, type Component } from 'vue'
 import { Search, X, ArrowUpDown, ChevronDown, Check } from 'lucide-vue-next'
 import StoryCard from './StoryCard.vue'
+import { useCollections, type Collection } from '../../composables/useCollections'
+import { useAuth } from '../../stores/auth'
 
 const SearchIcon = Search
 const XIcon = X
@@ -81,6 +85,10 @@ const ChevronDownIcon = ChevronDown
 const CheckIcon = Check
 
 type SortKey = 'time' | 'distance' | 'resonance' | 'views' | 'random'
+
+const auth = useAuth()
+const userId = computed(() => auth.user.value?.id ?? null)
+const collections = useCollections(userId)
 
 const props = defineProps<{
   stories: Array<{
@@ -92,6 +100,7 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
   }>
   variant: 'history' | 'all' | 'mine'
   searchQuery?: string
@@ -114,6 +123,11 @@ const emit = defineEmits<{
   'story-click': [story: any]
   'resonate': [story: any]
 }>()
+
+function getStoryCollection(story: { collectionId?: number | null }): Collection | null {
+  if (!story.collectionId || !collections.list.value.length) return null
+  return collections.list.value.find((c: Collection) => c.id === story.collectionId) || null
+}
 
 const sortLabels: Record<SortKey, string> = {
   time: '发布时间',
@@ -138,6 +152,9 @@ function onDocumentClick(e: MouseEvent) {
 }
 
 // 生命周期
+onMounted(() => {
+  collections.fetchList()
+})
 if (typeof document !== 'undefined') {
   document.addEventListener('click', onDocumentClick)
   onBeforeUnmount(() => {

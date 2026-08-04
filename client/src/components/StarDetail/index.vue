@@ -101,33 +101,26 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
+                        <!-- 合集行：正文下方、tag行之上，单独一行（极简线性风+Library） -->
+                        <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                          <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                          <Library :size="11" />
+                          <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                        </div>
                         <div
-                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                          v-if="storyDisplayTags(s).length"
                           class="card-tags-wrap"
                         >
-                          <div class="card-foot-left">
+                          <div
+                            v-if="storyDisplayTags(s).length"
+                            class="card-tags card-tags-inline"
+                          >
                             <span
-                              v-if="getStoryCollection(s)"
-                              class="card-coll"
-                              :title="`所属合集：${getStoryCollection(s)!.name}`"
-                            >
-                              <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <FolderOpen :size="11" />
-                              <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                            </span>
-                            <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
-                            <div
-                              v-if="storyDisplayTags(s).length"
-                              class="card-tags card-tags-inline"
-                            >
-                              <span
-                                v-for="t in storyDisplayTags(s)"
-                                :key="'top-' + s.id + '-' + t"
-                                class="story-tag story-tag-inline"
-                                :style="storyTagStyle(t)"
-                              >#{{ t }}</span>
-                            </div>
+                              v-for="t in storyDisplayTags(s)"
+                              :key="'top-' + s.id + '-' + t"
+                              class="story-tag story-tag-inline"
+                              :style="storyTagStyle(t)"
+                            >#{{ t }}</span>
                           </div>
                         </div>
                         <div class="card-meta">
@@ -171,33 +164,26 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方；空时隐藏；左侧展示所属合集（无胶囊） -->
+                        <!-- 合集行：正文下方、tag行之上，单独一行 -->
+                        <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                          <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                          <Library :size="11" />
+                          <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                        </div>
                         <div
-                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                          v-if="storyDisplayTags(s).length"
                           class="card-tags-wrap"
                         >
-                          <div class="card-foot-left">
+                          <div
+                            v-if="storyDisplayTags(s).length"
+                            class="card-tags card-tags-inline"
+                          >
                             <span
-                              v-if="getStoryCollection(s)"
-                              class="card-coll"
-                              :title="`所属合集：${getStoryCollection(s)!.name}`"
-                            >
-                              <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                              <FolderOpen :size="11" />
-                              <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                            </span>
-                            <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
-                            <div
-                              v-if="storyDisplayTags(s).length"
-                              class="card-tags card-tags-inline"
-                            >
-                              <span
-                                v-for="t in storyDisplayTags(s)"
-                                :key="'card-' + s.id + '-' + t"
-                                class="story-tag story-tag-inline"
-                                :style="storyTagStyle(t)"
-                              >#{{ t }}</span>
-                            </div>
+                              v-for="t in storyDisplayTags(s)"
+                              :key="'card-' + s.id + '-' + t"
+                              class="story-tag story-tag-inline"
+                              :style="storyTagStyle(t)"
+                            >#{{ t }}</span>
                           </div>
                         </div>
                       </div>
@@ -752,33 +738,26 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
+                            <!-- 合集行：正文下方、tag行之上，单独一行 -->
+                            <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <Library :size="11" />
+                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </div>
                             <div
-                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                              v-if="storyDisplayTags(s).length"
                               class="card-tags-wrap"
                             >
-                              <div class="card-foot-left">
+                              <div
+                                v-if="storyDisplayTags(s).length"
+                                class="card-tags card-tags-inline"
+                              >
                                 <span
-                                  v-if="getStoryCollection(s)"
-                                  class="card-coll"
-                                  :title="`所属合集：${getStoryCollection(s)!.name}`"
-                                >
-                                  <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                                  <FolderOpen :size="11" />
-                                  <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                                </span>
-                                <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
-                                <div
-                                  v-if="storyDisplayTags(s).length"
-                                  class="card-tags card-tags-inline"
-                                >
-                                  <span
-                                    v-for="t in storyDisplayTags(s)"
-                                    :key="'topm-' + s.id + '-' + t"
-                                    class="story-tag story-tag-inline"
-                                    :style="storyTagStyle(t)"
-                                  >#{{ t }}</span>
-                                </div>
+                                  v-for="t in storyDisplayTags(s)"
+                                  :key="'topm-' + s.id + '-' + t"
+                                  class="story-tag story-tag-inline"
+                                  :style="storyTagStyle(t)"
+                                >#{{ t }}</span>
                               </div>
                             </div>
                             <div class="card-meta">
@@ -809,33 +788,26 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊） -->
+                            <!-- 合集行：正文下方、tag行之上，单独一行 -->
+                            <div v-if="getStoryCollection(s)" class="card-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                              <span class="card-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <Library :size="11" />
+                              <span class="card-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </div>
                             <div
-                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                              v-if="storyDisplayTags(s).length"
                               class="card-tags-wrap"
                             >
-                              <div class="card-foot-left">
+                              <div
+                                v-if="storyDisplayTags(s).length"
+                                class="card-tags card-tags-inline"
+                              >
                                 <span
-                                  v-if="getStoryCollection(s)"
-                                  class="card-coll"
-                                  :title="`所属合集：${getStoryCollection(s)!.name}`"
-                                >
-                                  <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                                  <FolderOpen :size="11" />
-                                  <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                                </span>
-                                <span class="meta-sep" v-if="getStoryCollection(s) && storyDisplayTags(s).length">·</span>
-                                <div
-                                  v-if="storyDisplayTags(s).length"
-                                  class="card-tags card-tags-inline"
-                                >
-                                  <span
-                                    v-for="t in storyDisplayTags(s)"
-                                    :key="'l-' + s.id + '-' + t"
-                                    class="story-tag story-tag-inline"
-                                    :style="storyTagStyle(t)"
-                                  >#{{ t }}</span>
-                                </div>
+                                  v-for="t in storyDisplayTags(s)"
+                                  :key="'l-' + s.id + '-' + t"
+                                  class="story-tag story-tag-inline"
+                                  :style="storyTagStyle(t)"
+                                >#{{ t }}</span>
                               </div>
                             </div>
                             <div class="card-meta">
@@ -1022,7 +994,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Bookmark, FolderOpen } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Bookmark, Library } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -2363,35 +2335,26 @@ watch(() => props.catalogStarId, () => {
 }
 /* 卡片标签区外层：正文下方 / meta 上方，上下虚线分隔更紧凑；含合集+标签 */
 .card-tags-wrap {
-  margin-top: 5px;
+  margin-top: 2px;
   margin-bottom: 5px;
   padding: 5px 1px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
 }
-.card-foot-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  flex: 1;
-  min-width: 0;
-  font-size: 0.68rem;
-  color: rgba(242, 236, 255, 0.75);
-}
-.card-coll {
+.card-coll-row {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  max-width: 160px;
-  white-space: nowrap;
+  margin: 2px 0 10px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.68rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 240px;
 }
-.card-coll-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+.card-cr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.card-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-sep { opacity: 0.35; }
 .card-tags {
   display: flex;

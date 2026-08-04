@@ -133,16 +133,15 @@
                   </span>
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
+                <template v-if="getStoryCollection(s)">
+                  <div class="pd-t-coll-row" :title="`所属合集：${getStoryCollection(s)!.name}`">
+                    <span class="pd-cr-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                    <Library :size="11" />
+                    <span class="pd-cr-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                  </div>
+                </template>
                 <div class="pd-t-foot">
                   <div class="pd-t-foot-left">
-                    <template v-if="getStoryCollection(s)">
-                      <span class="pd-t-coll" :title="`所属合集：${getStoryCollection(s)!.name}`">
-                        <span class="pd-t-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
-                        <FolderOpen :size="11" />
-                        <span>{{ shortCollName(getStoryCollection(s)!.name) }}</span>
-                      </span>
-                    </template>
-                    <span class="meta-sep" v-if="getStoryCollection(s) && displayStoryTags(s).length">·</span>
                     <template v-if="displayStoryTags(s).length">
                       <span
                         v-for="t in displayStoryTags(s)"
@@ -152,7 +151,7 @@
                       >#{{ t }}</span>
                     </template>
                   </div>
-                  <span class="pd-t-sep" v-if="(getStoryCollection(s) || displayStoryTags(s).length) && (s.resonanceCount || 0) > 0"></span>
+                  <span class="pd-t-sep" v-if="displayStoryTags(s).length && (s.resonanceCount || 0) > 0"></span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -599,7 +598,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Bookmark, FolderPlus, FolderOpen, FolderKanban, Trash2, AlertCircle, Heart } from 'lucide-vue-next'
+import { Star, Bookmark, FolderPlus, Library, FolderKanban, Trash2, AlertCircle, Heart } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
@@ -1926,19 +1925,20 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   color: rgba(242, 236, 255, 0.75);
 }
-.pd-t-coll {
+.pd-t-coll-row {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  max-width: 170px;
-  white-space: nowrap;
+  margin: 2px 0 12px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.7rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 220px;
 }
-.pd-t-coll-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+.pd-cr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pd-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-sep { opacity: 0.35; }
 
 /* 开放标签胶囊样式：圆角 11px，compact */

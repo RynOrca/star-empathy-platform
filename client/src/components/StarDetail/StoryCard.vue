@@ -43,31 +43,25 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏；左侧展示所属合集（无胶囊，学meta行风格） -->
+    <!-- 合集行：正文下方、tag行之上，单独一行（极简线性风+Library图标） -->
+    <div v-if="collectionName" class="story-coll-row" :title="`所属合集：${collectionName}`">
+      <span class="story-cr-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
+      <Library :size="11" />
+      <span class="story-cr-name">{{ shortCollName(collectionName) }}</span>
+    </div>
+
+    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
     <div
-      v-if="displayTags.length || collectionName"
+      v-if="displayTags.length"
       class="story-tags-wrap"
     >
-      <div class="story-foot-left">
-        <template v-if="collectionName">
-          <span class="story-coll" :title="`所属合集：${collectionName}`">
-            <span class="story-coll-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
-            <FolderOpen :size="11" />
-            <span>{{ shortCollName(collectionName) }}</span>
-          </span>
-        </template>
-        <span class="meta-sep" v-if="collectionName && displayTags.length">·</span>
-        <div
-          v-if="displayTags.length"
-          class="story-tags-row"
-        >
-          <span
-            v-for="t in displayTags"
-            :key="'tag-' + story.id + '-' + t"
-            class="story-tag story-tag-inline"
-            :style="tagStyle(t)"
-          >#{{ t }}</span>
-        </div>
+      <div class="story-tags-row">
+        <span
+          v-for="t in displayTags"
+          :key="'tag-' + story.id + '-' + t"
+          class="story-tag story-tag-inline"
+          :style="tagStyle(t)"
+        >#{{ t }}</span>
       </div>
     </div>
 
@@ -96,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkles, Check, Eye, FolderOpen } from 'lucide-vue-next'
+import { Sparkles, Check, Eye, Library } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 const SparklesIcon = Sparkles
@@ -304,35 +298,26 @@ function shortCollName(name: string | null | undefined, max = 8): string {
 }
 .story-tag-inline:first-child { margin-left: 0; }
 .story-tags-wrap {
-  margin-top: 6px;
+  margin-top: 2px;
   margin-bottom: 6px;
   padding: 6px 2px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
 }
-.story-foot-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  flex: 1;
-  min-width: 0;
-  font-size: 0.68rem;
-  color: rgba(242, 236, 255, 0.75);
-}
-.story-coll {
+.story-coll-row {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  max-width: 170px;
-  white-space: nowrap;
+  margin: 2px 0 10px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.68rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 260px;
 }
-.story-coll-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+.story-cr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.story-cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-sep { opacity: 0.35; }
 .story-tags-row {
   display: flex; flex-wrap: wrap;

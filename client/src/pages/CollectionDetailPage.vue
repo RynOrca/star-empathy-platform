@@ -113,18 +113,15 @@
             <div class="cd-story-body">
               <h3 class="cd-story-title">{{ s.title || '未命名故事' }}</h3>
               <p class="cd-story-content">{{ s.content }}</p>
+              <div v-if="collection" class="cd-story-collection" :title="`所属合集：${collection.name}`">
+                <span class="cd-sc-dot" :style="{ background: collection.coverColor || '#caa7ff' }"></span>
+                <Library :size="11" />
+                <span class="cd-sc-name">{{ shortCollName(collection.name) }}</span>
+              </div>
               <div class="cd-story-foot">
-                <div class="cd-story-foot-left">
-                  <span v-if="collection" class="cd-story-coll" :title="`所属合集：${collection.name}`">
-                    <span class="cd-story-coll-dot" :style="{ background: collection.coverColor || '#caa7ff' }"></span>
-                    <FolderOpen :size="11" />
-                    <span>{{ shortCollName(collection.name) }}</span>
-                  </span>
-                  <span class="meta-sep" v-if="collection && s.tags && s.tags.length">·</span>
-                  <span v-if="s.tags && s.tags.length" class="cd-story-tags">
-                    <span v-for="t in s.tags.slice(0,4)" :key="t" class="cd-story-tag" :style="tagStyle(t)">#{{ t }}</span>
-                  </span>
-                </div>
+                <span v-if="s.tags && s.tags.length" class="cd-story-tags">
+                  <span v-for="t in s.tags.slice(0,4)" :key="t" class="cd-story-tag" :style="tagStyle(t)">#{{ t }}</span>
+                </span>
                 <span class="cd-story-meta">
                   <em><Sparkles :size="12" /> {{ s.resonanceCount }}</em>
                   <em><Eye :size="11" /> {{ s.viewCount }}</em>
@@ -143,7 +140,7 @@
             >
               {{ movingId === s.id ? '移动中…' : '' }}
               <template v-if="movingId !== s.id">
-                <FolderOpen :size="12" /> <span>移动</span>
+                <Library :size="12" /> <span>移动</span>
               </template>
             </button>
           </article>
@@ -232,7 +229,7 @@
           >
             {{ movingId === activeStory.id ? '移动中…' : '' }}
             <template v-if="movingId !== activeStory.id">
-              <FolderOpen :size="12" /> <span>移动到合集</span>
+              <Library :size="12" /> <span>移动到合集</span>
             </template>
           </button>
         </footer>
@@ -276,7 +273,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sparkles, Eye, FolderOpen, Bookmark, Globe, Lock } from 'lucide-vue-next'
+import { Sparkles, Eye, Library, Bookmark, Globe, Lock } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth } from '../stores/auth'
 import {
@@ -865,9 +862,20 @@ onMounted(async () => {
 }
 .cd-story-meta { display: inline-flex; gap: 14px; font-size: 0.7rem; color: rgba(202,167,255,0.55); letter-spacing: 0.08em; }
 .cd-story-meta em { font-style: normal; display: inline-flex; align-items: center; gap: 4px; }
-.cd-story-foot-left { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; font-size: 0.7rem; color: rgba(242,236,255,0.75); }
-.cd-story-coll { display: inline-flex; align-items: center; gap: 5px; max-width: 180px; white-space: nowrap; }
-.cd-story-coll-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cd-story-collection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(202, 167, 255, 0.04);
+  font-size: 0.7rem;
+  color: rgba(242,236,255,0.78);
+  max-width: 240px;
+}
+.cd-sc-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cd-sc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta-sep { opacity: 0.35; }
 
 .cd-move-btn {
