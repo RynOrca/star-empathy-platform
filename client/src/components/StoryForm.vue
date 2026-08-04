@@ -72,6 +72,11 @@
                 <Transition name="sf-drop">
                   <ul v-if="dropdownOpen && isLoggedIn" class="sf-dropdown-menu" @click.stop>
                     <li v-if="collections.loading.value" class="sf-drop-empty">加载中…</li>
+                    <li v-else-if="collections.listError.value" class="sf-drop-empty sf-drop-error">
+                      <AlertCircle :size="11" />
+                      <span>{{ collections.listError.value }}</span>
+                      <a class="sf-drop-retry" @click.stop.prevent="collections.fetchList()">重试</a>
+                    </li>
                     <template v-else-if="collections.list.value.length > 0">
                       <li
                         v-for="c in collections.list.value"
@@ -1522,6 +1527,28 @@ defineExpose({ doSubmit, resetForm })
   align-items: center;
   gap: 8px;
 }
+/* 下拉里的错误提示（可读+重试 */
+.sf-drop-error {
+  color: color-mix(in srgb, #ff8a80 85%, #fff 15%);
+  background: rgba(255, 138, 128, 0.06);
+  border-top: 0.5px solid rgba(255, 138, 128, 0.18);
+  border-bottom: 0.5px solid rgba(255, 138, 128, 0.18);
+  flex-direction: row;
+  text-align: left;
+  padding: 10px 14px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.sf-drop-error svg { margin-top: 2px; flex-shrink: 0; }
+.sf-drop-retry {
+  color: #ffb19e;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 4px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.sf-drop-retry:hover { color: #ffd3c4; }
 .sf-drop-action {
   padding: 6px 4px 4px;
   margin-top: 4px;

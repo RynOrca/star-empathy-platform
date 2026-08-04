@@ -68,7 +68,19 @@ export function useCollections(userId: Ref<number | null> | ComputedRef<number |
   const list = ref<Collection[]>([]);
 
   async function fetchList(): Promise<void> {
-    if (!userId.value) { list.value = []; return; }
+    // ⚠️ 注意：后端 /api/collections/mine 通过 JWT 鉴权从 token 里解析 user.id，
+    // 不需要前端在 URL/body/query 里传 userId！
+    // 之前的 if (!userId.value) return 是多此一举的双重判断：
+    // 当 auth.fetchMe() 还没回来或偶发失败时 userId.value 仍为 null，
+    // 但 localStorage.token 是存在的（authHeaders 会带 Bearer）→ 后端鉴权实际能过。
+    // 那道前置 return 会直接把 fetchList 挡死 = 创建成功后 list 不刷新 = 用户"看不到合集"
+    // → 移除该判断，请求成不成功交给后端响应 code / HTTP status
+    const tokenOk = !!localStorage.getItem('token');
+    if (!tokenOk) {
+      list.value = [];
+      listError.value = '';
+      return;
+    }
     loading.value = true;
     listError.value = '';
     try {
@@ -172,10 +184,18 @@ export function useCollections(userId: Ref<number | null> | ComputedRef<number |
   watch(
     () => userId.value,
     (uid) => {
-      if (uid) fetchList();
-      else list.value = [];
+      // 有 token 就尝试发请求（/mine 后端靠 JWT 鉴权从 token 解析 uid，不需要前端传）
+      // 之前的逻辑只有 uid 非 null 才请求，导致 auth.fetchMe 慢或失败时，
+      // 即使 localStorage.token 存在（能拿到正确列表），也被挡死不发请求。
+      const tokenOk = !!localStorage.getItem('token');
+      if (tokenOk) {
+        void fetchList();
+      } else if (!uid) {
+        list.value = [];
+      }
+      // uid 有值时确保再触发一次（fetchMe 回来后最新），fetchList 内部会去重 loading
     },
-    { immediate: true },
+    { immediate: true, flush: 'post' },
   );
 
   return {

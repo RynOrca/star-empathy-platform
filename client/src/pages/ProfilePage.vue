@@ -333,6 +333,12 @@
         <template v-if="collections.loading.value">
           <div class="pd-empty"><div class="pd-empty-orb" aria-hidden="true">…</div></div>
         </template>
+        <template v-else-if="collections.listError.value">
+          <div class="pd-error-row pd-coll-error">
+            <AlertCircle :size="12" />
+            <span>加载合集失败：{{ collections.listError.value }} · <a class="pd-inline-link" @click.stop.prevent="collections.fetchList()">点此重试</a></span>
+          </div>
+        </template>
         <template v-else-if="collections.list.value.length === 0">
           <div class="pd-empty">
             <div class="pd-empty-orb" aria-hidden="true">🎒</div>
@@ -2686,6 +2692,20 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   margin-top: 2px;
 }
+.pd-coll-error {
+  margin: 12px 0 18px;
+  padding: 12px 16px;
+  font-size: 0.8rem;
+}
+.pd-inline-link {
+  color: #ffb59a;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 2px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.pd-inline-link:hover { color: #ffd6c4; }
 
 /* 退出确认小弹窗 */
 .pd-modal-sm { max-width: 380px; }
