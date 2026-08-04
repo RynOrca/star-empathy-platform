@@ -767,8 +767,15 @@ function focusOnQueryStar() {
     if (!info) return
     const tryFocus = () => {
       if (skyRef.value?.sky) {
-        // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
-        onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+        if (isMobile.value) {
+          // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+          // 用户点按钮后 onStoryEnterClick → onPlanetClick(enterCloseup=false) 才开面板
+          skyRef.value.sky.focusOnPlanetSimple(bodyName)
+          skyRef.value.sky.snapToPlanet(bodyName)
+        } else {
+          // PC 端：直接进特写 + 开面板
+          onPlanetClick(bodyName, info.conName, starId, true)
+        }
       } else {
         setTimeout(tryFocus, 300)
       }
@@ -856,8 +863,14 @@ async function flyToStar(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
-    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+    if (isMobile.value) {
+      // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+      skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
+      skyRef.value?.sky?.snapToPlanet(bodyName)
+    } else {
+      // PC 端：直接进特写 + 开面板
+      onPlanetClick(bodyName, info.conName, starId, true)
+    }
     return
   }
   const star = catalogStarLookup.get(starId)
@@ -1319,8 +1332,14 @@ function onStarClick(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 移动端不进特写（issue #134），但需要定位：onPlanetClick 内部会调 focusOnPlanetSimple
-    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+    if (isMobile.value) {
+      // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+      skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
+      skyRef.value?.sky?.snapToPlanet(bodyName)
+    } else {
+      // PC 端：直接进特写 + 开面板
+      onPlanetClick(bodyName, info.conName, starId, true)
+    }
     return
   }
   const star = catalogStarLookup.get(starId); if (!star) return

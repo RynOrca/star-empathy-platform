@@ -301,6 +301,8 @@ export interface SkyAPI {
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
   /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
   releaseSnap: () => void
+  /** issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示） */
+  snapToPlanet: (bodyName: string) => void
 }
 
 export function useSky(
@@ -1149,6 +1151,34 @@ for (const s of stars) starById.set(s.id, s)
     }
     // issue #124：通知外部已脱吸附
     options?.onSnapChange?.(null)
+  }
+
+  /**
+   * issue #135：主动吸附到指定行星。
+   * 场景：移动端从搜索结果/收藏卡跳转到行星后，相机虽定位但未触发触屏拖动 snap，
+   * 导致「凝听星语」按钮不显示。此方法主动设置 snap 状态并通知外部。
+   * 仅移动端有意义（PC 端无准星无按钮），但调用安全（PC 端 onSnapChange 也会触发，外部 v-if=isMobile 自然不显示按钮）。
+   */
+  function snapToPlanet(bodyName: string) {
+    const found = planetUpdaters.find(u => u.bodyName === bodyName)
+    if (!found) return
+    // nameCN / planetId 存在 mesh.userData（见 createPlanet 内赋值）
+    const ud = found.mesh.userData as { planetNameCN?: string; planetId?: number }
+    const nameCN = ud.planetNameCN || bodyName
+    const planetId = ud.planetId || 0
+    // 清恒星吸附态（互斥）
+    snappedStarId = -1
+    snappedPlanet = { name: found.bodyName, nameCN, planetId }
+    if (crosshairEl) crosshairEl.classList.add('snapped')
+    // 记录 snapBaseFov 以便 releaseSnap 恢复（若未在拖动 snap 中则用当前 fov）
+    if (snapBaseFov === 0) snapBaseFov = camera.fov
+    // 通知外部驱动「凝听星语」按钮滑入
+    options?.onSnapChange?.({
+      type: 'planet',
+      planetName: found.bodyName,
+      planetNameCN: nameCN,
+      planetId,
+    })
   }
 
   // ═══ 移动端准星 DOM（issue #116） ═══
@@ -4195,5 +4225,7 @@ for (const s of stars) starById.set(s.id, s)
     },
     // issue #124：主动释放准星吸附（供外部「凝听星语」按钮点击后调用）
     releaseSnap,
+    // issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示）
+    snapToPlanet,
   }
 }
