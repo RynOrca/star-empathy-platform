@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -70,6 +70,10 @@
         <!-- 记录：AI 匹配星辰写故事 -->
         <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
+        </button>
+        <!-- 星笺：打开我的合集 -->
+        <button v-if="username && !isGuest" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
+          <Library :size="18" />
         </button>
         <!-- 设置 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
@@ -538,7 +542,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -1675,6 +1679,24 @@ function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = 
 function onToggleObserve() {
   planetObserveMode.value = !planetObserveMode.value
   skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
+}
+
+/**
+ * 右上角「星笺」按钮：打开当前用户的合集列表。
+ * 拉取用户合集后，默认打开第一个（默认合集），并在 overlay 内可通过合集列表 tab 切换。
+ */
+async function openMyCollections() {
+  if (isGuest.value) { goLogin(); return }
+  if (!username.value) { goLogin(); return }
+  await fetchUserCollections()
+  if (userCollections.value.length === 0) {
+    // 无合集则跳个人主页创建
+    router.push('/profile')
+    return
+  }
+  collectionDetailId.value = userCollections.value[0].id
+  collectionDetailIsOwner.value = true
+  showCollectionDetail.value = true
 }
 
 /**
