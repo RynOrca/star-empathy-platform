@@ -304,6 +304,10 @@
               <h3 class="sf-modal-title">新建合集</h3>
             </header>
             <div class="sf-modal-body">
+              <p v-if="createCollError" class="sf-error sf-error-modal">
+                <AlertCircle :size="12" />
+                {{ createCollError }}
+              </p>
               <div class="sf-field">
                 <label class="sf-label">合集名称 <span class="sf-label-sub">必填 · 最多 30 字</span></label>
                 <input
@@ -497,28 +501,34 @@ watch(
 const openCreateCollection = ref(false)
 const newCollection = ref<{ name: string; description: string }>({ name: '', description: '' })
 const createCollLoading = ref(false)
+const createCollError = ref('')
 const newCollNameRef = ref<HTMLInputElement | null>(null)
 async function doCreateCollection() {
   const name = newCollection.value.name.trim()
   if (!name) return
   createCollLoading.value = true
+  createCollError.value = ''
   const r = await collections.createCollection({
     name,
     description: newCollection.value.description.trim() || undefined,
   })
   createCollLoading.value = false
   if (!r.ok) {
-    error.value = r.error
+    createCollError.value = r.error
     return
   }
   selectedCollectionId.value = r.id
   // 锁定 2.5s，防止 watch(list) 里 newList 还没含它时被立刻重置掉
   lockedSelectedId.value = { id: r.id, until: Date.now() + 2500 }
   newCollection.value = { name: '', description: '' }
+  createCollError.value = ''
   openCreateCollection.value = false
 }
 watch(openCreateCollection, (open) => {
-  if (open) nextTick(() => newCollNameRef.value?.focus())
+  if (open) {
+    createCollError.value = ''
+    nextTick(() => newCollNameRef.value?.focus())
+  }
 })
 
 function toggleTag(t: string) {
@@ -1314,6 +1324,15 @@ defineExpose({ doSubmit, resetForm })
   border: 0.5px solid rgba(255, 139, 125, 0.20);
   border-radius: 10px;
 }
+/* 新建合集弹窗内的错误：尺寸收缩、贴顶无额外margin */
+.sf-error-modal {
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  align-items: flex-start;
+  line-height: 1.6;
+}
+.sf-error-modal svg { margin-top: 2px; flex-shrink: 0; }
 
 /* Primary 按钮：纯苹果风格 — 放大版 */
 .sf-primary {
