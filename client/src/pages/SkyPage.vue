@@ -469,6 +469,7 @@ import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
+import { isPlanetId, getPlanetBodyName } from '../utils/starName'
 
 const { isMobile } = useMediaQuery()
 
@@ -758,6 +759,23 @@ function focusOnQueryStar() {
   if (!targetStarId) return
   const starId = parseInt(targetStarId as string, 10)
   if (isNaN(starId)) return
+  // 负 id = 太阳系行星，走 onPlanetClick → focusOnPlanet 路径（修复收藏行星无法跳转 issue #135）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    const tryFocus = () => {
+      if (skyRef.value?.sky) {
+        onPlanetClick(bodyName, info.conName, starId, true)
+      } else {
+        setTimeout(tryFocus, 300)
+      }
+    }
+    setTimeout(tryFocus, 500)
+    return
+  }
+  // 正 id = 恒星，走 focusOnStar(x,y,z) 路径
   const tryFocus = () => {
     const star = catalogStarLookup.get(starId)
     if (star && skyRef.value?.sky) {
@@ -831,6 +849,15 @@ async function onSearchInput() {
 }
 
 async function flyToStar(starId: number) {
+  // 负 id = 行星，走 onPlanetClick 路径（防御性，当前搜索不返回行星）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    onPlanetClick(bodyName, info.conName, starId, true)
+    return
+  }
   const star = catalogStarLookup.get(starId)
   if (!star) return
   // 模拟点击该星
@@ -1277,6 +1304,15 @@ function onRecordStorySubmitted(story: any) {
 }
 
 function onStarClick(starId: number) {
+  // 负 id = 行星，转走 onPlanetClick 路径（防御性，从 fly-to-star CustomEvent 触发时也能正确处理）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    onPlanetClick(bodyName, info.conName, starId, true)
+    return
+  }
   const star = catalogStarLookup.get(starId); if (!star) return
   // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
   // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板

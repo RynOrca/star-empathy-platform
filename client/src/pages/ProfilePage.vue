@@ -445,8 +445,8 @@ import { useRouter } from 'vue-router'
 import { Star } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
-import catalogData from '../data/stars.json'
 import { constellationNames } from '../data/starInfo'
+import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
 
 const PAGE_SIZE = 20
 const VISIBLE_STEP = 5
@@ -634,13 +634,11 @@ const daysAgo = computed(() => {
 
 function formatDate(d: string) { if (!d) return ''; return d.slice(0, 16).replace('T', ' ') }
 
-interface CatalogStarLite { name: string; con: string; mag: number; color: string }
-const starLookup = new Map<number, CatalogStarLite>()
-for (const s of catalogData.stars) starLookup.set(s.id, { name: s.name || `${s.con || ''} #${s.id}`, con: s.con || '', mag: s.mag, color: s.color || '#fff' })
-function getStarName(id: number) { return starLookup.get(id)?.name || `星星 #${id}` }
-function getStarCon(id: number) { const c = starLookup.get(id)?.con; return c ? (constellationNames[c] || c) : '' }
-function getStarMag(id: number) { return starLookup.get(id)?.mag ?? null }
-function getStarColor(id: number) { return starLookup.get(id)?.color || '#ffffff' }
+// 星名/元信息查找走共享工具（合并 stars.json 恒星 + planets.ts 行星），修复收藏行星显示「星星 #-100」(issue #135)
+function getStarName(id: number) { return getStarDisplayName(id) }
+function getStarCon(id: number) { const c = getStarNameInfo(id)?.con; return c ? (constellationNames[c] || c) : '' }
+function getStarMag(id: number) { return getStarNameInfo(id)?.mag ?? null }
+function getStarColor(id: number) { return getStarNameInfo(id)?.color || '#ffffff' }
 
 function goToStar(starId: number) { router.push({ path: '/sky', query: { star: String(starId) } }) }
 
@@ -919,14 +917,14 @@ async function loadProfileData() {
     try { await linesRes.json() } catch { /* 静默 */ }
     const favJson = await favRes.json()
     if (favRes.ok && Array.isArray(favJson.data)) {
-      // 后端返回的是 catalog_star_id: number[]，需要用 starLookup 填充星名/星座等字段
+      // 后端返回的是 catalog_star_id: number[]，用共享工具填充星名/星座（含行星负 id）
       favorites.value = (favJson.data as number[]).map((cid) => {
-        const star = starLookup.get(cid)
+        const info = getStarNameInfo(cid)
         return {
           id: cid,
           starCatalogId: cid,
-          starName: star?.name || `星星 #${cid}`,
-          starConstellation: star ? (constellationNames[star.con] || star.con) : '',
+          starName: getStarDisplayName(cid),
+          starConstellation: info?.con ? (constellationNames[info.con] || info.con) : '',
           resonanceCount: 0,
           createdAt: '',
         } as FavoriteItem

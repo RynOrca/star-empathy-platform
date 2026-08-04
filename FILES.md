@@ -188,6 +188,7 @@
 |---|---|
 | `astro.ts` | 天文计算工具 |
 | `geoTime.ts` | 地理位置时区工具 |
+| `starName.ts` | **星名统一查找工具**（issue #135）。合并 stars.json 恒星 + planets.ts 行星，提供 `isPlanetId`/`getStarNameInfo`/`getStarDisplayName`/`getPlanetBodyName`，消除 ProfilePage/StarDetail/SkyPage 三处重复 lookup 对行星负 id 的漏查 |
 | `constants.ts` | 全局常量（含行星特写模式参数：CLOSEUP_FOV/CLOSEUP_INIT_RATIO/CLOSEUP_MIN_RATIO/CLOSEUP_MAX_RATIO/CLOSEUP_NEAR/DEFAULT_NEAR/CLOSEUP_WHEEL_FACTOR） |
 | `gpuDetect.ts` | GPU 性能检测 |
 | `sphereMapping.ts` | 球面坐标映射 |
