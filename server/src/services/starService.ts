@@ -1,5 +1,6 @@
 import db from '../db';
 import { generatePosition } from '../utils/position';
+import { ensureDefaultCollection, recountCollectionTotals } from './collectionsService';
 
 export interface Star {
   id: number;
@@ -19,6 +20,7 @@ export interface Star {
   image_url: string | null;
   tag: string | null;
   tags: string | null; // JSON array string e.g. '["思念","等待"]' or null
+  collection_id?: number | null;
 }
 
 // 把 tags(JSON string) + tag(老单列) 合并出前端可直接消费的 tags 数组，
@@ -128,6 +130,7 @@ export function createStar(
   imageUrl?: string,
   catalogStarIds?: number[],
   tags?: string[],
+  collectionId?: number | null,
 ): Star & { username: string | null; userId: number | null; tags: string[] } {
   const pos = generatePosition();
   // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长
@@ -160,9 +163,22 @@ export function createStar(
   // 主星：优先取 catalogStarId，否则取 catalogStarIds 第一个
   const effectiveCatalogStarId = catalogStarId ?? (catalogStarIds?.length ? catalogStarIds[0] : undefined);
 
+  // 合集：已登录用户未传 collectionId → 默认进默认合集；未登录用户 collectionId 永远 null
+  let finalCollectionId: number | null = null;
+  if (userId) {
+    if (collectionId == null) {
+      finalCollectionId = ensureDefaultCollection(userId).id;
+    } else {
+      // 校验归属：只能用自己的合集
+      const own = db.prepare('SELECT user_id FROM collections WHERE id = ?').get(collectionId) as { user_id: number } | undefined;
+      if (!own || own.user_id !== userId) finalCollectionId = ensureDefaultCollection(userId).id;
+      else finalCollectionId = collectionId;
+    }
+  }
+
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags, collection_id)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -176,6 +192,7 @@ export function createStar(
     isAnonymous ? 1 : 0,
     imageUrl ?? null,
     tagsJson,
+    finalCollectionId,
   );
 
   const storyId = result.lastInsertRowid as number;
@@ -190,6 +207,9 @@ export function createStar(
       insertJunction.run(storyId, cid, cid === effectiveCatalogStarId ? 1 : 0);
     }
   }
+
+  // 合集冗余计数同步
+  if (finalCollectionId) recountCollectionTotals(finalCollectionId);
 
   const row = db.prepare(`
     SELECT s.*,
@@ -242,6 +262,10 @@ export function resonate(id: number, userId?: number): { id: number; resonance_c
   }
 
   db.prepare('UPDATE stars SET resonance_count = resonance_count + 1 WHERE id = ?').run(id);
+  // 合集冗余共振数同步（如果挂在合集下）
+  if (star.collection_id != null) {
+    try { recountCollectionTotals(star.collection_id); } catch { /* ignore */ }
+  }
   const updated = db.prepare('SELECT id, resonance_count FROM stars WHERE id = ?').get(id) as unknown as {
     id: number;
     resonance_count: number;
@@ -266,7 +290,11 @@ export function recordCatalogVisit(catalogStarId: number): void {
 
 // 故事级浏览 +1（点击进入故事详情 = +1，纯计数不去重）
 export function recordStoryView(storyId: number): void {
+  const star = db.prepare('SELECT collection_id FROM stars WHERE id = ?').get(storyId) as { collection_id: number | null } | undefined;
   db.prepare('UPDATE stars SET view_count = view_count + 1 WHERE id = ?').run(storyId);
+  if (star && star.collection_id != null) {
+    try { recountCollectionTotals(star.collection_id); } catch { /* ignore */ }
+  }
 }
 
 // 按 catalog_star_id 获取统计数据（通过连接表聚合）
@@ -419,14 +447,19 @@ export function deleteStory(storyId: number, userId: number): {
   notFound?: boolean;
   notOwner?: boolean;
 } {
-  const existing = db.prepare('SELECT user_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null } | undefined;
+  const existing = db.prepare('SELECT user_id, collection_id FROM stars WHERE id = ?').get(storyId) as { user_id: number | null; collection_id: number | null } | undefined;
   if (!existing) return { success: false, notFound: true };
   if (existing.user_id !== userId) return { success: false, notOwner: true };
+  const affectedCollection = existing.collection_id;
   // 先清理外键关联数据，再删除故事本身
   db.prepare('DELETE FROM resonance_log WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM story_views WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM story_kernels WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM story_catalog_stars WHERE story_id = ?').run(storyId);
   db.prepare('DELETE FROM stars WHERE id = ?').run(storyId);
+  // 合集冗余计数同步
+  if (affectedCollection != null) {
+    try { recountCollectionTotals(affectedCollection); } catch { /* ignore */ }
+  }
   return { success: true };
 }

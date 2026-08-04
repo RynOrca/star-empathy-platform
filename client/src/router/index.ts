@@ -20,6 +20,12 @@ const router = createRouter({
       component: () => import('../pages/ProfilePage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/collections/:id',
+      name: 'collection-detail',
+      component: () => import('../pages/CollectionDetailPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

@@ -44,7 +44,10 @@ async function fetchMe() {
   try {
     const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
     const json = await res.json()
-    if (res.ok) user.value = json.data
+    if (res.ok) {
+      user.value = json.data
+      if (json.data?.id != null) localStorage.setItem('userId', String(json.data.id))
+    }
   } catch { /* 静默 */ }
 }
 
@@ -57,6 +60,7 @@ async function login(username: string, password: string, rememberMe?: boolean): 
   const json = await res.json()
   if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
+  if (json.data.user?.id != null) localStorage.setItem('userId', String(json.data.user.id))
   user.value = json.data.user
   startRefreshTimer()
   return json.data.token
@@ -71,6 +75,7 @@ async function register(username: string, password: string, email?: string): Pro
   const json = await res.json()
   if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
+  if (json.data.user?.id != null) localStorage.setItem('userId', String(json.data.user.id))
   user.value = json.data.user
   startRefreshTimer()
   return json.data.token
@@ -150,6 +155,7 @@ async function logout() {
     } catch { /* 即使 API 失败也清除本地状态 */ }
   }
   localStorage.removeItem('token')
+  localStorage.removeItem('userId')
   user.value = null
   stopRefreshTimer()
 }

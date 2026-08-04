@@ -93,8 +93,16 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
     const safeTags: string[] | undefined = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string') : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
+    // 合集：前端可以传 collectionId 选合集（写故事标题上方），不传走默认
+    const collectionIdRaw: unknown = (req.body as any).collectionId;
+    let collectionId: number | null | undefined = undefined;
+    if (collectionIdRaw === null || collectionIdRaw === '') collectionId = null;
+    else if (typeof collectionIdRaw === 'number') collectionId = Number.isInteger(collectionIdRaw) ? collectionIdRaw : undefined;
+    else if (typeof collectionIdRaw === 'string' && /^\d+$/.test(collectionIdRaw)) collectionId = parseInt(collectionIdRaw, 10);
+    // 用户未登录时忽略（createStar 里 userId 空会走空，collection_id 置 null）
+    if (!user || !user.id) collectionId = undefined;
 
-    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds, safeTags);
+    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds, safeTags, collectionId);
 
     // 异步生成 AI 故事内核
     if (star && (star as { id: number }).id) {

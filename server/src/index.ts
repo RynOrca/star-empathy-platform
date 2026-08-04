@@ -18,12 +18,14 @@ import chatRouter from './routes/chat';
 import moonRouter from './routes/moon';
 import locationRouter from './routes/location';
 import analysisRouter from './routes/analysis';
+import collectionsRouter from './routes/collections';
 import { ok, badRequest, serverError } from './utils/response';
 import { authRequired } from './middleware/auth';
 import { setApiKey, getApiKey } from './services/deepseek';
 import { setAmapKey, getAmapKey } from './services/amap';
 import { cleanExpiredTokens } from './services/userService';
 import { backfillMissingKernels } from './services/kernel';
+import { backfillDefaultCollectionsForAll } from './services/collectionsService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -206,6 +208,13 @@ app.use('/api/moon', moonRouter);
 // 定位（IP 定位 + 反向地理编码）
 app.use('/api/location', locationRouter);
 
+// 合集（收藏夹升级版的跨星故事主题笔记本）
+app.post('/api/collections', writeLimiter);
+app.post('/api/collections/move-story', writeLimiter);
+app.patch('/api/collections/:id', writeLimiter);
+app.delete('/api/collections/:id', writeLimiter);
+app.use('/api/collections', collectionsRouter);
+
 // ════════════════════════════════════════════════════════════════
 // 设置（只读）：
 //   · Key 只允许通过「环境变量」或「管理员服务器上写 .runtime-key」配置，
@@ -269,6 +278,14 @@ app.listen(PORT, () => {
   // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
   setImmediate(() => {
     try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+  });
+
+  // 启动后给所有还没建"默认合集"的老用户补一条（幂等）
+  setImmediate(() => {
+    try {
+      const n = backfillDefaultCollectionsForAll();
+      if (n > 0) console.log(`[collections] 为 ${n} 位老用户补建了默认合集`);
+    } catch (e) { console.error('[collections] 默认合集补建失败:', e); }
   });
 });
 

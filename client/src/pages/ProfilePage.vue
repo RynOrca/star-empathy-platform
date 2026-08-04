@@ -311,6 +311,123 @@
         </template>
       </section>
 
+      <!-- 4. 合集 COLLECTIONS · 笔记本主题分组 -->
+      <section id="pd-collections" class="pd-collections-section" aria-label="我的合集">
+        <div class="pd-section-head">
+          <h2>COLLECTIONS · 我的合集</h2>
+          <p>—— 把散落在不同星辰下的心事，按主题收拢成册 ——</p>
+        </div>
+
+        <div class="pd-coll-actions">
+          <button
+            type="button"
+            class="pd-back-btn pd-action-btn"
+            @click="openNewCollection = true"
+            :disabled="newCollLoading"
+          >
+            <FolderPlus :size="11" />
+            <span>{{ newCollLoading ? '创建中…' : '新建合集' }}</span>
+          </button>
+        </div>
+
+        <template v-if="collections.loading.value">
+          <div class="pd-empty"><div class="pd-empty-orb" aria-hidden="true">…</div></div>
+        </template>
+        <template v-else-if="collections.list.value.length === 0">
+          <div class="pd-empty">
+            <div class="pd-empty-orb" aria-hidden="true">🎒</div>
+            <h4 class="pd-empty-title">还没有合集，</h4>
+            <p class="pd-empty-sub">写故事时选择「新建合集」，故事就会自动归类到这里。</p>
+          </div>
+        </template>
+        <template v-else>
+          <div class="pd-coll-grid" role="list">
+            <article
+              v-for="(c, i) in collections.list.value"
+              :key="c.id"
+              class="pd-coll-card"
+              :class="'gal-' + ((i % 4) + 1)"
+              role="listitem"
+              tabindex="0"
+              :style="{ '--pd-coll-color': c.coverColor }"
+              :aria-label="`合集卡：${c.name}，故事 ${c.storyCount}，共鸣 ${c.totalResonance}，按 Enter 打开`"
+              @click="openCollection(c.id)"
+              @keyup.enter="openCollection(c.id)"
+              @mouseenter="onCardEnter" @mouseleave="onCardLeave"
+            >
+              <div class="pd-coll-head">
+                <Bookmark v-if="c.isDefault" :size="12" class="pd-coll-pin" />
+                <div class="pd-coll-name" :title="c.name">{{ c.name }}</div>
+                <button
+                  v-if="!c.isDefault"
+                  type="button"
+                  class="pd-coll-del"
+                  aria-label="删除合集"
+                  @click.stop="confirmDeleteCollection(c)"
+                  @keyup.enter.stop.prevent="confirmDeleteCollection(c)"
+                >
+                  <Trash2 :size="11" />
+                </button>
+              </div>
+              <p class="pd-coll-desc" :title="c.description || ''">
+                <span v-if="c.description">{{ c.description }}</span>
+                <span v-else class="pd-coll-desc-empty">· 还没有描述，可在详情页编辑 ·</span>
+              </p>
+              <div class="pd-coll-meta">
+                <span><strong>{{ c.storyCount }}</strong> 则</span>
+                <span><strong>{{ c.totalResonance }}</strong> 共鸣</span>
+                <span><strong>{{ c.totalViews }}</strong> 浏览</span>
+              </div>
+              <div class="pd-coll-foot">
+                <span class="pd-coll-hint">{{ c.isDefault ? '默认合集 · 无法删除' : '点击打开合集详情 →' }}</span>
+                <span class="pd-coll-date">{{ formatMD(c.createdAt) }}</span>
+              </div>
+            </article>
+          </div>
+        </template>
+      </section>
+
+      <!-- 新建合集 Modal -->
+      <Transition name="pd-modal">
+      <div v-if="openNewCollection" class="pd-modal-mask" @click.self="openNewCollection = false">
+        <div class="pd-modal-panel pd-modal-sm">
+          <header class="pd-modal-head">
+            <h3>· NEW · COLLECTION · 新建合集 ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="openNewCollection = false">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <div class="pd-modal-form-row">
+              <label class="pd-modal-label">合集名称</label>
+              <input
+                v-model="newCollForm.name"
+                maxlength="30"
+                class="pd-modal-input"
+                placeholder="给主题起个名字，例如：2026 年夏天"
+                ref="newCollNameInputRef"
+              />
+            </div>
+            <div class="pd-modal-form-row">
+              <label class="pd-modal-label">描述（可选）</label>
+              <input
+                v-model="newCollForm.description"
+                maxlength="200"
+                class="pd-modal-input"
+                placeholder="简单说说这册笔记记录的是什么…"
+              />
+            </div>
+          </main>
+          <footer class="pd-modal-foot">
+            <button type="button" class="pd-back-btn" :disabled="newCollLoading" @click="openNewCollection = false">取消</button>
+            <button type="button" class="pd-btn-primary"
+              :disabled="newCollLoading || !newCollForm.name.trim()"
+              @click="doCreateCollection">
+              {{ newCollLoading ? '创建中…' : '创建合集' }}
+            </button>
+          </footer>
+        </div>
+      </div>
+      </Transition>
+
       <!-- 签名 inline 编辑器 -->
       <div v-if="editingSig" class="pd-sign-inline">
         <label class="pd-sign-label">✦ 编辑你的个性签名 ✦</label>
@@ -456,13 +573,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star } from 'lucide-vue-next'
+import { Star, Bookmark, FolderPlus, Trash2 } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
 import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
+import { useCollections, type Collection } from '../composables/useCollections'
 
 /** 开放标签 hash 染色工具 */
 function _hashCode(s: string): number {
@@ -520,6 +638,45 @@ const stories = ref<any[]>([])
 const favorites = ref<FavoriteItem[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
 const activeStory = ref<any>(null)
+
+// ─── 合集 ───
+const userIdRef = computed<number | null>(() => user.value?.id ?? null)
+const collections = useCollections(userIdRef)
+const openNewCollection = ref(false)
+const newCollLoading = ref(false)
+const newCollForm = ref<{ name: string; description: string }>({ name: '', description: '' })
+const newCollNameInputRef = ref<HTMLInputElement | null>(null)
+async function doCreateCollection() {
+  const name = newCollForm.value.name.trim()
+  if (!name) return
+  newCollLoading.value = true
+  const r = await collections.createCollection({
+    name,
+    description: newCollForm.value.description.trim() || undefined,
+  })
+  newCollLoading.value = false
+  if (!r.ok) {
+    // 复用 profile 已有的 error 展示：简单 alert（后续可接入统一 toast）
+    alert(r.error)
+    return
+  }
+  newCollForm.value = { name: '', description: '' }
+  openNewCollection.value = false
+}
+watch(openNewCollection, (open) => {
+  if (open) nextTick(() => newCollNameInputRef.value?.focus())
+})
+function confirmDeleteCollection(c: Collection) {
+  if (c.isDefault) return
+  const ok = confirm(`确认删除合集「${c.name}」？\n此合集下的故事不会被删除，会自动移入「我的默认合集」。`)
+  if (!ok) return
+  collections.deleteCollection(c.id).then((r) => {
+    if (!r.ok) alert(r.error)
+  })
+}
+function openCollection(id: number) {
+  router.push(`/collections/${encodeURIComponent(id)}`)
+}
 
 const editingSig = ref(false)
 const sigDraft = ref('')
@@ -2114,6 +2271,183 @@ onBeforeUnmount(() => {
   background: rgba(255,107,138,0.1);
 }
 
+/* ═════════ (f2) COLLECTIONS · 合集区域 ═════════ */
+.pd-collections-section {
+  position: relative;
+  padding: 70px 28px 110px;
+  text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pd-coll-actions {
+  max-width: 960px;
+  margin: 0 auto 28px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pd-coll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.pd-coll-card {
+  --pd-coll-color: #ffd98a;
+  min-height: 220px;
+  padding: 18px 16px 16px;
+  background: linear-gradient(165deg, rgba(16,18,40,0.78), rgba(16,18,40,0.62));
+  border: 1px solid rgba(255,217,138,0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all var(--pd-hover-dur) var(--pd-hover-ease);
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  border-radius: 16px;
+  text-align: left;
+}
+.pd-coll-card::before {
+  /* 顶部色带 —— 封面色 */
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--pd-coll-color), color-mix(in srgb, var(--pd-coll-color) 35%, #caa7ff));
+  box-shadow: 0 0 20px color-mix(in srgb, var(--pd-coll-color) 35%, transparent);
+}
+
+/* 移动端保留一点随机错落但不夸张，PC 端使用整洁网格 */
+.pd-coll-card.gal-1,
+.pd-coll-card.gal-2,
+.pd-coll-card.gal-3,
+.pd-coll-card.gal-4,
+.pd-coll-card.gal-5 {
+  transform: none;
+}
+
+.pd-coll-card:hover,
+.pd-coll-card:focus-visible {
+  transform: translateY(-6px) scale(1.02) !important;
+  z-index: 10 !important;
+  border-color: color-mix(in srgb, var(--pd-coll-color) 60%, var(--pd-gold));
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 40px color-mix(in srgb, var(--pd-coll-color) 22%, transparent);
+}
+
+.pd-coll-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pd-coll-pin {
+  color: var(--pd-gold);
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(255,217,138,0.4));
+}
+.pd-coll-name {
+  flex: 1;
+  text-align: left;
+  font-family: var(--pd-font-serif);
+  font-size: 1rem;
+  color: #f6f1ff;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pd-coll-card:hover .pd-coll-name,
+.pd-coll-card:focus-visible .pd-coll-name { color: color-mix(in srgb, var(--pd-coll-color) 85%, #fff); }
+
+.pd-coll-del {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255,107,138,0.3);
+  border-radius: 6px;
+  color: rgba(255,107,138,0.7);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+.pd-coll-card:hover .pd-coll-del,
+.pd-coll-card:focus-visible .pd-coll-del,
+.pd-coll-del:focus-visible { opacity: 1; }
+.pd-coll-del:hover {
+  color: #ff6b8a;
+  border-color: #ff6b8a;
+  background: rgba(255,107,138,0.12);
+}
+
+.pd-coll-desc {
+  flex: 1;
+  margin: 0;
+  text-align: left;
+  font-size: 0.78rem;
+  color: rgba(202,167,255,0.72);
+  line-height: 1.65;
+  letter-spacing: 0.02em;
+  /* 4 行截断 */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pd-coll-desc-empty {
+  color: rgba(202,167,255,0.28);
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+.pd-coll-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 0 10px;
+  border-top: 1px dashed rgba(255,217,138,0.18);
+}
+.pd-coll-meta span {
+  font-size: 0.7rem;
+  color: rgba(202,167,255,0.55);
+  letter-spacing: 0.02em;
+}
+.pd-coll-meta strong {
+  color: color-mix(in srgb, var(--pd-coll-color) 85%, #fff);
+  font-weight: 600;
+  font-family: var(--pd-font-serif);
+  margin-right: 2px;
+}
+
+.pd-coll-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.pd-coll-hint {
+  font-size: 0.65rem;
+  color: rgba(202,167,255,0.45);
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+.pd-coll-date {
+  font-size: 0.65rem;
+  color: rgba(202,167,255,0.38);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
 /* ═══ (f) Modal Base ═══ */
 .pd-modal-mask {
   position: fixed;
@@ -2224,7 +2558,10 @@ onBeforeUnmount(() => {
 }
 
 .pd-modal-form-row {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .pd-story-meta-row {
@@ -2271,9 +2608,9 @@ onBeforeUnmount(() => {
 }
 
 .pd-modal-foot {
-  border-top: 1px dashed var(--pd-gold-line);
-  padding-top: 20px;
-  margin-top: 24px;
+  border-top: 0.5px solid rgba(255,217,138,0.12);
+  padding-top: 16px;
+  margin-top: 20px;
   display: flex;
   gap: 10px;
   justify-content: flex-end;
@@ -2642,7 +2979,7 @@ onBeforeUnmount(() => {
   /* Favorites — 移动端严格保持 grid 2 列竖直排布，不被 PC 5 列影响 */
   .pd-favorites-section { padding: 60px 18px 120px; }
   .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
-  .pd-gallery {
+  .pd-gallery, .pd-coll-grid {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 14px !important;
@@ -2650,10 +2987,11 @@ onBeforeUnmount(() => {
     margin: 0 !important;
     perspective: none;
   }
-  .pd-gal-card {
+  .pd-gal-card, .pd-coll-card {
     width: 100% !important;
-    height: 200px !important;
-    padding: 16px 12px !important;
+    min-height: 210px;
+    height: auto !important;
+    padding: 16px 14px !important;
     margin: 0 !important;
     flex: none;
   }
@@ -2669,6 +3007,15 @@ onBeforeUnmount(() => {
     margin: 10px !important;
     z-index: 1;
   }
+  .pd-coll-card.gal-1, .pd-coll-card.gal-2, .pd-coll-card.gal-3, .pd-coll-card.gal-4,
+  .pd-coll-card.gal-5, .pd-coll-card.gal-6, .pd-coll-card.gal-7, .pd-coll-card.gal-8,
+  .pd-coll-card.gal-9, .pd-coll-card.gal-10 {
+    transform: none !important;
+    margin: 10px !important;
+    z-index: 1;
+  }
+  .pd-collections-section { padding: 60px 18px 120px; }
+  .pd-coll-actions { justify-content: center; }
 
   /* Modal */
   .pd-modal-panel { padding: 22px 18px; }
@@ -2692,10 +3039,12 @@ onBeforeUnmount(() => {
   .pd-stat .stat-label { font-size: 0.55rem; letter-spacing: 0.08em; }
   .pd-t-card { padding: 16px 14px; }
   .pd-t-head { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .pd-gal-card { width: 120px; height: 180px; padding: 12px 10px; }
+  .pd-gal-card, .pd-coll-card { width: 100% !important; min-height: 200px; height: auto !important; padding: 14px 12px !important; }
   .pd-gal-img { height: 60px; font-size: 1.8rem; }
   .pd-gal-name { font-size: 0.72rem; }
   .pd-gal-sub { font-size: 0.55rem; }
+  .pd-coll-desc { font-size: 0.6rem; }
+  .pd-coll-meta span { font-size: 0.58rem; letter-spacing: 0.04em; }
   /* 极窄屏弹窗按钮纵向堆叠 */
   .pd-modal-foot { flex-direction: column; }
   .pd-modal-foot button { width: 100%; }

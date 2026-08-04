@@ -18,6 +18,16 @@
         </button>
         <button
           v-if="story.userId != null && story.userId === currentUserId"
+          class="move-collection-btn"
+          :disabled="movingCollection"
+          @click.stop="$emit('openMoveCollection')"
+          title="把这个故事移动到其他合集"
+        >
+          <FolderMoveIcon :size="14" />
+          <span>{{ movingCollection ? '移动中…' : '移动合集' }}</span>
+        </button>
+        <button
+          v-if="story.userId != null && story.userId === currentUserId"
           class="delete-story-btn"
           @click.stop="$emit('delete')"
           :disabled="deleting"
@@ -42,6 +52,12 @@
             <span class="meta-sep">·</span>
             <span class="detail-sender is-anon">匿名星语</span>
           </template>
+          <template v-if="story.userId != null && story.userId === currentUserId && collectionName">
+            <span class="meta-sep">·</span>
+            <span class="detail-collection" :style="{ color: collectionColor || '#caa7ff' }" :title="`合集：${collectionName}`">
+              🎒 {{ collectionName }}
+            </span>
+          </template>
         </div>
         <div class="detail-body">
           <div class="detail-content" v-html="renderedContent"></div>
@@ -62,13 +78,14 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Sparkles, Check, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Sparkles, Check, Trash2, FolderOpen } from 'lucide-vue-next'
 import { computed } from 'vue'
 
 const ArrowLeftIcon = ArrowLeft
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const Trash2Icon = Trash2
+const FolderMoveIcon = FolderOpen
 
 const props = defineProps<{
   story: {
@@ -79,6 +96,7 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
   }
   backLabel: string
   renderedContent: string
@@ -86,15 +104,20 @@ const props = defineProps<{
   isResonated: boolean
   resonating: boolean
   deleting: boolean
+  movingCollection?: boolean
   currentUserId: number | null
   formattedTime: string
   formattedDistance: { text: string; near: boolean } | null
+  /** 当前故事所属合集的名字，仅自己的故事显示。空串则隐藏 */
+  collectionName?: string | null
+  collectionColor?: string | null
 }>()
 
 defineEmits<{
   back: []
   resonate: []
   delete: []
+  openMoveCollection: []
 }>()
 
 /** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
@@ -218,6 +241,35 @@ function tagStyle(tag: string): Record<string, string> {
 .delete-story-btn:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+
+/* ─── Move to Collection Button ─── */
+.move-collection-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(202, 167, 255, 0.35);
+  color: #caa7ff;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.move-collection-btn:hover:not(:disabled) {
+  background: rgba(202, 167, 255, 0.12);
+  border-color: rgba(202, 167, 255, 0.65);
+  color: #dfc7ff;
+}
+.move-collection-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.detail-collection {
+  font-family: var(--font-serif);
+  letter-spacing: 0.02em;
+  font-size: 0.78rem;
+  opacity: 0.95;
 }
 
 /* ─── Detail View ─── */

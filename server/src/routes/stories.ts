@@ -80,8 +80,14 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     const safeTag = typeof tag === 'string' ? tag : undefined;
     const safeTags: string[] | undefined = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string') : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
+    // 合集：新规范路由支持 collectionId（写故事标题上方合集选择器传入）
+    const collectionIdRaw: unknown = (req.body as any).collectionId;
+    let collectionId: number | null | undefined = undefined;
+    if (collectionIdRaw === null || collectionIdRaw === '') collectionId = null;
+    else if (typeof collectionIdRaw === 'number') collectionId = Number.isInteger(collectionIdRaw) ? collectionIdRaw : undefined;
+    else if (typeof collectionIdRaw === 'string' && /^\d+$/.test(collectionIdRaw)) collectionId = parseInt(collectionIdRaw, 10);
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags, collectionId);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {

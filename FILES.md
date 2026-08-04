@@ -25,7 +25,7 @@
 | 文件 | 用途 |
 |---|---|
 | `src/index.ts` | **服务入口**。Express 启动、路由注册、CORS 配置、静态文件服务 |
-| `src/db.ts` | **数据库初始化**。SQLite 建表（users, stars, narratives, story_kernels 等）、迁移兼容 |
+| `src/db.ts` | **数据库初始化**。SQLite 建表（users, stars, narratives, story_kernels 等）、迁移兼容；新增 `collections`（合集元信息+冗余计数+默认/公开/审核状态）、`collection_visits`（访问日志）表；`stars.collection_id` FK 索引；`backfillDefaultCollectionsForAll()` 服务启动补全老用户默认合集
 | `package.json` | 依赖与脚本：`dev`（nodemon）、`build`（tsc）、`start`、`seed` |
 | `tsconfig.json` | TypeScript 编译配置 |
 | `.env.example` | 环境变量模板 |
@@ -45,6 +45,7 @@
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
 | `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回 |
+| **`collections.ts`** | **合集路由**（9 条）。`/api/collections/mine` 我的合集列表、`POST /api/collections` 创建、`PATCH /api/collections/:id` 改名改描述、`DELETE /api/collections/:id` 删除（故事自动迁默认合集）、`GET /api/collections/:id/stats` 聚合统计、`GET /api/collections/:id/stories` 故事分页、`POST /api/collections/move-story` 跨合集移动故事、`POST /api/collections/:id/visit` 记录访问 |
 
 ### 服务层 `src/services/`
 
@@ -53,12 +54,13 @@
 | `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
 | `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
-| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合） |
+| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）；新增写故事 `createStar(... collectionId)` 关联合集，共鸣/浏览/删除 触发 `recountCollectionTotals` 合集冗余计数同步 |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务。含 **`findMatchingStarsForContent(title, content, limit)`** 为未落库的新故事寻找 Top3 最契合的星辰（内核 Jaccard 相似度 Top10 + DeepSeek 语义重排给理由 + 匹配不到时降级选亮星）。**`extractSuggestedTagsForContent(title, content)`** 轻量接口：仅生成 3-5 个 AI 建议标签（不走星星匹配），配合前端 `POST /api/stories/ai-tags` 做实时标签推荐。`getSimilarStars(catalogStarId)` 星 vs 星内核相似度。`generateKernel()` AI 提取内核。 |
 | `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
 | `emailService.ts` | 邮件发送服务 |
+| **`collectionsService.ts`** | **合集业务服务**。`createCollection` 创建（2~4 色随机封面）、`listMyCollections`（默认合集置顶 + sort_order）、`getCollectionStats` 聚合（故事数/共鸣/浏览 + TopTags + TopCatalogs）、`getCollectionStoriesPaged` 分页、`updateCollection` 改名/描述/排序、`deleteCollection` 迁默认合集 + 删目标、`moveStoryToCollection` 校验所有权 + 重算两端计数、`getOrCreateDefaultCollection` 首次写故事兜底、`backfillDefaultCollectionsForAll` 服务启动补老用户、`recountCollectionTotals` 重算冗余计数 |
 
 ### 数据层 `src/data/`
 
@@ -129,16 +131,17 @@
 |---|---|
 | `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、设置面板、移动端底部「凝听星语」按钮（吸附星体后滑入，issue #124；issue #134 扩展支持行星：按钮区分恒星/行星，行星入口只打开故事面板不进入特写）；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail |
 | `HomePage.vue` | 首页/登录页。粒子星空背景 + 左右分栏（品牌意境/登录注册表单），含找回密码、匿名访客体验；移动端可竖向滚动（issue #124） |
-| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
+| `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录；**COLLECTIONS 我的合集区**（接 useCollections）：新建合集、卡片（4 错叠）、删除合集（故事迁默认合集）、编辑；响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
+| **`CollectionDetailPage.vue`** | **合集详情页**，路由 `/collections/:id`（requiresAuth）。Hero 封面色 radial 发光+公开/私密 ribbon+4 指标卡 Stories/Resonance/Views/Days；Top Tags / Top Catalogs 色带；故事卡片列表（左栏星星点+右栏共鸣/浏览/时间+移动按钮）；移动合集 picker Modal；故事详情 Modal；编辑合集 Modal；粒子背景画布；返回入口 `/profile#pd-collections` |
 
 ### 组件 `src/components/`
 
 | 文件 | 用途 |
 |---|---|
 | `SkyCanvas.vue` | **3D 画布组件**。挂载 `useSky`、代理点击/悬停/准星吸附事件（`starClick`/`starHover`/`starHoverLong`/`planetClick`/`snapChange`） |
-| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、PC端 4 个 Tab（AI 叙事/历史故事/用户故事/我的故事）+ 移动端 5 个 Tab（含星信息）、标签编辑、删除确认 |
+| `StarDetail/index.vue` | **星星详情容器**。状态管理、布局编排、PC端 4 个 Tab（AI 叙事/历史故事/用户故事/我的故事）+ 移动端 5 个 Tab（含星信息）、标签编辑、删除确认、**合集移动**（StoryDetail → openMoveCollection → 合集 picker Modal → collections.moveStory） |
 | `StarDetail/StoryCard.vue` | 故事卡片子组件（4 个 Tab 复用） |
-| `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除） |
+| `StarDetail/StoryDetail.vue` | 故事详情子组件（标题、正文、共鸣、删除、**移动合集**按钮、作者合集徽章显示）。新增 props：`movingCollection / collectionName / collectionColor`；新增 emit：`openMoveCollection` |
 | `StarDetail/StoryList.vue` | 故事列表子组件（搜索、排序、卡片列表、空状态） |
 | `StarDetail/StarHeader.vue` | 星星概要子组件（名称、星座、颜色） |
 | `StarDetail/StarInfoPanel.vue` | 信息面板子组件（视星等/距离/色温/亮度、统计、天文事件、月相、北极星岁差科普） |
@@ -149,7 +152,7 @@
 | `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
-| `StoryForm.vue` | 投递心事表单。两种 `mode` prop：**`bind-star`**（预绑定 catalogStarId，原行为） vs **`auto-match`**（未选星，点「寻找归属星辰」emit `requestMatch` 给父组件，匹配后父组件通过 ref 调 `doSubmit(catalogStarId)` 真正提交）。auto-match 模式下提供 3 步进度遮罩（提取内核 / 夜空寻星 / 判断缘分）。**实时 AI 标签推荐**：标题+正文变化 600ms debounce → `POST /api/stories/ai-tags`，推荐标签与匹配接口回传的 `suggestedTags` 合并去重后展示，两种模式都启用。暴露：`defineExpose({ doSubmit, resetForm })`。 |
+| `StoryForm.vue` | 投递心事表单。两种 `mode` prop：**`bind-star`**（预绑定 catalogStarId，原行为） vs **`auto-match`**（未选星，点「寻找归属星辰」emit `requestMatch` 给父组件，匹配后父组件通过 ref 调 `doSubmit(catalogStarId)` 真正提交）。auto-match 模式下提供 3 步进度遮罩（提取内核 / 夜空寻星 / 判断缘分）。**实时 AI 标签推荐**：标题+正文变化 600ms debounce → `POST /api/stories/ai-tags`，推荐标签与匹配接口回传的 `suggestedTags` 合并去重后展示，两种模式都启用。暴露：`defineExpose({ doSubmit, resetForm })`。**合集选择器**（标题上方）：下拉选中默认合集或已有合集，可一键新建合集 Modal；提交时 `collectionId` 一并发给后端。 |
 | `SettingsModal.vue` | 设置面板（API Key 管理、显示配置） |
 | `LoadingScreen.vue` | 加载动画 |
 | `LegendToggle.vue` | 图例开关 |
@@ -169,6 +172,7 @@
 | `useAstroEvents.ts` | 天文事件计算（日月出没、行星可见性） |
 | `useParticleSky.ts` | 粒子背景动画 |
 | `useMediaQuery.ts` | 响应式断点检测（768px PC/移动端分界） |
+| **`useCollections.ts`** | **合集状态管理 composable**。导出 `Collection / CollectionStats / CollectionStory / PagedResult` 类型；API：`fetchList / createCollection / patchCollection / deleteCollection / moveStory / getStats / getStoriesPaged / defaultCollectionId()`；watch userId，登录后自动 `fetchList()`，登出清空 |
 
 ### 数据 `src/data/`
 
@@ -199,7 +203,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `router/index.ts` | Vue Router 路由配置 |
+| `router/index.ts` | Vue Router 路由配置（home / sky / profile / **collection-detail**）。`beforeEach` 守卫：`meta.requiresAuth` → token 空跳登录；登录后访问 `/` → `/sky` |
 | `stores/auth.ts` | 用户认证状态管理（Zustand 风格）。login/register/logout（调后端黑名单 API）/fetchMe/token 自动刷新；导出 `authFetch`（401 兜底清 token 跳登录）、`setAuthRouter`（注入路由实例）、`isGuest`（访客账号判断） |
 
 ### 样式 `src/styles/`

@@ -153,6 +153,36 @@ db.exec(`
     generated_at      INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_csa_star ON catalog_star_analyses(catalog_star_id);
+
+  -- 合集（跨星故事的主题笔记本；1 故事只能属于 1 合集，作者自有，公开性由合集决定）
+  CREATE TABLE IF NOT EXISTS collections (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    cover_color     TEXT NOT NULL DEFAULT '#ffd98a',
+    is_default      INTEGER NOT NULL DEFAULT 0,
+    is_public       INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL DEFAULT 'draft',  -- draft(私有未提交审核)/pending/approved/rejected
+    reject_reason   TEXT,
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    story_count     INTEGER NOT NULL DEFAULT 0,
+    total_resonance INTEGER NOT NULL DEFAULT 0,
+    total_views     INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
+  CREATE INDEX IF NOT EXISTS idx_collections_public ON collections(is_public, status, created_at) WHERE is_public = 1;
+
+  -- 合集访问日志（用于 total_views 统计，与 catalog_visits 对称）
+  CREATE TABLE IF NOT EXISTS collection_visits (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    user_id       INTEGER REFERENCES users(id),
+    visited_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_collection_visits_coll ON collection_visits(collection_id);
 `);
 
 // 兼容旧数据库：添加新列
@@ -185,6 +215,9 @@ try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAUL
 try { db.exec('ALTER TABLE stars ADD COLUMN image_url TEXT'); } catch {}
 // 兼容旧数据库：stars 加 tags JSON 列（多标签数组）
 try { db.exec('ALTER TABLE stars ADD COLUMN tags TEXT'); } catch {}
+// 兼容旧数据库：stars 加 collection_id 列（1 故事只能属于 1 合集；空=未分类/历史故事）
+try { db.exec('ALTER TABLE stars ADD COLUMN collection_id INTEGER REFERENCES collections(id) ON DELETE SET NULL'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_collection ON stars(collection_id)'); } catch {}
 
 // 兼容旧数据库：迁移 story_catalog_stars 连接表（幂等）
 try {

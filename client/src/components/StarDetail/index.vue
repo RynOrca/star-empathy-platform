@@ -185,12 +185,16 @@
               :isResonated="justResonatedId === detailStory.id"
               :resonating="resonating"
               :deleting="deleting"
+              :movingCollection="movingCollection"
               :currentUserId="currentUserId"
+              :collectionName="detailStoryCollectionInfo?.name"
+              :collectionColor="detailStoryCollectionInfo?.color"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              @openMoveCollection="openMoveCollection"
             />
             <StoryList
               v-else
@@ -220,12 +224,16 @@
               :isResonated="justResonatedId === detailStory.id"
               :resonating="resonating"
               :deleting="deleting"
+              :movingCollection="movingCollection"
               :currentUserId="currentUserId"
+              :collectionName="detailStoryCollectionInfo?.name"
+              :collectionColor="detailStoryCollectionInfo?.color"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              @openMoveCollection="openMoveCollection"
             />
             <StoryList
               v-else
@@ -266,12 +274,16 @@
               :isResonated="justResonatedId === detailStory.id"
               :resonating="resonating"
               :deleting="deleting"
+              :movingCollection="movingCollection"
               :currentUserId="currentUserId"
+              :collectionName="detailStoryCollectionInfo?.name"
+              :collectionColor="detailStoryCollectionInfo?.color"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              @openMoveCollection="openMoveCollection"
             />
             <StoryList
               v-else
@@ -877,15 +889,55 @@
                 :isResonated="justResonatedId === detailStory.id"
                 :resonating="resonating"
                 :deleting="deleting"
+                :movingCollection="movingCollection"
                 :currentUserId="currentUserId"
+                :collectionName="detailStoryCollectionInfo?.name"
+                :collectionColor="detailStoryCollectionInfo?.color"
                 :formattedTime="formatTime(detailStory.createdAt)"
                 :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
+                @openMoveCollection="openMoveCollection"
               />
             </div>
           </div>
+        </Transition>
+
+        <!-- 移动合集 Modal -->
+        <Transition name="pd-modal">
+        <div v-if="showMovePicker && movingStory" class="move-collection-mask" @click.self="closeMovePicker">
+          <div class="move-collection-panel pd-modal-panel pd-modal-sm">
+            <header class="pd-modal-head">
+              <h3>· MOVE · TO · COLLECTION ·</h3>
+              <button type="button" class="pd-modal-close" aria-label="关闭" @click="closeMovePicker">×</button>
+            </header>
+            <main class="pd-modal-body">
+              <div class="move-collection-hint">
+                正在移动《{{ movingStory.title || '未命名故事' }}》至：
+              </div>
+              <div class="move-collection-list" role="radiogroup">
+                <button
+                  v-for="c in collections.list.value"
+                  :key="c.id"
+                  type="button"
+                  class="move-collection-item"
+                  :class="{ active: c.id === movingStoryCollectionId }"
+                  :style="{ '--pd-coll-color': c.coverColor }"
+                  :disabled="movingCollection"
+                  @click="doMoveCollection(c.id)"
+                >
+                  <span class="move-collection-dot"></span>
+                  <span class="move-collection-name">
+                    <Bookmark v-if="c.isDefault" :size="10" />
+                    {{ c.name }}
+                  </span>
+                  <span class="move-collection-count">{{ c.storyCount }} 则</span>
+                </button>
+              </div>
+            </main>
+          </div>
+        </div>
         </Transition>
 
         <!-- 移动端删除 Action Sheet -->
@@ -902,7 +954,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Bookmark } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -932,6 +984,7 @@ import { useAreaHighlights } from '../../composables/useAreaHighlights'
 import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
 import { useMediaQuery } from '../../composables/useMediaQuery'
+import { useCollections } from '../../composables/useCollections'
 import { constellationNames } from '../../data/starInfo'
 import { getStarNameInfo } from '../../utils/starName'
 import { marked } from 'marked'
@@ -1431,6 +1484,50 @@ async function doDeleteStory() {
 function cancelDelete() {
   showDeleteConfirm.value = false
   deletingStoryId.value = null
+}
+
+// ─── 合集：故事移动 + 当前合集展示 ───
+const currentUserIdRef = computed<number | null>(() => props.currentUserId)
+const collections = useCollections(currentUserIdRef)
+
+const movingCollection = ref(false)
+const showMovePicker = ref(false)
+const movingStory = ref<{ id: number; title: string | null } | null>(null)
+const movingStoryCollectionId = ref<number | null>(null)
+
+/** 获取故事详情上显示的合集信息（仅作者可见） */
+const detailStoryCollectionInfo = computed<{ name: string; color: string } | null>(() => {
+  if (!detailStory.value) return null
+  if (!props.currentUserId || detailStory.value.userId !== props.currentUserId) return null
+  const cid: unknown = (detailStory.value as any).collectionId
+  if (cid == null) {
+    const def = collections.list.value.find((c) => c.isDefault)
+    return def ? { name: def.name, color: def.coverColor } : null
+  }
+  const c = collections.list.value.find((x) => x.id === (cid as number))
+  if (c) return { name: c.name, color: c.coverColor }
+  return null
+})
+
+function openMoveCollection() {
+  if (!detailStory.value) return
+  movingStory.value = { id: detailStory.value.id, title: detailStory.value.title }
+  const cid: unknown = (detailStory.value as any).collectionId
+  movingStoryCollectionId.value = typeof cid === 'number' ? cid : null
+  showMovePicker.value = true
+}
+function closeMovePicker() {
+  showMovePicker.value = false
+  movingStory.value = null
+  movingStoryCollectionId.value = null
+}
+async function doMoveCollection(newCollId: number) {
+  if (!movingStory.value) return
+  movingCollection.value = true
+  const r = await collections.moveStory(movingStory.value.id, newCollId)
+  movingCollection.value = false
+  if (!r.ok) { alert(r.error); return }
+  closeMovePicker()
 }
 
 // ─── 收藏 ───
@@ -2849,5 +2946,165 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-story-slide-leave-to {
   transform: translateX(100%);
+}
+
+/* 合集 picker modal */
+.move-collection-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  background: rgba(5, 6, 15, 0.72);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.move-collection-panel {
+  background: var(--surface);
+  border: 1px solid rgba(255, 217, 138, 0.25);
+  border-radius: var(--radius-xl);
+  width: min(520px, 94vw);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.move-collection-hint {
+  font-size: 0.82rem;
+  color: var(--muted-light);
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
+}
+.move-collection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.move-collection-item {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  cursor: pointer;
+  transition: all 0.25s;
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-align: left;
+  font-family: var(--font);
+}
+.move-collection-item:hover:not(:disabled) {
+  border-color: rgba(255, 217, 138, 0.4);
+  background: rgba(255, 217, 138, 0.06);
+}
+.move-collection-item.active {
+  border-color: color-mix(in srgb, var(--pd-coll-color, #ffd98a) 70%, var(--accent, #ffd98a));
+  background: color-mix(in srgb, var(--pd-coll-color, #ffd98a) 10%, transparent);
+}
+.move-collection-item:disabled { opacity: 0.5; cursor: wait; }
+.move-collection-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--pd-coll-color, #ffd98a);
+  box-shadow: 0 0 10px var(--pd-coll-color, #ffd98a);
+}
+.move-collection-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.04em;
+}
+.move-collection-count {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-family: var(--font-serif);
+}
+
+/* 复用 profile 的 pd modal 结构（在 scoped 下重新声明核心样式，确保不穿透也能用） */
+.pd-modal-panel {
+  background: var(--surface);
+  border: 1px solid rgba(255, 217, 138, 0.25);
+  border-radius: var(--radius-xl);
+  width: min(560px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+}
+.pd-modal-sm { width: min(480px, 92vw); }
+.pd-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.pd-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+}
+.pd-modal-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(202, 167, 255, 0.3);
+  color: var(--muted-light);
+  font-size: 1.0rem; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.pd-modal-close:hover {
+  color: #ff6b8a;
+  border-color: rgba(255, 107, 138, 0.5);
+}
+.pd-modal-body {
+  padding: 22px;
+  overflow-y: auto;
+}
+.pd-modal-form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.pd-modal-label {
+  font-size: 0.72rem; letter-spacing: 0.25em; color: var(--muted-light);
+}
+.pd-modal-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255, 217, 138, 0.2);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  outline: none;
+  transition: all 0.25s;
+  font-family: var(--font);
+}
+.pd-modal-input:focus { border-color: rgba(255, 217, 138, 0.6); background: rgba(255, 217, 138, 0.05); }
+
+.pd-modal-enter-active, .pd-modal-leave-active { transition: opacity 0.25s ease; }
+.pd-modal-enter-from, .pd-modal-leave-to { opacity: 0; }
+
+.pwd-error { color: #ff6b8a; font-size: 0.8rem; letter-spacing: 0.05em; margin: 8px 0 0; }
+
+@media (max-width: 768px) {
+  .move-collection-mask { align-items: flex-end; }
+  .move-collection-panel, .pd-modal-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  .pd-modal-enter-from .move-collection-panel,
+  .pd-modal-leave-to .move-collection-panel,
+  .pd-modal-enter-from .pd-modal-panel,
+  .pd-modal-leave-to .pd-modal-panel { transform: translateY(100%); }
 }
 </style>

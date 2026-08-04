@@ -26,6 +26,91 @@
         <!-- STEP 1 -->
         <template v-if="step === 1">
           <div class="sf-group">
+            <!-- 合集选择（标题上方，自定义下拉，替换原生 select） -->
+            <div class="sf-field">
+              <div class="sf-label-row">
+                <label class="sf-label">合集 <span class="sf-label-sub">登录后可选</span></label>
+                <button
+                  type="button"
+                  class="sf-refresh-tags sf-tiny"
+                  :disabled="collections.loading.value || !isLoggedIn"
+                  @click.stop="openCreateCollection = true"
+                >
+                  <Plus :size="11" />
+                  <span>新建</span>
+                </button>
+              </div>
+              <div
+                class="sf-dropdown"
+                :class="{ disabled: !isLoggedIn || collections.loading.value, open: dropdownOpen }"
+              >
+                <button
+                  type="button"
+                  class="sf-dropdown-toggle"
+                  :disabled="!isLoggedIn || collections.loading.value"
+                  @click.stop="toggleDropdown"
+                >
+                  <template v-if="selectedCollection">
+                    <span class="sf-coll-dot" :style="{ background: selectedCollection.coverColor }"></span>
+                    <span class="sf-coll-name">{{ selectedCollection.name }}</span>
+                    <span v-if="selectedCollection.isDefault" class="sf-coll-badge">默认</span>
+                    <span class="sf-coll-count">{{ selectedCollection.storyCount }} 篇</span>
+                  </template>
+                  <template v-else-if="!isLoggedIn">
+                    <BookMarked :size="14" class="sf-coll-icon" />
+                    <span class="sf-coll-placeholder">登录后可选择合集</span>
+                  </template>
+                  <template v-else-if="collections.loading.value">
+                    <span class="sf-coll-placeholder sf-coll-loading">加载合集中…</span>
+                  </template>
+                  <template v-else>
+                    <BookMarked :size="14" class="sf-coll-icon" />
+                    <span class="sf-coll-placeholder">还没有合集？点击右侧「新建」</span>
+                  </template>
+                  <ChevronDown :size="15" class="sf-dropdown-arrow" :class="{ rot: dropdownOpen }" />
+                </button>
+                <Transition name="sf-drop">
+                  <ul v-if="dropdownOpen && isLoggedIn" class="sf-dropdown-menu" @click.stop>
+                    <li v-if="collections.loading.value" class="sf-drop-empty">加载中…</li>
+                    <template v-else-if="collections.list.value.length > 0">
+                      <li
+                        v-for="c in collections.list.value"
+                        :key="c.id"
+                        class="sf-dropdown-item"
+                        :class="{ active: c.id === selectedCollectionId }"
+                        @click="selectCollection(c.id)"
+                      >
+                        <span class="sf-coll-dot" :style="{ background: c.coverColor }"></span>
+                        <span class="sf-dropdown-item-main">
+                          <span class="sf-dropdown-item-title">
+                            {{ c.name }}
+                            <span v-if="c.isDefault" class="sf-coll-badge">默认</span>
+                          </span>
+                          <span class="sf-dropdown-item-sub">
+                            {{ c.storyCount }} 篇故事
+                            <span v-if="c.description" class="sf-dropdown-item-desc">· {{ c.description }}</span>
+                          </span>
+                        </span>
+                        <Check v-if="c.id === selectedCollectionId" :size="14" class="sf-drop-check" />
+                      </li>
+                    </template>
+                    <li v-else class="sf-drop-empty">
+                      <BookMarked :size="16" />
+                      <span>还没有合集，点「新建」创建一册属于你的故事集</span>
+                    </li>
+                    <li class="sf-drop-action">
+                      <button type="button" class="sf-drop-new-btn" @click="openCreateCollection = true; dropdownOpen = false;">
+                        <Plus :size="12" />
+                        <span>新建合集</span>
+                      </button>
+                    </li>
+                  </ul>
+                </Transition>
+              </div>
+            </div>
+
+            <div class="sf-sep"></div>
+
             <!-- 标题 -->
             <div class="sf-field">
               <label class="sf-label">标题</label>
@@ -211,6 +296,57 @@
         </template>
       </div>
 
+      <!-- 新建合集弹层（极简 Modal） -->
+      <Transition name="sf-fade">
+        <div v-if="openCreateCollection" class="sf-mask" @click.self="openCreateCollection = false">
+          <div class="sf-modal" role="dialog" aria-modal="true">
+            <header class="sf-modal-header">
+              <h3 class="sf-modal-title">新建合集</h3>
+            </header>
+            <div class="sf-modal-body">
+              <div class="sf-field">
+                <label class="sf-label">合集名称 <span class="sf-label-sub">必填 · 最多 30 字</span></label>
+                <input
+                  v-model="newCollection.name"
+                  class="sf-input"
+                  placeholder="例：2026 年夏天"
+                  maxlength="30"
+                  ref="newCollNameRef"
+                />
+              </div>
+              <div class="sf-field">
+                <label class="sf-label">描述 <span class="sf-label-sub">可选 · 最多 200 字</span></label>
+                <input
+                  v-model="newCollection.description"
+                  class="sf-input"
+                  placeholder="简单介绍一下这册笔记（可不填）"
+                  maxlength="200"
+                />
+              </div>
+            </div>
+            <footer class="sf-modal-footer">
+              <button
+                type="button"
+                class="sf-btn sf-btn-ghost"
+                :disabled="createCollLoading"
+                @click="openCreateCollection = false"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="sf-btn sf-btn-primary"
+                :disabled="createCollLoading || !newCollection.name.trim()"
+                @click="doCreateCollection"
+              >
+                <Check v-if="createCollLoading" :size="11" class="spin" />
+                <span>{{ createCollLoading ? '创建中…' : '创建并选中' }}</span>
+              </button>
+            </footer>
+          </div>
+        </div>
+      </Transition>
+
       <!-- 匹配遮罩：苹果 Progress Ring -->
       <Transition name="sf-fade">
         <div v-if="mode === 'auto-match' && matching" class="sf-mask">
@@ -238,9 +374,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick } from 'vue'
-import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus, RefreshCw } from 'lucide-vue-next'
+import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick, toRef, readonly } from 'vue'
+import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus, RefreshCw, ChevronDown, BookMarked } from 'lucide-vue-next'
 import { useLocation } from '../composables/useLocation'
+import { useCollections, type Collection } from '../composables/useCollections'
 
 const props = withDefaults(defineProps<{
   starName: string
@@ -291,6 +428,98 @@ const isAnonymous = ref(false)
 const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/
 const customTagInput = ref('')
 const MAX_TAGS = 5
+
+/* ════════════════════════════════════════════════
+   合集选择 & 新建合集 Modal（标题上方 select）
+   ════════════════════════════════════════════════ */
+const isLoggedIn = computed<boolean>(() => !!localStorage.getItem('token'))
+// 注意：useCollections 内部会按 userId 自动 fetch 一次我的合集列表
+const currentUserId = ref<number | null>(null)
+const collections = useCollections(currentUserId)
+watch(
+  () => localStorage.getItem('userId'),
+  (v) => {
+    const n = v == null ? null : parseInt(String(v), 10)
+    currentUserId.value = Number.isFinite(n) ? (n as number) : null
+  },
+  { immediate: true },
+)
+// 未登录：userId 从 token 取（localStorage 没 userId 字段），兜底：有 token 先拉列表
+watch(
+  () => localStorage.getItem('token'),
+  (tk) => {
+    if (tk && !currentUserId.value) {
+      // 不关心 userId，fetchList 内部是按 token 鉴权的
+      collections.fetchList().catch(() => {})
+    }
+  },
+  { immediate: true },
+)
+const selectedCollectionId = ref<number | null>(null)
+/** 刚创建成功时锁住所选 ID，避免紧接着的 list 为空/变更时被 watch 误重置 */
+const lockedSelectedId = ref<{ id: number; until: number } | null>(null)
+const selectedCollection = computed<Collection | null>(() => {
+  if (selectedCollectionId.value == null) return null
+  return collections.list.value.find((c) => c.id === selectedCollectionId.value) ?? null
+})
+const dropdownOpen = ref(false)
+function toggleDropdown() {
+  if (!isLoggedIn.value || collections.loading.value) return
+  dropdownOpen.value = !dropdownOpen.value
+}
+function selectCollection(id: number) {
+  selectedCollectionId.value = id
+  dropdownOpen.value = false
+}
+function closeDropdownOnOutside(e: MouseEvent) {
+  if (!dropdownOpen.value) return
+  const tgt = e.target as HTMLElement | null
+  if (!tgt) { dropdownOpen.value = false; return }
+  if (!tgt.closest('.sf-dropdown')) dropdownOpen.value = false
+}
+watch(
+  () => collections.list.value,
+  (newList) => {
+    // 1) 有锁且锁未过期且 newList 中找不到该 id：保留原值，不重置（创建后 list 尚未刷新的瞬间）
+    if (lockedSelectedId.value && Date.now() < lockedSelectedId.value.until) {
+      const stillValid = newList.some((c) => c.id === lockedSelectedId.value!.id)
+      if (selectedCollectionId.value === lockedSelectedId.value.id && !stillValid) return
+    }
+    // 2) 已有选中且仍在列表中：不动
+    if (selectedCollectionId.value != null && newList.some((c) => c.id === selectedCollectionId.value)) return
+    // 3) 默认选中 isDefault=true 的第一个；没有 isDefault 就选第一个
+    const d = newList.find((c) => c.isDefault) ?? newList[0]
+    selectedCollectionId.value = d ? d.id : null
+  },
+  { immediate: true },
+)
+// 新建合集
+const openCreateCollection = ref(false)
+const newCollection = ref<{ name: string; description: string }>({ name: '', description: '' })
+const createCollLoading = ref(false)
+const newCollNameRef = ref<HTMLInputElement | null>(null)
+async function doCreateCollection() {
+  const name = newCollection.value.name.trim()
+  if (!name) return
+  createCollLoading.value = true
+  const r = await collections.createCollection({
+    name,
+    description: newCollection.value.description.trim() || undefined,
+  })
+  createCollLoading.value = false
+  if (!r.ok) {
+    error.value = r.error
+    return
+  }
+  selectedCollectionId.value = r.id
+  // 锁定 2.5s，防止 watch(list) 里 newList 还没含它时被立刻重置掉
+  lockedSelectedId.value = { id: r.id, until: Date.now() + 2500 }
+  newCollection.value = { name: '', description: '' }
+  openCreateCollection.value = false
+}
+watch(openCreateCollection, (open) => {
+  if (open) nextTick(() => newCollNameRef.value?.focus())
+})
 
 function toggleTag(t: string) {
   const i = selectedTags.value.indexOf(t)
@@ -487,7 +716,10 @@ watch(step, (ns, os) => {
     nextTick(() => refreshAiTags(false))
   }
 })
-onBeforeUnmount(() => { if (_suggestTimer) clearTimeout(_suggestTimer) })
+onBeforeUnmount(() => {
+  if (_suggestTimer) clearTimeout(_suggestTimer)
+  document.removeEventListener('click', closeDropdownOnOutside)
+})
 
 const stepProgress = computed(() => props.matchingStep || 0)
 
@@ -523,6 +755,7 @@ function onPrimaryClick() {
 
 onMounted(() => {
   textareaRef.value?.focus()
+  document.addEventListener('click', closeDropdownOnOutside)
 })
 
 watch(() => [props.mode, props.starName] as const, () => {
@@ -575,6 +808,7 @@ async function doSubmit(
       tag: effectivePrimaryTag,
       tags: finalTags,
       isAnonymous: isAnonymous.value,
+      collectionId: isLoggedIn ? (selectedCollectionId.value ?? null) : undefined,
     }
     const res = await fetch('/api/stories', {
       method: 'POST',
@@ -786,16 +1020,18 @@ defineExpose({ doSubmit, resetForm })
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .sf-label-row .sf-label { margin-right: auto; }
 .sf-label-sub {
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.26);
+  color: rgba(255, 255, 255, 0.30);
   letter-spacing: 0;
   text-transform: none;
   font-weight: 400;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 .sf-count {
   font-size: 10.5px;
@@ -1117,12 +1353,266 @@ defineExpose({ doSubmit, resetForm })
   color: #fff3cd;
 }
 
-/* ══════════ 匹配遮罩 — 放大版 ══════════ */
+/* 合集自定义下拉（替换原生 select，统一交互与视觉） */
+.sf-refresh-tags.sf-tiny {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  gap: 4px;
+  color: rgba(255, 229, 168, 0.84);
+}
+.sf-refresh-tags.sf-tiny:hover:not(:disabled) {
+  background: rgba(255, 217, 138, 0.12);
+}
+.sf-dropdown {
+  position: relative;
+  margin-top: 8px;
+}
+.sf-dropdown.disabled { opacity: .5; pointer-events: none; }
+.sf-dropdown-toggle {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.024);
+  color: rgba(255,255,255,0.92);
+  font: inherit;
+  letter-spacing: 0.004em;
+  font-size: 14px;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  outline: none;
+  cursor: pointer;
+  transition: all .18s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.sf-dropdown-toggle:hover:not(:disabled) {
+  border-color: rgba(255,217,138,0.22);
+  background: rgba(255,217,138,0.035);
+}
+.sf-dropdown.open .sf-dropdown-toggle {
+  border-color: rgba(255,217,138,0.35);
+  background: rgba(255,217,138,0.045);
+}
+.sf-dropdown-toggle:disabled { cursor: not-allowed; opacity: .55; }
+
+.sf-coll-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex: 0 0 10px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+}
+.sf-coll-icon { color: rgba(255,255,255,0.35); flex-shrink: 0; }
+.sf-coll-name { color: #fff; font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-coll-count { color: rgba(255,255,255,0.42); font-size: 12px; margin-left: 2px; }
+.sf-coll-placeholder { color: rgba(255,255,255,0.42); font-size: 13px; }
+.sf-coll-loading { opacity: .7; }
+.sf-coll-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px 2px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,202,108,0.22), rgba(239,169,75,0.14));
+  color: #ffd385;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 0.5px solid rgba(255,217,138,0.28);
+}
+.sf-dropdown-arrow {
+  margin-left: auto;
+  color: rgba(255,255,255,0.42);
+  transition: transform .18s ease;
+  flex-shrink: 0;
+}
+.sf-dropdown-arrow.rot { transform: rotate(180deg); }
+
+.sf-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: rgba(25,26,43,0.97);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  max-height: 320px;
+  overflow-y: auto;
+  animation: sf-dropin .18s ease-out;
+}
+@keyframes sf-dropin {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sf-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .14s ease;
+}
+.sf-dropdown-item:hover { background: rgba(255,255,255,0.045); }
+.sf-dropdown-item.active {
+  background: linear-gradient(180deg, rgba(255,217,138,0.13), rgba(255,202,108,0.07));
+  border: 0.5px solid rgba(255,217,138,0.18);
+  padding: 9px 10px;
+}
+.sf-dropdown-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.sf-dropdown-item-title {
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-dropdown-item-sub {
+  color: rgba(255,255,255,0.40);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-dropdown-item-desc { color: rgba(255,255,255,0.32); }
+.sf-drop-check {
+  color: #ffd385;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.sf-drop-empty {
+  padding: 18px 14px;
+  color: rgba(255,255,255,0.44);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.sf-drop-action {
+  padding: 6px 4px 4px;
+  margin-top: 4px;
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+}
+.sf-drop-new-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255,217,138,0.1);
+  color: #ffd98a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 0.5px dashed rgba(255,217,138,0.26);
+  cursor: pointer;
+  transition: all .14s ease;
+}
+.sf-drop-new-btn:hover { background: rgba(255,217,138,0.16); }
+
+.sf-drop-enter-active, .sf-drop-leave-active { transition: all .18s ease; }
+.sf-drop-enter-from, .sf-drop-leave-to { opacity: 0; transform: translateY(-4px); }
+/* 合集 modal（全局遮罩，不被 StoryForm panel 本身裁剪） */
+.sf-modal {
+  width: min(440px, 100%);
+  background: rgba(34, 34, 55, 0.96);
+  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  animation: sf-matchin .32s cubic-bezier(.22,1,.36,1);
+  overflow: hidden;
+}
+.sf-modal-header {
+  padding: 18px 22px 14px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.05);
+}
+.sf-modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.004em;
+}
+.sf-modal-body {
+  padding: 18px 22px 4px;
+}
+.sf-modal-body .sf-field { margin-bottom: 14px; }
+.sf-modal-footer {
+  padding: 12px 22px 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 0.5px solid rgba(255,255,255,0.05);
+  margin-top: 10px;
+}
+.sf-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.004em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  transition: all .16s ease;
+}
+.sf-btn:disabled { cursor: not-allowed; }
+.sf-btn-ghost {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.72);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  padding: 8px 15px;
+}
+.sf-btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #fff; }
+.sf-btn-ghost:disabled { opacity: .4; }
+.sf-btn-primary {
+  background: linear-gradient(180deg, #F4A261 0%, #E76F51 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.22) inset,
+    0 6px 16px rgba(231,111,81,0.22);
+  border: 0.5px solid rgba(255,255,255,0.12);
+}
+.sf-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.25) inset,
+    0 8px 20px rgba(231,111,81,0.28);
+}
+.sf-btn-primary:disabled { opacity: .45; box-shadow: none; filter: saturate(.8); }
+.spin { animation: sf-ring-rotate 1s linear infinite; }
+
+/* ══════════ 匹配遮罩 / 新建合集遮罩：全局 fixed，不占 StoryForm panel 流 ══════════ */
 .sf-fade-enter-active, .sf-fade-leave-active { transition: opacity .26s ease }
 .sf-fade-enter-from, .sf-fade-leave-to { opacity: 0 }
 
 .sf-mask {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(8, 7, 18, 0.72);
   backdrop-filter: blur(18px) saturate(180%);
@@ -1130,8 +1620,8 @@ defineExpose({ doSubmit, resetForm })
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 5;
-  padding: 32px;
+  z-index: 2147483000;
+  padding: 20px;
 }
 .sf-match {
   width: 100%;
