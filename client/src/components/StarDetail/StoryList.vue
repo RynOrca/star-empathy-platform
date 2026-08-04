@@ -125,20 +125,33 @@ const emit = defineEmits<{
 }>()
 
 /**
- * 根据 story.collectionId / collection_id 双命名找合集元信息。
- * 注意：必须在函数开头主动读取一次 collections.list.value（即使逻辑上后面才用），
- *       让 Vue 模板调用时把合集列表收集为响应式依赖 —— 否则首次渲染 fetchList 还没返回，
- *       全返回 null，等异步回来也不会重渲染。
+ * 找故事所属合集：100% 优先用后端 LEFT JOIN 直接返回的 story.collectionName / story.collectionCoverColor
+ * （这样无论当前登录用户是不是故事作者，都能正确显示合集归属）
+ * 只有在后端字段为空（极旧数据）时，才 fallback 到「当前用户自己的合集列表」匹配（兜底，兼容旧数据）
+ *
+ * 注意：函数开头主动读一次 collections.list.value，强制 Vue 收集响应式依赖
  */
-function getStoryCollection(story: { collectionId?: number | null; collection_id?: number | null }): Collection | null {
-  // 1. 先主动读一次，强制依赖收集
+function getStoryCollection(story: {
+  collectionId?: number | null; collection_id?: number | null;
+  collectionName?: string | null; collectionCoverColor?: string | null;
+}): { name: string; coverColor: string } | null {
+  // 1. 先主动读一次，强制依赖收集（兜底fallback场景需要）
   const list = collections.list.value
-  // 2. 兼容 snake_case / camelCase 双字段
+  // 2. 100% 优先用后端 JOIN 直接返回的字段（解决「别人的故事我匹配不到合集」的致命问题）
+  if (story.collectionName) {
+    return {
+      name: story.collectionName,
+      coverColor: story.collectionCoverColor || '#caa7ff',
+    }
+  }
+  // 3. Fallback：兼容旧数据，用双命名 + Number 宽松匹配自己的合集列表
   const cidRaw = (story as any).collectionId ?? (story as any).collection_id
   if (cidRaw == null) return null
   const cid = Number(cidRaw)
   if (!cid || !Array.isArray(list) || list.length === 0) return null
-  return list.find((c: Collection) => c.id === cid) || null
+  const hit = list.find((c: Collection) => Number(c.id) === cid)
+  if (!hit) return null
+  return { name: hit.name || '未命名合集', coverColor: hit.coverColor || '#caa7ff' }
 }
 
 const sortLabels: Record<SortKey, string> = {

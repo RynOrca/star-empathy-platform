@@ -1063,9 +1063,25 @@ function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | n
   return s.tag ? [s.tag] : []
 }
 
-/** 根据 story.collectionId / collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null；兼容 snake_case / camelCase 双字段 + 宽松类型匹配（id可能是string/number） */
+/**
+ * 找故事所属合集：100% 优先用后端 LEFT JOIN 直接返回的 story.collectionName / story.collectionCoverColor
+ * （解决「公开故事的合集我匹配不到」的终极根因）
+ * 只有后端字段为空时，才 fallback 到当前登录用户自己的合集列表匹配（兼容旧数据）
+ *
+ * 兼容 snake_case / camelCase 双字段 + 宽松类型匹配（Number(x.id)===cid）
+ */
 function getStoryCollection(s: any): { name: string; coverColor: string } | null {
   if (!s) return null
+  // 1. 强制依赖收集（fallback 场景用）
+  void collections.list.value
+  // 2. 100% 优先用后端 JOIN 返回的字段（无论是不是当前用户的故事，都能正确显示）
+  if (s.collectionName) {
+    return {
+      name: s.collectionName,
+      coverColor: s.collectionCoverColor || '#caa7ff',
+    }
+  }
+  // 3. Fallback：旧数据兼容 → 双命名 + Number 宽松匹配自己的合集列表
   const cidRaw = s.collectionId ?? s.collection_id
   if (cidRaw == null) return null
   const cid = Number(cidRaw)
@@ -1551,9 +1567,19 @@ const showMovePicker = ref(false)
 const movingStory = ref<{ id: number; title: string | null } | null>(null)
 const movingStoryCollectionId = ref<number | null>(null)
 
-/** 获取故事详情上显示的合集信息（公开可见：任何访客都能看到该故事属于哪册合集，类似专栏/超话归属） */
+/** 获取故事详情上显示的合集信息（公开可见：任何访客都能看到该故事属于哪册合集，类似专栏/超话归属）
+ * 100% 优先用后端 LEFT JOIN 直接返回的字段（无论是不是当前用户写的故事，都能正确显示）
+ */
 const detailStoryCollectionInfo = computed<{ name: string; color: string } | null>(() => {
   if (!detailStory.value) return null
+  // 1. 优先用后端 JOIN 直接返回的字段（终极根因修复）
+  if ((detailStory.value as any).collectionName) {
+    return {
+      name: (detailStory.value as any).collectionName,
+      color: (detailStory.value as any).collectionCoverColor || '#caa7ff',
+    }
+  }
+  // 2. Fallback：兼容旧数据 + 默认合集兜底
   const cidRaw = (detailStory.value as any).collectionId ?? (detailStory.value as any).collection_id
   if (cidRaw == null) {
     const def = collections.list.value.find((c) => c.isDefault)
