@@ -30,8 +30,8 @@ router.get('/mine', authRequired, (req: Request, res: Response) => {
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
     const user = (req as Request & { user: { id: number } }).user;
-    const { name, description, coverColor } = req.body ?? {};
-    const r = createCollection(user.id, { name, description, coverColor });
+    const { name, description, coverColor, isPublic } = req.body ?? {};
+    const r = createCollection(user.id, { name, description, coverColor, isPublic });
     if ('error' in r) return badRequest(res, r.error);
     ok(res, '已创建合集', r);
   } catch (error) {

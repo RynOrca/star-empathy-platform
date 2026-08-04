@@ -1,4 +1,5 @@
 import db from '../db';
+import { getCatalogStar } from './catalogMeta';
 
 export interface Collection {
   id: number;
@@ -151,21 +152,21 @@ export function patchCollection(userId: number, collectionId: number, patch: {
   const assignments: string[] = [];
   const bindings: (string | number | null)[] = [];
 
-  if ('name' in patch) {
+  if (patch.name !== undefined) {
     const name = cleanName(patch.name);
     if (!name) return { ok: false, reason: '合集名称不合法（1~30 个汉字/字母/数字）' };
     assignments.push('name = ?');
     bindings.push(name);
   }
-  if ('description' in patch) {
+  if (patch.description !== undefined) {
     assignments.push('description = ?');
     bindings.push(cleanDescription(patch.description));
   }
-  if ('coverColor' in patch) {
+  if (patch.coverColor !== undefined) {
     assignments.push('cover_color = ?');
     bindings.push(cleanColor(patch.coverColor));
   }
-  if ('isPublic' in patch) {
+  if (patch.isPublic !== undefined) {
     const v = typeof patch.isPublic === 'number'
       ? (patch.isPublic === 1 ? 1 : 0)
       : typeof patch.isPublic === 'boolean'
@@ -178,7 +179,7 @@ export function patchCollection(userId: number, collectionId: number, patch: {
     assignments.push("status = ?");
     bindings.push(v === 1 ? 'approved' : 'draft');
   }
-  if ('sortOrder' in patch) {
+  if (patch.sortOrder !== undefined) {
     const so = typeof patch.sortOrder === 'number' && Number.isInteger(patch.sortOrder)
       ? patch.sortOrder
       : null;
@@ -275,13 +276,10 @@ export function getCollectionStoriesPaged(
   const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
-      cs.name as catalog_star_name,
-      cs.chinese_name as catalog_star_chinese_name,
-      cs.color as catalog_star_color
+      COALESCE(scs.catalog_star_id, s.catalog_star_id) as catalog_star_id_resolved
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     LEFT JOIN story_catalog_stars scs ON scs.story_id = s.id AND scs.is_primary = 1
-    LEFT JOIN catalog_stars cs ON cs.id = scs.catalog_star_id
     WHERE s.collection_id = ?
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
@@ -301,11 +299,24 @@ export function getCollectionStoriesPaged(
     if (tagsArr.length === 0 && typeof s.tag === 'string' && s.tag.trim()) {
       tagsArr = [s.tag.trim()];
     }
+    const catalogId = s.catalog_star_id_resolved;
+    const meta = catalogId != null ? getCatalogStar(catalogId) : undefined;
+    const catalogStarName = meta?.name ? (meta.constellationCN ? `${meta.name}·${meta.constellationCN}座` : meta.name) : null;
+    // 简单 fallback 色温：根据视星等 mag 给一个暖色/白色（越亮越暖）
+    let catalogStarColor = '#ffffff';
+    if (meta?.mag != null) {
+      const m = meta.mag;
+      if (m < 0.5) catalogStarColor = '#fff3d6';
+      else if (m < 1.5) catalogStarColor = '#ffd98a';
+      else if (m < 2.5) catalogStarColor = '#e7e2ff';
+      else if (m < 3.5) catalogStarColor = '#cfd3ff';
+      else catalogStarColor = '#f0f0ff';
+    }
     return {
       ...s,
       tags: Array.from(new Set(tagsArr)),
-      catalogStarName: s.catalog_star_chinese_name || s.catalog_star_name || null,
-      catalogStarColor: s.catalog_star_color || '#ffffff',
+      catalogStarName,
+      catalogStarColor,
     };
   });
 
@@ -355,23 +366,34 @@ export function getCollectionStats(userId: number, collectionId: number):
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  const catalogs = db.prepare(`
+  const catalogRows = db.prepare(`
     SELECT COALESCE(scs.catalog_star_id, s.catalog_star_id) as cid,
-      cs.name as cname, cs.chinese_name as ccname, cs.color as ccolor,
       COUNT(DISTINCT s.id) as cnt
     FROM stars s
     LEFT JOIN story_catalog_stars scs ON scs.story_id = s.id AND scs.is_primary = 1
-    LEFT JOIN catalog_stars cs ON cs.id = COALESCE(scs.catalog_star_id, s.catalog_star_id)
     WHERE s.collection_id = ?
     GROUP BY cid
+    HAVING cid IS NOT NULL
     ORDER BY cnt DESC
     LIMIT 12
-  `).all(collectionId).map((r: any) => ({
-    catalogStarId: r.cid,
-    name: r.ccname || r.cname || null,
-    color: r.ccolor || null,
-    count: r.cnt,
-  }));
+  `).all(collectionId) as { cid: number; cnt: number }[];
+
+  const catalogs: CollectionStatsCatalog[] = catalogRows.map((r) => {
+    const meta = getCatalogStar(r.cid);
+    const name = meta?.name
+      ? (meta.constellationCN ? `${meta.name}·${meta.constellationCN}座` : meta.name)
+      : null;
+    let color = '#ffffff';
+    if (meta?.mag != null) {
+      const m = meta.mag;
+      if (m < 0.5) color = '#fff3d6';
+      else if (m < 1.5) color = '#ffd98a';
+      else if (m < 2.5) color = '#e7e2ff';
+      else if (m < 3.5) color = '#cfd3ff';
+      else color = '#f0f0ff';
+    }
+    return { catalogStarId: r.cid, name, color, count: r.cnt };
+  });
 
   return {
     ok: true,
