@@ -83,11 +83,11 @@
 
 | 文件 | 用途 |
 |---|---|
-| `seed.ts` | **冷启动数据注入**。23 条古诗/星座神话/社区语录初始数据 |
+| `seed.ts` | **冷启动数据注入**。历史星（type='history'）初始数据。共鸣/浏览计数用标题+内容的稳定哈希（FNV-1a）生成，**同一内容多次 seed 结果一致，不再 Math.random() 随机假数据**；浏览量按共鸣的 2.2~3.6x 自然比例写入。 |
 | `generateKernels.ts` | 故事内核（情感标签）批量生成 |
 | `generateAllAnalyses.ts` | **单星分析批量生成**。调用 starAnalysisAgent.runAll()：themehour SQL 聚合 + AI 三段文 / persona 画像 / emotion 情感故事摘录；支持 --ids/--limit/--only/--force/--throttle；对应脚本名 `npm run agent:analyze`；内核脚本为 `npm run agent:kernels` |
 | `migrate-origin.ts` | 数据迁移脚本（旧 origin 字段迁移） |
-| `seed_user_stories.ts` | 用户故事种子数据 |
+| `seed_user_stories.ts` | 用户故事种子数据（type='user'，30 颗星 × 2 条 = 60 条）。resonance_count 手写固定值；view_count 按标题+内容稳定哈希 × 2.0~3.0x 比例算出，保证多次 seed 稳定无随机。 |
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
 | **`AGENT_CONTROL.md`** | **Agent 控制手册**。Key 配置、冷启动、agent:kernels、agent:analyze 参数、幂等&安全、常见 401/429 排查、自动再生闭环、部署自检清单（**部署必读**） |
 | `fix-cids.mjs` | 修复 catalog_star_id 脏数据（历史迁移，异常场景才用） |

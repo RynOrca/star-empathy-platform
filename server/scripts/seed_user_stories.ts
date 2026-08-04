@@ -10,6 +10,22 @@ import { generatePosition } from '../src/utils/position';
  * 用法：npx tsx scripts/seed_user_stories.ts
  */
 
+/** 给用户故事算稳定 view_count：按 resonance_count 的 2.0~3.0 倍，
+ *  用标题+内容的小哈希扰动，保证每篇不同但同一内容再 seed 不变。 */
+function hash22(str: string): number {
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function computeViewCount(title: string, content: string, resonance: number): number {
+  const h = hash22(title + '\u0001' + content);
+  const ratio = 2.0 + (h % 100) / 100; // 2.00 ~ 2.99x
+  return Math.floor(resonance * ratio);
+}
+
 // ─── 清理旧数据 ───────────────────────────────────────────
 console.log('正在清除所有 type=user 的记录...');
 const del = db.prepare("DELETE FROM stars WHERE type = 'user'");
@@ -18,8 +34,8 @@ console.log('清除完成。');
 
 // ─── 插入模板 ─────────────────────────────────────────────
 const insert = db.prepare(
-  `INSERT INTO stars (type, title, content, resonance_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
-   VALUES ('user', ?, ?, ?, ?, ?, ?, ?, null)`
+  `INSERT INTO stars (type, title, content, resonance_count, view_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
+   VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, null)`
 );
 
 interface UserStory {
@@ -456,7 +472,8 @@ const stories: UserStory[] = [
 console.log(`正在插入 ${stories.length} 条用户故事...`);
 for (const row of stories) {
   const pos = generatePosition();
-  insert.run(row.title, row.content, row.resonance_count, pos.x, pos.y, pos.z, row.catalog_star_id);
+  const viewCount = computeViewCount(row.title, row.content, row.resonance_count);
+  insert.run(row.title, row.content, row.resonance_count, viewCount, pos.x, pos.y, pos.z, row.catalog_star_id);
 }
 console.log('插入完成。');
 

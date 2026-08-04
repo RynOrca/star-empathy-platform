@@ -88,15 +88,29 @@ const props = withDefaults(defineProps<{
   constellationName?: string
   starColor?: string
   persona?: PersonaPayload
+  /** 后端是否已完成此 catalog 星的整套分析生成（ready=true 表示 persona/emotion/themehour.note 都有了） */
+  analysisReady?: boolean
 }>(), {
   storyCount: 0,
   updatedAt: '刚刚生成',
   starName: '未知星',
   constellationName: '未知星座',
   starColor: '#ffd98a',
+  analysisReady: false,
 })
 
-const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
+/**
+ * 显示哪个分支的判断逻辑（必须与 AIRadarWordcloud / AIHeatmapThemes 一致，避免不同卡不同分支）：
+ *  1) hasReal=true（persona 完整）→ 展示真实数据
+ *  2) props.analysisReady=true 但 persona 缺失 → 说明后端判定"无分析/无法生成"→ 走 tooFewStories 空态（防止骨架无限转圈）
+ *  3) storyCount < 5 → 心事太少
+ *  4) 否则（ready=false 且 storyCount>=5 且 persona 不完整）→ 生成中骨架
+ */
+const tooFewStories = computed(() => {
+  if (hasReal.value) return false
+  if (props.analysisReady) return true
+  return (props.storyCount ?? 0) < 5
+})
 
 const hasReal = computed(() => {
   const p = props.persona

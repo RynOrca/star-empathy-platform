@@ -156,23 +156,40 @@ import type { ThemeHourPayload } from '../../composables/useStarAnalysis'
 const props = withDefaults(defineProps<{
   storyCount?: number
   themeHour?: ThemeHourPayload
-}>(), { storyCount: 0 })
+  /** 后端整套分析是否已生成（ready=true → 缺 note 也视为"生成完毕 直接展示已有的 SQL 聚合"，不再骨架转圈） */
+  analysisReady?: boolean
+}>(), { storyCount: 0, analysisReady: false })
 
-const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
+/**
+ * 空态分支判断（与 AIPersonaCard / AIRadarWordcloud 一致）：
+ *  1) hasForest / hasHour 任一满足 → 展示真实数据
+ *  2) analysisReady=true → 即便 AI 三段文缺，也不显示加载骨架，改走"心事太少"或展示（hasForest / hasHour 自身包含 analysisReady 的兜底：放宽判定）
+ *  3) storyCount < 5 → 心事太少
+ *  4) 否则 → 生成中骨架
+ */
+const tooFewStories = computed(() => {
+  if (hasForest.value || hasHour.value) return false
+  if (props.analysisReady) return true
+  return (props.storyCount ?? 0) < 5
+})
 
-// 故事数 >=5 且 themes>=2 + hourly 完整 + AI note（forestNote）已生成 → 算有真实数据
+// storyCount>=5 且 themes>=2 + hourly 完整 → 森林 / 时辰 能展示 SQL 聚合部分；
+// analysisReady=true 时即便 AI note（forestNote / peakText / lowText）没生成，也放宽为"有真实数据 直接展示"，避免骨架卡死。
 const hasForest = computed(() => {
   if (tooFewStories.value) return false
   const t = props.themeHour
   if (!t) return false
   if (!Array.isArray(t.themes) || t.themes.length < 2) return false
-  return !!forestNote.value?.length  // 必须 AI note 也生成了
+  // analysisReady=true 则 AI note 可能因某些原因缺失（降级），不再强制判空
+  if (props.analysisReady) return true
+  return !!forestNote.value?.length
 })
 const hasHour = computed(() => {
   if (tooFewStories.value) return false
   const t = props.themeHour
   if (!t) return false
   if (!Array.isArray(t.hourly) || t.hourly.length !== 24) return false
+  if (props.analysisReady) return true
   return !!(peakText.value?.length || lowText.value?.length)
 })
 

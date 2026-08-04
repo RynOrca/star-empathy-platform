@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory } from '../services/starService';
+import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory, getCatalogStarIdsForStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent, extractSuggestedTagsForContent } from '../services/kernel';
@@ -117,6 +117,15 @@ router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) =>
     if (!result) return notFound(res, '故事不存在');
     if (result.already) return ok(res, '已共鸣', result);
 
+    // 共鸣改变聚合分布 → 触发 catalog 级 AI 分析延迟再生
+    const affected = getCatalogStarIdsForStory(storyId);
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stories/resonate] 自动触发分析失败:', e); }
+      });
+    }
+
     ok(res, '共鸣已点亮', result);
   } catch (error) {
     console.error('POST /api/stories/:storyId/resonate error:', error);
@@ -143,9 +152,18 @@ router.delete('/:storyId', authRequired, (req: Request, res: Response) => {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
     const user = (req as Request & { user: { id: number } }).user;
+    // 先拿到受影响的 catalog 星（删除后连接表会被清空，必须在此之前查）
+    const affected = getCatalogStarIdsForStory(storyId);
     const result = deleteStory(storyId, user.id);
     if (result.notFound) return notFound(res, '故事不存在');
     if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    // 删除成功 → catalog 级 AI 分析需要重新生成（画像/主题/情感分布都要更新）
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stories/delete] 自动触发分析失败:', e); }
+      });
+    }
     ok(res, '已删除');
   } catch (error) {
     console.error('DELETE /api/stories/:storyId error:', error);
@@ -179,6 +197,15 @@ router.patch('/:storyId/kernel', (req: Request, res: Response) => {
     const { emotionalTags, essence, themes } = req.body;
     const updated = updateKernel(storyId, { emotionalTags, essence, themes });
     if (!updated) return notFound(res, '内核不存在，请先生成');
+
+    // 用户手动改了情感标签/主题 → catalog 级 persona / emotion / themhour 都可能变
+    const affected = getCatalogStarIdsForStory(storyId);
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stories/patch-kernel] 自动触发分析失败:', e); }
+      });
+    }
 
     ok(res, '内核已更新', updated);
   } catch (error) {

@@ -33,18 +33,21 @@
                   :constellationName="currentConstellation || '未知星座'"
                   :starColor="getStarColor(catalogStarId)"
                   :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
                 <AIRadarWordcloud
                   :storyCount="catalogStats?.storyCount ?? 0"
                   :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
                 <AIHeatmapThemes
                   :storyCount="catalogStats?.storyCount ?? 0"
                   :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <div class="narrative-bottom">
@@ -629,22 +632,27 @@
 
                     <!-- 🧠 AI 分析模块（1）星格画像 -->
                     <AIPersonaCard
+                      :storyCount="catalogStats?.storyCount ?? 0"
                       :updatedAt="analysisUpdatedText || '刚刚生成'"
                       :starName="currentStarName"
                       :constellationName="currentConstellation || '未知星座'"
                       :starColor="getStarColor(catalogStarId)"
                       :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
                     <AIRadarWordcloud
                       :storyCount="catalogStats?.storyCount ?? 0"
                       :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
                     <AIHeatmapThemes
+                      :storyCount="catalogStats?.storyCount ?? 0"
                       :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <div class="narrative-bottom">
@@ -1070,6 +1078,10 @@ const emit = defineEmits<{
   writeStory: []
   updateSimilarStars: [ids: number[]]
   deleteStory: [storyId: number]
+  /** 故事集合或权重发生了实质变动 → 父级可用于通知 SkyPage 做跨星同步
+   *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
+   */
+  storiesMutated: [kind: 'new' | 'delete' | 'resonate' | 'kernel-edit']
 }>()
 
 const router = useRouter()
@@ -1291,6 +1303,19 @@ const catalogStarIdRef = toRef(props, 'catalogStarId')
 const catalogStarIdNullable = computed<number | null>(() => catalogStarIdRef.value ?? null)
 const starAnalysis = useStarAnalysis(catalogStarIdNullable)
 
+/**
+ * 触发一次 AI 分析"就地刷新"：
+ *  - reset() 清除缓存 ready 标记
+ *  - fetchAnalysis() 立即拉一次并自动启动 3s × 20 次的 ready 轮询
+ * 所有会改变 catalog 级故事集合/权重分布的动作都应调用：新增故事 / 删除故事 / 共鸣成功 / 内核被用户修改
+ */
+function retriggerStarAnalysis() {
+  starAnalysis.reset()
+  if (catalogStarIdNullable.value) {
+    starAnalysis.fetchAnalysis()
+  }
+}
+
 // 从 persona 返回里取 updatedAt 文案（用服务端生成时间）
 const analysisUpdatedText = computed(() => {
   const t = starAnalysis.analysis.value?.generatedAt
@@ -1301,6 +1326,8 @@ const analysisUpdatedText = computed(() => {
   if (diff < 86400 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
   return new Date(t).toLocaleDateString('zh-CN')
 })
+// 传递给所有 AI 子卡的"ready 信号"：子卡用它判断"骨架是否还能一直转"，避免 ready=true 但卡片仍显示"生成中"
+const analysisReady = computed(() => starAnalysis.analysis.value?.ready ?? false)
 
 // 星名/元信息查找走共享工具（合并 stars.json 恒星 + planets.ts 行星），修复行星显示「恒星 #-100」(issue #135)
 function getStarName(catalogStarId: number): string {
@@ -1355,8 +1382,11 @@ function onResonate(story: { id: number; resonanceCount: number }) {
   const current = getDisplayResonance(story)
   resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
+  emit('storiesMutated', 'resonate')
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
+  // 共鸣改变故事权重分布 → 通知 composable 重置轮询，等后端异步重新生成完（15s debounce + 串行）就地刷新
+  retriggerStarAnalysis()
 }
 
 // ─── 删除故事 ───
@@ -1381,9 +1411,12 @@ async function doDeleteStory() {
     })
     if (res.ok) {
       emit('deleteStory', deletingStoryId.value)
+      emit('storiesMutated', 'delete')
       showDeleteConfirm.value = false
       deletingStoryId.value = null
       detailStoryId.value = null
+      // 删除改变故事集合 → 立即重新拉 analysis + 启动 ready 轮询
+      retriggerStarAnalysis()
     } else {
       const json = await res.json()
       alert(json.message || '删除失败')
