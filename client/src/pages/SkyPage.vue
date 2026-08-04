@@ -767,7 +767,8 @@ function focusOnQueryStar() {
     if (!info) return
     const tryFocus = () => {
       if (skyRef.value?.sky) {
-        onPlanetClick(bodyName, info.conName, starId, true)
+        // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
+        onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
       } else {
         setTimeout(tryFocus, 300)
       }
@@ -855,7 +856,8 @@ async function flyToStar(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    onPlanetClick(bodyName, info.conName, starId, true)
+    // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
+    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
     return
   }
   const star = catalogStarLookup.get(starId)
@@ -1310,7 +1312,8 @@ function onStarClick(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    onPlanetClick(bodyName, info.conName, starId, true)
+    // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
+    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
     return
   }
   const star = catalogStarLookup.get(starId); if (!star) return
