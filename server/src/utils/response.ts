@@ -20,6 +20,7 @@ export function send(
   data: any = null,
 ): void {
   res.status(status).json({
+    code: status,
     message,
     data: convertKeys(data),
   })
