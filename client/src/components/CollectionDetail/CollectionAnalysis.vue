@@ -74,28 +74,37 @@
         </div>
       </section>
 
-      <!-- 主题脉络 -->
-      <section class="ca-card ca-theme">
+      <!-- 星辰归属（替换原主题脉络：避免与情感光谱条形图重复） -->
+      <section class="ca-card ca-stars">
         <div class="ca-card-head">
-          <component :is="Workflow" :size="12" class="ca-ch-icon ca-ch-blue" />
-          <span class="ca-ch-title">主题脉络</span>
-          <span class="ca-ch-count">{{ themes.length }} 主题 · {{ themeTotal }} 条</span>
+          <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
+          <span class="ca-ch-title">星辰归属</span>
+          <span class="ca-ch-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
         </div>
-        <div class="ca-theme-body">
-          <div v-for="t in themes" :key="t.name" class="ca-theme-row">
-            <span class="ca-theme-name">{{ t.name }}</span>
-            <div class="ca-theme-bar">
-              <div
-                class="ca-theme-fill"
-                :style="{ width: (t.count / maxThemeCount * 100) + '%', background: t.color }"
-              ></div>
-            </div>
-            <span class="ca-theme-count">{{ t.count }}</span>
+        <div class="ca-stars-body">
+          <div
+            v-for="s in starBelongings"
+            :key="s.id"
+            class="ca-star-bubble"
+            :style="{
+              '--bubble-c': s.color,
+              fontSize: bubbleFontSize(s.count) + 'rem',
+            } as Record<string, string>"
+            :title="`${s.name}${s.con ? ' · ' + s.con : ''} · ${s.count} 篇`"
+          >
+            <span class="ca-star-bubble-name">{{ s.name }}</span>
+            <span class="ca-star-bubble-count">{{ s.count }}</span>
           </div>
-          <div class="ca-theme-flow">
-            <GitBranch :size="10" class="ca-flow-icon" />
-            <span>脉络：夜雨 → 故乡 → 独行 → 灯火，情绪由浓转淡</span>
+          <div v-if="starBelongings.length === 0" class="ca-stars-empty">
+            故事尚未挂上星辰
           </div>
+        </div>
+        <div class="ca-stars-insight">
+          <component :is="Orbit" :size="10" class="ca-stars-flow-icon" />
+          <span v-if="starBelongings.length > 0">
+            心事散落于 {{ starBelongings.length }} 颗星，最密处在「{{ starBelongings[0].name }}」
+          </span>
+          <span v-else>等待第一则心事找到它的星辰</span>
         </div>
       </section>
     </div>
@@ -244,24 +253,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  Sparkles, MoonStar, HeartPulse, Workflow, Clock3, Route, Flame, Heart,
-  CloudFog, Feather, Info, GitBranch,
+  Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
+  CloudFog, Feather, Info,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { getStarNameInfo } from '../../utils/starName'
 
 marked.setOptions({ breaks: true, gfm: true })
 
 const props = defineProps<{
   collectionName: string
   storyCount: number
-  /** 真实故事列表，用于共鸣榜（若为空则用 mock） */
+  /** 真实故事列表，用于共鸣榜与星辰归属（若为空则用 mock） */
   stories?: Array<{
     id: number
     title: string | null
     content: string
     resonanceCount: number
     createdAt: string
+    catalogStarId?: number | null
+    catalogStarIds?: number[]
   }>
 }>()
 
@@ -300,16 +312,38 @@ const topInsight = {
   desc: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
 }
 
-const themes = [
-  { name: '夜雨', count: 18, color: '#86a8ff' },
-  { name: '故乡', count: 14, color: '#95f0c0' },
-  { name: '独行', count: 11, color: '#caa7ff' },
-  { name: '灯火', count: 9, color: '#ffd98a' },
-  { name: '回忆', count: 7, color: '#ff8b7d' },
-  { name: '远方', count: 5, color: '#9ae6b4' },
-]
-const maxThemeCount = computed(() => Math.max(...themes.map(t => t.count), 1))
-const themeTotal = computed(() => themes.reduce((a, b) => a + b.count, 0))
+/** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数 */
+const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number }[]>(() => {
+  const map = new Map<number, number>()
+  for (const s of props.stories ?? []) {
+    const ids: number[] = []
+    if (s.catalogStarId != null) ids.push(s.catalogStarId)
+    if (Array.isArray(s.catalogStarIds)) ids.push(...s.catalogStarIds)
+    for (const id of Array.from(new Set(ids))) {
+      map.set(id, (map.get(id) ?? 0) + 1)
+    }
+  }
+  return Array.from(map.entries())
+    .map(([id, count]) => {
+      const info = getStarNameInfo(id)
+      return {
+        id,
+        name: info?.name ?? `星 ${id}`,
+        con: info?.con ?? '',
+        color: info?.color ?? '#86a8ff',
+        count,
+      }
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12)
+})
+const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
+/** 气泡字号：按故事数映射 0.62rem ~ 1.05rem */
+function bubbleFontSize(count: number): number {
+  const max = Math.max(1, ...starBelongings.value.map(s => s.count))
+  const ratio = max > 0 ? count / max : 0
+  return +(0.62 + ratio * 0.43).toFixed(2)
+}
 
 const hourly = [2, 1, 1, 0, 0, 1, 3, 5, 4, 3, 2, 2, 4, 3, 2, 1, 2, 3, 4, 6, 9, 12, 8, 5]
 const peakHour = 22
@@ -724,44 +758,48 @@ function kwColor(w: number) {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* ═══ 3. Theme ═══ */
-.ca-theme-body {
+/* ═══ 3. Stars Belonging（替换原 Theme，气泡云避免与情感光谱条形图重复）═══ */
+.ca-stars-body {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.ca-theme-row {
-  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 8px;
   align-items: center;
-  gap: 8px;
+  min-height: 60px;
+  padding: 4px 2px;
 }
-.ca-theme-name {
-  font-size: 0.72rem;
-  color: var(--ink-secondary);
-  width: 38px;
-  flex-shrink: 0;
-}
-.ca-theme-bar {
-  flex: 1;
-  height: 5px;
+.ca-star-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+  background: color-mix(in srgb, var(--bubble-c, #86a8ff) 10%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--bubble-c, #86a8ff) 28%, transparent);
+  color: var(--bubble-c, var(--ink-secondary));
+  line-height: 1.4;
+  transition: transform 0.15s, filter 0.15s;
+  cursor: default;
 }
-.ca-theme-fill {
-  height: 100%;
-  border-radius: 100px;
-  transition: width 0.5s ease;
+.ca-star-bubble:hover {
+  transform: translateY(-1px) scale(1.06);
+  filter: brightness(1.15);
 }
-.ca-theme-count {
-  font-size: 0.66rem;
-  color: var(--muted);
-  width: 22px;
-  text-align: right;
+.ca-star-bubble-name {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ca-star-bubble-count {
+  font-size: 0.6rem;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
 }
-.ca-theme-flow {
+.ca-stars-empty {
+  font-size: 0.7rem;
+  color: var(--muted-light);
+  font-style: italic;
+  padding: 8px 0;
+}
+.ca-stars-insight {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -774,7 +812,7 @@ function kwColor(w: number) {
   color: rgba(255, 255, 255, 0.5);
   line-height: 1.6;
 }
-.ca-flow-icon { color: #86a8ff; flex-shrink: 0; }
+.ca-stars-flow-icon { color: #86a8ff; flex-shrink: 0; }
 
 /* ═══ 4. Hour ═══ */
 .ca-hour-beads {
