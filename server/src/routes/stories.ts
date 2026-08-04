@@ -3,19 +3,21 @@ import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, reco
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent, extractSuggestedTagsForContent } from '../services/kernel';
+import { verifyCollectionOwnership, createCollection, getDefaultCollection, ensureDefaultCollection } from '../services/collectionService';
 
 const router = Router();
 
 // 获取所有故事（支持分页 ?page=&limit=，不传则返回全量）
-router.get('/', (req: Request, res: Response) => {
+router.get('/', authOptional, (req: Request, res: Response) => {
   try {
+    const currentUserId = (req as Request & { user?: { id: number } }).user?.id;
     const page = parseInt(req.query.page as string, 10);
     const limit = parseInt(req.query.limit as string, 10);
     if (!isNaN(page) && !isNaN(limit)) {
-      const paged = getAllStarsPaged(page, limit);
+      const paged = getAllStarsPaged(page, limit, currentUserId);
       ok(res, 'success', paged);
     } else {
-      const stories = getAllStars();
+      const stories = getAllStars(currentUserId);
       ok(res, 'success', stories);
     }
   } catch (error) {
@@ -41,7 +43,7 @@ router.get('/:storyId', (req: Request, res: Response) => {
 // 投递故事（需登录）
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, tags, isAnonymous, imageUrl } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, tags, isAnonymous, imageUrl, collectionId, collectionName, collectionVisibility } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -81,7 +83,28 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     const safeTags: string[] | undefined = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string') : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags);
+    // 合集归属处理：collectionId 优先（校验归属），其次 collectionName 便捷新建，
+    // 都没有则自动归入用户的默认合集（每个用户必有默认合集，确保故事不裸奔）
+    let finalCollectionId: number | undefined;
+    if (typeof collectionId === 'number') {
+      if (!verifyCollectionOwnership(collectionId, user.id)) {
+        return badRequest(res, '合集不存在或不属于当前用户');
+      }
+      finalCollectionId = collectionId;
+    } else if (typeof collectionName === 'string' && collectionName.trim()) {
+      const visi = typeof collectionVisibility === 'string' && ['public', 'private'].includes(collectionVisibility)
+        ? collectionVisibility as 'public' | 'private'
+        : undefined;
+      const created = createCollection(user.id, { name: collectionName.trim(), visibility: visi });
+      if (created.error) return badRequest(res, created.error);
+      finalCollectionId = created.collection?.id;
+    } else {
+      // 无指定合集 → 自动归入默认合集
+      const def = ensureDefaultCollection(user.id);
+      finalCollectionId = def?.id;
+    }
+
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags, finalCollectionId);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {
