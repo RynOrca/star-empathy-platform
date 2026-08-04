@@ -767,8 +767,9 @@ function focusOnQueryStar() {
     if (!info) return
     const tryFocus = () => {
       if (skyRef.value?.sky) {
-        // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
-        onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+        // 从收藏卡/URL query 跳转：行星可能不在视野，必须 focusOnPlanet 定位
+        // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
+        onPlanetClick(bodyName, info.conName, starId, true)
       } else {
         setTimeout(tryFocus, 300)
       }
@@ -856,8 +857,9 @@ async function flyToStar(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
-    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+    // 从搜索结果跳转：行星可能不在视野，必须 focusOnPlanet 定位
+    // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
+    onPlanetClick(bodyName, info.conName, starId, true)
     return
   }
   const star = catalogStarLookup.get(starId)
@@ -867,6 +869,13 @@ async function flyToStar(starId: number) {
 }
 
 function locateStar(starId: number) {
+  // 负 id = 行星，调 focusOnPlanet 定位（会进入特写，但用户点击了「定位」按钮属预期行为）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName || !skyRef.value?.sky) return
+    skyRef.value.sky.focusOnPlanet(bodyName)
+    return
+  }
   const star = catalogStarLookup.get(starId)
   if (!star || !skyRef.value?.sky) return
   // 平滑转动相机，以该星为中心（不打开详情面板）
@@ -1312,8 +1321,9 @@ function onStarClick(starId: number) {
     if (!bodyName) return
     const info = PLANET_INFO[bodyName]
     if (!info) return
-    // 移动端不进入行星特写（与 issue #134 设计一致），仅打开故事面板
-    onPlanetClick(bodyName, info.conName, starId, !isMobile.value)
+    // 从 fly-to-star CustomEvent 跳转：行星可能不在视野，必须 focusOnPlanet 定位
+    // enterCloseup=true（PC 移动端均进入特写，issue #134 的 false 仅用于「凝听星语」按钮已吸附入口）
+    onPlanetClick(bodyName, info.conName, starId, true)
     return
   }
   const star = catalogStarLookup.get(starId); if (!star) return
