@@ -1261,6 +1261,8 @@ const snappedLabel = ref<string>('')
 // issue #135：定位结果目标（独立于 snap 机制，解决程序化 snap 后按钮不显示的 bug）
 // 定位/搜索跳转后直接设置此状态驱动按钮显示，不依赖 pointermove snap 触发
 const locatedTarget = ref<SnapTarget | null>(null)
+// issue #136：点击「凝听星语」时保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示
+const lastEnteredTarget = ref<SnapTarget | null>(null)
 
 function onSnapChange(target: SnapTarget | null) {
   console.log('[onSnapChange] target=', target)
@@ -1289,6 +1291,8 @@ function onSnapChange(target: SnapTarget | null) {
 function onStoryEnterClick() {
   const target = locatedTarget.value || snappedTarget.value
   if (!target) return
+  // 保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示（移动端视角没动时按钮应保持可用）
+  lastEnteredTarget.value = target
   // 清除定位目标和吸附状态
   locatedTarget.value = null
   skyRef.value?.sky?.releaseSnap?.()
@@ -1635,7 +1639,7 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; planetObserveMode.value = false; skyRef.value?.sky?.setObserveMode(false); skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; planetObserveMode.value = false; skyRef.value?.sky?.setObserveMode(false); skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup(); if (lastEnteredTarget.value && isMobile.value) { locatedTarget.value = lastEnteredTarget.value; lastEnteredTarget.value = null } }
 // PC 端行星特写 · 切换观察模式（issue #136）
 // true：隐藏故事面板露出行星，禁止 hover/点击，只允许拖动/缩放观察
 // false：回到故事界面，恢复正常交互

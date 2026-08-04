@@ -3943,6 +3943,11 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
       }
+      // 取消 releaseSnap 的 FOV 恢复动画，避免与飞行动画竞争修改 camera.fov 导致视角抖动
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
 
       const starLocal = new Vector3(x, y, z)
       const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
