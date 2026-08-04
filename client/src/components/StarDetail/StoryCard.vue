@@ -43,17 +43,30 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
     <div
-      v-if="displayTags.length"
-      class="story-tags-row"
+      v-if="displayTags.length || collectionName"
+      class="story-tags-wrap"
     >
-      <span
-        v-for="t in displayTags"
-        :key="'tag-' + story.id + '-' + t"
-        class="story-tag story-tag-inline"
-        :style="tagStyle(t)"
-      >#{{ t }}</span>
+      <div class="story-foot-left">
+        <template v-if="collectionName">
+          <span class="story-coll" :title="`所属合集：${collectionName}`">
+            <span class="story-coll-dot" :style="{ background: collectionCoverColor || '#caa7ff' }"></span>
+            <span class="story-coll-name">{{ shortCollName(collectionName) }}</span>
+          </span>
+        </template>
+        <div
+          v-if="displayTags.length"
+          class="story-tags-row"
+        >
+          <span
+            v-for="t in displayTags"
+            :key="'tag-' + story.id + '-' + t"
+            class="story-tag story-tag-inline"
+            :style="tagStyle(t)"
+          >#{{ t }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="story-meta">
@@ -97,6 +110,7 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -107,6 +121,8 @@ const props = defineProps<{
   formattedTime?: string
   formattedDistance?: { text: string; near: boolean } | null
   index: number
+  collectionName?: string | null
+  collectionCoverColor?: string | null
 }>()
 
 defineEmits<{
@@ -136,6 +152,14 @@ function tagStyle(tag: string): Record<string, string> {
   const border = `hsla(${h}, 62%, 74%, 0.24)`
   const bg = `hsla(${h}, 62%, 74%, 0.07)`
   return { color, borderColor: border, backgroundColor: bg, border: '0.5px solid ' + border }
+}
+
+/** 合集名截断：超过 max 加省略号 */
+function shortCollName(name: string | null | undefined, max = 8): string {
+  if (!name) return ''
+  const n = name.trim()
+  if (n.length <= max) return n
+  return n.slice(0, max) + '…'
 }
 </script>
 
@@ -277,15 +301,50 @@ function tagStyle(tag: string): Record<string, string> {
   transform: translateY(-0.3px);
 }
 .story-tag-inline:first-child { margin-left: 0; }
-.story-tags-row {
-  display: flex; flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 7px;
+.story-tags-wrap {
   margin-top: 6px;
   margin-bottom: 6px;
   padding: 6px 2px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
+}
+.story-foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.story-coll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.07);
+  border: 1px solid rgba(202, 167, 255, 0.22);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: rgba(242, 236, 255, 0.84);
+  max-width: 170px;
+  white-space: nowrap;
+}
+.story-coll-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
+}
+.story-coll-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.story-tags-row {
+  display: flex; flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
 }
 
 /* ─── Story Image ─── */

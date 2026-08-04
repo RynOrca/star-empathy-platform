@@ -101,17 +101,32 @@
                       <div class="card-body">
                         <div class="card-title" v-if="s.title">{{ s.title }}</div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                        <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
                         <div
-                          v-if="storyDisplayTags(s).length"
-                          class="card-tags card-tags-inline"
+                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                          class="card-tags-wrap"
                         >
-                          <span
-                            v-for="t in storyDisplayTags(s)"
-                            :key="'top-' + s.id + '-' + t"
-                            class="story-tag story-tag-inline"
-                            :style="storyTagStyle(t)"
-                          >#{{ t }}</span>
+                          <div class="card-foot-left">
+                            <span
+                              v-if="getStoryCollection(s)"
+                              class="card-coll"
+                              :title="`所属合集：${getStoryCollection(s)!.name}`"
+                            >
+                              <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </span>
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'top-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
+                          </div>
                         </div>
                         <div class="card-meta">
                           <HeartIcon :size="10" />
@@ -154,17 +169,32 @@
                           </div>
                         </div>
                         <div class="card-summary">{{ storySummary(s.content) }}</div>
-                        <!-- 标签行：正文下方、meta 上方；空时隐藏 -->
+                        <!-- 标签行：正文下方、meta 上方；空时隐藏；左侧展示所属合集 -->
                         <div
-                          v-if="storyDisplayTags(s).length"
-                          class="card-tags card-tags-inline"
+                          v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                          class="card-tags-wrap"
                         >
-                          <span
-                            v-for="t in storyDisplayTags(s)"
-                            :key="'card-' + s.id + '-' + t"
-                            class="story-tag story-tag-inline"
-                            :style="storyTagStyle(t)"
-                          >#{{ t }}</span>
+                          <div class="card-foot-left">
+                            <span
+                              v-if="getStoryCollection(s)"
+                              class="card-coll"
+                              :title="`所属合集：${getStoryCollection(s)!.name}`"
+                            >
+                              <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                              <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                            </span>
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'card-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -718,17 +748,32 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
                             <div
-                              v-if="storyDisplayTags(s).length"
-                              class="card-tags card-tags-inline"
+                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                              class="card-tags-wrap"
                             >
-                              <span
-                                v-for="t in storyDisplayTags(s)"
-                                :key="'topm-' + s.id + '-' + t"
-                                class="story-tag story-tag-inline"
-                                :style="storyTagStyle(t)"
-                              >#{{ t }}</span>
+                              <div class="card-foot-left">
+                                <span
+                                  v-if="getStoryCollection(s)"
+                                  class="card-coll"
+                                  :title="`所属合集：${getStoryCollection(s)!.name}`"
+                                >
+                                  <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                                  <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                </span>
+                                <div
+                                  v-if="storyDisplayTags(s).length"
+                                  class="card-tags card-tags-inline"
+                                >
+                                  <span
+                                    v-for="t in storyDisplayTags(s)"
+                                    :key="'topm-' + s.id + '-' + t"
+                                    class="story-tag story-tag-inline"
+                                    :style="storyTagStyle(t)"
+                                  >#{{ t }}</span>
+                                </div>
+                              </div>
                             </div>
                             <div class="card-meta">
                               <HeartIcon :size="10" />
@@ -758,17 +803,32 @@
                           <div class="card-body">
                             <div class="card-title" v-if="s.title">{{ s.title }}</div>
                             <div class="card-summary">{{ storySummary(s.content) }}</div>
-                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏；左侧展示所属合集 -->
                             <div
-                              v-if="storyDisplayTags(s).length"
-                              class="card-tags card-tags-inline"
+                              v-if="getStoryCollection(s) || storyDisplayTags(s).length"
+                              class="card-tags-wrap"
                             >
-                              <span
-                                v-for="t in storyDisplayTags(s)"
-                                :key="'l-' + s.id + '-' + t"
-                                class="story-tag story-tag-inline"
-                                :style="storyTagStyle(t)"
-                              >#{{ t }}</span>
+                              <div class="card-foot-left">
+                                <span
+                                  v-if="getStoryCollection(s)"
+                                  class="card-coll"
+                                  :title="`所属合集：${getStoryCollection(s)!.name}`"
+                                >
+                                  <span class="card-coll-dot" :style="{ background: getStoryCollection(s)!.coverColor || '#caa7ff' }"></span>
+                                  <span class="card-coll-name">{{ shortCollName(getStoryCollection(s)!.name) }}</span>
+                                </span>
+                                <div
+                                  v-if="storyDisplayTags(s).length"
+                                  class="card-tags card-tags-inline"
+                                >
+                                  <span
+                                    v-for="t in storyDisplayTags(s)"
+                                    :key="'l-' + s.id + '-' + t"
+                                    class="story-tag story-tag-inline"
+                                    :style="storyTagStyle(t)"
+                                  >#{{ t }}</span>
+                                </div>
+                              </div>
                             </div>
                             <div class="card-meta">
                               <ClockIcon :size="10" class="meta-clock" />
@@ -1029,6 +1089,24 @@ function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | n
   const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
   if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
   return s.tag ? [s.tag] : []
+}
+
+/** 根据 story.collection_id 从我的合集列表找合集元信息，返回 { name, coverColor } 或 null */
+function getStoryCollection(s: any): { name: string; coverColor: string } | null {
+  if (!s || s.collection_id == null) return null
+  const cid = Number(s.collection_id)
+  if (!cid || !Array.isArray(collections.list.value)) return null
+  const c = collections.list.value.find((x) => x.id === cid)
+  if (!c) return null
+  return { name: c.name || '未命名合集', coverColor: c.coverColor || '#caa7ff' }
+}
+
+/** 合集名截断：超过 max 加省略号 */
+function shortCollName(name: string | null | undefined, max = 8): string {
+  if (!name) return ''
+  const n = name.trim()
+  if (n.length <= max) return n
+  return n.slice(0, max) + '…'
 }
 /** Star 详情展示区的标签（type = emotion/theme/custom 都用） */
 function infoTagStyle(tag: string, type: 'emotion' | 'theme' | 'custom'): Record<string, string> {
@@ -2275,17 +2353,52 @@ watch(() => props.catalogStarId, () => {
 .meta-user {
   color: rgba(255, 255, 255, 0.35);
 }
-/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更紧凑 */
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 7px;
+/* 卡片标签区外层：正文下方 / meta 上方，上下虚线分隔更紧凑；含合集+标签 */
+.card-tags-wrap {
   margin-top: 5px;
   margin-bottom: 5px;
   padding: 5px 1px;
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
+}
+.card-foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.card-coll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.07);
+  border: 1px solid rgba(202, 167, 255, 0.22);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: rgba(242, 236, 255, 0.84);
+  max-width: 160px;
+  white-space: nowrap;
+}
+.card-coll-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
+}
+.card-coll-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
 }
 /* meta 行内嵌式标签（向后兼容但不作为默认视觉） */
 .card-tags-inline {
