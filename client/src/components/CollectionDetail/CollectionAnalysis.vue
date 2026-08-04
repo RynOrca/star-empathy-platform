@@ -153,29 +153,36 @@
       </div>
     </section>
 
-    <!-- ═══ 5. 情感轨迹（故事序列）═══ -->
+    <!-- ═══ 5. 情感轨迹（故事序列，限高滚动+渐隐）═══ -->
     <section class="ca-card ca-trajectory">
       <div class="ca-card-head">
         <component :is="Route" :size="12" class="ca-ch-icon ca-ch-green" />
         <span class="ca-ch-title">情感轨迹</span>
-        <span class="ca-ch-count">逐则心事 · 情绪流转</span>
+        <span class="ca-ch-count">逐则心事 · 情绪流转 · {{ trajectory.length }} 则</span>
+        <button
+          v-if="trajectory.length > 3"
+          class="ca-traj-toggle"
+          @click="trajExpanded = !trajExpanded"
+        >{{ trajExpanded ? '收起' : '展开' }}</button>
       </div>
-      <div class="ca-traj-body">
-        <div class="ca-traj-line"></div>
-        <div
-          v-for="(p, i) in trajectory"
-          :key="i"
-          class="ca-traj-node"
-          :style="{ '--node-color': p.color } as Record<string, string>"
-        >
-          <div class="ca-traj-dot" :style="{ background: p.color, boxShadow: `0 0 8px ${p.color}aa` }"></div>
-          <div class="ca-traj-card">
-            <div class="ca-traj-head">
-              <span class="ca-traj-emo" :style="{ color: p.color }">{{ p.emotion }}</span>
-              <span class="ca-traj-date">{{ p.date }}</span>
+      <div class="ca-traj-scroll" :class="{ expanded: trajExpanded }">
+        <div class="ca-traj-body">
+          <div class="ca-traj-line"></div>
+          <div
+            v-for="(p, i) in trajectory"
+            :key="i"
+            class="ca-traj-node"
+            :style="{ '--node-color': p.color } as Record<string, string>"
+          >
+            <div class="ca-traj-dot" :style="{ background: p.color, boxShadow: `0 0 8px ${p.color}aa` }"></div>
+            <div class="ca-traj-card">
+              <div class="ca-traj-head">
+                <span class="ca-traj-emo" :style="{ color: p.color }">{{ p.emotion }}</span>
+                <span class="ca-traj-date">{{ p.date }}</span>
+              </div>
+              <div class="ca-traj-title">{{ p.title }}</div>
+              <div class="ca-traj-snippet">{{ p.snippet }}</div>
             </div>
-            <div class="ca-traj-title">{{ p.title }}</div>
-            <div class="ca-traj-snippet">{{ p.snippet }}</div>
           </div>
         </div>
       </div>
@@ -251,7 +258,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
   CloudFog, Feather, Info,
@@ -344,6 +351,9 @@ function bubbleFontSize(count: number): number {
   const ratio = max > 0 ? count / max : 0
   return +(0.62 + ratio * 0.43).toFixed(2)
 }
+
+// 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
+const trajExpanded = ref(false)
 
 const hourly = [2, 1, 1, 0, 0, 1, 3, 5, 4, 3, 2, 2, 4, 3, 2, 1, 2, 3, 4, 6, 9, 12, 8, 5]
 const peakHour = 22
@@ -885,7 +895,41 @@ function kwColor(w: number) {
   color: rgba(255, 255, 255, 0.48);
 }
 
-/* ═══ 5. Trajectory ═══ */
+/* ═══ 5. Trajectory（限高滚动+渐隐+展开） ═══ */
+.ca-traj-toggle {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  color: var(--accent);
+  background: rgba(255, 217, 138, 0.08);
+  border: 0.5px solid rgba(255, 217, 138, 0.2);
+  border-radius: 100px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.ca-traj-toggle:hover { background: rgba(255, 217, 138, 0.16); }
+.ca-traj-scroll {
+  max-height: 210px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  /* 底部渐隐遮罩，提示可滚动 */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 calc(100% - 28px), transparent 100%);
+  transition: max-height 0.3s ease;
+  padding-right: 4px;
+}
+.ca-traj-scroll.expanded {
+  max-height: 1200px;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.ca-traj-scroll::-webkit-scrollbar { width: 3px; }
+.ca-traj-scroll::-webkit-scrollbar-track { background: transparent; }
+.ca-traj-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
 .ca-traj-body {
   position: relative;
   display: flex;
