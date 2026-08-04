@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -75,8 +75,8 @@
         <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
-        <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
-        <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+        <!-- 用户：普通用户进个人主页合集区（直接定位我的合集），访客（体验账号）跳登录页 -->
+        <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile#pd-collections')" title="个人中心 · 我的合集">
           <User :size="18" />
         </button>
         <button v-if="!username || isGuest" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
