@@ -18,6 +18,7 @@ import chatRouter from './routes/chat';
 import moonRouter from './routes/moon';
 import locationRouter from './routes/location';
 import analysisRouter from './routes/analysis';
+import collectionsRouter from './routes/collections';
 import { ok, badRequest, serverError } from './utils/response';
 import { authRequired } from './middleware/auth';
 import { setApiKey, getApiKey } from './services/deepseek';
@@ -199,6 +200,12 @@ app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// 故事合集（星笺）：故事的唯一系列标识
+app.post('/api/collections', writeLimiter);
+app.patch('/api/collections/:id', writeLimiter);
+app.delete('/api/collections/:id', writeLimiter);
+app.use('/api/collections', collectionsRouter);
 
 // 月相解读
 app.use('/api/moon', moonRouter);
