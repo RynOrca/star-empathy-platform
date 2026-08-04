@@ -233,6 +233,7 @@
 |---|---|
 | `2026-07-31-personal-space-ui-style-d-design.md` | **个人空间界面优化设计规范**。Style D（叙事沉浸式）完整 Spec：美学方向、颜色 token、字体层级、4 大段结构、交互流程、数据/API 映射、响应式规则、无障碍、验收清单 |
 | `2026-08-02-mobile-login-and-story-button-design.md` | **移动端登录页适配 + 凝听星语按钮设计规范**（issue #124）。登录页可滚动 + 移动端进入故事改用底部「凝听星语」按钮（吸附星辰后滑入）替代触屏点击 |
+| `2026-08-04-story-collection-folio-design.md` | **故事合集（星笺）设计规范**。合集=故事唯一系列标识（非收藏夹）：`collections` 表 + `stars.collection_id` 列；投递故事时选合集；合集 `visibility` 决定内含故事可见性（public/private）；与 favorites/星星归属正交。含数据模型、API、可见性过滤逻辑、前端模块、P1–P4 路线图与验收清单 |
 
 ### 实现计划 `docs/superpowers/plans/`
 
