@@ -124,9 +124,21 @@ const emit = defineEmits<{
   'resonate': [story: any]
 }>()
 
-function getStoryCollection(story: { collectionId?: number | null }): Collection | null {
-  if (!story.collectionId || !collections.list.value.length) return null
-  return collections.list.value.find((c: Collection) => c.id === story.collectionId) || null
+/**
+ * 根据 story.collectionId / collection_id 双命名找合集元信息。
+ * 注意：必须在函数开头主动读取一次 collections.list.value（即使逻辑上后面才用），
+ *       让 Vue 模板调用时把合集列表收集为响应式依赖 —— 否则首次渲染 fetchList 还没返回，
+ *       全返回 null，等异步回来也不会重渲染。
+ */
+function getStoryCollection(story: { collectionId?: number | null; collection_id?: number | null }): Collection | null {
+  // 1. 先主动读一次，强制依赖收集
+  const list = collections.list.value
+  // 2. 兼容 snake_case / camelCase 双字段
+  const cidRaw = (story as any).collectionId ?? (story as any).collection_id
+  if (cidRaw == null) return null
+  const cid = Number(cidRaw)
+  if (!cid || !Array.isArray(list) || list.length === 0) return null
+  return list.find((c: Collection) => c.id === cid) || null
 }
 
 const sortLabels: Record<SortKey, string> = {
