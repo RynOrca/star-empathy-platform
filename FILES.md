@@ -93,6 +93,8 @@
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
 | **`AGENT_CONTROL.md`** | **Agent 控制手册**。Key 配置、冷启动、agent:kernels、agent:analyze 参数、幂等&安全、常见 401/429 排查、自动再生闭环、部署自检清单（**部署必读**） |
 | `fix-cids.mjs` | 修复 catalog_star_id 脏数据（历史迁移，异常场景才用） |
+| `e2e_collections_test.mjs` | **合集接口端到端集成测试**。12 步覆盖：注册/登录→默认合集字段→创建合集→PATCH→投故事→移故事→合集统计→故事列表→删除合集→默认合集防删。运行：`node scripts/e2e_collections_test.mjs`（要求后端 `npm run dev` 已在 :3000 运行）。 |
+| `e2e_full_collection_flow.mjs` | **合集全流程端到端验证**（模拟前端真实请求路径，代替浏览器调试）。18 步 100% 对齐前端代码：注册→auth/me→/mine(1条默认)→创建→/mine(2条默认最顶)→stats→stories分页→PATCH改名清空描述→投故事挂默认→move-story→移动后stats(计数+标签聚合)→默认storyCount=0→故事分页有内容→删除非默认合集→/mine回到1条→故事自动迁回默认→默认防删400。要求后端 `npm run dev` 在 :3000 运行；运行：`node scripts/e2e_full_collection_flow.mjs` |
 
 ### AI 分析 Agent `src/agents/`
 
