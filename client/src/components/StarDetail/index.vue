@@ -191,6 +191,8 @@
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
             />
             <StoryList
               v-else
@@ -226,6 +228,8 @@
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
             />
             <StoryList
               v-else
@@ -272,6 +276,8 @@
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
             />
             <StoryList
               v-else
@@ -891,6 +897,8 @@
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
+                :collection-clickable="true"
+                @collection-click="onCollectionClick"
               />
             </div>
           </div>
@@ -1064,6 +1072,7 @@ const props = defineProps<{
     collectionName?: string | null
     collectionCoverColor?: string | null
     collectionVisibility?: string | null
+    collectionStoryCount?: number | null
   }>
   activeIndex: number
   starInfo: { id: number; displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -1100,6 +1109,8 @@ const emit = defineEmits<{
   storiesMutated: [kind: 'new' | 'delete' | 'resonate' | 'kernel-edit']
   /** PC 端行星特写：点击 overlay 空白切换观察模式（隐藏故事面板露出行星） */
   toggleObserve: []
+  /** 合集徽章点击：透传合集信息给父组件，由父组件决定如何展示合集内所有故事 */
+  'collection-click': [data: { collectionId: number; collectionName: string | null }]
 }>()
 
 const router = useRouter()
@@ -1506,6 +1517,19 @@ function openStoryDetail(story: { id: number }) {
     .catch(() => {
       viewCountOverrides.set(story.id, current)
     })
+}
+
+/**
+ * 合集徽章点击：透传合集信息给父组件（SkyPage）。
+ * 具体的合集详情视图（展示合集内所有故事）暂未实现，由父组件后续接入。
+ */
+function onCollectionClick(story: any) {
+  if (story?.collectionId != null) {
+    emit('collection-click', {
+      collectionId: story.collectionId,
+      collectionName: story.collectionName ?? null,
+    })
+  }
 }
 
 // ─── 时间格式化 ───

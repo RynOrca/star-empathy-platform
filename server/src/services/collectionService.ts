@@ -81,7 +81,17 @@ export function getCollectionDetail(id: number, currentUserId?: number): any | n
   if (!row) return null;
   if (row.visibility === 'private' && row.user_id !== currentUserId) return null;
   const stories = getStoriesByCollectionId(id);
-  return { ...attachStoryCount([row])[0], stories };
+  // 收藏数：合集故事所属 catalog star 被收藏的总次数（含 story_catalog_stars 多对多绑定）
+  const favRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM favorites
+    WHERE catalog_star_id IN (
+      SELECT DISTINCT catalog_star_id FROM stars WHERE collection_id = ? AND catalog_star_id IS NOT NULL
+      UNION
+      SELECT DISTINCT scs.catalog_star_id FROM story_catalog_stars scs
+      JOIN stars s ON s.id = scs.story_id WHERE s.collection_id = ?
+    )
+  `).get(id, id) as { cnt: number };
+  return { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories };
 }
 
 // 编辑合集（owner 校验）

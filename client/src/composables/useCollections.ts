@@ -16,6 +16,8 @@ export interface Collection {
 
 export interface CollectionDetail extends Collection {
   stories: any[]
+  /** 合集故事所属 catalog star 被收藏的总次数 */
+  favoriteCount: number
 }
 
 export interface CreateCollectionInput {

@@ -51,6 +51,7 @@
         :formattedDistance="variant !== 'history' && formattedDistance ? formattedDistance(story) : undefined"
         :index="index"
         :collectionClickable="collectionClickable"
+        :showStarBelonging="showStarBelonging"
         @click="$emit('story-click', story)"
         @resonate="$emit('resonate', story)"
         @collection-click="$emit('collection-click', story)"
@@ -114,6 +115,8 @@ const props = defineProps<{
   formattedDistance?: (story: any) => { text: string; near: boolean } | null
   /** 合集 Badge 是否可点击；透传给 StoryCard */
   collectionClickable?: boolean
+  /** 合集上下文：显示星星归属而非合集徽章；透传给 StoryCard */
+  showStarBelonging?: boolean
 }>()
 
 const emit = defineEmits<{

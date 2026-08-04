@@ -43,22 +43,32 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 合集 + 标签行：合集在左、标签在右，同一行；两者都空时隐藏 -->
+    <!-- 合集 / 星星归属 + 标签行：左侧归属、右侧标签，同一行；两者都空时隐藏 -->
     <div
-      v-if="story.collectionName || displayTags.length"
+      v-if="(showStarBelonging && starBelonging) || story.collectionName || displayTags.length"
       class="story-tags-row"
     >
-      <!-- 合集徽章（左侧） -->
+      <!-- 星星归属（合集上下文：显示挂在哪颗星上） -->
+      <span
+        v-if="showStarBelonging && starBelonging"
+        class="story-star-belong"
+        :style="{ '--ssb-c': starBelonging.color } as Record<string, string>"
+      >
+        <StarIcon :size="11" class="ssb-icon" />
+        <span class="ssb-name">{{ starBelonging.name }}</span>
+        <span v-if="starBelonging.con" class="ssb-con">· {{ starBelonging.con }}</span>
+      </span>
+      <!-- 合集徽章（非合集上下文） -->
       <CollectionBadge
-        v-if="story.collectionName"
+        v-else-if="story.collectionName"
         :collection-name="story.collectionName"
         :cover-color="story.collectionCoverColor ?? null"
         :collection-visibility="story.collectionVisibility ?? null"
         :clickable="!!story.collectionId && !!collectionClickable"
-        @click.stop="collectionClickable && $emit('collection-click', story)"
+        @click="collectionClickable && $emit('collection-click', story)"
       />
-      <!-- 分隔点：合集和标签同时存在时 -->
-      <span v-if="story.collectionName && displayTags.length" class="story-tag-sep"></span>
+      <!-- 分隔点：归属/合集和标签同时存在时 -->
+      <span v-if="(showStarBelonging ? !!starBelonging : !!story.collectionName) && displayTags.length" class="story-tag-sep"></span>
       <!-- 标签（右侧） -->
       <span
         v-for="t in displayTags"
@@ -93,13 +103,15 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { Sparkles, Check, Eye, Star } from 'lucide-vue-next'
 import { computed } from 'vue'
 import CollectionBadge from '../CollectionBadge.vue'
+import { getStarNameInfo } from '../../utils/starName'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
+const StarIcon = Star
 
 const props = defineProps<{
   story: {
@@ -114,6 +126,8 @@ const props = defineProps<{
     collectionName?: string | null
     collectionCoverColor?: string | null
     collectionVisibility?: string | null
+    catalogStarId?: number | null
+    catalogStarIds?: number[]
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -126,6 +140,8 @@ const props = defineProps<{
   index: number
   /** 合集 Badge 是否可点击打开合集详情；默认 false（仅展示） */
   collectionClickable?: boolean
+  /** 合集上下文：显示星星归属（挂在哪颗星上）而非合集徽章 */
+  showStarBelonging?: boolean
 }>()
 
 defineEmits<{
@@ -139,6 +155,13 @@ const displayTags = computed<string[]>(() => {
   const arr = Array.isArray(props.story.tags) ? props.story.tags.filter((t) => !!t) : []
   if (arr.length) return arr.slice(0, 5)
   return props.story.tag ? [props.story.tag] : []
+})
+
+/** 星星归属：取主星 catalogStarId，否则 catalogStarIds[0]；查 stars.json/planets 取名+星座+颜色 */
+const starBelonging = computed(() => {
+  const id = props.story.catalogStarId ?? props.story.catalogStarIds?.[0]
+  if (id == null) return null
+  return getStarNameInfo(id) ?? null
 })
 
 /** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
@@ -316,6 +339,24 @@ function tagStyle(tag: string): Record<string, string> {
   flex-shrink: 0;
   margin: 0 2px;
 }
+
+/* ── 星星归属（合集上下文） ── */
+.story-star-belong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  padding: 2px 9px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--ssb-c, #fff) 8%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--ssb-c, #fff) 22%, transparent);
+  color: var(--ssb-c, var(--ink-secondary));
+  flex-shrink: 0;
+  line-height: 1.45;
+}
+.ssb-icon { opacity: 0.85; flex-shrink: 0; }
+.ssb-name { font-weight: 500; }
+.ssb-con { opacity: 0.6; font-size: 0.64rem; }
 
 /* ─── Story Image ─── */
 .story-image {
