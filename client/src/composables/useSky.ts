@@ -344,7 +344,7 @@ export function useSky(
   // ═══ 行星实时位置更新器（参考 NASA Eyes / Stellarium：每帧重算位置） ═══
   // astronomy-engine Equator() 单次 ~50-100μs，9 颗行星 × 60fps ≈ 3-5% CPU，可接受
   // 闭包缓存 AE 模块避免重复动态 import；planetUpdaters 存 tiltGroup 引用 + body 名
-  type PlanetUpdater = { tiltGroup: Group; bodyName: string; mesh: Mesh; haloSprite?: Sprite; color: number; size: number }
+  type PlanetUpdater = { tiltGroup: Group; bodyName: string; mesh: Mesh; haloSprite?: Sprite; color: number; size: number; glows?: Object3D[] }
   const planetUpdaters: PlanetUpdater[] = []
   // ═══ 特写状态机（closeup） ═══
   // IDLE: 自由浏览天球，相机在原点，near=DEFAULT_NEAR
@@ -354,6 +354,12 @@ export function useSky(
   // 安全不变式：near 平面、Halo 可见性、wheel 语义必须与状态严格一致
   let closeupState: 'IDLE' | 'TWEENING' | 'CLOSEUP' | 'EXITING' = 'IDLE'
   let closeupTarget: { updater: PlanetUpdater; dist: number; haloSprite: Sprite | null; size: number } | null = null
+  // PC 端行星特写 · 观察模式（issue #136）：true 时禁止 hover 光晕和点击弹出故事界面，只允许拖动/缩放
+  let observeMode = false
+  // 行星特写前的相机快照（pos/quat/fov + rotY/rotX 拖拽基准），exitCloseup 回到这里实现望远镜效果（不回到固定原点）
+  let preCloseupCamera: { pos: Vector3; quat: Quaternion; fov: number; rotY: number; rotX: number } | null = null
+  // 观察模式拖拽退出特写后，glows 需保持隐藏直到 exitCloseup 完成；此变量保存引用供 exitCloseup 恢复
+  let hiddenGlows: Object3D[] | null = null
   // closeup 跟随复用 Vector3（避免每帧 new，animate 循环高频调用）
   const _closeupWorld = new Vector3()
   const _closeupDir = new Vector3()
@@ -1418,9 +1424,9 @@ for (const s of stars) starById.set(s.id, s)
       // 用屏幕投影找最近的星（issue #116：提取为共用函数，hover 与 click 同一套逻辑）
       let { id: bestId, dist: bestDist } = detectStarByProjection(mouse.x, mouse.y)
       // 行星 hover 检测（issue #82 补充：行星含日月 hover 淡光晕，与恒星互斥）
-      // 特写模式下跳过（相机太近光晕会糊屏）
+      // 特写模式 / 观察模式下跳过（相机太近光晕会糊屏 / 观察模式禁止任何交互反馈）
       let planetHovered = false
-      if (closeupState === 'IDLE' && planetMeshes.length) {
+      if (closeupState === 'IDLE' && !observeMode && planetMeshes.length) {
         const planetRay = new Raycaster()
         planetRay.setFromCamera(mouse, camera)
         const planetHits = planetRay.intersectObjects(planetMeshes)
@@ -1446,6 +1452,8 @@ for (const s of stars) starById.set(s.id, s)
       if (!planetHovered) planetHoverTargetOpacity = 0
       // 行星 hover 时跳过恒星 hover（bestId = -1 让下方阈值判断走 else 分支清除恒星高亮）
       if (planetHovered) bestId = -1
+      // 观察模式下强制清除 hover 状态（禁止任何 hover 反馈）
+      if (observeMode) bestId = -1
       // 阈值通过 cfg.hoverThreshold 配置（移动端跳过 hover：仅吸附星显示 tooltip）
       if (!isMobile) {
         if (bestDist < cfg.hoverThreshold && bestId !== -1) {
@@ -1599,6 +1607,10 @@ for (const s of stars) starById.set(s.id, s)
       }
 
       // 优先级：行星直接命中 > 恒星在阈值内
+      // 观察模式下禁止点击弹出故事界面（只允许拖动/缩放）
+      if (observeMode) {
+        return
+      }
       // 行星 hitbox 是几何 Mesh，Raycaster 命中即说明点击在行星上
       if (bestPlanetPd) {
         options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
@@ -1678,6 +1690,8 @@ for (const s of stars) starById.set(s.id, s)
         camera.near = DEFAULT_NEAR
         camera.updateProjectionMatrix()
         if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+        // 观察模式下不恢复 glows（保持 corona 隐藏），exitCloseup 完成时统一恢复
+        if (!observeMode && closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
         closeupState = 'IDLE'
         closeupTarget = null
         // 从当前相机朝向同步 rotY/rotX，避免拖拽首帧跳变
@@ -1710,6 +1724,8 @@ for (const s of stars) starById.set(s.id, s)
             // 拉远到极限 → 退出特写到 IDLE（相机停留，继续 pinch 调 FOV）
             camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
             if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
+            // 观察模式下不恢复 glows（保持 corona 隐藏），exitCloseup 完成时统一恢复
+            if (!observeMode && closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
             closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
           } else {
             closeupTarget.dist = Math.max(minDist, newDist)
@@ -1751,6 +1767,8 @@ for (const s of stars) starById.set(s.id, s)
         // 拉远到极限 → 退出特写到 IDLE（相机停留，继续滚轮调 FOV）
         camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
         if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
+        // 观察模式下不恢复 glows（保持 corona 隐藏），exitCloseup 完成时统一恢复
+        if (!observeMode && closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
         closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
       } else {
         closeupTarget.dist = Math.max(minDist, newDist)
@@ -2014,6 +2032,9 @@ for (const s of stars) starById.set(s.id, s)
       tiltGroup.add(hitboxMesh)
       planetMeshes.push(hitboxMesh)
 
+      // 收集所有光晕对象（太阳 corona 三层 + 行星大气层），特写模式下统一隐藏避免糊屏
+      const planetGlows: Object3D[] = []
+
       // Halo 辅助光点：物理直径比例下小天体（size < 0.5）盘面亚像素不可见
       // 用 Sprite 渲染行星颜色的光点，辅助肉眼定位（类似 Stellarium hint circle）
       // halo 不参与 raycast（点击靠 hitbox），不影响物理比例（盘面仍按 size 渲染）
@@ -2036,7 +2057,7 @@ for (const s of stars) starById.set(s.id, s)
       }
 
       // 注册到 planetUpdaters，供 animate 循环每帧重算位置 + 每 1s 重算视星等
-      planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh, haloSprite, color: planet.color, size: planet.size })
+      planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh, haloSprite, color: planet.color, size: planet.size, glows: planetGlows })
 
       // ═══ 伽利略卫星（木卫 1-4）：实时位置模拟 ═══
       // astronomy-engine JupiterMoons() 返回 jovicentric EQJ 向量（AU）
@@ -2123,7 +2144,9 @@ for (const s of stars) starById.set(s.id, s)
           side: BackSide,
           depthWrite: false,
         })
-        tiltGroup.add(new Mesh(innerGlowGeo, innerGlowMat))
+        const innerGlowMesh = new Mesh(innerGlowGeo, innerGlowMat)
+        tiltGroup.add(innerGlowMesh)
+        planetGlows.push(innerGlowMesh)
 
         // 中层：日冕扩散光晕
         const coronaGeo = new SphereGeometry(planet.size * 1.8, 32, 16)
@@ -2153,7 +2176,9 @@ for (const s of stars) starById.set(s.id, s)
           side: BackSide,
           depthWrite: false,
         })
-        tiltGroup.add(new Mesh(coronaGeo, coronaMat))
+        const coronaMesh = new Mesh(coronaGeo, coronaMat)
+        tiltGroup.add(coronaMesh)
+        planetGlows.push(coronaMesh)
 
         // 外层：大范围 sprite 光晕（被 Bloom 进一步扩散）
         const outerGlow = new Sprite(new SpriteMaterial({
@@ -2166,6 +2191,7 @@ for (const s of stars) starById.set(s.id, s)
         }))
         outerGlow.scale.set(planet.size * 6, planet.size * 6, 1)
         tiltGroup.add(outerGlow)
+        planetGlows.push(outerGlow)
       }
 
       // P0-3 / OPT-9：行星大气层光晕
@@ -2294,7 +2320,9 @@ for (const s of stars) starById.set(s.id, s)
             depthWrite: false,
           })
         }
-        tiltGroup.add(new Mesh(atmoGeo, atmoMat))
+        const atmoMesh = new Mesh(atmoGeo, atmoMat)
+        tiltGroup.add(atmoMesh)
+        planetGlows.push(atmoMesh)
       }
 
       // ═══ 土星环：ShaderMaterial（P1 优化 — world-space HG 前向散射 + Blinn-Phong 冰粒高光） ═══
@@ -3671,6 +3699,18 @@ for (const s of stars) starById.set(s.id, s)
     camera,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
+    // issue #136：PC 端行星特写观察模式开关
+    // true：禁止 hover 光晕和点击弹出故事界面，只允许拖动视角/滚轮缩放
+    // false：恢复正常交互
+    setObserveMode(v: boolean) {
+      observeMode = v
+      // 进入观察模式时立即清除当前 hover 状态，避免残留光晕
+      if (v) {
+        planetHoverTargetOpacity = 0
+        planetHoverGlow.visible = false
+        hoveredStarId = -1
+      }
+    },
     // 设置时间加速倍率（1=真实时间，100=加速 100 倍观察行星运动）
     setTimeScale(scale: number) { timeScale = Math.max(1, Math.min(10000, Math.round(scale))); },
     // 获取当前时间倍率
@@ -3981,10 +4021,22 @@ for (const s of stars) starById.set(s.id, s)
         activeTweenId = null
       }
 
-      // 防御性恢复：若从 CLOSEUP/EXITING 进入，先恢复 near/halo 避免状态泄漏
+      // 防御性恢复：若从 CLOSEUP/EXITING 进入，先恢复 near/halo/glows 避免状态泄漏
       if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+      if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+      if (hiddenGlows) { for (const g of hiddenGlows) g.visible = true; hiddenGlows = null }
       camera.near = DEFAULT_NEAR
       camera.updateProjectionMatrix()
+
+      // 保存进入特写前的相机快照（pos/quat/fov + rotY/rotX），exitCloseup 时回到这里实现望远镜效果
+      // 注意：仅在首次进入特写时保存（IDLE→TWEENING），避免连续切换行星时丢失原始视角
+      if (closeupState === 'IDLE') {
+        preCloseupCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, rotY, rotX }
+      }
+
+      // 隐藏行星 hover 发光（相机靠近时 planetHoverGlow 会很大，特写中糊屏 + 闪光弹感）
+      planetHoverGlow.visible = false
+      planetHoverTargetOpacity = 0
 
       // 查行星 size 算目标距离（直接从 updater 取，避免依赖动态 import 闭包中的 planets）
       const planetSize = updater.size
@@ -3994,6 +4046,12 @@ for (const s of stars) starById.set(s.id, s)
       // 隐藏目标 halo（特写中盘面已可见，halo 糊屏）
       const haloSprite = updater.haloSprite ?? null
       if (haloSprite) haloSprite.visible = false
+
+      // 隐藏目标行星所有光晕（太阳 corona 三层 + 大气层），特写中相机太近会糊屏 + 闪光弹感
+      const glows = updater.glows ?? []
+      for (const g of glows) g.visible = false
+      // 保存引用：观察模式拖拽退出特写时不恢复 glows，exitCloseup 完成时统一恢复
+      hiddenGlows = glows.length ? glows : null
 
       closeupState = 'TWEENING'
       closeupTarget = { updater, dist: targetDist, haloSprite, size: planetSize }
@@ -4024,6 +4082,7 @@ for (const s of stars) starById.set(s.id, s)
       if (!init) {
         // 恢复并退出
         if (haloSprite) haloSprite.visible = true
+        for (const g of glows) g.visible = true
         closeupState = 'IDLE'
         closeupTarget = null
         return
@@ -4083,10 +4142,17 @@ for (const s of stars) starById.set(s.id, s)
       // 复用 focusOnStar 的平滑飞行（接收 skyGroup 局部坐标，与 planetUpdaters 坐标系一致）
       this.focusOnStar(pos.x, pos.y, pos.z)
     },
-    // 退出特写：飞回原点 (0,0,0)，FOV 回 DEFAULT_FOV，末态恢复 near/halo → IDLE
+    // 退出特写：飞回进入特写前的相机位置（望远镜效果），FOV/朝向同步恢复，末态 near/halo → IDLE
     // 触发场景：关闭详情面板
+    // 若 preCloseupCamera 为空（异常情况），回退到原点 + 基础朝向 + DEFAULT_FOV
     exitCloseup() {
-      if (closeupState === 'IDLE') return
+      // IDLE 状态下若存在特写前快照（观察模式拖拽退出 CLOSEUP 后关闭详情），仍需飞回原视角
+      if (closeupState === 'IDLE' && !preCloseupCamera) return
+      // IDLE + 有快照：进入 EXITING 执行飞回动画；CLOSEUP/TWEENING/EXITING：正常退出
+      if (closeupState === 'IDLE' && preCloseupCamera) {
+        // 观察模式拖拽已退出 CLOSEUP，closeupTarget 已清空，但 preCloseupCamera 仍在
+        // 直接执行飞回动画，无需清理 closeupTarget
+      }
       if (activeTweenId !== null) {
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
@@ -4096,10 +4162,15 @@ for (const s of stars) starById.set(s.id, s)
       const startPos = camera.position.clone()
       const startQuat = camera.quaternion.clone()
       const startFov = camera.fov
-      const endPos = new Vector3(0, 0, 0)
-      const endFov = DEFAULT_FOV
-      // 末态朝向：重置到基础朝向
-      const endQuat = new Quaternion().setFromEuler(new Euler(baseRotX + 0.3, baseRotY, 0, 'YXZ'))
+      // 优先回到特写前的相机快照；无快照时回退到原点 + 基础朝向
+      const snap = preCloseupCamera
+      const endPos = snap ? snap.pos.clone() : new Vector3(0, 0, 0)
+      const endFov = snap ? snap.fov : DEFAULT_FOV
+      const endQuat = snap
+        ? snap.quat.clone()
+        : new Quaternion().setFromEuler(new Euler(baseRotX + 0.3, baseRotY, 0, 'YXZ'))
+      const endRotY = snap ? snap.rotY : 0
+      const endRotX = snap ? snap.rotX : 0
 
       const totalMs = 1200
       const rotEnd = 0.58, fovStart = 0.25, fovEnd = 0.83, posStart = 0.42, posEnd = 1.0
@@ -4128,15 +4199,19 @@ for (const s of stars) starById.set(s.id, s)
           activeTweenId = requestAnimationFrame(animStep)
         } else {
           activeTweenId = null
-          // 恢复 IDLE：near 平面、halo 可见性、清空 closeupTarget
+          // 恢复 IDLE：near 平面、halo/glows 可见性、清空 closeupTarget、恢复 rotY/rotX 拖拽基准
           camera.near = DEFAULT_NEAR
           camera.updateProjectionMatrix()
           if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+          if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          if (hiddenGlows) { for (const g of hiddenGlows) g.visible = true; hiddenGlows = null }
           closeupState = 'IDLE'
           closeupTarget = null
-          rotY = 0
-          rotX = 0
+          rotY = endRotY
+          rotX = endRotX
           userFov = camera.fov
+          // 清空快照，下次进入特写时重新保存
+          preCloseupCamera = null
         }
       }
       activeTweenId = requestAnimationFrame(animStep)
