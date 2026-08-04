@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory } from '../services/starService';
+import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory, getCatalogStarIdsForStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
@@ -131,6 +131,16 @@ router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) =>
     if (!result) return notFound(res, '故事不存在');
     if (result.already) return ok(res, '已共鸣', result);
 
+    // 共鸣会改变 story_count 的聚合权重分布 → 触发 catalog 级 AI 分析延迟再生
+    // （15s debounce 合并窗口，不会每次点击都调 AI）
+    const affected = getCatalogStarIdsForStory(storyId);
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stars/resonate] 自动触发分析失败:', e); }
+      });
+    }
+
     ok(res, '共鸣已点亮', result);
   } catch (error) {
     console.error('POST /api/stars/:storyId/resonate error:', error);
@@ -211,9 +221,18 @@ router.delete('/story/:storyId', authRequired, (req: Request, res: Response) => 
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
     const user = (req as Request & { user: { id: number } }).user;
+    // 先拿到受影响的 catalog 星（删除后 story_catalog_stars 会被清空，必须在此之前查）
+    const affected = getCatalogStarIdsForStory(storyId);
     const result = deleteStory(storyId, user.id);
     if (result.notFound) return notFound(res, '故事不存在');
     if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    // 删除成功 → 触发 catalog 级 AI 分析再生（故事集合变了，原来的画像/主题可能失真）
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stars/delete-story] 自动触发分析失败:', e); }
+      });
+    }
     ok(res, '已删除');
   } catch (error) {
     console.error('DELETE /api/stars/story/:storyId error:', error);

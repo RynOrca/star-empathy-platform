@@ -1078,6 +1078,10 @@ const emit = defineEmits<{
   writeStory: []
   updateSimilarStars: [ids: number[]]
   deleteStory: [storyId: number]
+  /** 故事集合或权重发生了实质变动 → 父级可用于通知 SkyPage 做跨星同步
+   *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
+   */
+  storiesMutated: [kind: 'new' | 'delete' | 'resonate' | 'kernel-edit']
 }>()
 
 const router = useRouter()
@@ -1299,6 +1303,19 @@ const catalogStarIdRef = toRef(props, 'catalogStarId')
 const catalogStarIdNullable = computed<number | null>(() => catalogStarIdRef.value ?? null)
 const starAnalysis = useStarAnalysis(catalogStarIdNullable)
 
+/**
+ * 触发一次 AI 分析"就地刷新"：
+ *  - reset() 清除缓存 ready 标记
+ *  - fetchAnalysis() 立即拉一次并自动启动 3s × 20 次的 ready 轮询
+ * 所有会改变 catalog 级故事集合/权重分布的动作都应调用：新增故事 / 删除故事 / 共鸣成功 / 内核被用户修改
+ */
+function retriggerStarAnalysis() {
+  starAnalysis.reset()
+  if (catalogStarIdNullable.value) {
+    starAnalysis.fetchAnalysis()
+  }
+}
+
 // 从 persona 返回里取 updatedAt 文案（用服务端生成时间）
 const analysisUpdatedText = computed(() => {
   const t = starAnalysis.analysis.value?.generatedAt
@@ -1369,8 +1386,11 @@ function onResonate(story: { id: number; resonanceCount: number }) {
   const current = getDisplayResonance(story)
   resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
+  emit('storiesMutated', 'resonate')
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
+  // 共鸣改变故事权重分布 → 通知 composable 重置轮询，等后端异步重新生成完（15s debounce + 串行）就地刷新
+  retriggerStarAnalysis()
 }
 
 // ─── 删除故事 ───
@@ -1395,9 +1415,12 @@ async function doDeleteStory() {
     })
     if (res.ok) {
       emit('deleteStory', deletingStoryId.value)
+      emit('storiesMutated', 'delete')
       showDeleteConfirm.value = false
       deletingStoryId.value = null
       detailStoryId.value = null
+      // 删除改变故事集合 → 立即重新拉 analysis + 启动 ready 轮询
+      retriggerStarAnalysis()
     } else {
       const json = await res.json()
       alert(json.message || '删除失败')

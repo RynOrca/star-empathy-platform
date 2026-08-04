@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -310,6 +310,7 @@
         @close="onCloseDetail"
         @write-story="onWriteStory"
         @delete-story="onDeleteStory"
+        @stories-mutated="onStarDetailStoriesMutated"
       />
 
       <StoryForm
@@ -1567,6 +1568,18 @@ function onDeleteStory(storyId: number) {
   // 如果当前星没有故事了，关闭面板
   if (selectedStories.value.length === 0) {
     onCloseDetail()
+  }
+}
+/**
+ * StarDetail 内部发生会改变权重分布的变动（共鸣/删除）时统一回调：
+ *  - 共鸣/删除都已在 StarDetail 内部触发 retriggerStarAnalysis（新一轮轮询）
+ *  - 这里兜底：刷新 catalogStats / 过滤计数（已有 onDeleteStory/onResonate 单独处理，冗余不坏事）
+ */
+function onStarDetailStoriesMutated(kind: 'new' | 'delete' | 'resonate' | 'kernel-edit') {
+  if (!selectedCatalogStarId.value) return
+  if (kind === 'resonate' || kind === 'delete' || kind === 'kernel-edit') {
+    fetchCatalogStats(selectedCatalogStarId.value)
+    recalcFilteredStats()
   }
 }
 async function onResonate(storyId: number) {
