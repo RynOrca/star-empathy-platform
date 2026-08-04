@@ -77,22 +77,25 @@ function attachCatalogStarIds(stories: any[]): any[] {
   }));
 }
 
-// 获取所有星星（含用户名、用户 ID 和标签）
+// 获取所有星星（含用户名、用户 ID、标签 + 所属合集元信息（直接 LEFT JOIN，无需前端二次匹配））
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[] {
+export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; collectionName?: string | null; collectionCoverColor?: string | null; catalogStarIds?: number[]; tags: string[] })[] {
   const rows = db.prepare(`
     SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      c.name as collection_name,
+      c.cover_color as collection_cover_color
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON s.collection_id = c.id
     ORDER BY s.created_at DESC
-  `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null; collectionName?: string | null; collectionCoverColor?: string | null })[];
   return attachCatalogStarIds(rows);
 }
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null; collectionName?: string | null; collectionCoverColor?: string | null; catalogStarIds?: number[]; tags: string[] })[];
   total: number;
   page: number;
   limit: number;
@@ -108,12 +111,15 @@ export function getAllStarsPaged(page: number, limit: number): {
 
   const items = db.prepare(`
     SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      c.name as collection_name,
+      c.cover_color as collection_cover_color
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON s.collection_id = c.id
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null; collectionName?: string | null; collectionCoverColor?: string | null })[];
 
   return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
 }
@@ -213,11 +219,14 @@ export function createStar(
 
   const row = db.prepare(`
     SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      c.name as collection_name,
+      c.cover_color as collection_cover_color
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON s.collection_id = c.id
     WHERE s.id = ?
-  `).get(storyId) as unknown as Star & { username: string | null; userId: number | null };
+  `).get(storyId) as unknown as Star & { username: string | null; userId: number | null; collectionName?: string | null; collectionCoverColor?: string | null };
   const normalized = normalizeTagsForStories([row])[0];
   return { ...normalized, catalogStarIds: effectiveCatalogStarId != null ? [effectiveCatalogStarId] : [] };
 }
@@ -233,9 +242,12 @@ function normalizeRowSingle(row: any): any {
 export function getStoryById(id: number): any | null {
   const row = db.prepare(`
     SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username,
+      c.name as collection_name,
+      c.cover_color as collection_cover_color
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON s.collection_id = c.id
     WHERE s.id = ?
   `).get(id);
   if (!row) return null;
