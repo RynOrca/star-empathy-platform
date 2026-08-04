@@ -122,9 +122,22 @@ import type { EmotionPayload } from '../../composables/useStarAnalysis'
 const props = withDefaults(defineProps<{
   storyCount?: number
   emotion?: EmotionPayload
-}>(), { storyCount: 0 })
+  /** 后端整套分析是否已生成（ready=true → 即使 emotion 缺也不再显示无限加载） */
+  analysisReady?: boolean
+}>(), { storyCount: 0, analysisReady: false })
 
-const tooFewStories = computed(() => (props.storyCount ?? 0) < 5)
+/**
+ * 空态分支判断（与 AIPersonaCard / AIHeatmapThemes 保持一致）：
+ *  1) hasEmotion/hasQuote 真 → 真实数据
+ *  2) analysisReady=true 但 emotion 缺 → 认为无法生成，走"心事太少"分支（避免骨架卡住）
+ *  3) storyCount < 5 → 心事太少
+ *  4) 否则 → 生成中骨架
+ */
+const tooFewStories = computed(() => {
+  if (hasEmotion.value || hasQuote.value) return false
+  if (props.analysisReady) return true
+  return (props.storyCount ?? 0) < 5
+})
 
 const hasEmotion = computed(() => {
   const e = props.emotion

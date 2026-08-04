@@ -33,18 +33,21 @@
                   :constellationName="currentConstellation || '未知星座'"
                   :starColor="getStarColor(catalogStarId)"
                   :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
                 <AIRadarWordcloud
                   :storyCount="catalogStats?.storyCount ?? 0"
                   :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
                 <AIHeatmapThemes
                   :storyCount="catalogStats?.storyCount ?? 0"
                   :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
 
                 <div class="narrative-bottom">
@@ -629,22 +632,27 @@
 
                     <!-- 🧠 AI 分析模块（1）星格画像 -->
                     <AIPersonaCard
+                      :storyCount="catalogStats?.storyCount ?? 0"
                       :updatedAt="analysisUpdatedText || '刚刚生成'"
                       :starName="currentStarName"
                       :constellationName="currentConstellation || '未知星座'"
                       :starColor="getStarColor(catalogStarId)"
                       :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
                     <AIRadarWordcloud
                       :storyCount="catalogStats?.storyCount ?? 0"
                       :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
                     <AIHeatmapThemes
+                      :storyCount="catalogStats?.storyCount ?? 0"
                       :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                      :analysis-ready="analysisReady"
                     />
 
                     <div class="narrative-bottom">
@@ -1301,6 +1309,8 @@ const analysisUpdatedText = computed(() => {
   if (diff < 86400 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
   return new Date(t).toLocaleDateString('zh-CN')
 })
+// 传递给所有 AI 子卡的"ready 信号"：子卡用它判断"骨架是否还能一直转"，避免 ready=true 但卡片仍显示"生成中"
+const analysisReady = computed(() => starAnalysis.analysis.value?.ready ?? false)
 
 const catalogLookup = new Map<number, { name: string | null; con: string; color: string }>()
 for (const s of (catalogData as any).stars) {
