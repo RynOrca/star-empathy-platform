@@ -864,7 +864,8 @@ async function flyToStar(starId: number) {
     const info = PLANET_INFO[bodyName]
     if (!info) return
     if (isMobile.value) {
-      // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+      // 移动端：先清旧 snap 状态（避免上次搜索残留），再定位 + 主动 snap
+      skyRef.value?.sky?.releaseSnap?.()
       skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
       skyRef.value?.sky?.snapToPlanet(bodyName)
     } else {
