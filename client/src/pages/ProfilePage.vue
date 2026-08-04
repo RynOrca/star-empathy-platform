@@ -423,14 +423,16 @@
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
             </div>
-            <!-- 合集归属：正文下方、标签行上方（与卡片/详情保持一致视觉位） -->
+            <!-- 合集归属：正文下方、标签行上方（详情弹窗用大号徽章，显示标题+故事数，可点击） -->
             <div v-if="activeStory.collectionName" class="pd-story-collection-row">
               <CollectionBadge
                 :collection-name="activeStory.collectionName"
                 :cover-color="activeStory.collectionCoverColor ?? null"
                 :collection-visibility="activeStory.collectionVisibility ?? null"
+                :collection-story-count="activeStory.collectionStoryCount ?? null"
                 :clickable="!!activeStory.collectionId"
-                @click.stop="openCollectionFromStory(activeStory)"
+                size="md"
+                @click="openCollectionFromStory(activeStory)"
               />
             </div>
             <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
@@ -489,14 +491,18 @@
         @submit="handleCollectionSubmit"
       />
 
-      <!-- 星笺详情弹窗（点击合集卡 / 故事 Badge 时打开） -->
-      <CollectionDetailModal
-        :show="showCollectionDetail"
+      <!-- 星笺详情（点击合集卡 / 故事 Badge 时打开） -->
+      <CollectionDetail
+        v-if="showCollectionDetail"
         :collection-id="collectionDetailId"
+        :collections="collections"
+        :current-user-id="user?.id ?? null"
         :is-owner="collectionDetailIsOwner"
         @close="showCollectionDetail = false"
         @story-click="onCollectionStoryClick"
         @edit="handleCollectionDetailEdit"
+        @delete="deleteCollectionWithConfirm"
+        @collection-switch="onCollectionSwitchFromDetail"
       />
     </template>
   </div>
@@ -513,7 +519,7 @@ import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
 import CollectionBadge from '../components/CollectionBadge.vue'
 import CollectionGrid from '../components/CollectionGrid.vue'
 import CollectionEditModal from '../components/CollectionEditModal.vue'
-import CollectionDetailModal from '../components/CollectionDetailModal.vue'
+import CollectionDetail from '../components/CollectionDetail/index.vue'
 import { useCollections, type Collection, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
 
 /** 开放标签 hash 染色工具 */
@@ -685,16 +691,18 @@ function openCollectionFromStory(story: any) {
 }
 
 async function handleCollectionDetailEdit(c: any) {
-  // 来自 CollectionDetailModal 的编辑事件：c 已含合集字段
+  // 来自 CollectionDetail 的编辑事件：c 已含合集字段
   openEditCollection(c as Collection)
 }
 
-/** 从星笺详情点击单条故事：关闭星笺弹窗，打开该故事详情 */
-function onCollectionStoryClick(story: any) {
-  showCollectionDetail.value = false
-  // 若故事已在本地 stories 列表，直接复用；否则用接口返回的故事对象打开
-  const local = stories.value.find((s) => s.id === story.id)
-  activeStory.value = local ?? story
+/** 合集详情内切换到另一个合集 */
+function onCollectionSwitchFromDetail(id: number) {
+  collectionDetailId.value = id
+}
+
+/** 从星笺详情点击单条故事：故事已在 CollectionDetail 内联展示，此回调仅做通知 */
+function onCollectionStoryClick(_story: any) {
+  // no-op：故事详情已在 CollectionDetail 内部展示
 }
 
 async function handleLogout() {

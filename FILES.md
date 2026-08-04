@@ -147,6 +147,8 @@
 | `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
 | `StarDetail/MobileTabSelect.vue` | 移动端下拉 Tab 选择器（替代 PC 端 Tab 栏） |
 | `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
+| `CollectionDetail/index.vue` | **合集详情容器**（镜像 StarDetail 双栏布局）。PC 端左栏 tab（**AI 解读默认首个**/故事列表/合集列表）+ 右栏合集信息（描述/**4 列统计 故事/共鸣/浏览/收藏**/活跃时辰热力/故事时间轴/高频标签/编辑删除）；移动端底部抽屉 + 全屏故事详情。故事缩略/详细中 tag 上方显示**星星归属**（挂在哪颗星上）而非合集徽章（`showStarBelonging` 透传）。复用 StoryList/StoryDetail/CollectionAnalysis，内部处理共鸣/删除（optimistic）。从 ProfilePage 合集卡片和 SkyPage 故事详情合集徽章两处打开 |
+| `CollectionDetail/CollectionAnalysis.vue` | **合集 AI 解读组件**（设计预览阶段，未接 agent）。8 个富信息板块：合集画像（四字凝意+维度条）/情感光谱/主题脉络/时辰热力/情感轨迹（逐则心事情绪流转）/共鸣榜/关键词星云/AI 总叙。mock 数据占位，共鸣榜优先用真实故事 Top3。接入 `collectionName`/`storyCount`/`stories` props，emit `story-click` |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
 | `StoryForm.vue` | 投递心事表单。两种 `mode` prop：**`bind-star`**（预绑定 catalogStarId，原行为） vs **`auto-match`**（未选星，点「寻找归属星辰」emit `requestMatch` 给父组件，匹配后父组件通过 ref 调 `doSubmit(catalogStarId)` 真正提交）。auto-match 模式下提供 3 步进度遮罩（提取内核 / 夜空寻星 / 判断缘分）。**实时 AI 标签推荐**：标题+正文变化 600ms debounce → `POST /api/stories/ai-tags`，推荐标签与匹配接口回传的 `suggestedTags` 合并去重后展示，两种模式都启用。暴露：`defineExpose({ doSubmit, resetForm })`。 |

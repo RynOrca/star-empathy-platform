@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -316,6 +316,20 @@
         @delete-story="onDeleteStory"
         @stories-mutated="onStarDetailStoriesMutated"
         @toggle-observe="onToggleObserve"
+        @collection-click="onCollectionClick"
+      />
+
+      <!-- 合集详情 overlay（从故事详情的合集徽章点击打开） -->
+      <CollectionDetail
+        v-if="showCollectionDetail"
+        :collection-id="collectionDetailId"
+        :collections="userCollections"
+        :current-user-id="currentUserId"
+        :is-owner="collectionDetailIsOwner"
+        @close="onCollectionDetailClose"
+        @collection-switch="onCollectionSwitch"
+        @edit="onCollectionEditOrDelete"
+        @delete="onCollectionEditOrDelete"
       />
 
       <StoryForm
@@ -529,6 +543,7 @@ import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail/index.vue'
+import CollectionDetail from '../components/CollectionDetail/index.vue'
 import StoryForm from '../components/StoryForm.vue'
 import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
@@ -539,6 +554,7 @@ import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
+import { useCollections } from '../composables/useCollections'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
 
 const { isMobile } = useMediaQuery()
@@ -550,6 +566,13 @@ const username = ref('')
 // 访客账号（体验账号）无个人主页，点用户按钮应跳登录页
 const isGuest = computed(() => username.value === '星穹访客')
 const currentUserId = ref<number | null>(null)
+
+// ─── 合集详情 overlay 状态 ───
+const { list: userCollections, fetchList: fetchUserCollections } = useCollections()
+const showCollectionDetail = ref(false)
+const collectionDetailId = ref<number | null>(null)
+const collectionDetailIsOwner = ref(false)
+
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
 const locationCityToast = ref('')
@@ -1060,8 +1083,9 @@ interface StoryData {
   imageUrl: string | null
   collectionId?: number | null; collectionName?: string | null
   collectionCoverColor?: string | null; collectionVisibility?: string | null
+  collectionStoryCount?: number | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null, collectionId: null, collectionName: null, collectionCoverColor: null, collectionVisibility: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null, collectionId: null, collectionName: null, collectionCoverColor: null, collectionVisibility: null, collectionStoryCount: null }
 
 /** 统一 tags 字段归一化：tags[] 存在(且数组)→ 最多 5 条/去重；否则回退 tag 单列；最后兜底空数组
  *  避免任何端上出现 undefined/null → displayTags 兜底能保证显示，但是 SkyPage 主动构造 StoryData 时
@@ -1112,6 +1136,7 @@ function mergeStoriesIntoMap(
       imageUrl: s.imageUrl ?? null,
       collectionId: s.collectionId ?? null, collectionName: s.collectionName ?? null,
       collectionCoverColor: s.collectionCoverColor ?? null, collectionVisibility: s.collectionVisibility ?? null,
+      collectionStoryCount: s.collectionStoryCount ?? null,
     }
     for (const cid of cids) {
       if (cid == null) continue
@@ -1651,6 +1676,40 @@ function onToggleObserve() {
   planetObserveMode.value = !planetObserveMode.value
   skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
 }
+
+/**
+ * 合集徽章点击：从故事详情透传上来的合集点击事件。
+ * 打开 CollectionDetail overlay 展示合集内所有故事。
+ */
+async function onCollectionClick(data: { collectionId: number; collectionName: string | null }) {
+  collectionDetailId.value = data.collectionId
+  // 拉取用户合集列表，判断是否为 owner（控制编辑/删除按钮和合集列表 tab）
+  if (currentUserId.value && !isGuest.value) {
+    await fetchUserCollections()
+    collectionDetailIsOwner.value = userCollections.value.some(c => c.id === data.collectionId)
+  } else {
+    collectionDetailIsOwner.value = false
+  }
+  showCollectionDetail.value = true
+}
+
+/** 合集详情关闭 */
+function onCollectionDetailClose() {
+  showCollectionDetail.value = false
+  collectionDetailId.value = null
+}
+
+/** 合集详情内切换合集 */
+function onCollectionSwitch(id: number) {
+  collectionDetailId.value = id
+}
+
+/** 合集详情内编辑/删除 → 跳转个人主页 */
+function onCollectionEditOrDelete() {
+  showCollectionDetail.value = false
+  router.push('/profile')
+}
+
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
