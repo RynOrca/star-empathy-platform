@@ -273,16 +273,18 @@
     </div>
 
     <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
-    <Transition name="story-enter" appear>
-      <button
-        v-if="isMobile && snappedTarget !== null && !selectedStarInfo"
-        class="story-enter-btn"
-        type="button"
-        @click="onStoryEnterClick"
-      >
-        <span class="story-enter-main">凝听星语</span>
-        <span v-if="snappedLabel" class="story-enter-sub">{{ snappedLabel }}</span>
-      </button>
+    <!-- issue #135 动画修复：完全复刻 .search-sheet 结构 → wrapper套 Transition + inner 用 @keyframes animation -->
+    <Transition name="sheet-fade">
+      <div v-if="isMobile && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
+        <button
+          class="story-enter-btn"
+          type="button"
+          @click="onStoryEnterClick"
+        >
+          <span class="story-enter-main">凝听星语</span>
+          <span v-if="snappedLabel" class="story-enter-sub">{{ snappedLabel }}</span>
+        </button>
+      </div>
     </Transition>
 
       <StarDetail
@@ -837,7 +839,12 @@ function onSearchSelect(starId: number) {
   showSearch.value = false
   searchOpen.value = false
   searchQuery.value = ''
-  flyToStar(starId)
+  // issue #135：移动端等搜索面板滑出（0.25s）后再定位 + 显示按钮，形成先后顺序
+  if (isMobile.value) {
+    setTimeout(() => flyToStar(starId), 300)
+  } else {
+    flyToStar(starId)
+  }
 }
 
 function closeSearchDropdown() {
@@ -857,6 +864,7 @@ async function onSearchInput() {
 }
 
 async function flyToStar(starId: number) {
+  console.log('[flyToStar] starId=', starId, 'isPlanetId=', isPlanetId(starId), 'isMobile=', isMobile.value)
   // 负 id = 行星，走 onPlanetClick 路径（防御性，当前搜索不返回行星）
   if (isPlanetId(starId)) {
     const bodyName = getPlanetBodyName(starId)
@@ -864,10 +872,17 @@ async function flyToStar(starId: number) {
     const info = PLANET_INFO[bodyName]
     if (!info) return
     if (isMobile.value) {
-      // 移动端：先清旧 snap 状态（避免上次搜索残留），再定位 + 主动 snap
+      // issue #135：移动端定位后直接设置 locatedTarget 驱动按钮显示，
+      // 不再依赖 snapToPlanet（程序化 snap 触发后按钮偶发不显示的 bug）
       skyRef.value?.sky?.releaseSnap?.()
       skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
-      skyRef.value?.sky?.snapToPlanet(bodyName)
+      locatedTarget.value = {
+        type: 'planet',
+        planetName: bodyName,
+        planetNameCN: info.conName,
+        planetId: starId,
+      }
+      snappedLabel.value = info.conName
     } else {
       // PC 端：直接进特写 + 开面板
       onPlanetClick(bodyName, info.conName, starId, true)
@@ -886,12 +901,28 @@ function locateStar(starId: number) {
     const bodyName = getPlanetBodyName(starId)
     if (!bodyName || !skyRef.value?.sky) return
     skyRef.value.sky.focusOnPlanetSimple(bodyName)
+    // issue #135：移动端定位后设置 locatedTarget 驱动按钮显示
+    if (isMobile.value) {
+      const info = PLANET_INFO[bodyName]
+      locatedTarget.value = {
+        type: 'planet',
+        planetName: bodyName,
+        planetNameCN: info?.conName || bodyName,
+        planetId: starId,
+      }
+      snappedLabel.value = info?.conName || bodyName
+    }
     return
   }
   const star = catalogStarLookup.get(starId)
   if (!star || !skyRef.value?.sky) return
   // 平滑转动相机，以该星为中心（不打开详情面板）
   skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+  // issue #135：移动端定位后设置 locatedTarget 驱动按钮显示
+  if (isMobile.value) {
+    locatedTarget.value = { type: 'star', starId }
+    snappedLabel.value = formatStarName(star)
+  }
   // 动画结束后高亮该星 2s
   setTimeout(() => {
     skyRef.value?.sky?.highlightStar(star.x, star.y, star.z)
@@ -1125,13 +1156,22 @@ const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; vi
 // issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
 const snappedTarget = ref<SnapTarget | null>(null)
 const snappedLabel = ref<string>('')
+// issue #135：定位结果目标（独立于 snap 机制，解决程序化 snap 后按钮不显示的 bug）
+// 定位/搜索跳转后直接设置此状态驱动按钮显示，不依赖 pointermove snap 触发
+const locatedTarget = ref<SnapTarget | null>(null)
 
 function onSnapChange(target: SnapTarget | null) {
+  console.log('[onSnapChange] target=', target)
   if (target === null) {
     snappedTarget.value = null
     snappedLabel.value = ''
+    // issue #135：snap 释放时清除 locatedTarget（用户拖动离开或 releaseSnap 调用）
+    // 注意：flyToStar 中 releaseSnap() 先于 locatedTarget 设置，此处清除无影响
+    locatedTarget.value = null
     return
   }
+  // issue #135：用户拖动触发 snap 时，清除 locatedTarget（snap 接管按钮驱动）
+  locatedTarget.value = null
   snappedTarget.value = target
   if (target.type === 'star') {
     const star = catalogStarLookup.get(target.starId)
@@ -1143,10 +1183,12 @@ function onSnapChange(target: SnapTarget | null) {
 
 // issue #124/#134：点击「凝听星语」按钮 → 进入故事详情并释放吸附
 // 行星分支不进入特写模式（issue #134：移动端暂不进入行星特写，仅打开故事面板）
+// issue #135：优先用 locatedTarget（独立于 snap 机制），回退到 snappedTarget
 function onStoryEnterClick() {
-  const target = snappedTarget.value
+  const target = locatedTarget.value || snappedTarget.value
   if (!target) return
-  // 先释放吸附（同步触发 onSnapChange(null) 清状态），再打开故事
+  // 清除定位目标和吸附状态
+  locatedTarget.value = null
   skyRef.value?.sky?.releaseSnap?.()
   if (target.type === 'star') {
     onStarClick(target.starId)
@@ -1419,7 +1461,7 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
+function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
@@ -2501,13 +2543,30 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 
 /* ================= issue #124：移动端「凝听星语」按钮 ================= */
-/* 对齐项目移动端抽屉美术：5px 金边 + 深蓝灰 + 顶部圆角 + 向上投影 */
-.story-enter-btn {
+/* issue #135：完全复刻 .search-sheet 的动画方案
+   结构：Transition name="sheet-fade" → .story-btn-wrap (wrapper) → .story-enter-btn (inner)
+   对应搜索框：Transition name="sheet-fade" → .search-sheet-overlay (wrapper) → .search-sheet (inner)
+   动画触发：.sheet-fade-enter-active .search-sheet { animation: slideUpSheet }
+   这里等价于：.sheet-fade-enter-active .story-enter-btn { animation: slideUpStoryBtn }
+*/
+
+/* wrapper：与 .search-sheet-overlay 类似，但不做遮罩（只定位+放内部元素） */
+.story-btn-wrap {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 30;
+  pointer-events: none;   /* wrapper 不拦截点击，只传递给 inner */
+}
+.story-btn-wrap .story-enter-btn {
+  pointer-events: auto;   /* inner 正常响应 */
+}
+
+/* inner：按钮本身，美术与之前一致 */
+.story-enter-btn {
+  position: relative;      /* 放在 wrapper 内，由 wrapper 控制 fixed 定位 */
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2523,7 +2582,7 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   font-family: 'Cinzel', 'Noto Serif SC', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.25s ease;
+  /* 注意：这里不加 transition，动画完全由 @keyframes 驱动（和 search-sheet 一致） */
 }
 .story-enter-btn:active {
   background: #232648;
@@ -2546,28 +2605,31 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   white-space: nowrap;
 }
 
-/* 滑入/滑出过渡 */
-.story-enter-enter-active,
-.story-enter-leave-active {
-  transition: transform 0.4s cubic-bezier(.2, .9, .3, 1) !important;
+/* ════════════════════════════════════════════════
+   核心动画：完全对等 .sheet-fade-enter-active .search-sheet { animation: slideUpSheet }
+   ════════════════════════════════════════════════ */
+/* wrapper 挂载时 Transition 加 sheet-fade-enter-active → 内部按钮触发 @keyframes */
+.sheet-fade-enter-active .story-enter-btn {
+  animation: slideUpStoryBtn 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.story-enter-enter-from,
-.story-enter-leave-to {
-  transform: translateY(100%);
+.sheet-fade-leave-active .story-enter-btn {
+  animation: slideDownStoryBtn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.story-enter-enter-to,
-.story-enter-leave-from {
-  transform: translateY(0);
+@keyframes slideUpStoryBtn {
+  /* 位移用 150px（按钮高~80px + 额外缓冲 70px）确保足够明显的从视口外滑入效果 */
+  from { transform: translateY(150px); opacity: 0.5; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes slideDownStoryBtn {
+  from { transform: translateY(0);     opacity: 1; }
+  to   { transform: translateY(150px); opacity: 0.3; }
 }
 
 /* 尊重用户的减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
-  .story-enter-btn {
-    transition: none;
-  }
-  .story-enter-enter-active,
-  .story-enter-leave-active {
-    transition: none;
+  .sheet-fade-enter-active .story-enter-btn,
+  .sheet-fade-leave-active .story-enter-btn {
+    animation: none !important;
   }
 }
 
