@@ -127,7 +127,8 @@ router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
     const detail = getCollectionDetail(id, currentUserId);
     if (!detail) return notFound(res, '合集不存在');
 
-    const storyCount = detail.storyCount ?? 0;
+    // 优先级：stories.length（最可靠，已 JOIN 查出来）→ detail.storyCount → detail.story_count → 0
+    const storyCount = detail.stories?.length ?? detail.storyCount ?? detail.story_count ?? 0;
 
     // 故事太少：直接返回空态（带 storyCount 供前端判定），不写缓存，不生成
     if (storyCount < 3) {

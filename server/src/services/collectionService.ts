@@ -91,7 +91,10 @@ export function getCollectionDetail(id: number, currentUserId?: number): any | n
       JOIN stars s ON s.id = scs.story_id WHERE s.collection_id = ?
     )
   `).get(id, id) as { cnt: number };
-  return { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories };
+  const enriched = { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories };
+  // 双写：同时返回 snake_case (story_count) 和 camelCase (storyCount)，兼容前端/路由不同命名
+  enriched.storyCount = enriched.story_count ?? stories.length;
+  return enriched;
 }
 
 // 编辑合集（owner 校验）
