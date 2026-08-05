@@ -65,10 +65,10 @@ function main() {
       // 2) 统计：该用户未归属合集的故事数（只动 type='user' 的用户故事，不动系统/历史星）
       const pendingCnt = (db.prepare(
         `SELECT COUNT(*) AS cnt FROM stars WHERE user_id = ? AND type = 'user' AND collection_id IS NULL`
-      ).get(u.id, u.id) as { cnt: number }).cnt;
+      ).get(u.id) as { cnt: number }).cnt;
       const withCollCnt = (db.prepare(
         `SELECT COUNT(*) AS cnt FROM stars WHERE user_id = ? AND type = 'user' AND collection_id IS NOT NULL`
-      ).get(u.id, u.id) as { cnt: number }).cnt;
+      ).get(u.id) as { cnt: number }).cnt;
       skippedWithColl += withCollCnt;
 
       if (pendingCnt === 0) {
@@ -83,7 +83,7 @@ function main() {
       // 3) UPDATE: 把该用户 collection_id 为空的用户故事归属到「公开星笺」
       const updateInfo = db.prepare(
         `UPDATE stars SET collection_id = ? WHERE user_id = ? AND type = 'user' AND collection_id IS NULL`
-      ).run(publicColl.id, u.id, u.id);
+      ).run(publicColl.id, u.id);
       const changed = (updateInfo as { changes?: number }).changes ?? 0;
       updatedStories += changed;
 
