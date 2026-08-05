@@ -341,11 +341,11 @@ function buildEmotion(rows: any[], themes: any[]): EmotionPayload {
   const names: ['思念', '孤独', '释然', '希望', '共鸣'] = ['思念', '孤独', '释然', '希望', '共鸣']
   const weights = calcEmotionWeights(rows, themes)
   const emotions: EmotionPayload['emotions'] = [
-    { name: names[0], value: weights[0], color: SPECTRUM_PALETTE[0], desc: '远方的人与未寄出的话' },
-    { name: names[1], value: weights[1], color: SPECTRUM_PALETTE[1], desc: '末班车与空荡的街' },
-    { name: names[2], value: weights[2], color: SPECTRUM_PALETTE[2], desc: '雨停后的第一缕晨光' },
-    { name: names[3], value: weights[3], color: SPECTRUM_PALETTE[3], desc: '纸船顺流而下的方向' },
-    { name: names[4], value: weights[4], color: SPECTRUM_PALETTE[4], desc: '陌生人留下的温度' },
+    { name: names[0], value: weights[0], color: SPECTRUM_PALETTE[0] },
+    { name: names[1], value: weights[1], color: SPECTRUM_PALETTE[1] },
+    { name: names[2], value: weights[2], color: SPECTRUM_PALETTE[2] },
+    { name: names[3], value: weights[3], color: SPECTRUM_PALETTE[3] },
+    { name: names[4], value: weights[4], color: SPECTRUM_PALETTE[4] },
   ]
   const topTheme = themes[0]?.name ?? '夜色'
   const top3Stories = rows.slice(0, 3).concat([null, null, null]).slice(0, 3) as (any | null)[]
