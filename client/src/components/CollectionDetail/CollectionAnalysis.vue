@@ -10,37 +10,96 @@
       <span class="ca-hero-badge">DESIGN PREVIEW</span>
     </div>
 
-    <!-- ═══ 1. 合集画像（Persona）═══ -->
+    <!-- ═══ 1. 合集画像（Persona）参考星星 AIPersonaCard：左笺卷小卡 + 右双段解读 + 维度═══ -->
     <section class="ca-card ca-persona">
       <div class="ca-card-head">
         <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
         <span class="ca-ch-title">合集画像</span>
-        <span class="ca-ch-count">四字凝意 · {{ persona.tags.length }} 标签</span>
+        <span class="ca-ch-count">四字凝意 · {{ persona.tags.length }} 标签 · {{ storyCount }} 则心事</span>
       </div>
       <div class="ca-persona-body">
-        <div class="ca-persona-main">
-          <div class="ca-han-name">{{ persona.hanName }}</div>
-          <div class="ca-han-sub">{{ persona.constellation }}</div>
-          <div class="ca-tags">
-            <span
-              v-for="t in persona.tags"
-              :key="t"
-              class="ca-tag"
-              :style="tagStyle(t)"
-            >#{{ t }}</span>
+        <!-- 左：笺卷小卡（参考星格画像 star-card） -->
+        <div class="ca-scroll-card">
+          <div class="sc-corner sc-tl"></div>
+          <div class="sc-corner sc-tr"></div>
+          <div class="sc-corner sc-bl"></div>
+          <div class="sc-corner sc-br"></div>
+
+          <div class="sc-top">
+            <div class="sc-collection">{{ persona.constellation }}</div>
+            <div class="sc-name-han">{{ persona.hanName }}</div>
           </div>
-          <blockquote class="ca-quote">{{ persona.quote }}</blockquote>
-          <p class="ca-intro">{{ persona.suggestIntro }}</p>
+
+          <!-- SVG 笺卷插画：卷起来的星笺 + 月亮 + 散落星点 -->
+          <svg viewBox="0 0 120 120" class="sc-svg">
+            <circle v-for="(s, i) in bgStars" :key="'ps'+i"
+              :cx="s.x" :cy="s.y" :r="s.r" fill="#fff" :opacity="s.opacity" />
+            <!-- 月亮 -->
+            <path d="M82 34 a18 18 0 1 0 0 24 a14 14 0 1 1 0 -24z"
+              fill="#ffd98a" opacity="0.88" />
+            <!-- 卷轴主体 -->
+            <rect x="16" y="58" width="88" height="42" rx="3"
+              fill="rgba(30,24,52,0.85)" stroke="rgba(255,217,138,0.35)" stroke-width="0.8" />
+            <!-- 卷轴上下轴 -->
+            <rect x="12" y="54" width="96" height="6" rx="3" fill="rgba(202,167,255,0.25)" stroke="rgba(202,167,255,0.45)" stroke-width="0.6" />
+            <rect x="12" y="98" width="96" height="6" rx="3" fill="rgba(202,167,255,0.25)" stroke="rgba(202,167,255,0.45)" stroke-width="0.6" />
+            <!-- 卷轴内容：三行短横线模拟文字 -->
+            <rect x="24" y="68" width="54" height="1.6" rx="0.8" fill="rgba(255,217,138,0.35)" />
+            <rect x="24" y="74" width="72" height="1.6" rx="0.8" fill="rgba(255,217,138,0.28)" />
+            <rect x="24" y="80" width="42" height="1.6" rx="0.8" fill="rgba(255,217,138,0.22)" />
+            <rect x="24" y="86" width="62" height="1.6" rx="0.8" fill="rgba(255,217,138,0.18)" />
+            <!-- 卷轴印章 -->
+            <rect x="88" y="82" width="10" height="10" rx="1.5" fill="rgba(255,139,125,0.35)" stroke="rgba(255,139,125,0.55)" stroke-width="0.6" />
+            <text x="93" y="90" text-anchor="middle" font-size="5" fill="rgba(255,255,255,0.55)" font-weight="700">笺</text>
+            <!-- 连线星 -->
+            <path d="M10 22 L42 46" stroke="rgba(255,255,255,0.5)" stroke-width="0.8" stroke-linecap="round" />
+            <circle cx="42" cy="46" r="1.4" fill="#fff" />
+          </svg>
+
+          <div class="sc-tags">
+            <span class="sc-tag" v-for="t in persona.tags" :key="t">#{{ t }}</span>
+          </div>
         </div>
-        <div class="ca-dims">
-          <div v-for="d in persona.dimensions" :key="d.left + d.right" class="ca-dim">
-            <div class="ca-dim-labels">
-              <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
-              <span :class="{ active: d.side === 'right' }">{{ d.right }}</span>
+
+        <!-- 右：文字解读（双段 + 金句 + 引导条 + 维度） -->
+        <div class="ca-persona-text">
+          <p class="ca-pt-para first">
+            这卷名为<span class="ca-han-hl">「{{ persona.hanName }}」</span>的星笺，收着
+            <b>{{ storyCount }}</b> 则心事——
+            {{ persona.paragraphFirst }}
+          </p>
+          <p class="ca-pt-para">{{ persona.paragraphSecond }}</p>
+
+          <!-- 金句卡片（引用块） -->
+          <div class="ca-quote-card">
+            <span class="ca-quote-mark">"</span>
+            <span class="ca-quote-text">{{ persona.quote }}</span>
+          </div>
+
+          <!-- 引导条（参考星格画像的 pt-suggest-wrap） -->
+          <div class="ca-suggest-wrap">
+            <span class="ca-s-tip">📜 给这卷星笺的注脚</span>
+            <span class="ca-s-text">{{ persona.suggestIntro }}</span>
+          </div>
+
+          <!-- 维度条（改成卡片式，参考星格画像风格） -->
+          <div class="ca-dims-card">
+            <div class="ca-dims-title">
+              <component :is="MoonStar" :size="9" />
+              <span>性格光谱</span>
             </div>
-            <div class="ca-dim-track">
-              <div class="ca-dim-fill" :style="{ width: d.percent + '%' }"></div>
-              <div class="ca-dim-knob" :style="{ left: d.percent + '%' }"></div>
+            <div class="ca-dims">
+              <div v-for="d in persona.dimensions" :key="d.left + d.right" class="ca-dim">
+                <div class="ca-dim-labels">
+                  <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
+                  <span class="ca-dim-pct">{{ d.percent }}%</span>
+                  <span :class="{ active: d.side === 'right' }">{{ d.right }}</span>
+                </div>
+                <div class="ca-dim-track">
+                  <div class="ca-dim-fill" :style="{ width: d.percent + '%' }"></div>
+                  <div class="ca-dim-knob" :style="{ left: d.percent + '%' }"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -371,6 +430,10 @@ const persona = {
   tags: ['思念', '夜雨', '独行', '回忆', '微光'],
   quote: '每一盏孤灯，都是夜里不肯睡的人。',
   suggestIntro: '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
+  paragraphFirst:
+    '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
+  paragraphSecond:
+    '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
   dimensions: [
     { left: '内向', right: '外向', percent: 78, side: 'left' as const },
     { left: '柔和', right: '锋利', percent: 34, side: 'left' as const },
@@ -774,65 +837,193 @@ function tagStyle(tag: string): Record<string, string> {
   flex-shrink: 0;
 }
 
-/* ═══ 1. Persona ═══ */
+/* ═══ 1. Persona（合集画像：笺卷小卡 + 双段解读 + 金句 + 引导 + 维度）═══ */
 .ca-persona-body {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: 160px 1fr;
+  gap: 20px;
+  align-items: stretch;
+  min-height: 0;
 }
-.ca-han-name {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0.12em;
-  line-height: 1.1;
-  margin-bottom: 2px;
-  background: linear-gradient(135deg, #ffd98a, #caa7ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.ca-han-sub {
-  font-size: 0.66rem;
-  color: var(--muted);
-  margin-bottom: 10px;
-  letter-spacing: 0.04em;
-}
-.ca-tags {
+
+/* 左：笺卷小卡（参考星格画像 star-card） */
+.ca-scroll-card {
+  position: relative;
+  background: linear-gradient(160deg, rgba(22, 12, 48, 0.9), rgba(8, 16, 38, 0.9));
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 12px 12px 10px;
+  overflow: hidden;
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 12px;
+  flex-direction: column;
 }
-.ca-tag {
-  font-size: 0.68rem;
-  padding: 2px 8px;
-  border-radius: 100px;
-  border: 0.5px solid;
-  font-weight: 500;
+.ca-scroll-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 35%, rgba(202,167,255,0.1), transparent 55%),
+              radial-gradient(circle at 72% 82%, rgba(255,217,138,0.1), transparent 55%);
+  pointer-events: none;
 }
-.ca-quote {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-left: 2px solid var(--accent);
-  background: rgba(255, 217, 138, 0.04);
-  border-radius: 0 6px 6px 0;
-  font-size: 0.82rem;
-  color: var(--accent);
-  font-style: italic;
-  line-height: 1.6;
+.sc-corner {
+  position: absolute;
+  width: 9px; height: 9px;
+  border-color: rgba(255,217,138,0.45);
+  border-style: solid;
+  border-width: 0;
+  z-index: 1;
 }
-.ca-intro {
+.sc-tl { top: 6px; left: 6px;  border-top-width: 1px; border-left-width: 1px; }
+.sc-tr { top: 6px; right: 6px; border-top-width: 1px; border-right-width: 1px; }
+.sc-bl { bottom: 6px; left: 6px;  border-bottom-width: 1px; border-left-width: 1px; }
+.sc-br { bottom: 6px; right: 6px; border-bottom-width: 1px; border-right-width: 1px; }
+.sc-top {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; gap: 2px;
+  margin-bottom: 4px;
+}
+.sc-collection {
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-name-han {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffd98a;
+  letter-spacing: 0.16em;
+  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  text-shadow: 0 0 8px rgba(255,217,138,0.28);
+}
+.sc-svg {
+  width: 100%;
+  flex: 1;
+  min-height: 86px;
+  display: block;
+  position: relative; z-index: 1;
+}
+.sc-tags {
+  position: relative; z-index: 1;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.sc-tag {
+  padding: 1px 6px;
+  font-size: 0.54rem;
+  border-radius: 3px;
+  background: rgba(202,167,255,0.1);
+  border: 1px solid rgba(202,167,255,0.22);
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* 右：文字解读区 */
+.ca-persona-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.ca-pt-para {
   margin: 0;
   font-size: 0.76rem;
-  line-height: 1.75;
-  color: var(--ink-secondary);
+  line-height: 1.9;
+  color: rgba(255,255,255,0.68);
+  text-align: justify;
 }
+.ca-pt-para.first {
+  color: rgba(255,255,255,0.8);
+  line-height: 1.95;
+}
+.ca-han-hl {
+  color: #ffd98a;
+  font-weight: 700;
+  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  letter-spacing: 0.06em;
+  padding: 0 2px;
+}
+.ca-pt-para b { color: var(--ink); font-weight: 600; }
+
+/* 金句卡片（参考故事摘录 quote-mark 风格） */
+.ca-quote-card {
+  position: relative;
+  padding: 10px 14px 10px 28px;
+  border-radius: 6px;
+  background: rgba(255, 217, 138, 0.035);
+  border-left: 2px solid rgba(255, 217, 138, 0.45);
+}
+.ca-quote-mark {
+  position: absolute;
+  left: 10px;
+  top: 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 0.8;
+  color: rgba(255, 217, 138, 0.55);
+  font-family: Georgia, serif;
+}
+.ca-quote-text {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: #ffd98a;
+  font-style: italic;
+  text-shadow: 0 0 12px rgba(255,217,138,0.1);
+}
+
+/* 引导条（参考星格画像的 pt-suggest-wrap） */
+.ca-suggest-wrap {
+  padding-top: 2px;
+  border-top: 1px dashed rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+.ca-s-tip {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  color: #ffd98a;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: rgba(255,217,138,0.08);
+  border: 1px solid rgba(255,217,138,0.2);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.ca-s-text {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.52);
+  line-height: 1.75;
+}
+
+/* 维度条卡片（包一层 + 标题） */
+.ca-dims-card {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.ca-dims-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(202,167,255,0.8);
+  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+}
+.ca-dims-title svg { opacity: 0.75; }
 .ca-dims {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 10px;
 }
 .ca-dim {
   display: flex;
@@ -841,11 +1032,19 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-dim-labels {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   color: var(--muted);
+  gap: 8px;
 }
 .ca-dim-labels .active { color: var(--accent); font-weight: 600; }
+.ca-dim-pct {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: rgba(255,217,138,0.7);
+  font-variant-numeric: tabular-nums;
+}
 .ca-dim-track {
   position: relative;
   height: 4px;
@@ -857,7 +1056,7 @@ function tagStyle(tag: string): Record<string, string> {
   top: 0; left: 0;
   height: 100%;
   border-radius: 100px;
-  background: linear-gradient(90deg, rgba(255, 217, 138, 0.4), rgba(202, 167, 255, 0.4));
+  background: linear-gradient(90deg, rgba(202,167,255,0.55), rgba(255,217,138,0.55));
   transition: width 0.5s ease;
 }
 .ca-dim-knob {
@@ -866,11 +1065,14 @@ function tagStyle(tag: string): Record<string, string> {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px rgba(255, 217, 138, 0.6);
+  background: #ffd98a;
+  box-shadow: 0 0 6px rgba(255,217,138,0.65);
   transform: translate(-50%, -50%);
   transition: left 0.5s ease;
 }
+
+/* 删除旧的未用 class */
+.ca-han-name, .ca-han-sub, .ca-tags, .ca-tag, .ca-quote, .ca-intro { display: none; }
 
 /* ═══ 2. Emotion（发光球体 orb） ═══ */
 .ca-emotion-body {
