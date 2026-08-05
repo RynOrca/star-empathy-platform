@@ -84,6 +84,51 @@
               </span>
             </div>
           </div>
+
+          <!-- 【星辰分布速览】：星图下方信息块，平衡左右栏高度差 + 增加信息密度
+               左栏原来只有星图249px，右栏419px，这里加一块约150px的信息卡补齐视觉落差 -->
+          <div v-if="starBelongings.length > 0" class="ca-h-stardust">
+            <div class="ca-hsd-head">
+              <span class="ca-hsd-dot" style="background:#ffd98a;box-shadow:0 0 4px #ffd98a"></span>
+              <span class="ca-hsd-title">星辰分布速览</span>
+            </div>
+            <div class="ca-hsd-grid">
+              <div class="ca-hsd-cell">
+                <div class="ca-hsd-k">恒星总数</div>
+                <div class="ca-hsd-v" style="color:#ffd98a">{{ starBelongings.length }}</div>
+                <div class="ca-hsd-sub">跨 {{ new Set(starBelongings.map(x => x.con)).size }} 个星座</div>
+              </div>
+              <div class="ca-hsd-cell">
+                <div class="ca-hsd-k">故事总数</div>
+                <div class="ca-hsd-v" style="color:#caa7ff">{{ starBelongTotal }}</div>
+                <div class="ca-hsd-sub">平均 {{ starStatistics.avg }} 篇/星</div>
+              </div>
+              <div class="ca-hsd-cell ca-hsd-cell-wide">
+                <div class="ca-hsd-k">最亮 α 星</div>
+                <div class="ca-hsd-bright">
+                  <span class="ca-hsd-bright-color" :style="{background: starStatistics.brightest?.color ?? '#ffd98a', boxShadow: `0 0 5px ${starStatistics.brightest?.color ?? '#ffd98a'}`}"></span>
+                  <span class="ca-hsd-bright-name" :style="{color: starStatistics.brightest?.color ?? '#ffd98a'}">
+                    {{ starStatistics.brightest?.name ?? '—' }}
+                  </span>
+                  <span class="ca-hsd-bright-con">{{ starStatistics.brightest?.con ?? '' }}</span>
+                  <span class="ca-hsd-bright-mag">m{{ starStatistics.brightest?.mag ?? '—' }}</span>
+                </div>
+              </div>
+              <div class="ca-hsd-cell ca-hsd-cell-wide">
+                <div class="ca-hsd-k">光谱主流</div>
+                <div class="ca-hsd-specbar">
+                  <span v-for="s in spectralSummary" :key="s.type" class="ca-hsd-spec-seg"
+                    :style="{width: s.pct + '%', background: s.color, boxShadow: `inset 0 0 3px ${s.color}55`}">
+                  </span>
+                </div>
+                <div class="ca-hsd-spec-label">
+                  <span v-for="s in spectralSummary.slice(0, 3)" :key="s.type" class="ca-hsd-spec-item" :style="{color: s.color}">
+                    {{ s.type }} {{ s.pct }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 右：星星统计信息（融合到大Hero里，不再单独包card） -->
@@ -1123,44 +1168,54 @@ function orbSize(value: number): number {
  *  确保星辰归属星图 / 光谱分布 / 星座Top 等所有 v-if 都有数据，绝不整块消失
  */
 const MOCK_BELONGINGS = [
-  // 6 颗真实亮星（有 getStarNameInfo 数据），分别来自不同星座、不同光谱色，覆盖统计维度
-  { id: 171,   name: '危宿一',   con: '宝瓶座', color: '#ffd98a', count: 5, ra: 334.5, dec: -0.2 },   // α Aqr G2V
-  { id: 169,   name: '虚宿一',   con: '宝瓶座', color: '#caa7ff', count: 4, ra: 333.8, dec: -5.0 },   // β Aqr B8III
-  { id: 1027,  name: '天津四',   con: '天鹅座', color: '#86a8ff', count: 3, ra: 306.5, dec: 45.3 },   // α Cyg A0V
-  { id: 603,   name: '河鼓二',   con: '天鹰座', color: '#9ae6b4', count: 3, ra: 297.7, dec: 8.9 },    // α Aql F5V
-  { id: 441,   name: '织女一',   con: '天琴座', color: '#ff8b7d', count: 2, ra: 279.2, dec: 38.8 },   // α Lyr M2III
-  { id: 862,   name: '心宿二',   con: '天蝎座', color: '#ffb48a', count: 2, ra: 247.4, dec: -26.4 },  // α Sco K5V
+  // 8 颗真实亮星（有 getStarNameInfo 数据），分别来自8个星座、不同光谱/色，让光谱条/星座Top/标签云有丰富层次
+  { id: 171,   name: '危宿一',   con: '宝瓶座', color: '#ffd98a', count: 6, ra: 334.5, dec: -0.2 },   // α Aqr G2V  金黄
+  { id: 169,   name: '虚宿一',   con: '宝瓶座', color: '#caa7ff', count: 4, ra: 333.8, dec: -5.0 },   // β Aqr B8III 紫蓝
+  { id: 1027,  name: '天津四',   con: '天鹅座', color: '#86a8ff', count: 5, ra: 306.5, dec: 45.3 },   // α Cyg A0V  冰蓝
+  { id: 603,   name: '河鼓二',   con: '天鹰座', color: '#9ae6b4', count: 3, ra: 297.7, dec: 8.9 },    // α Aql F5V  青绿
+  { id: 441,   name: '织女一',   con: '天琴座', color: '#ff8b7d', count: 2, ra: 279.2, dec: 38.8 },   // α Lyr M2III 珊瑚红
+  { id: 862,   name: '心宿二',   con: '天蝎座', color: '#ffb48a', count: 3, ra: 247.4, dec: -26.4 },  // α Sco K5V  暖橙
+  { id: 455,   name: '贯索四',   con: '北冕座', color: '#ffe7ad', count: 2, ra: 234.9, dec: 31.0 },   // α CrB A0V  米白
+  { id: 323,   name: '右枢',     con: '天龙座', color: '#b9c9ff', count: 1, ra: 211.6, dec: 64.4 },   // α Dra B9V  灰蓝
 ]
 const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number; ra: number; dec: number }[]>(() => {
-  const map = new Map<number, number>()
-  for (const s of props.stories ?? []) {
-    const ids: number[] = []
-    if (s.catalogStarId != null) ids.push(s.catalogStarId)
-    if (Array.isArray(s.catalogStarIds)) ids.push(...s.catalogStarIds)
-    for (const id of Array.from(new Set(ids))) {
-      map.set(id, (map.get(id) ?? 0) + 1)
-    }
-  }
-  // 真实数据不为空 → 用真实数据
-  if (map.size > 0) {
-    return Array.from(map.entries())
-      .map(([id, count]) => {
-        const info = getStarNameInfo(id)
-        return {
-          id,
-          name: info?.name ?? `星 ${id}`,
-          con: info?.con ?? '',
-          color: info?.color ?? '#86a8ff',
-          count,
-          ra: info?.ra ?? -1,
-          dec: info?.dec ?? 0,
-        }
-      })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 12)
-  }
-  // 真实数据为空（设计预览） → 返回 mock，确保后续所有 v-if / v-for 都有数据，不消失
+  /**
+   * 【设计预览模式：强制返回 MOCK，不依赖真实数据】
+   * 用户已明确：禁止接数据，先把前端设计做好，信息充实。
+   * 因此这里直接使用 MOCK_BELONGINGS（8 颗跨星座星），保证光谱/星座/标签/星图
+   * 全部有足够数据呈现设计效果。
+   * 将来接入真实数据时，恢复下面注释掉的真实数据聚合逻辑即可。
+   */
   return MOCK_BELONGINGS.map(x => ({ ...x }))
+
+  // —— 真实数据逻辑（暂不启用） ——
+  // const map = new Map<number, number>()
+  // for (const s of props.stories ?? []) {
+  //   const ids: number[] = []
+  //   if (s.catalogStarId != null) ids.push(s.catalogStarId)
+  //   if (Array.isArray(s.catalogStarIds)) ids.push(...s.catalogStarIds)
+  //   for (const id of Array.from(new Set(ids))) {
+  //     map.set(id, (map.get(id) ?? 0) + 1)
+  //   }
+  // }
+  // if (map.size > 0) {
+  //   return Array.from(map.entries())
+  //     .map(([id, count]) => {
+  //       const info = getStarNameInfo(id)
+  //       return {
+  //         id,
+  //         name: info?.name ?? `星 ${id}`,
+  //         con: info?.con ?? '',
+  //         color: info?.color ?? '#86a8ff',
+  //         count,
+  //         ra: info?.ra ?? -1,
+  //         dec: info?.dec ?? 0,
+  //       }
+  //     })
+  //     .sort((a, b) => b.count - a.count)
+  //     .slice(0, 12)
+  // }
+  // return MOCK_BELONGINGS.map(x => ({ ...x }))
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
 
@@ -1441,6 +1496,17 @@ const starStatistics = computed(() => {
     : 4.0
 
   return { avg, spectral, topCons, horizonPct, sm, brightest, dimmest, avgMag }
+})
+
+/** 光谱主流汇总：取 starStatistics.spectral 前4个，按百分比归一化，给左侧"星辰分布速览"的光谱条用 */
+const spectralSummary = computed(() => {
+  const arr = starStatistics.value.spectral.slice(0, 4)
+  const total = arr.reduce((s, x) => s + x.pct, 0) || 1
+  return arr.map(s => ({
+    type: s.spec,
+    pct: Math.round(s.pct / total * 100),
+    color: s.color,
+  }))
 })
 
 /* ═══════════════════════════════════════════════════════════
@@ -4318,8 +4384,6 @@ function tagStyle(tag: string): Record<string, string> {
    Hero：星辰归属 + 星星品质（横铺双栏替代原合集星图+星辰归属双栏）
    ═══════════════════════════════════════════ */
 .ca-hero-panel {
-  /* panel-wrapper 默认 10px 圆角 + 1px 极淡边 + 1px 顶金线紫线渐变已由 AIPersonaCard 同款的全局类控制？
-     本组件没 import AIPersonaCard CSS，这里重写一份保证一致 */
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
@@ -4328,13 +4392,11 @@ function tagStyle(tag: string): Record<string, string> {
   flex-direction: column;
   gap: 10px;
   position: relative;
-  /* 不能 overflow:hidden（会裁掉 520px 的 body），改为 visible；圆角无需裁剪溢出因为内部元素都有圆角 */
   overflow: visible;
   margin: 0 0 4px;
-  /* 【关键】必须给 min-height！
-     panel-head ≈ 30px + ca-hero-body-big min-height 520px + padding/gap 余量 ≈ 580
-     没有 min-height 时 flex 容器会收缩到 panel-head 的 27px，然后子元素 520px 被裁掉！ */
-  min-height: 600px;
+  /* 【彻底移除硬编码 min-height:600px！之前为了防塌缩的补丁已经不需要，
+     现在内容自然撑高（panel-head≈28 + body≈350 + padding≈30 ≈ 410px，自然而不溢出） */
+  min-height: auto;
   flex-shrink: 0;
 }
 /* 顶部 1px 金线紫线渐变（和 StarDetail 同款） */
@@ -4386,12 +4448,17 @@ function tagStyle(tag: string): Record<string, string> {
 /* Hero body stats：融合版 —— 左星图/右品质自然融为一体，不再两张独立card
    用一条柔和的垂直渐变分割线（代替两个硬box边界），营造统一的"一张大图"的感觉 */
 .ca-hero-body-stats {
+  display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 20px;   /* 中间留足空间给垂直分隔线，视觉上不挤也不飘 */
-  align-items: stretch;
-  min-height: 480px;
+  gap: 16px;   /* 从20→16，更紧凑，减少呼吸空间 */
+  align-items: start; /* start代替stretch：左右栏按内容高度自然排布，不硬拉伸，避免右栏空白 */
+  justify-items: stretch;
+  /* 【移除 480px 硬 min-height】—— 让内容自然撑高，不强制溢出 */
+  min-height: auto;
   position: relative;
-  padding: 6px 2px 8px;
+  padding: 4px 2px 6px;
+  flex: 1;
+  width: 100%;
 }
 /* 中间柔和垂直分隔线：顶底透明度渐变，中间实 —— 像一张画的折痕/裱画分格线 */
 .ca-hero-body-stats::before {
@@ -4428,7 +4495,8 @@ function tagStyle(tag: string): Record<string, string> {
 /* 左的星图 SVG：放大到 420:300 比例，保证星图足够大气 */
 .ca-h-left-block .ca-starmap-svg {
   aspect-ratio: 420 / 300;
-  min-height: 260px;
+  /* 【降低 min-height:260 → 180】—— 以aspect-ratio为主，自然适配宽度，不硬撑高 */
+  min-height: 180px;
 }
 /* 星图容器在左栏：无边框加成（但保留本身 starmap-wrap 的深蓝底+蓝框，那个是星图本体的夜空感） */
 .ca-h-left-block .ca-starmap-wrap {
@@ -4441,15 +4509,134 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 10px 8px 8px;
 }
 
+/* 【星辰分布速览】：星图下方信息块，平衡左右栏高度差 + 增加信息密度 */
+.ca-h-stardust {
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.045);
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(255,217,138,0.05), transparent 55%),
+    radial-gradient(ellipse at 85% 100%, rgba(134,168,255,0.05), transparent 55%),
+    rgba(255,255,255,0.012);
+  border-radius: 8px;
+  padding: 9px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ca-hsd-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ca-hsd-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ca-hsd-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: rgba(220, 220, 240, 0.7);
+  font-weight: 500;
+}
+.ca-hsd-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+.ca-hsd-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ca-hsd-cell-wide {
+  grid-column: 1 / -1;
+}
+.ca-hsd-k {
+  font-size: 0.6rem;
+  color: rgba(200, 200, 225, 0.42);
+  letter-spacing: 0.12em;
+}
+.ca-hsd-v {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ca-hsd-sub {
+  font-size: 0.6rem;
+  color: rgba(200, 200, 225, 0.38);
+}
+
+/* 最亮α星单行 */
+.ca-hsd-bright {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.ca-hsd-bright-color {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ca-hsd-bright-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.ca-hsd-bright-con {
+  font-size: 0.62rem;
+  color: rgba(200, 200, 225, 0.48);
+  margin-left: 2px;
+}
+.ca-hsd-bright-mag {
+  font-size: 0.62rem;
+  color: rgba(200, 200, 225, 0.55);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* 光谱主流条 */
+.ca-hsd-specbar {
+  display: flex;
+  width: 100%;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+  margin-top: 3px;
+  gap: 1px;
+}
+.ca-hsd-spec-seg {
+  display: inline-block;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.ca-hsd-spec-label {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.ca-hsd-spec-item {
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+}
+
 /* 右：星星品质区域 —— 无独立card背景/边框，内容自然展开 */
 .ca-h-right-block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;   /* 从 12 → 9，更紧凑，减少段间空白 */
   min-width: 0;
   min-height: 0;
-  padding: 2px 2px 2px 6px;  /* 右贴大panel右，左留 6px 给分隔线呼吸感 */
-  align-self: stretch;
+  padding: 0 2px 2px 6px;  /* 右贴大panel右，左留 6px 给分隔线呼吸感，顶padding去掉 */
   flex: 1;
 }
 
@@ -4794,6 +4981,6 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-h-stats { grid-template-columns: 1fr 1fr; }
   .ca-h-ss-quad { grid-template-columns: 1fr 1fr; }
   .ca-et-svg { min-height: 180px; }
-  .ca-h-left-block .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 200px; }
+  .ca-h-left-block .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 150px; }
 }
 </style>
