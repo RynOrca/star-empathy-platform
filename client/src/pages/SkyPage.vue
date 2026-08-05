@@ -59,10 +59,6 @@
         <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
           <Search :size="18" />
         </button>
-        <!-- 我的/全部切换 -->
-        <button v-if="username" class="nav-icon-btn" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" :title="showMyStoriesOnly ? '查看全部故事' : '只看我的故事'">
-          <component :is="showMyStoriesOnly ? Globe : Star" :size="18" />
-        </button>
         <!-- 定位 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
@@ -78,6 +74,9 @@
         <!-- 设置 -->
         <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
+        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线） -->
+        <button v-if="locationReady" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
+          <Orbit :size="18" />
         </button>
         <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
         <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
@@ -133,11 +132,6 @@
           </div>
         </div>
       </div>
-    </Transition>
-
-    <!-- 切换反馈提示 -->
-    <Transition name="toast-fade">
-      <div v-if="myToggleFeedback" class="toggle-toast">{{ myToggleFeedback }}</div>
     </Transition>
 
     <!-- 定位城市提示 -->
@@ -531,11 +525,6 @@
       </Transition>
       <!-- ═══ 记录 结束 ═══ -->
 
-      <SettingsModal
-        :visible="showSettings"
-        @close="showSettings = false"
-      />
-
       <MoonPanel
         :visible="showMoonPanel"
         :data="moonPanelData"
@@ -553,7 +542,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -561,7 +550,6 @@ import StarDetail from '../components/StarDetail/index.vue'
 import CollectionDetail from '../components/CollectionDetail/index.vue'
 import CollectionEditModal from '../components/CollectionEditModal.vue'
 import StoryForm from '../components/StoryForm.vue'
-import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
 import { useLocation } from '../composables/useLocation'
@@ -600,20 +588,6 @@ const collectionEditError = ref<string | null>(null)
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
 const locationCityToast = ref('')
-
-function toggleMyStories() {
-  // 访客账号无个人故事，跳登录页
-  if (isGuest.value) { goLogin(); return }
-  // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
-  if (!currentUserId.value) {
-    myToggleFeedback.value = '请先登录'
-    setTimeout(() => { myToggleFeedback.value = '' }, 2000)
-    return
-  }
-  showMyStoriesOnly.value = !showMyStoriesOnly.value
-  myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
-  setTimeout(() => { myToggleFeedback.value = '' }, 2000)
-}
 const favoriteStarIds = ref<number[]>([])
 
 // ─── 统一位置管理（快速缓存+低精度优先+后台高精度更新） ───
@@ -1192,6 +1166,24 @@ function publishStories(
   skyRef.value?.sky?.setStarStatsCache(statsMap)
 }
 
+// 从 storiesByStarId 重建全量天空统计并同步到 sky（数据变更后调用）
+function rebuildStatsFromMap() {
+  const fullMap = storiesByStarId.value
+  if (!fullMap) return
+  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  for (const [cid, stories] of fullMap) {
+    if (stories.length === 0) continue
+    statsMap.set(cid, {
+      stories: stories.length,
+      resonance: stories.reduce((sum, s) => sum + s.resonanceCount, 0),
+      views: stories.reduce((sum, s) => sum + s.viewCount, 0),
+      favorites: 0,
+    })
+  }
+  pendingStatsMap.value = statsMap
+  skyRef.value?.sky?.setStarStatsCache(statsMap)
+}
+
 async function fetchStories() {
   if (fetchingStories.value) return
   fetchingStories.value = true
@@ -1225,87 +1217,8 @@ async function fetchStories() {
   } finally {
     fetchingStories.value = false
   }
-  // 如果"只看我的"已开启，重新计算过滤后的天空统计
-  if (showMyStoriesOnly.value) recalcFilteredStats()
 }
 onMounted(() => { fetchStories() })
-
-// 根据"只看我的"切换，重新计算天空中的星星统计数据
-function recalcFilteredStats() {
-  const fullMap = storiesByStarId.value
-  if (!fullMap) return
-  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
-  for (const [cid, stories] of fullMap) {
-    const filtered = showMyStoriesOnly.value
-      ? stories.filter(s => s.userId === currentUserId.value)
-      : stories
-    if (filtered.length === 0) continue
-    statsMap.set(cid, {
-      stories: filtered.length,
-      resonance: filtered.reduce((sum, s) => sum + s.resonanceCount, 0),
-      views: filtered.reduce((sum, s) => sum + s.viewCount, 0),
-      favorites: 0,
-    })
-  }
-  pendingStatsMap.value = statsMap
-  skyRef.value?.sky?.setStarStatsCache(statsMap)
-}
-
-// 监听"只看我的"切换，更新天空统计和私有连线
-watch(showMyStoriesOnly, async () => {
-  recalcFilteredStats()
-  if (showMyStoriesOnly.value) {
-    // 开启"只看我的"：加载私有连线
-    await fetchMyKernelLines()
-  } else {
-    // 关闭"只看我的"：清除连线
-    skyRef.value?.sky?.setKernelLines([])
-  }
-  // 如果详情面板打开：仅当该星完全没有故事时关闭面板
-  // 注意：showMyStoriesOnly 只影响 3D 天空，不影响详情面板数据
-  if (selectedStarInfo.value && selectedCatalogStarId.value) {
-    const allStories = storiesByStarId.value.get(selectedCatalogStarId.value)
-    if (!allStories || allStories.length === 0) {
-      selectedStories.value = []
-      selectedStarInfo.value = null
-      catalogStats.value = null
-    }
-  }
-})
-
-// 获取过滤后的故事（考虑"只看我的"开关）
-function getFilteredStories(starId: number): StoryData[] {
-  const stories = storiesByStarId.value.get(starId)
-  if (!stories) return []
-  if (!showMyStoriesOnly.value) return stories
-  return stories.filter(s => s.userId === currentUserId.value)
-}
-
-// 获取用户私有内核连线
-async function fetchMyKernelLines() {
-  const token = localStorage.getItem('token')
-  if (!token) return
-  try {
-    const res = await fetch('/api/profile/kernel-lines', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const json = await res.json()
-    if (!res.ok || !json.data?.length) {
-      skyRef.value?.sky?.setKernelLines([])
-      return
-    }
-    const lines = (json.data as {
-      from: { catalogStarId: number; x: number; y: number; z: number }
-      to: { catalogStarId: number; x: number; y: number; z: number }
-    }[]).map(l => ({
-      from: { x: l.from.x, y: l.from.y, z: l.from.z },
-      to: { x: l.to.x, y: l.to.y, z: l.to.z },
-    }))
-    skyRef.value?.sky?.setKernelLines(lines)
-  } catch {
-    skyRef.value?.sky?.setKernelLines([])
-  }
-}
 
 function formatStarName(s: CatalogStar): string {
   if (s.name) return s.name
@@ -1432,7 +1345,12 @@ const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
-const showSettings = ref(false)
+// 行星轨迹开关：true=显示所有行星视运动轨迹，false=只显示太阳轨迹（黄道线）
+const showPlanetTrails = ref(true)
+function togglePlanetTrails() {
+  showPlanetTrails.value = !showPlanetTrails.value
+  skyRef.value?.sky?.setPlanetTrailsVisible(showPlanetTrails.value)
+}
 
 // ─── PC 端行星特写 · 观察模式（issue #136）───
 // planetObserveMode=true 时隐藏故事面板和模糊背景，露出 3D 行星特写供用户滚轮/拖拽观察
@@ -1626,7 +1544,6 @@ function onStarClick(starId: number) {
   }
   const star = catalogStarLookup.get(starId); if (!star) return
   // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
-  // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { id: star.id, displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
@@ -1826,8 +1743,8 @@ function onStorySubmitted(story: StoryData) {
     map.set(cid, existing)
   }
   storiesByStarId.value = map
-  // 更新天空统计（无论是否"只看我的"模式）
-  recalcFilteredStats()
+  // 更新天空统计
+  rebuildStatsFromMap()
   // 更新当前选中星的故事列表（如果故事绑定到当前星）
   if (cids.includes(selectedCatalogStarId.value) && selectedStarInfo.value) {
     selectedStories.value = map.get(selectedCatalogStarId.value) ?? []
@@ -1860,7 +1777,7 @@ function onDeleteStory(storyId: number) {
     storiesByStarId.value = map
   }
   // 更新统计
-  recalcFilteredStats()
+  rebuildStatsFromMap()
   fetchCatalogStats(cid)
   // 如果当前星没有故事了，关闭面板
   if (selectedStories.value.length === 0) {
@@ -1876,7 +1793,7 @@ function onStarDetailStoriesMutated(kind: 'new' | 'delete' | 'resonate' | 'kerne
   if (!selectedCatalogStarId.value) return
   if (kind === 'resonate' || kind === 'delete' || kind === 'kernel-edit') {
     fetchCatalogStats(selectedCatalogStarId.value)
-    recalcFilteredStats()
+    rebuildStatsFromMap()
   }
 }
 async function onResonate(storyId: number) {
@@ -1920,7 +1837,7 @@ async function onResonate(storyId: number) {
       // 从后端拉取权威 stats，确保数据准确
       fetchCatalogStats(selectedCatalogStarId.value)
       // 刷新天空统计
-      recalcFilteredStats()
+      rebuildStatsFromMap()
     }
   } catch (e) {
     console.error('共鸣失败:', e)
@@ -2467,14 +2384,6 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
 
-/* ─── 切换反馈 Toast ─── */
-.toggle-toast {
-  position: fixed; top: 3.5rem; left: 50%; transform: translateX(-50%);
-  z-index: 25; padding: 0.5rem 1.2rem; border-radius: 20px;
-  background: rgba(255, 217, 138, 0.15); border: 1px solid rgba(255, 217, 138, 0.3);
-  color: #ffd98a; font-size: 0.82rem; backdrop-filter: blur(8px);
-  pointer-events: none;
-}
 .toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
 .toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
@@ -2774,13 +2683,6 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   }
 
   /* Toasts */
-  .toggle-toast {
-    top: auto;
-    bottom: 1rem;
-    font-size: 0.78rem;
-    padding: 0.5rem 1rem;
-  }
-
   .location-toast {
     top: auto;
     bottom: 4rem;
