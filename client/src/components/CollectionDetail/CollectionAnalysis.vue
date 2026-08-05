@@ -429,76 +429,81 @@
       </div>
     </section>
 
-    <!-- ═══ 2. 星座星色（=原情感光谱，升级星空绑定：球阵加光谱型+赫罗图轴、洞察卡加星等/距离） + 3. 星辰归属 双栏═══ -->
+    <!-- ═══ 2. 夜色流转（=原情感光谱，天空本色重构：左=横向天色渐变带+5颗时辰光球；右=星辰归属保留） + 3. 星辰归属 双栏═══ -->
     <div class="ca-duo">
-      <!-- 星座星色（赫罗图风格：发光球体+光谱标签+洞察卡加天文参数+主调叙事→星座主序） -->
-      <section class="ca-card ca-emotion">
+      <!-- 夜色流转（横向天色渐变带：入夜→子夜→黎明；5颗光球按时辰散落+时辰标签；洞察卡=夜刻叙述；主调→夜色主调） -->
+      <section class="ca-card ca-emotion ca-night-flow">
         <div class="ca-card-head">
-          <component :is="HeartPulse" :size="12" class="ca-ch-icon ca-ch-red" />
-          <span class="ca-ch-title">星座星色</span>
-          <span class="ca-ch-count">HR 图 · {{ emotions.length }} 光谱型 · {{ storyCount }} 主星</span>
+          <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
+          <span class="ca-ch-title">夜色流转</span>
+          <span class="ca-ch-count">子流 → 卯散 · {{ emotions.length }} 种夜色</span>
         </div>
         <div class="ca-emotion-body">
-          <!-- 球体展示：容器改成赫罗图(HR Diagram)风格，加X/Y轴 -->
-          <div class="ca-emo-orbs ca-hr-diagram">
-            <!-- Y 轴：光度 Lum (暗→亮，从下到上) -->
-            <div class="ca-hr-y">
-              <span class="ca-hr-y-top">Lum ↑</span>
-              <span class="ca-hr-y-bot">暗</span>
+          <!-- 发光球展示：容器不再是HR图 → 是横向天色轨道带（入夜→子夜→黎明） -->
+          <div class="ca-emo-orbs ca-night-track">
+            <!-- 顶部时辰小字（子/丑/寅/卯）-->
+            <div class="ca-nt-hours">
+              <span>子</span><span>丑</span><span>寅</span><span>卯</span>
             </div>
-            <!-- X 轴：温度 Temp (蓝→红，从左到右) -->
-            <div class="ca-hr-x">
-              <span class="ca-hr-x-l">O B A F G K M →</span>
-              <span class="ca-hr-x-r">Temp ↓</span>
-            </div>
-            <!-- 球体：加光谱型小标签 badge -->
-            <span
-              v-for="(e, i) in emotions"
-              :key="e.name"
-              class="ca-emo-orb ca-hr-orb"
-              :style="{
-                width: orbSize(e.value) + 'px',
-                height: orbSize(e.value) + 'px',
-                background: `radial-gradient(circle at 35% 30%, ${e.color}dd, ${e.color}33 70%, transparent)`,
-                boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
-                // HR 图 X 偏移：按光谱顺序从左到右排布
-                left: `calc(8% + ${i * 17}%)`,
-                // HR 图 Y 偏移：值越大光度越高（越靠上）
-                bottom: `calc(22% + ${e.value * 45}%)`,
-              }"
-              :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc} · 光谱 ${emotionSpectra[i].type}`"
-            >
-              <!-- 光谱型标签徽章（右下） -->
-              <span class="ca-hr-spec-tag" :style="{ color: e.color, borderColor: e.color + '66' }">
-                {{ emotionSpectra[i].type }}
+            <!-- 横向天色渐变轨道（核心：入夜→子夜→黎明 的 夜色渐变带） -->
+            <div class="ca-nt-band">
+              <!-- 球：按时段位置散落，每个 ball 上带时辰小标签（子初三刻/丑正四刻...） -->
+              <span
+                v-for="(e, i) in emotions"
+                :key="e.name"
+                class="ca-emo-orb ca-nt-orb"
+                :style="{
+                  width: orbSize(e.value) + 'px',
+                  height: orbSize(e.value) + 'px',
+                  background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}33 70%, transparent)`,
+                  boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
+                  // 横向按 5 段夜分布：子时中段最集中（思念/孤独），寅初分散（释然/希望），最右是黎明附近
+                  left: `calc(${10 + i * 18}%)`,
+                  // 纵向：值越大越靠上（夜色越浓越高）
+                  top:  `calc(${50 - e.value * 42}%)`,
+                }"
+                :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
+              >
+                <!-- 时辰小标签：替代原光谱型 badge（子初三刻 / 丑正 / 寅初 / ...） -->
+                <span class="ca-nt-hour-tag" :style="{ color: e.color, borderColor: e.color + '66' }">
+                  {{ (['子初三刻','丑正二刻','寅初一刻','寅正三刻','卯初初刻'])[i] }}
+                </span>
+                <span class="ca-emo-orb-label">{{ e.name }}</span>
+                <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
               </span>
-              <span class="ca-emo-orb-label">{{ e.name }}</span>
-              <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
-            </span>
+            </div>
+            <!-- 底部天色色温标尺（冷→暖：蓝紫→金曙） -->
+            <div class="ca-nt-scale">
+              <span class="ca-nt-sc-l">· 夜愈深</span>
+              <span class="ca-nt-sc-r">天将曙 ·</span>
+            </div>
           </div>
 
-          <!-- 情绪洞察卡片：加星等/光年/恒星类型参数行 -->
+          <!-- 情绪洞察卡：去掉恒星 TYPE/MAG/DIST 行 → 改成「夜刻」头标签（子时二刻/丑初一刻/寅初三刻...） -->
           <div class="ca-emo-insights">
-            <div class="ca-ei-card" v-for="(ins, i) in emotionInsights" :key="i">
+            <div class="ca-ei-card ca-ei-card-night" v-for="(ins, i) in emotionInsights" :key="i">
               <span class="ca-ei-dot" :style="{ background: ins.color, boxShadow: `0 0 5px ${ins.color}` }"></span>
               <div class="ca-ei-text">
                 <div class="ca-ei-title" :style="`--c:${ins.color}`">
                   <span class="ca-ei-title-name" v-html="ins.title"></span>
-                  <span class="ca-ei-pct" :style="{ color: ins.color }">{{ ins.pct }}</span>
+                  <!-- 原占比 → 改成「夜刻」：子时末 / 丑正二刻 / ... -->
+                  <span class="ca-ei-night-hour" :style="{ color: ins.color }">
+                    {{ (['子时末','丑正二刻','寅初一刻','寅正三刻'])[i] ?? '卯初初刻' }}
+                  </span>
                 </div>
-                <!-- 新增：天文参数行（恒星类型 / 视星等 / 光年距离） -->
-                <div class="ca-ei-astro">
+                <!-- 原 astro 行 → 改成「夜色属性」：月相/云量/温度短行 -->
+                <div class="ca-ei-astro ca-ei-night-meteo">
                   <span class="ca-ei-astro-item">
-                    <i class="ca-ei-astro-k">TYPE</i>
-                    <i class="ca-ei-astro-v" :style="{ color: ins.color }">{{ ins.astro.type }}</i>
+                    <i class="ca-ei-astro-k">相</i>
+                    <i class="ca-ei-astro-v" :style="{ color: ins.color }">{{ (['残月','残月','蛾眉','蛾眉','上弦'])[i] ?? '残月' }}</i>
                   </span>
                   <span class="ca-ei-astro-item">
-                    <i class="ca-ei-astro-k">MAG</i>
-                    <i class="ca-ei-astro-v">{{ ins.astro.mag }}m</i>
+                    <i class="ca-ei-astro-k">云</i>
+                    <i class="ca-ei-astro-v">{{ (['3/8','4/8','2/8','4/8','1/8'])[i] ?? '3/8' }}</i>
                   </span>
                   <span class="ca-ei-astro-item">
-                    <i class="ca-ei-astro-k">DIST</i>
-                    <i class="ca-ei-astro-v">{{ ins.astro.dist }}ly</i>
+                    <i class="ca-ei-astro-k">温</i>
+                    <i class="ca-ei-astro-v">{{ ([11.4,10.8,11.2,12.1,12.9])[i] ?? 11 }}℃</i>
                   </span>
                 </div>
                 <div class="ca-ei-desc">{{ ins.desc }}</div>
@@ -506,19 +511,20 @@
             </div>
           </div>
 
-          <!-- 主调叙事：改成星座主序口吻（恒星演化类比） -->
-          <div class="ca-emo-narrative ca-emo-mainseq">
+          <!-- 主调叙事：星座主序口吻 → 夜色主调（子时最浓→卯时渐散） -->
+          <div class="ca-emo-narrative ca-emo-night-narr">
             <p class="ca-emo-para">
               <span class="ca-emo-lead">{{ emotionNarrative.dominant }}</span>
               <span class="ca-emo-lead-pct">{{ emotionNarrative.dominantPct }}</span>
+              是这一夜的底色，
               {{ emotionNarrative.summary }}
             </p>
             <p class="ca-emo-para ca-emo-para-sub">
-              <i class="ca-emo-ms-label">主序阶段</i>
+              <i class="ca-emo-ms-label ca-emo-nl-label">夜 · 浓淡</i>
               {{ emotionNarrative.contrast }}
             </p>
             <p class="ca-emo-para ca-emo-para-flow">
-              <component :is="Orbit" :size="10" class="ca-emo-flow-icon" />
+              <component :is="Sparkles" :size="10" class="ca-emo-flow-icon" />
               {{ emotionNarrative.flow }}
             </p>
           </div>
@@ -624,66 +630,80 @@
       </section>
     </div>
 
-    <!-- ═══ 心事摘录 → 【星空绑定】亮星独白（全宽：左插画+αβγ亮星编号徽章+星等/光年+正文+标签）═══ -->
-    <section class="ca-card ca-quote">
+    <!-- ═══ 心事摘录 → 【天空本色】天窗片段（那一夜夜色里剪出来的几帧：时辰贴纸+插画窗+当夜属性）═══ -->
+    <section class="ca-card ca-quote ca-quote-sky">
       <div class="ca-card-head">
-        <component :is="Quote" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">亮星独白</span>
-        <span class="ca-ch-count">α β γ · {{ storyQuotes.length }} 颗亮星 · 精选心事</span>
+        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
+        <span class="ca-ch-title">天窗片段</span>
+        <span class="ca-ch-count">子·丑·寅·卯 · {{ storyQuotes.length }} 帧 · 心事剪成的夜色</span>
       </div>
       <div class="ca-q-body">
         <div class="ca-q-list">
-          <div class="ca-q-item" v-for="(q, i) in storyQuotes" :key="i">
-            <!-- 【新增】左上 α/β/γ 亮星编号徽章（彩色发光） -->
-            <span class="ca-q-rank" :style="{ '--c': q.color }"><i>{{ q.rank }}</i></span>
+          <div class="ca-q-item ca-q-item-sky" v-for="(q, i) in storyQuotes" :key="i">
+            <!-- 左上：α/β/γ 亮星徽章 → 改成「时辰贴纸」（子初三刻 / 丑正二刻 / 寅初一刻） -->
+            <span class="ca-q-rank ca-q-sticker" :style="{ '--c': q.color }">
+              <i>{{ (['子初三刻','丑正二刻','寅初一刻'])[i % 3] }}</i>
+            </span>
 
-            <!-- 左 SVG 插画：根据 illus 渲染月亮 / 家屋 / 花枝 -->
-            <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="ca-q-illus">
-              <circle cx="14" cy="18" r="1" fill="#fff" opacity="0.5" />
-              <circle cx="45" cy="44" r="0.7" fill="#fff" opacity="0.4" />
-              <circle cx="30" cy="10" r="0.5" fill="#fff" opacity="0.3" />
-              <circle cx="50" cy="28" r="0.8" fill="#fff" opacity="0.45" />
-              <path d="M42 28 a16 16 0 1 0 0 20 a12 12 0 1 1 0 -20z" fill="#ffd98a" opacity="0.62" />
-            </svg>
-            <svg v-else-if="q.illus === 'house'" viewBox="0 0 60 60" class="ca-q-illus">
-              <circle cx="10" cy="20" r="0.7" fill="#fff" opacity="0.35" />
-              <circle cx="52" cy="16" r="0.6" fill="#fff" opacity="0.3" />
-              <path d="M30 14 L14 28 L18 28 L18 48 L42 48 L42 28 L46 28 Z"
-                fill="none" stroke="rgba(255,217,138,0.55)" stroke-width="1.2" stroke-linejoin="round" />
-              <rect x="26" y="36" width="8" height="12" fill="none" stroke="rgba(255,217,138,0.42)" stroke-width="1" />
-              <rect x="21" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
-              <rect x="34" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
-              <path d="M36 14 Q34 10 38 8 Q40 6 36 4" fill="none" stroke="rgba(202,167,255,0.45)" stroke-width="0.8" stroke-linecap="round" />
-            </svg>
-            <svg v-else viewBox="0 0 60 60" class="ca-q-illus">
-              <circle cx="16" cy="50" r="0.7" fill="#fff" opacity="0.35" />
-              <circle cx="48" cy="52" r="0.6" fill="#fff" opacity="0.3" />
-              <g stroke="rgba(251,182,206,0.58)" stroke-width="0.85" fill="none">
-                <path d="M30 52 L30 20" />
-                <path d="M30 32 L18 24 M30 28 L44 18 M30 38 L22 32" />
-              </g>
-              <g fill="rgba(251,182,206,0.7)">
-                <circle cx="18" cy="24" r="1.5" /><circle cx="44" cy="18" r="1.3" />
-                <circle cx="22" cy="32" r="1.2" /><circle cx="38" cy="36" r="1.1" />
-                <circle cx="30" cy="18" r="1.2" /><circle cx="26" cy="26" r="1" />
-              </g>
-              <circle cx="20" cy="44" r="0.9" fill="rgba(251,182,206,0.55)" />
-              <circle cx="40" cy="46" r="0.8" fill="rgba(251,182,206,0.48)" />
-            </svg>
+            <!-- 左 SVG 插画：保留月/屋/花，但套一层「夜色小窗」方形外框（把插画嵌进窗里，窗内=天色） -->
+            <!-- 窗 = 4px 边框 + 内部天色渐变（夜色蓝紫） + 边角残灯点 -->
+            <div class="ca-q-skywindow">
+              <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="ca-q-illus">
+                <circle cx="14" cy="18" r="1" fill="#fff" opacity="0.5" />
+                <circle cx="45" cy="44" r="0.7" fill="#fff" opacity="0.4" />
+                <circle cx="30" cy="10" r="0.5" fill="#fff" opacity="0.3" />
+                <circle cx="50" cy="28" r="0.8" fill="#fff" opacity="0.45" />
+                <path d="M42 28 a16 16 0 1 0 0 20 a12 12 0 1 1 0 -20z" fill="#ffd98a" opacity="0.62" />
+              </svg>
+              <svg v-else-if="q.illus === 'house'" viewBox="0 0 60 60" class="ca-q-illus">
+                <circle cx="10" cy="20" r="0.7" fill="#fff" opacity="0.35" />
+                <circle cx="52" cy="16" r="0.6" fill="#fff" opacity="0.3" />
+                <path d="M30 14 L14 28 L18 28 L18 48 L42 48 L42 28 L46 28 Z"
+                  fill="none" stroke="rgba(255,217,138,0.55)" stroke-width="1.2" stroke-linejoin="round" />
+                <rect x="26" y="36" width="8" height="12" fill="none" stroke="rgba(255,217,138,0.42)" stroke-width="1" />
+                <rect x="21" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
+                <rect x="34" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
+                <path d="M36 14 Q34 10 38 8 Q40 6 36 4" fill="none" stroke="rgba(202,167,255,0.45)" stroke-width="0.8" stroke-linecap="round" />
+              </svg>
+              <svg v-else viewBox="0 0 60 60" class="ca-q-illus">
+                <circle cx="16" cy="50" r="0.7" fill="#fff" opacity="0.35" />
+                <circle cx="48" cy="52" r="0.6" fill="#fff" opacity="0.3" />
+                <g stroke="rgba(251,182,206,0.58)" stroke-width="0.85" fill="none">
+                  <path d="M30 52 L30 20" />
+                  <path d="M30 32 L18 24 M30 28 L44 18 M30 38 L22 32" />
+                </g>
+                <g fill="rgba(251,182,206,0.7)">
+                  <circle cx="18" cy="24" r="1.5" /><circle cx="44" cy="18" r="1.3" />
+                  <circle cx="22" cy="32" r="1.2" /><circle cx="38" cy="36" r="1.1" />
+                  <circle cx="30" cy="18" r="1.2" /><circle cx="26" cy="26" r="1" />
+                </g>
+                <circle cx="20" cy="44" r="0.9" fill="rgba(251,182,206,0.55)" />
+                <circle cx="40" cy="46" r="0.8" fill="rgba(251,182,206,0.48)" />
+              </svg>
+              <!-- 夜色窗的 4 角 窗棂点（残灯/光斑） -->
+              <i class="ca-q-sw-corner tl"></i>
+              <i class="ca-q-sw-corner tr"></i>
+              <i class="ca-q-sw-corner bl"></i>
+              <i class="ca-q-sw-corner br"></i>
+            </div>
 
-            <!-- 右：正文（顶部新增亮星星名+天文参数行） -->
+            <!-- 右：正文（顶部新增「当夜时间 + 夜属性」行，替代亮星星名+天文参数） -->
             <div class="ca-q-body-inner">
               <div class="ca-q-mark" :style="{ color: q.color }">"</div>
-              <!-- 【新增】亮星星名+天文参数行（α 雨夜寄北 / 视星等 / 光年） -->
-              <div class="ca-q-star-head">
+              <!-- 那一夜的时间 + 夜属性（残月 / 11.4℃ / 云量 3成）：替代 MAG/DIST -->
+              <div class="ca-q-star-head ca-q-night-head">
                 <span class="ca-q-star-name" :style="{ color: q.color }">
-                  <i class="ca-q-star-greek" :style="{ color: q.color }">{{ q.rank }}</i>
-                  {{ q.starName }}
+                  <!-- 左侧时辰名替代 α 雨夜寄北：子初三刻 + 星名（原星名保留，颜色+楷体）-->
+                  <i class="ca-q-star-greek ca-q-sky-greek" :style="{ color: q.color }">
+                    {{ (['子初三刻','丑正二刻','寅初一刻'])[i % 3] }}
+                  </i>
+                  · {{ q.starName }}
                 </span>
-                <span class="ca-q-star-astro">
-                  <span><i>MAG</i>{{ q.astro.mag }}m</span>
-                  <span><i>DIST</i>{{ q.astro.dist }}ly</span>
-                  <span><i>TYPE</i>{{ q.astro.type }}</span>
+                <span class="ca-q-star-astro ca-q-night-astro">
+                  <!-- 替代 MAG/DIST/TYPE：月相 / 夜温 / 云量 -->
+                  <span><i>相</i>{{ (['残月','残月','蛾眉'])[i % 3] }}</span>
+                  <span><i>温</i>{{ ([11.4, 10.8, 11.6])[i % 3] }}℃</span>
+                  <span><i>云</i>{{ (['3/8','4/8','2/8'])[i % 3] }}</span>
                 </span>
               </div>
               <div class="ca-q-text">{{ q.text }}</div>
@@ -2648,6 +2668,132 @@ function tagStyle(tag: string): Record<string, string> {
   z-index: 2;
   opacity: 0.92;
 }
+/* 【天空本色】夜色流转：横向天色渐变带 + 时辰光球布局（替代HR图） */
+.ca-night-track {
+  position: relative;
+  min-height: 136px;
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255,245,230,0.02), transparent 65%),
+    rgba(0,0,0,0.18);
+  border: 1px solid rgba(134,168,255,0.09);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ca-nt-hours {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-family: Georgia, 'STKaiti', serif;
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.22em;
+}
+/* 核心：横向天色渐变带（入夜→子夜→黎明） */
+.ca-nt-band {
+  position: relative;
+  flex: 1;
+  min-height: 90px;
+  border-radius: 44px;
+  background:
+    /* 主色带：入夜的深蓝（左）→ 子夜紫（中）→ 黎明的淡曙金（右） */
+    linear-gradient(90deg,
+      #0a0c24 0%,
+      #12163e 18%,
+      #1b1a47 42%,
+      #2a234d 66%,
+      #3a2e50 84%,
+      #58403c 95%,
+      #6b4a36 100%
+    );
+  box-shadow:
+    inset 0 2px 6px rgba(134,168,255,0.12),
+    inset 0 -3px 8px rgba(255,179,120,0.12),
+    0 0 0 1px rgba(255,255,255,0.03);
+  overflow: visible;
+}
+/* 光球：相对渐变带绝对定位 */
+.ca-nt-orb {
+  position: absolute;
+  margin: 0 !important;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+/* 时辰小标签（替代光谱型 badge）：右上角贴带 */
+.ca-nt-hour-tag {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.46rem;
+  font-family: Georgia, 'STKaiti', serif;
+  font-weight: 500;
+  padding: 1.5px 5px;
+  background: linear-gradient(90deg, rgba(11,13,42,0.72), rgba(11,13,42,0.82));
+  border: 1px solid;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  backdrop-filter: blur(1.5px);
+  z-index: 3;
+  opacity: 0.98;
+  box-shadow: 0 0 4px rgba(0,0,0,0.4);
+}
+/* 底部天色色温标尺：冷→暖 */
+.ca-nt-scale {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-family: Georgia, 'STKaiti', serif;
+  font-size: 0.54rem;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.32);
+  opacity: 0.9;
+}
+.ca-nt-sc-l { color: rgba(134,168,255,0.55); }
+.ca-nt-sc-r { color: rgba(255,200,140,0.5); }
+
+/* 洞察卡：夜色版（夜刻标签替代占比，夜属性替代恒星参数） */
+.ca-ei-card-night .ca-ei-night-hour {
+  font-family: Georgia, 'STKaiti', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  padding: 1.5px 5px;
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
+  border-radius: 8px;
+}
+/* 夜属性行（相/云/温）风格微调 */
+.ca-ei-night-meteo .ca-ei-astro-item .ca-ei-astro-k {
+  font-family: Georgia, serif;
+  letter-spacing: 0.04em;
+  font-size: 0.5rem;
+  color: rgba(255,255,255,0.3);
+  margin-right: 2px;
+}
+/* 叙事卡：夜色版（夜·浓淡 替代主序阶段） */
+.ca-emo-night-narr {
+  background:
+    linear-gradient(90deg, rgba(134,168,255,0.04), rgba(255,217,138,0.05)),
+    rgba(255,255,255,0.005);
+  border: 1px solid rgba(134,168,255,0.08);
+  border-top-color: rgba(255,217,138,0.08);
+}
+.ca-emo-nl-label {
+  background: linear-gradient(90deg, rgba(134,168,255,0.15), rgba(255,217,138,0.12));
+  color: rgba(255,255,255,0.7);
+  border-color: rgba(134,168,255,0.18);
+  font-family: Georgia, 'STKaiti', serif;
+}
+/* 叙事 icon：Sparkles 夜色发光 */
+.ca-emo-night-narr .ca-emo-flow-icon {
+  color: rgba(255,217,138,0.7);
+  filter: drop-shadow(0 0 2px rgba(255,217,138,0.55));
+}
 .ca-emo-orb {
   display: flex;
   flex-direction: column;
@@ -2884,6 +3030,104 @@ function tagStyle(tag: string): Record<string, string> {
     0 0 6px var(--rk, #ffd98a)66,
     inset 0 0 4px rgba(255,255,255,0.25);
   z-index: 1;
+}
+/* 【天空本色】天窗片段：左上圆形徽章 → 改成「时辰贴纸」（横椭圆微贴纸风） */
+.ca-q-sticker {
+  width: auto;
+  height: auto;
+  min-width: 48px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, rgba(11,13,42,0.9)), rgba(11,13,42,0.92));
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
+  color: color-mix(in srgb, var(--c) 95%, #fff);
+  font-family: Georgia, 'STKaiti', serif;
+  font-size: 0.56rem;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--c) 22%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+  margin-top: 0;
+}
+.ca-q-sticker i {
+  font-style: normal;
+  font-family: inherit;
+  color: inherit;
+}
+/* 【天空本色】天窗片段：左侧插画 → 套一层「夜色小窗」（方形窗框+内部天色） */
+.ca-q-skywindow {
+  position: relative;
+  align-self: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(134,168,255,0.35), rgba(202,167,255,0.3)),
+    linear-gradient(180deg, #0b0d2a, #1f2046);
+  border: 1px solid rgba(134,168,255,0.22);
+  box-shadow:
+    inset 0 0 6px rgba(11,13,42,0.8),
+    0 0 8px rgba(134,168,255,0.1);
+}
+/* 夜色窗内嵌 svg 插画 */
+.ca-q-skywindow .ca-q-illus {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(11,13,42,0.6), rgba(31,32,70,0.5));
+  opacity: 1;
+}
+/* 夜色窗的 4 角窗棂光斑（残灯/星） */
+.ca-q-sw-corner {
+  position: absolute;
+  width: 1.6px;
+  height: 1.6px;
+  background: rgba(255,217,138,0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(255,217,138,0.7);
+  pointer-events: none;
+}
+.ca-q-sw-corner.tl { top: 1px;   left: 1px; }
+.ca-q-sw-corner.tr { top: 1px;   right: 1px; }
+.ca-q-sw-corner.bl { bottom: 1px; left: 1px; background: rgba(134,168,255,0.8); box-shadow: 0 0 2px rgba(134,168,255,0.65); }
+.ca-q-sw-corner.br { bottom: 1px; right: 1px; background: rgba(202,167,255,0.8); box-shadow: 0 0 2px rgba(202,167,255,0.65); }
+/* 天色版：头行（夜名+夜属性）字体更楷体更夜色 */
+.ca-q-night-head .ca-q-star-name {
+  font-family: Georgia, 'STKaiti', serif;
+}
+/* 希腊字母（α/β/γ）→ 天色：时辰前缀（子初三刻） */
+.ca-q-sky-greek {
+  font-style: normal;
+  font-family: Georgia, 'STKaiti', serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.5px 4px 1px;
+  margin-right: 2px;
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+/* 天色：属性行（相/温/云） → 改字体夜色楷体感（非等宽） */
+.ca-q-night-astro {
+  font-family: Georgia, 'STKaiti', serif;
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.04em;
+}
+.ca-q-night-astro span i {
+  font-style: normal;
+  font-family: inherit;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
 }
 .ca-q-illus {
   width: 48px;
