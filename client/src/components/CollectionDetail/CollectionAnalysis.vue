@@ -432,14 +432,107 @@
       </section>
     </div>
 
-    <!-- ═══ 8. AI 总叙 ═══ -->
+    <!-- ═══ 8. AI 总叙（结构化三段卡 + 独白卡 + 寄语条，替代原纯 Markdown）═══ -->
     <section class="ca-card ca-narrative">
       <div class="ca-card-head">
         <component :is="Feather" :size="12" class="ca-ch-icon ca-ch-gold" />
         <span class="ca-ch-title">AI 总叙</span>
-        <span class="ca-ch-count">星笺综述</span>
+        <span class="ca-ch-count">星笺综述 · 3 段式解读</span>
       </div>
-      <div class="ca-narr-body" v-html="renderedNarrative"></div>
+      <div class="ca-narr-body">
+        <!-- 第一段：星笺概览（夜半低语）—— 左图标 + 标题金条 + 正文 -->
+        <div class="ca-narr-section ca-narr-overview">
+          <div class="ca-nr-head">
+            <div class="ca-nr-icon ca-nr-icon-gold">
+              <component :is="MoonStar" :size="13" />
+            </div>
+            <div class="ca-nr-title-wrap">
+              <div class="ca-nr-title">{{ narrative.overview.title }}</div>
+              <div class="ca-nr-sub">总览 · {{ narrative.overview.storyCount }} 则 · {{ narrative.overview.time }}</div>
+            </div>
+          </div>
+          <div class="ca-nr-content">{{ narrative.overview.content }}</div>
+          <div class="ca-nr-tags">
+            <span class="ca-nr-tag" v-for="k in narrative.overview.keywords" :key="k">#{{ k }}</span>
+          </div>
+        </div>
+
+        <!-- 第二段：情绪流转分析（弧线分析卡）—— 三阶段步点图 + 正文 -->
+        <div class="ca-narr-section ca-narr-arc">
+          <div class="ca-nr-head">
+            <div class="ca-nr-icon ca-nr-icon-purple">
+              <component :is="Route" :size="13" />
+            </div>
+            <div class="ca-nr-title-wrap">
+              <div class="ca-nr-title">{{ narrative.arc.title }}</div>
+              <div class="ca-nr-sub">情绪弧线 · {{ narrative.arc.phases.length }} 阶段</div>
+            </div>
+          </div>
+          <!-- 步点图（三阶段） -->
+          <div class="ca-nr-arc-steps">
+            <div
+              class="ca-nr-step"
+              v-for="(p, i) in narrative.arc.phases"
+              :key="i"
+              :style="{ '--step-color': p.color } as Record<string, string>"
+            >
+              <div class="ca-nr-step-dot"></div>
+              <div class="ca-nr-step-body">
+                <div class="ca-nr-step-name">{{ p.name }}</div>
+                <div class="ca-nr-step-anchor" v-if="p.anchor">「{{ p.anchor }}」</div>
+                <div class="ca-nr-step-desc">{{ p.desc }}</div>
+              </div>
+              <div v-if="i < narrative.arc.phases.length - 1" class="ca-nr-step-line"></div>
+            </div>
+          </div>
+          <p class="ca-nr-summary">{{ narrative.arc.summary }}</p>
+        </div>
+
+        <!-- 第三段：独立独白卡（引用金句，参考心事摘录风格） -->
+        <div class="ca-narr-monologue">
+          <div class="sc-corner sc-tl"></div>
+          <div class="sc-corner sc-tr"></div>
+          <div class="sc-corner sc-bl"></div>
+          <div class="sc-corner sc-br"></div>
+          <!-- 左小插画：星灯 -->
+          <svg viewBox="0 0 60 60" class="ca-nm-illus">
+            <circle cx="10" cy="14" r="0.8" fill="#fff" opacity="0.5" />
+            <circle cx="50" cy="10" r="0.6" fill="#fff" opacity="0.4" />
+            <circle cx="52" cy="46" r="0.7" fill="#fff" opacity="0.45" />
+            <circle cx="14" cy="48" r="0.6" fill="#fff" opacity="0.38" />
+            <!-- 提灯 -->
+            <path d="M30 10 L30 14" stroke="rgba(202,167,255,0.5)" stroke-width="0.8" />
+            <path d="M24 14 L36 14 L34 40 L26 40 Z"
+              fill="rgba(255,217,138,0.18)" stroke="rgba(255,217,138,0.55)" stroke-width="0.9" />
+            <line x1="24" y1="20" x2="36" y2="20" stroke="rgba(255,217,138,0.4)" stroke-width="0.4" />
+            <line x1="24" y1="28" x2="36" y2="28" stroke="rgba(255,217,138,0.35)" stroke-width="0.4" />
+            <line x1="24" y1="36" x2="36" y2="36" stroke="rgba(255,217,138,0.3)" stroke-width="0.4" />
+            <rect x="22" y="40" width="16" height="2.5" rx="0.8"
+              fill="rgba(202,167,255,0.35)" stroke="rgba(202,167,255,0.55)" stroke-width="0.6" />
+            <!-- 光晕 -->
+            <circle cx="30" cy="28" r="12" fill="rgba(255,217,138,0.08)" />
+            <circle cx="30" cy="28" r="7" fill="rgba(255,217,138,0.12)" />
+          </svg>
+          <div class="ca-nm-body">
+            <div class="ca-nm-mark">"</div>
+            <p class="ca-nm-text">{{ narrative.monologue.text }}</p>
+            <div class="ca-nm-meta">
+              <span class="ca-nm-tag">{{ narrative.monologue.tag }}</span>
+              <span class="ca-nm-spacer"></span>
+              <span class="ca-nm-author">{{ narrative.monologue.author }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第四段：写作者寄语（引导条风格） -->
+        <div class="ca-narr-postscript">
+          <span class="ca-ps-tip">
+            <component :is="Feather" :size="10" />
+            {{ narrative.postscript.tag }}
+          </span>
+          <span class="ca-ps-text">{{ narrative.postscript.content }}</span>
+        </div>
+      </div>
     </section>
 
     <!-- 底部说明（设计预览标记）-->
@@ -752,19 +845,62 @@ const trajectory = [
   { emotion: '释然', color: '#95f0c0', date: '04/30', title: '合上这一卷', snippet: '把散落的纸页收好，灯灭了，雨也停了。' },
 ]
 
-const narrativeMd = `### 夜半的低语
-
-这卷星笺收着 **8 则**心事，多写在子时前后。雨声、灯影、与不肯寄出的话，是反复出现的三种光。思念是主调，却并不尖锐——更像一盏不肯熄的灯，温吞地亮着。
-
-### 情绪的流转
-
-从「雨夜寄北」到「合上这一卷」，情绪走过一个小小的弧线：浓稠的思念 → 短暂的释然 → 再度回望 → 最终放下。中间那篇「凌晨四点」是最低的谷，之后开始慢慢上扬。
-
-> 孤独不是没有人，而是有些话找不到人说。
-
-### 给纺织者的话
-
-你习惯把情绪写下来再收起来，像把雨折好放进抽屉。这卷星笺就是你的抽屉——别急着合上，还有些微光没说完。`
+/** AI 总叙结构化数据（替代原纯 Markdown）—— 概览卡 + 情绪弧线 + 独白卡 + 寄语条 */
+const narrative = {
+  // 第一段：星笺概览（夜半低语）
+  overview: {
+    title: '夜半的低语',
+    storyCount: 8,
+    time: '多写于子时前后',
+    keywords: ['雨声', '灯影', '不肯寄出的话'],
+    content:
+      '这卷星笺收着 8 则心事，多落在子时之后、天还未亮的那段安静里。反复出现的三种意象：雨声（洗涤却不带走）、灯影（点亮又按灭）、未寄出的话（折成纸船随水漂走）。思念是底色，却并不尖锐——更像一盏不肯熄灭的灯，温吞地亮到天明。',
+  },
+  // 第二段：情绪弧线分析
+  arc: {
+    title: '情绪的流转',
+    phases: [
+      {
+        name: '浓稠的思念',
+        anchor: '雨夜寄北',
+        desc: '开篇就落在最深的雨里，心事以「未寄出」开篇，带着不敢投递的重量。',
+        color: '#ffd98a',
+      },
+      {
+        name: '短暂的释然',
+        anchor: '江边走走',
+        desc: '中间出现几次松动：帽子被风吹走时的笑、种子冒出的一点绿——风一拂，有些事就松了绑。',
+        color: '#95f0c0',
+      },
+      {
+        name: '再度回望',
+        anchor: '凌晨四点',
+        desc: '整个弧线的最低点：只有一盏台灯、一座空城市、和一个人还醒着。但谷底之后，就开始上扬。',
+        color: '#caa7ff',
+      },
+      {
+        name: '轻轻合上',
+        anchor: '合上这一卷',
+        desc: '末章「灯灭了，雨也停了」——没有刻意的大喜大悲，只是把散落的纸页收起来，放回原来的位置。',
+        color: '#86a8ff',
+      },
+    ],
+    summary:
+      '从最浓的雨到最淡的晴，情绪没有急转弯，而是悄悄起变化。弧线最低点在「凌晨四点」，但那之后每一则都比前一则更轻一点——像湿透的纸，在阳光里慢慢变干。',
+  },
+  // 第三段：独白卡（参考心事摘录风格，四角装饰 + 左提灯插画）
+  monologue: {
+    tag: '摘录 · 独白',
+    text: '孤独不是没有人，而是有些话找不到人说。可当我把它写下来、再收进这卷星笺的时候，我好像终于找到那个愿意听完的人了。',
+    author: '夜雨孤灯 · 第 8 则末',
+  },
+  // 第四段：写作者寄语（引导条风格）
+  postscript: {
+    tag: '📜 给这卷星笺的写作者',
+    content:
+      '你习惯把情绪写下来再收起来，像把雨折好放进抽屉。这卷星笺就是你的抽屉——别急着合上。那些没说完的话、没亮透的灯、没漂到对岸的纸船，只要还在，就总会有个人愿意把它们再翻开。',
+  },
+}
 
 /* ═══════════════════════════════════════════════════════════
    Computed / 工具
@@ -796,14 +932,6 @@ function storySummary(content: string): string {
   const plain = (content || '').replace(/[#*`>\-_~]/g, '').replace(/\s+/g, ' ').trim()
   return plain.length > 36 ? plain.slice(0, 36) + '…' : plain
 }
-
-const renderedNarrative = computed(() => {
-  const raw = marked.parse(narrativeMd) as string
-  return DOMPurify.sanitize(raw, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'code', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'hr'],
-    ALLOWED_ATTR: [],
-  })
-})
 
 const hourSum = computed(() => Math.max(1, hourly.reduce((a, b) => a + b, 0)))
 const peakPct = computed(() => Math.max(1, Math.round(hourly[peakHour] / hourSum.value * 100)))
@@ -1813,38 +1941,271 @@ function tagStyle(tag: string): Record<string, string> {
   border: 0.5px solid rgba(255, 139, 125, 0.15);
 }
 
-/* ═══ 7. Narrative ═══ */
-.ca-narr-body :deep(h3) {
-  margin: 14px 0 8px;
+/* ═══ 7. AI 总叙（结构化四段：概览卡 + 弧线步点 + 独白卡 + 寄语条）═══ */
+.ca-narr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* 通用 section 卡：概览 + 弧线 */
+.ca-narr-section {
+  position: relative;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(3px);
+  transition: all 0.25s ease;
+}
+.ca-narr-section:hover {
+  background: rgba(255, 255, 255, 0.032);
+  border-color: rgba(255, 217, 138, 0.2);
+  transform: translateY(-0.5px);
+}
+/* 左金条（概览）/ 左紫条（弧线）装饰边 */
+.ca-narr-overview { border-left: 2.5px solid rgba(255, 217, 138, 0.55); }
+.ca-narr-arc { border-left: 2.5px solid rgba(202, 167, 255, 0.55); }
+
+.ca-nr-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ca-nr-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ca-nr-icon-gold {
+  background: rgba(255, 217, 138, 0.12);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(255, 217, 138, 0.12);
+}
+.ca-nr-icon-purple {
+  background: rgba(202, 167, 255, 0.12);
+  color: var(--star-purple);
+  box-shadow: 0 0 8px rgba(202, 167, 255, 0.12);
+}
+.ca-nr-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+.ca-nr-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.02em;
+}
+.ca-nr-sub {
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.ca-nr-content {
+  font-size: 0.76rem;
+  line-height: 1.9;
+  color: var(--ink-secondary);
+  text-align: justify;
+}
+.ca-nr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.ca-nr-tag {
+  font-size: 0.62rem;
+  color: var(--accent);
+  padding: 2px 8px;
+  background: rgba(255, 217, 138, 0.06);
+  border: 1px solid rgba(255, 217, 138, 0.15);
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+
+/* 情绪弧线步点图：四阶段竖向时间线 */
+.ca-nr-arc-steps {
+  position: relative;
+  margin: 12px 0 8px;
+  padding-left: 6px;
+}
+.ca-nr-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0 0 14px 0;
+}
+.ca-nr-step:last-child { padding-bottom: 0; }
+.ca-nr-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--step-color);
+  box-shadow: 0 0 8px var(--step-color), 0 0 0 3px rgba(255, 255, 255, 0.025);
+  margin-top: 5px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.ca-nr-step-line {
+  position: absolute;
+  left: 10px;   /* dot 中心偏上（10px宽/2） */
+  top: 18px;
+  bottom: -2px;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, var(--step-color), rgba(255,255,255,0.06));
+  opacity: 0.5;
+}
+.ca-nr-step-body { flex: 1; min-width: 0; }
+.ca-nr-step-name {
   font-size: 0.78rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--step-color);
   letter-spacing: 0.02em;
-  padding-left: 8px;
-  border-left: 2px solid rgba(255, 217, 138, 0.4);
+  margin-bottom: 3px;
 }
-.ca-narr-body :deep(h3:first-child) { margin-top: 0; }
-.ca-narr-body :deep(p) {
-  margin: 0 0 10px;
-  font-size: 0.76rem;
-  line-height: 1.85;
+.ca-nr-step-anchor {
+  display: inline-block;
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-style: italic;
+  margin-bottom: 4px;
+  padding: 1px 7px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border-left: 2px solid var(--step-color);
+}
+.ca-nr-step-desc {
+  font-size: 0.72rem;
+  line-height: 1.75;
   color: var(--ink-secondary);
 }
-.ca-narr-body :deep(strong) { color: var(--ink); font-weight: 600; }
-.ca-narr-body :deep(em) { color: var(--star-purple); }
-.ca-narr-body :deep(blockquote) {
-  margin: 10px 0;
-  padding: 8px 14px;
-  border-left: 3px solid var(--accent);
-  background: rgba(255, 217, 138, 0.03);
-  border-radius: 0 6px 6px 0;
-}
-.ca-narr-body :deep(blockquote p) {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--accent);
+.ca-nr-summary {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  font-size: 0.74rem;
+  line-height: 1.9;
+  color: rgba(202, 167, 255, 0.9);
   font-style: italic;
-  line-height: 1.7;
+  background: rgba(202, 167, 255, 0.04);
+  border-left: 2px solid rgba(202, 167, 255, 0.35);
+  border-radius: 0 8px 8px 0;
+  text-align: justify;
+}
+
+/* 独白卡（参考心事摘录风格，四角装饰 + 左提灯 SVG） */
+.ca-narr-monologue {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px 20px;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(255, 217, 138, 0.05), transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(202, 167, 255, 0.05), transparent 55%),
+    rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 217, 138, 0.12);
+  border-radius: 14px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+.ca-narr-monologue:hover {
+  border-color: rgba(255, 217, 138, 0.25);
+  background-color: rgba(255, 255, 255, 0.03);
+  transform: translateY(-1px);
+}
+.ca-nm-illus {
+  width: 68px;
+  height: 68px;
+  align-self: center;
+  justify-self: center;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 6px rgba(255, 217, 138, 0.12));
+}
+.ca-nm-body { position: relative; padding-left: 8px; }
+.ca-nm-mark {
+  position: absolute;
+  top: -6px;
+  left: 0px;
+  font-size: 2.2rem;
+  font-family: Georgia, 'STSong', serif;
+  color: var(--accent);
+  line-height: 1;
+  opacity: 0.55;
+  user-select: none;
+  pointer-events: none;
+}
+.ca-nm-text {
+  margin: 0 0 12px 22px;
+  font-size: 0.82rem;
+  line-height: 2;
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+  text-align: justify;
+  letter-spacing: 0.015em;
+}
+.ca-nm-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 22px;
+}
+.ca-nm-tag {
+  font-size: 0.62rem;
+  color: rgba(255, 217, 138, 0.85);
+  padding: 2px 8px;
+  background: rgba(255, 217, 138, 0.07);
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+.ca-nm-spacer { flex: 1; }
+.ca-nm-author {
+  font-size: 0.64rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  font-style: italic;
+}
+
+/* 寄语条（引导条风格，参考画像 section 末尾） */
+.ca-narr-postscript {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-top: 2px;
+  background:
+    linear-gradient(100deg, rgba(255, 217, 138, 0.07), rgba(202, 167, 255, 0.05) 70%, transparent),
+    rgba(255, 255, 255, 0.012);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2.5px solid rgba(255, 217, 138, 0.5);
+  border-radius: 12px;
+}
+.ca-ps-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 4px 8px;
+  background: rgba(255, 217, 138, 0.08);
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+.ca-ps-text {
+  font-size: 0.74rem;
+  line-height: 1.95;
+  color: var(--ink-secondary);
+  text-align: justify;
 }
 
 /* ═══ Foot Note ═══ */
@@ -1866,5 +2227,20 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-duo { grid-template-columns: 1fr; }
   .ca-persona-body { grid-template-columns: 1fr; gap: 14px; }
   .ca-wrap { padding: 14px 16px 20px; }
+  /* 心事摘录：单列 */
+  .ca-q-item { grid-template-columns: 52px 1fr; gap: 10px; padding: 12px 12px; }
+  .ca-q-illus { width: 48px; height: 48px; }
+  .ca-q-meta { flex-wrap: wrap; gap: 6px; }
+  .ca-q-spacer { display: none; }
+  /* AI 总叙：独白卡单列、寄语条竖排 */
+  .ca-narr-monologue { grid-template-columns: 56px 1fr; padding: 14px 14px; gap: 8px; }
+  .ca-nm-illus { width: 52px; height: 52px; }
+  .ca-nm-mark { font-size: 1.7rem; }
+  .ca-nm-text { margin-left: 18px; font-size: 0.78rem; }
+  .ca-nm-meta { padding-left: 18px; flex-wrap: wrap; }
+  .ca-nm-spacer { display: none; }
+  .ca-narr-postscript { flex-direction: column; gap: 8px; padding: 12px 12px; }
+  /* 情绪步点线修正 */
+  .ca-nr-step-line { left: 10px; }
 }
 </style>
