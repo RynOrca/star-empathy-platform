@@ -229,6 +229,12 @@
       </div>
     </section>
 
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+    </div>
+
     <!-- ═══ 1. 夜观手记（=原合集画像，天空本色重构：笺卷卡→夜观小册+月相节气+五大天条，关键词→天空意象，维度→夜的气象五列）═══ -->
     <section class="ca-card ca-persona ca-night-notes">
       <div class="ca-card-head">
@@ -428,6 +434,12 @@
         </div>
       </div>
     </section>
+
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+    </div>
 
     <!-- ═══ 2. 夜色流转（=原情感光谱，天空本色重构：左=横向天色渐变带+5颗时辰光球；右=星辰归属保留） + 3. 星辰归属 双栏═══ -->
     <div class="ca-duo">
@@ -630,6 +642,12 @@
       </section>
     </div>
 
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+    </div>
+
     <!-- ═══ 心事摘录 → 【天空本色】天窗片段（那一夜夜色里剪出来的几帧：时辰贴纸+插画窗+当夜属性）═══ -->
     <section class="ca-card ca-quote ca-quote-sky">
       <div class="ca-card-head">
@@ -719,6 +737,12 @@
       </div>
     </section>
 
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+    </div>
+
     <!-- ═══ 4. 时辰热力 ═══ -->
     <section class="ca-card ca-hour">
       <div class="ca-card-head">
@@ -762,6 +786,12 @@
         </div>
       </div>
     </section>
+
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+    </div>
 
     <!-- ═══ 5. 共鸣榜 + 情感轨迹（双栏，情感轨迹替换原关键词云）═══ -->
     <div class="ca-duo">
@@ -826,6 +856,12 @@
           </div>
         </div>
       </section>
+    </div>
+
+    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
+    <div class="ca-sky-divider">
+      <div class="csd-bar"></div>
+      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
     </div>
 
     <!-- ═══ 8. 那夜的天官书（=原AI总叙，天空本色：夜览日志+夜半四刻+夜半自语+夜的尾注）═══ -->
@@ -4228,5 +4264,104 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-obs-header { flex-direction: column; align-items: stretch; gap: 8px; }
   .ca-obs-meta { justify-content: flex-start; }
   .ca-obs-sign { flex-wrap: wrap; }
+}
+
+/* ═══════════════════════════════════════════
+   【天空本色 · 最后】那夜的天官书：四大段落夜色左边框 + 天色渐变分隔条
+   ═══════════════════════════════════════════ */
+
+/* 1. 那夜的天官书：四段落夜色左边框（入夜→子夜→黎明） */
+.ca-no-overview {
+  border-left: 2.5px solid #86a8ff; /* 入夜蓝 */
+}
+.ca-no-arc {
+  border-left: 2.5px solid #caa7ff; /* 子夜紫 */
+}
+.ca-no-self {
+  border-left: 2.5px solid #95f0c0; /* 寅卯绿 */
+}
+.ca-no-postscript {
+  border-left: 2.5px solid #ffd98a; /* 黎明金 */
+}
+
+/* 2. 天色渐变分隔条（板块之间：入夜蓝 → 子夜紫 → 黎明金） */
+.ca-sky-divider {
+  position: relative;
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0 4px;
+  user-select: none;
+  pointer-events: none;
+}
+.csd-bar {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    rgba(134, 168, 255, 0.18) 0%,
+    rgba(134, 168, 255, 0.85) 14%,
+    rgba(202, 167, 255, 0.95) 48%,
+    rgba(149, 240, 192, 0.88) 76%,
+    rgba(255, 217, 138, 0.82) 92%,
+    rgba(255, 217, 138, 0.2) 100%
+  );
+  box-shadow:
+    0 0 14px rgba(202, 167, 255, 0.22),
+    0 0 28px rgba(134, 168, 255, 0.10);
+  /* 两端淡入淡出小光斑 */
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    filter: blur(0.2px);
+  }
+  &::before {
+    left: -1px;
+    background: #86a8ff;
+    box-shadow: 0 0 8px #86a8ff;
+  }
+  &::after {
+    right: -1px;
+    background: #ffd98a;
+    box-shadow: 0 0 8px #ffd98a;
+  }
+}
+.csd-hours {
+  position: relative;
+  z-index: 2;
+  padding: 3px 14px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  letter-spacing: 0.35em;
+  background: rgba(21, 21, 42, 0.92);
+  color: rgba(255, 238, 202, 0.82);
+  border: 1px solid rgba(202, 167, 255, 0.22);
+  backdrop-filter: blur(6px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 0 14px rgba(202, 167, 255, 0.10);
+  font-family: "STKaiti", "KaiTi", "楷体", serif;
+}
+
+@media (max-width: 640px) {
+  .ca-sky-divider { height: 28px; margin: 12px 0 2px; }
+  .csd-bar { height: 2.4px; left: 6%; right: 6%; }
+  .csd-hours {
+    padding: 2px 10px;
+    font-size: 0.58rem;
+    letter-spacing: 0.28em;
+  }
 }
 </style>
