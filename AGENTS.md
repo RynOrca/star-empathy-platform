@@ -90,6 +90,8 @@ npm run preview    # 预览构建产物
 - **冷启动数据真实** — seed 脚本中含古诗词、星座神话、社区语录，禁止用假数据
 - **数据迁移兼容** — `server/src/db.ts` 中有 `ALTER TABLE ... ADD COLUMN` 的 try-catch 兼容旧库，新环境不需要但保留无害
 - **星表坐标预计算** — 恒星坐标由 `generateStarCatalog.ts` 离线生成 JSON，后端不参与
+- **天镜览星模式（Camera Mode）** — 相机模式逻辑全部位于 `client/src/composables/useCameraMode.ts`，`useSky.ts` 仅暴露 API（`flyToStar3D`/`getStarsInFrame`/`onCameraFrame` 等）不承载业务；模式切换由 SkyPage 顶层 `v-if="cameraMode === 'observe'"` 分叉；与行星特写状态机互斥（进入相机模式时若在 CLOSEUP 先 `exitCloseup()`）；PC 端复刻方案B（取景框+HUD+列表），移动端复刻方案A（气泡+拖拽补齐）；详细故事卡片复用 `useResonate` 但不复用完整 StarDetail
+- **图标规范（全项目）** — 所有 UI 图标必须使用 SVG icon（内联 SVG 或 SVG 函数式组件），**禁止使用 emoji 字符**（如 ✨🔥📍📜💫👁🌌📖🕐）。新增 icon 统一放 `client/src/components/icons/` 或对应功能模块的 `icons/` 子目录。设计原型中的 emoji 仅作占位，落地时必须替换为 SVG icon
 
 ## 部署
 
