@@ -2708,6 +2708,8 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 14px 16px 18px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;       /* 关键：覆盖 .ca-emo-orbs 的 align-items:flex-end（column 时会把所有子挤到水平右端） */
+  justify-content: flex-start; /* 覆盖 .ca-emo-orbs 的 space-around */
   gap: 8px;
   background:
     radial-gradient(ellipse at 50% 20%, rgba(255,245,230,0.02), transparent 65%),
@@ -4353,18 +4355,22 @@ function tagStyle(tag: string): Record<string, string> {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
-  align-items: stretch;
+  align-items: start;   /* 避免 stretch 时某栏高度被压成线 */
+  min-height: 0;
 }
 /* 放大版：左星图(1.05) + 右栏星图+品质(0.95) */
 .ca-hero-body-big {
   grid-template-columns: 1.05fr 0.95fr;
   gap: 16px;
+  align-items: start;   /* 关键：两栏顶部对齐，不要用 stretch 否则其中一栏被压成线 */
+  min-height: 0;
 }
 /* 左：星点散点图容器（放大版 min-height 加高） */
 .ca-h-starfield {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;    /* grid 子项 min-width: 0 防止撑爆或挤压成 0 */
 }
 .ca-h-starfield-big { min-height: 0; }
 .ca-h-svg {
@@ -4376,8 +4382,10 @@ function tagStyle(tag: string): Record<string, string> {
   background: #0a0b1f;
 }
 .ca-h-svg-big {
-  /* 放大版：让散点图视觉占比更大 */
+  /* 放大版：明确 aspect-ratio 保证高度不被压成一条线；再给 min-height 兜底 */
+  aspect-ratio: 420 / 280;   /* 3:2 = 1.5 */
   min-height: 280px;
+  flex-shrink: 0;
 }
 /* 图例 */
 .ca-h-legend {
@@ -4413,6 +4421,7 @@ function tagStyle(tag: string): Record<string, string> {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
 }
 /* 上：星辰归属（小星图卡片） */
 .ca-h-belong {
@@ -4423,6 +4432,29 @@ function tagStyle(tag: string): Record<string, string> {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+}
+/* 星图 SVG 容器：宽高按比例撑，不允许被压成 0 */
+.ca-starmap-wrap {
+  position: relative;
+  background: rgba(10,12,35,0.55);
+  border: 1px solid rgba(134,168,255,0.08);
+  border-radius: 7px;
+  padding: 6px 4px 4px;
+  min-width: 0;
+}
+.ca-h-starmap-wrap .ca-starmap-svg {
+  width: 100%;
+  aspect-ratio: 280 / 180;   /* 14:9，和 viewBox 比例一致 */
+  height: auto;
+  display: block;
+  min-height: 150px;
+}
+/* 老的 ca-starmap-svg 默认也给个比例兜底 */
+.ca-starmap-svg {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 .ca-h-belong-head {
   display: flex;
