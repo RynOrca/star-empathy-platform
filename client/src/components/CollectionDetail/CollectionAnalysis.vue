@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="ca-wrap">
     <!-- ═══ 0. 顶部标识条 ═══ -->
     <div class="ca-hero-strip">
@@ -266,18 +266,6 @@
               <span class="sc-astro-v" style="color: #ffd98a">{{ nightSky.moonIllum }}</span>
             </div>
           </div>
-
-          <!-- 标签：从αβγ亮星→改为天空意象徽章（夜雨/孤灯/江风/远乡…） -->
-          <div class="sc-tags sc-tags-images">
-            <span
-              v-for="(im, i) in skyImages.slice(0, 5)"
-              :key="'skyIm'+i"
-              class="ca-pt-kw ca-pt-kw-sky"
-              :style="{ '--c': im.color, fontSize: im.size === 'lg' ? '0.64rem' : (im.size === 'md' ? '0.58rem' : '0.52rem'), padding: im.size === 'lg' ? '3px 7px' : '2px 6px' }"
-            >
-              {{ im.word }}
-            </span>
-          </div>
         </div>
 
         <!-- 右：手记文字（不再是星座主人叙事，改成当夜"你"的视角：从子初坐到卯初，8处光斑散在夜里） -->
@@ -299,38 +287,6 @@
             {{ persona.paragraphSecond }}
             月是一弯蛾眉，云是四分散卷；你说话的声音很轻，像江风掠过时带起的槐花。
           </p>
-
-          <!-- 金句卡片：引用号从 " → 改为「残灯」视觉（左上角小灯 + 夜色边） -->
-          <div class="ca-quote-card ca-qc-night">
-            <svg viewBox="0 0 16 16" width="18" height="18" class="ca-qc-lamp">
-              <circle cx="8" cy="6" r="3.5" fill="#ffd98a" opacity="0.85" />
-              <rect x="6" y="9" width="4" height="4" rx="1" fill="rgba(255,217,138,0.35)" />
-            </svg>
-            <span class="ca-quote-text">{{ persona.quote }}</span>
-          </div>
-
-          <!-- 关键词云：意象·亮星 → 改为「天空意象」：夜雨/江风/孤灯/远乡/独坐/槐花/种子/残卷 -->
-          <div class="ca-pt-keywords">
-            <div class="ca-pt-kw-title ca-pt-kw-title-sky">天空意象 · 那一夜的风物</div>
-            <div class="ca-pt-kw-cloud">
-              <span
-                v-for="(im, i) in skyImages"
-                :key="'skyImM'+i"
-                class="ca-pt-kw ca-pt-kw-sky"
-                :style="{ '--c': im.color, fontSize: im.size === 'lg' ? '0.74rem' : (im.size === 'md' ? '0.66rem' : '0.58rem'), padding: im.size === 'lg' ? '5px 10px' : '4px 8px' }"
-              >
-                {{ im.word }}
-              </span>
-              <!-- 同时保留主标签（#独属于你 …）但改风格为淡灰透明 -->
-              <span class="ca-pt-kw ca-pt-kw-tag ca-pt-kw-tag-ghost" v-for="t in persona.tags" :key="'tag'+t">#{{ t }}</span>
-            </div>
-          </div>
-
-          <!-- 引导条：📜 给这卷星笺的注脚 → 🌙 给那一夜的注脚 -->
-          <div class="ca-suggest-wrap ca-sw-night">
-            <span class="ca-s-tip">🌙 给那一夜的注脚</span>
-            <span class="ca-s-text">{{ persona.suggestIntro }}</span>
-          </div>
 
           <!-- ===== 【那一夜·五大气象维度】夜温/风向/见月/云量/体感 五列横条，用户说"去了很丑"必须加回来！ ===== -->
           <div class="ca-pt-meteo-five">
@@ -366,17 +322,17 @@
 
 
 
-    <!-- ═══ 2. 夜色流转 + 心事投递时间轨迹（双栏：左=夜色流转球+洞察+叙事；右=散点时间轨迹） ═══ -->
-    <div class="ca-single ca-single-double">
-      <section class="ca-card ca-emotion ca-night-flow ca-night-flow-wide">
+    <!-- ═══ 2. 夜色流转 + 心事投递时间轨迹（双栏平级：左=夜色流转卡带滚动条；右=心事轨迹卡，两卡等高） ═══ -->
+    <div class="ca-night-track-wrap">
+      <!-- 左：夜色流转（独立卡片，内部overflow滚动条） -->
+      <section class="ca-card ca-emotion ca-night-flow ca-night-flow-left">
         <div class="ca-card-head">
           <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-          <span class="ca-ch-title">夜色流转 · 心事轨迹</span>
-          <span class="ca-ch-count">子流 → 卯散 · {{ emotions.length }} 种夜色 · {{ heroStars.length }} 段轨迹</span>
+          <span class="ca-ch-title">夜色流转</span>
+          <span class="ca-ch-count">子流 → 卯散 · {{ emotions.length }} 种夜色</span>
         </div>
-        <div class="ca-emotion-body ca-emotion-body-double">
-          <!-- 左：夜色流转（5球 + 洞察卡 + 叙事） -->
-          <div class="ca-emo-left">
+        <div class="ca-emotion-body ca-night-scroll">
+          <div class="ca-emo-left ca-emo-left-full">
             <!-- 发光球展示：完全对齐 StarDetail emotion-orbs 结构 → flex row 水平一条线均匀分布 -->
             <div class="emotion-orbs ca-night-orbs">
               <span
@@ -444,13 +400,18 @@
               </p>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- 右：心事投递时间轨迹（原Hero左栏的散点星图缩小版，替代原星辰归属位置） -->
-          <div class="ca-emo-right ca-emo-side-track">
-            <div class="ca-et-head">
-              <component :is="Clock3" :size="10" class="pw-icon pw-blue" />
-              <span>心事投递时间轨迹</span>
-            </div>
+      <!-- 右：心事投递时间轨迹（平级独立卡片，与左等高） -->
+      <section class="ca-card ca-night-side-track">
+        <div class="ca-card-head">
+          <component :is="Clock3" :size="11" class="ca-ch-icon ca-ch-purple" />
+          <span class="ca-ch-title">心事投递时间轨迹</span>
+          <span class="ca-ch-count">{{ heroStars.length }} 段 · 连线=时间轨迹</span>
+        </div>
+        <div class="ca-emotion-body ca-track-body">
+          <div class="ca-emo-right ca-emo-side-track ca-track-inner">
             <svg viewBox="0 0 420 280" class="ca-et-svg" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <radialGradient id="hSkyBg2" cx="50%" cy="40%" r="80%">
@@ -480,7 +441,7 @@
               <ellipse cx="210" cy="140" rx="195" ry="60" fill="rgba(202,167,255,0.055)" transform="rotate(-16 210 140)" />
               <ellipse cx="210" cy="145" rx="160" ry="36" fill="rgba(134,168,255,0.035)" transform="rotate(-16 210 145)" />
 
-              <!-- 背景星点 60 颗（因为图小了，少20颗） -->
+              <!-- 背景星点 60 颗 -->
               <g opacity="0.92">
                 <circle v-for="(s, i) in deepSkyStars.slice(0, 60)" :key="'dss2'+i"
                   :cx="(s.x / 320) * 420"
@@ -743,196 +704,6 @@
     </div>
 
 
-
-    <!-- ═══ 8. 那夜的天官书（=原AI总叙，天空本色：夜览日志+夜半四刻+夜半自语+夜的尾注）═══ -->
-    <section class="ca-card ca-narrative ca-night-book">
-      <div class="ca-card-head">
-        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">那夜的天官书</span>
-        <span class="ca-ch-count">夜览 · 四刻 · 夜半自语 · 尾注</span>
-      </div>
-      <div class="ca-narr-body">
-        <!-- ===== 第一段：夜览日志 · 开篇（原星图总志：观测卡→当夜的天象概览：月/节气/夜温/风/光斑数） ===== -->
-        <div class="ca-narr-section ca-narr-overview ca-no-overview">
-          <div class="ca-nr-head">
-            <div class="ca-nr-icon ca-nr-icon-gold ca-no-icon">
-              <component :is="Sparkles" :size="13" />
-            </div>
-            <div class="ca-nr-title-wrap">
-              <div class="ca-nr-title">{{ narrative.overview.title.replace('星图总志','夜览日志') }}</div>
-              <div class="ca-nr-sub">{{ nightSky.season }} · {{ nightSky.timeSpan }} · {{ storyCount }} 处心事光斑</div>
-            </div>
-          </div>
-          <!-- 【天空本色】当夜天象概览卡（6宫格，替代赤经/赤纬/银纬天文参数） -->
-          <div class="ca-nr-obs-card ca-no-obs-card">
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">月相</span>
-              <span class="ca-nr-obs-v ca-nr-obs-v-gold">{{ nightSky.phase }} · {{ nightSky.moonIllum }}</span>
-            </div>
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">节气</span>
-              <span class="ca-nr-obs-v ca-nr-obs-v-purple">{{ nightSky.term }} · 黄经 {{ nightSky.ecliptic }}</span>
-            </div>
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">夜温</span>
-              <span class="ca-nr-obs-v" style="color:#86a8ff">{{ nightSky.meteo[1].v }}</span>
-            </div>
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">风向</span>
-              <span class="ca-nr-obs-v" style="color:#caa7ff">{{ nightSky.meteo[2].v }}</span>
-            </div>
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">云量</span>
-              <span class="ca-nr-obs-v" style="color:#95f0c0">{{ nightSky.meteo[4].v }}</span>
-            </div>
-            <div class="ca-nr-obs-item">
-              <span class="ca-nr-obs-k">观夜地</span>
-              <span class="ca-nr-obs-v ca-nr-obs-v-gold">北纬 31.2° · 江边</span>
-            </div>
-          </div>
-          <div class="ca-nr-content">{{ narrative.overview.content }}</div>
-          <div class="ca-nr-tags">
-            <!-- 关键字 → 改成天空意象 #夜雨 #孤灯 #槐花 #独坐 -->
-            <span class="ca-nr-tag ca-no-tag" v-for="k in (['夜雨','孤灯','独坐','槐花','残卷'])" :key="k">#{{ k }}</span>
-          </div>
-        </div>
-
-        <!-- ===== 第二段：夜半四刻（原星轨运行四步 → 子/丑/寅/卯 四节，每节=你那一夜的真实时位，带小气象属性） ===== -->
-        <div class="ca-narr-section ca-narr-arc ca-no-arc">
-          <div class="ca-nr-head">
-            <div class="ca-nr-icon ca-nr-icon-blue">
-              <component :is="Clock3" :size="13" />
-            </div>
-            <div class="ca-nr-title-wrap">
-              <div class="ca-nr-title">夜半四刻 · 子丑寅卯</div>
-              <div class="ca-nr-sub">从子初坐到卯初 · 那一夜的你在四段夜色里</div>
-            </div>
-          </div>
-          <!-- 夜半四刻步点：步点名称=四节，坐标=当夜气象小标，anchor→最亮的那道斑 -->
-          <div class="ca-nr-arc-steps ca-nr-orb-steps">
-            <div
-              class="ca-nr-step ca-nr-orbit-step"
-              v-for="(p, i) in [
-                  { name:'子初一刻', tag:'入夜浓时', color:'#86a8ff', desc:'你在灯下展开这一夜，窗外的雨刚开始落。月是一弯残眉，斜斜挂在檐西。', anchor:'雨夜寄北' },
-                  { name:'子末丑初', tag:'独坐无声', color:'#caa7ff', desc:'灯花落尽一盏，你什么也没写。城市的末班车过去了，远处的江灯连成一片。', anchor:'凌晨四点' },
-                  { name:'寅正时分', tag:'风过江岸', color:'#95f0c0', desc:'你走到江边，风从西北来，带着槐花的香气——忽然就不难过了。', anchor:'江边走走' },
-                  { name:'卯初将晓', tag:'天色欲曙', color:'#ffd98a', desc:'东方有一点点淡白，你合上本子，把那盏残灯也留给了夜空。', anchor:'合上这一卷' }
-              ]"
-              :key="i"
-              :style="{ '--step-color': p.color } as Record<string, string>"
-            >
-              <div class="ca-nr-step-dot ca-nr-orbit-dot"></div>
-              <div class="ca-nr-step-body">
-                <div class="ca-nr-step-name-row ca-no-step-name-row">
-                  <div class="ca-nr-step-name ca-no-step-name">{{ p.name }} · <i style="color:var(--step-color); font-style:normal; font-family:'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; letter-spacing:0.04em">{{ p.tag }}</i></div>
-                  <!-- 地平坐标 → 改成「当夜三小气象」：月位置 / 夜温 / 云量 -->
-                  <div class="ca-nr-step-coord ca-no-meteo">
-                    <span>月位 <b>{{ (['檐西','天顶西','天中偏东','东方将白'])[i] }}</b></span>
-                    <span>夜温 <b>{{ ([12,10.8,11.4,12.9])[i] }}℃</b></span>
-                  </div>
-                </div>
-                <div class="ca-nr-step-anchor" v-if="p.anchor">最亮的光斑：「{{ p.anchor }}」</div>
-                <div class="ca-nr-step-desc">{{ p.desc }}</div>
-              </div>
-              <div v-if="i < 3" class="ca-nr-step-line ca-nr-orbit-line"></div>
-            </div>
-          </div>
-          <p class="ca-nr-summary">{{ narrative.arc.summary }}</p>
-        </div>
-
-        <!-- ===== 第三段：夜半自语（原星座神话独白 → 那一夜你写在夜色里的自己；星官注→夜的注；插画→夜色小卷） ===== -->
-        <div class="ca-narr-monologue ca-narr-myth ca-no-self">
-          <div class="sc-corner sc-tl"></div>
-          <div class="sc-corner sc-tr"></div>
-          <div class="sc-corner sc-bl"></div>
-          <div class="sc-corner sc-br"></div>
-          <!-- 星官注标签 → 改成「那夜的注」小印章 + 卷名 -->
-          <div class="ca-nm-myth-tag ca-no-tag-row">
-            <span class="ca-nm-myth-seal ca-no-seal">夜之注</span>
-            <span class="ca-nm-myth-sub">《夜雨孤灯 · 天官书》卷三</span>
-          </div>
-          <!-- 左插画：星座连线图→ 换成「那一夜的夜色小卷」：天色带 + 月 + 8颗光斑连线 -->
-          <svg viewBox="0 0 60 60" class="ca-nm-illus ca-no-illus">
-            <!-- 背景天色横带（入夜→黎明）-->
-            <defs>
-              <linearGradient id="nightBandMini" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"  stop-color="#0a0c24" />
-                <stop offset="50%" stop-color="#1b1a47" />
-                <stop offset="100%" stop-color="#58403c" />
-              </linearGradient>
-            </defs>
-            <rect x="2" y="18" width="56" height="24" rx="3" fill="url(#nightBandMini)" stroke="rgba(134,168,255,0.25)" stroke-width="0.5" />
-            <!-- 残月蛾眉（左） -->
-            <g transform="translate(10,15)">
-              <circle cx="0" cy="0" r="4.2" fill="rgba(245,240,228,0.92)" />
-              <circle cx="1.4" cy="-0.8" r="4" fill="url(#nightBandMini)" />
-            </g>
-            <!-- 8 颗心事光斑连线（夜色带里的一段曲线，5 颗点即可） -->
-            <path d="M12 38 Q20 30, 28 34 T44 32 T52 30" fill="none" stroke="rgba(255,217,138,0.42)" stroke-width="0.7" stroke-dasharray="1.5 1.2" stroke-linecap="round" />
-            <circle cx="12" cy="38" r="1.5" fill="#ffd98a">
-              <animate attributeName="r" values="1.5;1.9;1.5" dur="2.8s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="28" cy="34" r="1.3" fill="#caa7ff" />
-            <circle cx="36" cy="32" r="1.1" fill="#95f0c0" />
-            <circle cx="44" cy="32" r="1.0" fill="#86a8ff" />
-            <circle cx="52" cy="30" r="1.2" fill="#ffd98a" />
-            <!-- 背景散星 -->
-            <circle cx="4"  cy="6"  r="0.5" fill="#fff" opacity="0.45" />
-            <circle cx="54" cy="8"  r="0.4" fill="#fff" opacity="0.35" />
-            <circle cx="48" cy="52" r="0.5" fill="#fff" opacity="0.42" />
-            <circle cx="10" cy="54" r="0.45" fill="#fff" opacity="0.38" />
-          </svg>
-          <div class="ca-nm-body">
-            <div class="ca-nm-mark">"</div>
-            <p class="ca-nm-text">{{ narrative.monologue.text }}</p>
-            <!-- 星官注释行 → 改成「夜的注语」口吻 -->
-            <div class="ca-nm-myth-note">
-              <span class="ca-nm-myth-note-k ca-no-note-k">夜之按：</span>
-              <span class="ca-nm-myth-note-v">{{ narrative.monologue.mythNote }}</span>
-            </div>
-            <div class="ca-nm-meta">
-              <span class="ca-nm-tag">{{ narrative.monologue.tag }}</span>
-              <span class="ca-nm-spacer"></span>
-              <span class="ca-nm-author">{{ narrative.monologue.author }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ===== 第四段：夜的尾注（原观星者手记 → 给那一夜最后的尾注；仪器→心之所感+青灯纸砚） ===== -->
-        <div class="ca-narr-postscript ca-narr-obs-log ca-no-postscript">
-          <div class="ca-obs-header">
-            <span class="ca-obs-tip ca-no-tip">
-              <component :is="Feather" :size="10" />
-              {{ narrative.postscript.tag }}
-            </span>
-            <!-- 观测元数据 → 当夜的收尾气象 -->
-            <div class="ca-obs-meta ca-no-meta">
-              <div class="ca-obs-meta-item">
-                <span class="ca-obs-meta-k">夜之程</span>
-                <span class="ca-obs-meta-v">甲辰 · 春分后三夜</span>
-              </div>
-              <div class="ca-obs-meta-item">
-                <span class="ca-obs-meta-k">所携</span>
-                <span class="ca-obs-meta-v">心之所感 · 残灯一盏</span>
-              </div>
-              <div class="ca-obs-meta-item">
-                <span class="ca-obs-meta-k">收灯时</span>
-                <span class="ca-obs-meta-v">夜雨初霁 · 天将破晓</span>
-              </div>
-            </div>
-          </div>
-          <p class="ca-ps-text ca-obs-text">{{ narrative.postscript.content }}</p>
-          <!-- 落款：观星者 → 改成「这一夜观你者」印章 + 签名 -->
-          <div class="ca-obs-sign ca-no-sign">
-            <div class="ca-obs-sign-seal ca-no-seal-sign">夜</div>
-            <div class="ca-obs-sign-name">
-              <span>夜雨孤灯 · 那一夜的你</span>
-              <span class="ca-obs-sign-date">卯初 · 露结为霜</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- 底部说明（设计预览标记）-->
     <div class="ca-foot-note">
@@ -4904,11 +4675,77 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-h-left-block .ca-starmap-wrap { height: auto; }
   .ca-h-right-block { padding: 0; gap: 11px; }
   .ca-emotion-body-double { grid-template-columns: 1fr; }
+  /* 夜色+心事轨迹双栏 → 移动端单列 */
+  .ca-night-track-wrap { grid-template-columns: 1fr; }
+  .ca-night-flow-left, .ca-night-side-track { height: auto; }
+  .ca-night-scroll { max-height: none; overflow-y: visible; }
 }
 @media (max-width: 540px) {
   .ca-h-stats { grid-template-columns: 1fr 1fr; }
   .ca-h-ss-quad { grid-template-columns: 1fr 1fr; }
   .ca-et-svg { min-height: 180px; }
   .ca-h-left-block .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 150px; }
+}
+
+/* ===== 夜色流转 · 心事投递时间轨迹（双栏平级：左右均为独立ca-card，等高；左夜色加滚动条） ===== */
+.ca-night-track-wrap {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 14px;
+  align-items: stretch;   /* 关键：两栏等高 */
+  min-width: 0;
+}
+.ca-night-flow-left,
+.ca-night-side-track {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* 夜色body：可滚动，高度跟随右栏 */
+.ca-night-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* 精细滚动条，贴合夜色主题 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134,168,255,0.22) rgba(255,255,255,0.03);
+  padding-right: 4px;
+  margin-right: -4px;
+}
+.ca-night-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.ca-night-scroll::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.02);
+  border-radius: 10px;
+}
+.ca-night-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(134,168,255,0.24), rgba(202,167,255,0.22));
+  border-radius: 10px;
+}
+.ca-night-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(134,168,255,0.34), rgba(202,167,255,0.30));
+}
+/* 左栏夜色内容撑满 */
+.ca-emo-left-full {
+  width: 100%;
+}
+/* 心事轨迹body：与卡片同高，内容垂直居中 */
+.ca-track-body {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ca-track-inner {
+  flex: 1 1 auto;
+  /* 外面已经是ca-card，去掉原来 .ca-emo-side-track 的背景边框padding */
+  background: transparent !important;
+  border: none !important;
+  padding: 2px 0 0 !important;
+  gap: 10px;
 }
 </style>
