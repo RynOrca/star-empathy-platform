@@ -119,15 +119,15 @@
       </div>
     </section>
 
-    <!-- ═══ 1. 合集画像（Persona）参考星星 AIPersonaCard：左笺卷小卡 + 右双段解读 + 维度═══ -->
+    <!-- ═══ 1. 星座肖像（=原合集画像，升级星空绑定：笺卷卡加天文参数、关键词→亮星、性格光谱→星座五曜）═══ -->
     <section class="ca-card ca-persona">
       <div class="ca-card-head">
         <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">合集画像</span>
-        <span class="ca-ch-count">四字凝意 · {{ persona.tags.length }} 标签 · {{ storyCount }} 则心事</span>
+        <span class="ca-ch-title">星座肖像</span>
+        <span class="ca-ch-count">星格凝意 · {{ persona.dimensions.length }} 五曜 · {{ storyCount }} 主星</span>
       </div>
       <div class="ca-persona-body">
-        <!-- 左：笺卷小卡（参考星格画像 star-card） -->
+        <!-- 左：笺卷小卡（加入天文参数条：赤经/赤纬/视星等/距离） -->
         <div class="ca-scroll-card">
           <div class="sc-corner sc-tl"></div>
           <div class="sc-corner sc-tr"></div>
@@ -165,16 +165,44 @@
             <circle cx="42" cy="46" r="1.4" fill="#fff" />
           </svg>
 
-          <div class="sc-tags">
-            <span class="sc-tag" v-for="t in persona.tags" :key="t">#{{ t }}</span>
+          <!-- 【新增】天文参数条（小卡中部：赤经/赤纬/视星等/光年） -->
+          <div class="sc-astro">
+            <div class="sc-astro-row">
+              <span class="sc-astro-k">RA</span>
+              <span class="sc-astro-v">{{ constellation.ra.replace('RA ', '') }}</span>
+            </div>
+            <div class="sc-astro-row">
+              <span class="sc-astro-k">Dec</span>
+              <span class="sc-astro-v">{{ constellation.dec.replace('Dec ', '') }}</span>
+            </div>
+            <div class="sc-astro-row">
+              <span class="sc-astro-k">m</span>
+              <span class="sc-astro-v">{{ constellation.avgMag }}</span>
+            </div>
+            <div class="sc-astro-row">
+              <span class="sc-astro-k">ly</span>
+              <span class="sc-astro-v">{{ constellation.distance }}</span>
+            </div>
+          </div>
+
+          <!-- 标签：从通用标签改成「主要亮星」αβγ -->
+          <div class="sc-tags sc-tags-brights">
+            <span class="ca-pt-kw-bright" v-for="b in brightStars" :key="b.rank" :style="{ '--c': b.color }">
+              <i class="ca-pt-kw-rank">{{ b.rank }}</i>{{ b.name }}
+            </span>
           </div>
         </div>
 
-        <!-- 右：文字解读（双段 + 金句 + 引导条 + 维度） -->
+        <!-- 右：文字解读（星区简介 + 双段 + 金句 + 关键词·亮星云 + 引导条 + 星座五曜） -->
         <div class="ca-persona-text">
+          <!-- 【新增】星区简介条（天文志口吻） -->
+          <div class="ca-pt-intro">
+            <component :is="Orbit" :size="10" />
+            <span>春夜南天第 ⅰ 星区 · 凝神静视可见 · 属「温吞思念」之格</span>
+          </div>
           <p class="ca-pt-para first">
             这卷名为<span class="ca-han-hl">「{{ persona.hanName }}」</span>的星笺，收着
-            <b>{{ storyCount }}</b> 则心事——
+            <b>{{ storyCount }}</b> 主星——
             {{ persona.paragraphFirst }}
           </p>
           <p class="ca-pt-para">{{ persona.paragraphSecond }}</p>
@@ -185,28 +213,51 @@
             <span class="ca-quote-text">{{ persona.quote }}</span>
           </div>
 
+          <!-- 【新增】关键词云 → 改名为「意象·亮星」云（主标签+亮星混合） -->
+          <div class="ca-pt-keywords">
+            <div class="ca-pt-kw-title">意象 · 亮星</div>
+            <div class="ca-pt-kw-cloud">
+              <span class="ca-pt-kw ca-pt-kw-tag" v-for="t in persona.tags" :key="t">#{{ t }}</span>
+              <span class="ca-pt-kw ca-pt-kw-bright" v-for="b in brightStars" :key="'k'+b.rank" :style="{ '--c': b.color }">
+                <i class="ca-pt-kw-rank">{{ b.rank }}</i>{{ b.name }}
+              </span>
+            </div>
+          </div>
+
           <!-- 引导条（参考星格画像的 pt-suggest-wrap） -->
           <div class="ca-suggest-wrap">
             <span class="ca-s-tip">📜 给这卷星笺的注脚</span>
             <span class="ca-s-text">{{ persona.suggestIntro }}</span>
           </div>
 
-          <!-- 维度条（改成卡片式，参考星格画像风格） -->
+          <!-- 维度条：性格光谱 → 星座五曜（金木水火土，五行星对应五维） -->
           <div class="ca-dims-card">
             <div class="ca-dims-title">
-              <component :is="MoonStar" :size="9" />
-              <span>性格光谱</span>
+              <component :is="Orbit" :size="9" />
+              <span>星座五曜</span>
+              <span class="ca-dims-sub">金 · 木 · 水 · 火 · 土 — 守护星格</span>
             </div>
-            <div class="ca-dims">
-              <div v-for="d in persona.dimensions" :key="d.left + d.right" class="ca-dim">
-                <div class="ca-dim-labels">
-                  <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
-                  <span class="ca-dim-pct">{{ d.percent }}%</span>
-                  <span :class="{ active: d.side === 'right' }">{{ d.right }}</span>
+            <div class="ca-dims ca-dims-five">
+              <div v-for="(d, i) in persona.dimensions" :key="d.left + d.right" class="ca-dim ca-dim-five">
+                <div class="ca-dim-planet" :style="{ '--pc': fivePlanets[i].color }">
+                  <div class="ca-dim-planet-orb" :style="{ background: fivePlanets[i].color }"></div>
                 </div>
-                <div class="ca-dim-track">
-                  <div class="ca-dim-fill" :style="{ width: d.percent + '%' }"></div>
-                  <div class="ca-dim-knob" :style="{ left: d.percent + '%' }"></div>
+                <div class="ca-dim-main">
+                  <div class="ca-dim-labels ca-dim-labels-five">
+                    <div class="ca-dim-ln">
+                      <span class="ca-dim-planet-name" :style="{ color: fivePlanets[i].color }">{{ fivePlanets[i].cn }}</span>
+                      <span class="ca-dim-planet-en" :style="{ color: fivePlanets[i].color }">{{ fivePlanets[i].en }}</span>
+                      <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
+                    </div>
+                    <div class="ca-dim-rn">
+                      <span :class="{ active: d.side === 'right' }">{{ d.right }}</span>
+                      <span class="ca-dim-pct">{{ d.percent }}%</span>
+                    </div>
+                  </div>
+                  <div class="ca-dim-track ca-dim-track-five" :style="{ '--ptc': fivePlanets[i].color }">
+                    <div class="ca-dim-fill" :style="{ width: d.percent + '%', background: fivePlanets[i].color }"></div>
+                    <div class="ca-dim-knob" :style="{ left: d.percent + '%', background: fivePlanets[i].color, boxShadow: `0 0 6px ${fivePlanets[i].color}` }"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -700,12 +751,23 @@ const persona = {
   paragraphSecond:
     '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
   dimensions: [
-    { left: '内向', right: '外向', percent: 78, side: 'left' as const },
-    { left: '柔和', right: '锋利', percent: 34, side: 'left' as const },
-    { left: '沉静', right: '炽烈', percent: 62, side: 'left' as const },
-    { left: '现实', right: '梦幻', percent: 71, side: 'right' as const },
+    { left: '内向',   right: '外向',   percent: 78, side: 'left'  as const },
+    { left: '柔和',   right: '锋利',   percent: 34, side: 'left'  as const },
+    { left: '沉静',   right: '炽烈',   percent: 62, side: 'left'  as const },
+    { left: '现实',   right: '梦幻',   percent: 71, side: 'right' as const },
+    { left: '慢热',   right: '热切',   percent: 57, side: 'left'  as const },  // 补 5 维对应 5 曜
   ],
 }
+
+/** 星座五曜：金木水火土五行星对应 5 个性格维度（中文名+英文名+代表色） */
+const fivePlanets = [
+  { cn: '金', en: 'Venus',   color: '#ffd98a' },   // 金星：温软→内向/外向
+  { cn: '木', en: 'Jupiter', color: '#95f0c0' },   // 木星：舒展→柔和/锋利
+  { cn: '水', en: 'Mercury', color: '#86a8ff' },   // 水星：流动→沉静/炽烈
+  { cn: '火', en: 'Mars',    color: '#ff8b7d' },   // 火星：热情→现实/梦幻
+  { cn: '土', en: 'Saturn',  color: '#caa7ff' },   // 土星：沉淀→慢热/热切
+]
+
 
 const emotions = [
   { name: '思念', value: 0.78, color: '#ffd98a', desc: '远方的人与未寄出的话' },
@@ -1542,12 +1604,137 @@ function tagStyle(tag: string): Record<string, string> {
   white-space: nowrap;
 }
 
+/* 【星空绑定】笺卷卡中部：天文参数条（赤经/赤纬/视星等/光年） */
+.sc-astro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 8px;
+  padding: 5px 7px;
+  margin-top: 4px;
+  background: rgba(202,167,255,0.05);
+  border-top: 1px solid rgba(202,167,255,0.12);
+  border-bottom: 1px solid rgba(202,167,255,0.12);
+}
+.sc-astro-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.sc-astro-k {
+  font-size: 0.46rem;
+  color: rgba(202,167,255,0.55);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  width: 18px;
+  flex-shrink: 0;
+}
+.sc-astro-v {
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.72);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+/* 笺卷卡底部标签：从通用标签改「主要亮星」αβγ 徽章样式 */
+.sc-tags-brights {
+  gap: 3px;
+  margin-top: 5px;
+}
+.sc-tags-brights .ca-pt-kw-bright {
+  font-size: 0.5rem;
+  padding: 1px 6px 1px 4px;
+}
+
 /* 右：文字解读区 */
 .ca-persona-text {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+/* 【星空绑定】星区简介条（解读区首条：天文志口吻） */
+.ca-pt-intro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 0.6rem;
+  color: rgba(202, 167, 255, 0.85);
+  background:
+    linear-gradient(90deg, rgba(202,167,255,0.08), rgba(202,167,255,0.02)),
+    rgba(255,255,255,0.01);
+  border: 1px solid rgba(202,167,255,0.18);
+  border-left: 2.5px solid rgba(202,167,255,0.5);
+  border-radius: 0 6px 6px 0;
+  letter-spacing: 0.05em;
+  opacity: 0.95;
+}
+
+/* 【星空绑定】意象·亮星云：关键词 + 亮星混合标签云 */
+.ca-pt-keywords {
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 10px;
+}
+.ca-pt-kw-title {
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.85;
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed rgba(255,217,138,0.12);
+}
+.ca-pt-kw-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+/* 通用关键词标签 */
+.ca-pt-kw-tag {
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.68);
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+/* 亮星徽章（α/β/γ + 星名），带情绪色发光边框 */
+.ca-pt-kw-bright {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.64rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.88);
+  padding: 2px 8px 2px 5px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 14%, transparent), rgba(255,255,255,0.015));
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  transition: all 0.2s ease;
+}
+.ca-pt-kw-bright:hover {
+  transform: translateY(-0.5px);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--c) 20%, transparent);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+}
+.ca-pt-kw-rank {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: var(--c);
+  filter: drop-shadow(0 0 2px var(--c));
+  line-height: 1;
+  padding: 0 1px 0 2px;
 }
 .ca-pt-para {
   margin: 0;
@@ -1690,6 +1877,92 @@ function tagStyle(tag: string): Record<string, string> {
   transform: translate(-50%, -50%);
   transition: left 0.5s ease;
 }
+
+/* 【星空绑定】维度卡副标题（星座五曜：金木水火土 守护星格） */
+.ca-dims-sub {
+  margin-left: auto;
+  font-size: 0.54rem;
+  font-weight: 400;
+  color: rgba(202,167,255,0.55);
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+/* 【星空绑定】星座五曜：每行 = 左行星小图标 + 右标签条+轨道（五行星对应五维） */
+.ca-dims-five { gap: 9px; }
+.ca-dim-five {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.012);
+  transition: background 0.2s ease;
+}
+.ca-dim-five:hover { background: rgba(255,255,255,0.025); }
+/* 行星图标（彩色发光小圆 + 光晕） */
+.ca-dim-planet {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), transparent 60%),
+    color-mix(in srgb, var(--pc) 18%, transparent);
+  box-shadow:
+    inset 0 0 5px color-mix(in srgb, var(--pc) 25%, transparent),
+    0 0 8px color-mix(in srgb, var(--pc) 20%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ca-dim-planet-orb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow:
+    inset -1px -1px 2px rgba(0,0,0,0.25),
+    0 0 5px color-mix(in srgb, var(--pc) 45%, transparent);
+  opacity: 0.92;
+}
+.ca-dim-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ca-dim-labels-five {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+}
+.ca-dim-ln, .ca-dim-rn {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ca-dim-rn { justify-content: space-between; }
+.ca-dim-planet-name {
+  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  width: 16px;
+  text-align: center;
+  filter: drop-shadow(0 0 2px currentColor);
+}
+.ca-dim-planet-en {
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  width: 34px;
+}
+.ca-dim-labels-five .active { font-size: 0.6rem; }
+.ca-dim-track-five {
+  height: 5px;
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--ptc) 20%, rgba(255,255,255,0.03)),
+      rgba(255,255,255,0.05));
+}
+
 
 /* 删除旧的未用 class */
 .ca-han-name, .ca-han-sub, .ca-tags, .ca-tag, .ca-quote, .ca-intro { display: none; }
