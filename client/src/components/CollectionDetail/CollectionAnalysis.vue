@@ -457,44 +457,24 @@
           <span class="ca-ch-count">子流 → 卯散 · {{ emotions.length }} 种夜色</span>
         </div>
         <div class="ca-emotion-body">
-          <!-- 发光球展示：容器不再是HR图 → 是横向天色轨道带（入夜→子夜→黎明） -->
-          <div class="ca-emo-orbs ca-night-track">
-            <!-- 顶部时辰小字（子/丑/寅/卯）-->
-            <div class="ca-nt-hours">
-              <span>子</span><span>丑</span><span>寅</span><span>卯</span>
-            </div>
-            <!-- 横向天色渐变轨道（核心：入夜→子夜→黎明 的 夜色渐变带） -->
-            <div class="ca-nt-band">
-              <!-- 球：按时段位置散落，每个 ball 上带时辰小标签（子初三刻/丑正四刻...） -->
-              <span
-                v-for="(e, i) in emotions"
-                :key="e.name"
-                class="ca-emo-orb ca-nt-orb"
-                :style="{
-                  width: orbSize(e.value) + 'px',
-                  height: orbSize(e.value) + 'px',
-                  background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}33 70%, transparent)`,
-                  boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
-                  // 横向按 5 段夜分布：子时中段最集中（思念/孤独），寅初分散（释然/希望），最右是黎明附近
-                  left: `calc(${10 + i * 18}%)`,
-                  // 纵向：值越大越靠上（夜色越浓越高）
-                  top:  `calc(${50 - e.value * 42}%)`,
-                }"
-                :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
-              >
-                <!-- 时辰小标签：替代原光谱型 badge（子初三刻 / 丑正 / 寅初 / ...） -->
-                <span class="ca-nt-hour-tag" :style="{ color: e.color, borderColor: e.color + '66' }">
-                  {{ (['子初三刻','丑正二刻','寅初一刻','寅正三刻','卯初初刻'])[i] }}
-                </span>
-                <span class="ca-emo-orb-label">{{ e.name }}</span>
-                <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
-              </span>
-            </div>
-            <!-- 底部天色色温标尺（冷→暖：蓝紫→金曙） -->
-            <div class="ca-nt-scale">
-              <span class="ca-nt-sc-l">· 夜愈深</span>
-              <span class="ca-nt-sc-r">天将曙 ·</span>
-            </div>
+          <!-- 发光球展示：完全对齐 StarDetail emotion-orbs 结构 → flex row 水平一条线均匀分布
+               （之前的绝对定位斜着排、时辰轨道带、top/left错位全部删掉，用户要模仿故事界面的UI） -->
+          <div class="emotion-orbs ca-night-orbs">
+            <span
+              v-for="e in emotions"
+              :key="e.name"
+              class="orb ca-night-orb"
+              :style="{
+                width: orbSize(e.value) + 'px',
+                height: orbSize(e.value) + 'px',
+                background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}33 70%, transparent)`,
+                boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
+              }"
+              :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
+            >
+              <span class="orb-label ca-no-label">{{ e.name }}</span>
+              <span class="orb-val ca-no-val">{{ Math.round(e.value * 100) }}</span>
+            </span>
           </div>
 
           <!-- 情绪洞察卡：去掉恒星 TYPE/MAG/DIST 行 → 改成「夜刻」头标签（子时二刻/丑初一刻/寅初三刻...） -->
@@ -2812,104 +2792,57 @@ function tagStyle(tag: string): Record<string, string> {
   z-index: 2;
   opacity: 0.92;
 }
-/* 【天空本色】夜色流转：横向天色渐变带 + 时辰光球布局（替代HR图） */
-.ca-night-track {
-  position: relative;
-  min-height: 136px;
-  padding: 14px 16px 18px;
+/* 【夜色流转】5个球 → 完全对齐 StarDetail AIRadarWordcloud.vue 的 emotion-orbs 结构：
+   flex row 水平一条线，align-items:flex-end 底部对齐，space-around 均匀分布 */
+.ca-night-orbs {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;       /* 关键：覆盖 .ca-emo-orbs 的 align-items:flex-end（column 时会把所有子挤到水平右端） */
-  justify-content: flex-start; /* 覆盖 .ca-emo-orbs 的 space-around */
-  gap: 8px;
+  align-items: flex-end;    /* 和 StarDetail 一样：所有球底部对齐 */
+  justify-content: space-around;
+  padding: 6px 4px 8px;
+  min-height: 100px;        /* StarDetail是82px，我们球稍大一点所以100px */
+  border-bottom: 1px dashed rgba(255,255,255,0.04);
+  flex-shrink: 0;
+  width: 100%;
   background:
-    radial-gradient(ellipse at 50% 20%, rgba(255,245,230,0.02), transparent 65%),
-    rgba(0,0,0,0.18);
-  border: 1px solid rgba(134,168,255,0.09);
-  border-radius: 10px;
-  overflow: hidden;
+    linear-gradient(180deg, rgba(134,168,255,0.045) 0%, rgba(255,139,125,0.045) 100%);
+  border-radius: 8px 8px 0 0;
 }
-.ca-nt-hours {
+/* orb 本体：完全沿用 StarDetail 的 orb 样式（scoped不共享，重写一份） */
+.ca-night-orb {
+  border-radius: 50%;
   display: flex;
-  justify-content: space-between;
-  padding: 0 6px;
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.56rem;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.22em;
-}
-/* 核心：横向天色渐变带（入夜→子夜→黎明） */
-.ca-nt-band {
-  position: relative;
-  flex: 1;
-  min-height: 90px;
-  border-radius: 44px;
-  background:
-    /* 主色带：入夜的深蓝（左）→ 子夜紫（中）→ 黎明的淡曙金（右） */
-    linear-gradient(90deg,
-      #0a0c24 0%,
-      #12163e 18%,
-      #1b1a47 42%,
-      #2a234d 66%,
-      #3a2e50 84%,
-      #58403c 95%,
-      #6b4a36 100%
-    );
-  box-shadow:
-    inset 0 2px 6px rgba(134,168,255,0.12),
-    inset 0 -3px 8px rgba(255,179,120,0.12),
-    0 0 0 1px rgba(255,255,255,0.03);
-  overflow: visible;
-}
-/* 光球：相对渐变带绝对定位 */
-.ca-nt-orb {
-  position: absolute;
-  display: flex;            /* 覆盖 ca-emo-orb，明确 flex 使 label/val 居中 */
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: 0 !important;
-  transform: translate(-50%, -50%);   /* 这个绝对定位居中不能被 orbFloat 动画覆盖 */
-  animation: none !important;         /* 禁用 orbFloat，否则 translateY 会破坏 left/top 锚点 */
-  z-index: 1;
+  flex-shrink: 0;
+  position: relative;
+  cursor: default;
+  transition: transform 0.2s ease;
 }
-/* hover 时锚点不变，只额外加 scale */
-.ca-nt-orb:hover {
-  transform: translate(-50%, -50%) scale(1.12) !important;
-}
-/* 时辰小标签（替代光谱型 badge）：右上角贴带 */
-.ca-nt-hour-tag {
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.46rem;
+/* orb 内部 label：名称（思念/孤独/释然等） */
+.ca-no-label {
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.9);
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  line-height: 1;
+  margin-bottom: 2px;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-weight: 500;
-  padding: 1.5px 5px;
-  background: linear-gradient(90deg, rgba(11,13,42,0.72), rgba(11,13,42,0.82));
-  border: 1px solid;
-  border-radius: 10px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  backdrop-filter: blur(1.5px);
-  z-index: 3;
-  opacity: 0.98;
-  box-shadow: 0 0 4px rgba(0,0,0,0.4);
 }
-/* 底部天色色温标尺：冷→暖 */
-.ca-nt-scale {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 6px;
+/* orb 内部 val：数值 */
+.ca-no-val {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.75);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.85;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.54rem;
-  letter-spacing: 0.12em;
-  color: rgba(255,255,255,0.32);
-  opacity: 0.9;
 }
-.ca-nt-sc-l { color: rgba(134,168,255,0.55); }
-.ca-nt-sc-r { color: rgba(255,200,140,0.5); }
+/* hover 轻微上浮，StarDetail没有hover，我们保留一点反馈 */
+.ca-night-orb:hover {
+  transform: translateY(-3px) scale(1.07);
+}
 
 /* 洞察卡：夜色版（夜刻标签替代占比，夜属性替代恒星参数） */
 .ca-ei-card-night .ca-ei-night-hour {
@@ -4421,8 +4354,14 @@ function tagStyle(tag: string): Record<string, string> {
   flex-direction: column;
   gap: 10px;
   position: relative;
-  overflow: hidden;
+  /* 不能 overflow:hidden（会裁掉 520px 的 body），改为 visible；圆角无需裁剪溢出因为内部元素都有圆角 */
+  overflow: visible;
   margin: 0 0 4px;
+  /* 【关键】必须给 min-height！
+     panel-head ≈ 30px + ca-hero-body-big min-height 520px + padding/gap 余量 ≈ 580
+     没有 min-height 时 flex 容器会收缩到 panel-head 的 27px，然后子元素 520px 被裁掉！ */
+  min-height: 600px;
+  flex-shrink: 0;
 }
 /* 顶部 1px 金线紫线渐变（和 StarDetail 同款） */
 .ca-hero-panel::before {
@@ -4483,25 +4422,40 @@ function tagStyle(tag: string): Record<string, string> {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  min-height: 280px;     /* 兜底：散点图容器别再塌成 0 了 */
-  height: 100%;          /* 跟随 grid row 的 stretch 高度 */
+  min-height: 280px;
+  /* 去掉 height:100%！grid row 已经 stretch 了，height:100% 会和 flex column 内部的 SVG 高度计算打架 */
+  height: auto;
+  align-self: stretch;    /* 显式对齐：占满 grid cell 的高度 */
+  flex-shrink: 0;
 }
 .ca-h-starfield-big { min-height: 300px; }  /* 放大版兜底，删掉了之前那句 min-height: 0 */
 .ca-h-svg {
+  /* 普通版：width 100% + aspect-ratio 控制高度，绝不写height:100%（会冲突） */
   width: 100%;
+  aspect-ratio: 420 / 280;
   height: auto;
+  min-height: 260px;
   display: block;
+  flex-shrink: 0;
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.04);
   background: #0a0b1f;
 }
 .ca-h-svg-big {
-  /* 放大版：aspect-ratio + 固定 height 双保险，绝不塌成一条线 */
+  /* 放大版：【width:100% + aspect-ratio】是唯一正确组合，
+     浏览器会按 420/280 的比值自动算出 height（由width自动推），
+     加 min-height 兜底防止极端窄屏塌缩，
+     绝对不能写 height:100% 或 flex:1——它们会强制覆盖 aspect-ratio 计算结果！ */
+  width: 100%;
   aspect-ratio: 420 / 280;
-  height: 100%;
+  height: auto;
   min-height: 280px;
-  flex: 1;                /* 占满左栏剩余高度，保证 1:1.5 比例 */
+  max-height: 380px;  /* 上限：放大版也别太夸张占满一屏 */
+  display: block;
   flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.04);
+  background: #0a0b1f;
 }
 /* 图例 */
 .ca-h-legend {
