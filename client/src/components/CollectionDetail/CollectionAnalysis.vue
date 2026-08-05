@@ -288,30 +288,33 @@
             月是一弯蛾眉，云是四分散卷；你说话的声音很轻，像江风掠过时带起的槐花。
           </p>
 
-          <!-- ===== 【那一夜·五大气象维度】夜温/风向/见月/云量/体感 五列横条，用户说"去了很丑"必须加回来！ ===== -->
-          <div class="ca-pt-meteo-five">
-            <div class="ca-pt-meteo-title">
+          <!-- ===== 【那一夜·五大气象维度】一行5列紧凑小卡（原5行横条太高，改成扁平方块网格） ===== -->
+          <div class="ca-pt-meteo-five ca-meteo-compact">
+            <div class="ca-mc-title">
               <component :is="MoonStar" :size="9" />
-              <span>那一夜·五大气象</span>
+              <span>那一夜 · 五大气象</span>
             </div>
-            <div class="ca-pt-meteo-bars">
+            <div class="ca-mc-grid">
+              <!-- 五个气象小卡：icon点 + 中文名 + 具体数值/描述 + 底部英文小字 -->
               <div
                 v-for="(m, i) in fiveMeteo"
                 :key="m.k"
-                class="ca-pt-meteo-row"
+                class="ca-mc-item"
                 :style="{ '--mc': m.color } as Record<string, string>"
               >
-                <span class="ca-pt-meteo-k">{{ m.k }}</span>
-                <div class="ca-pt-meteo-track">
-                  <div
-                    class="ca-pt-meteo-fill"
-                    :style="{
-                      width: (persona.dimensions[i]?.percent ?? 50) + '%',
-                      background: `linear-gradient(90deg, ${m.color}33, ${m.color})`,
-                    }"
-                  ></div>
+                <span class="ca-mc-dot"></span>
+                <div class="ca-mc-text">
+                  <span class="ca-mc-k">{{ m.k }}</span>
+                  <!-- 具体数值：按 i 对应 nightSky.meteo 或月相 -->
+                  <span class="ca-mc-v">
+                    {{ i===0 ? nightSky.meteo[1].v : i===1 ? nightSky.meteo[2].v : i===2 ? nightSky.phase+'·'+nightSky.moonIllum : i===3 ? nightSky.meteo[4].v : nightSky.meteo[5].v }}
+                  </span>
+                  <span class="ca-mc-en">{{ m.en }}</span>
                 </div>
-                <span class="ca-pt-meteo-en">{{ m.en }}</span>
+                <!-- 百分比小横条（极短，只做装饰不占高） -->
+                <div class="ca-mc-bar">
+                  <div class="ca-mc-fill" :style="{ width: (persona.dimensions[i]?.percent ?? 50) + '%' }"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -494,6 +497,36 @@
               <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
               <span class="ca-h-legend-note">· 连线=时间轨迹</span>
             </div>
+
+            <!-- 心事投递统计：一行4小格（紧凑不高） -->
+            <div class="ca-et-stats">
+              <div class="ca-et-stat ca-et-stat-gold">
+                <span class="ca-es-k">夜间投递</span>
+                <span class="ca-es-v">86<span>%</span></span>
+                <span class="ca-es-sub">20:00 ~ 06:00</span>
+              </div>
+              <div class="ca-et-stat ca-et-stat-purple">
+                <span class="ca-es-k">情绪波动</span>
+                <span class="ca-es-v">Δ 0.64</span>
+                <span class="ca-es-sub">高 → 低幅度</span>
+              </div>
+              <div class="ca-et-stat ca-et-stat-blue">
+                <span class="ca-es-k">最频时辰</span>
+                <span class="ca-es-v">子正</span>
+                <span class="ca-es-sub">23:41 ~ 00:28</span>
+              </div>
+              <div class="ca-et-stat ca-et-stat-green">
+                <span class="ca-es-k">最长间隔</span>
+                <span class="ca-es-v">2h 17<span>'</span></span>
+                <span class="ca-es-sub">独坐时没写</span>
+              </div>
+            </div>
+
+            <!-- 底部一句话说明条 -->
+            <p class="ca-et-note">
+              <component :is="Sparkles" :size="9" class="ca-et-note-icon" />
+              从 20:31 的灯下第一笔，写到 05:42 天将亮 —— 连线是心事出现的顺序，越靠上=情绪越亮。
+            </p>
           </div>
         </div>
       </section>
@@ -1501,7 +1534,7 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-wrap {
   display: flex;
   flex-direction: column;
-  gap: 0;  /* 分隔符改用星座连线 ::before 代替 */
+  gap: 18px;
   padding: 18px 22px 24px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1513,56 +1546,9 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-wrap::-webkit-scrollbar-track { background: transparent; }
 .ca-wrap::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 
-/* 【星空绑定】板块间分隔符：星座连线 SVG（5颗星+虚连线，只显示在非首元素） */
-.ca-wrap > * + * {
-  position: relative;
-  margin-top: 22px;
-}
-.ca-wrap > * + *::before {
-  content: '';
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  top: -16px;
-  height: 12px;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 12' preserveAspectRatio='none'>\
-    <!-- 5颗星沿水平曲线分布 -->\
-    <defs>\
-      <radialGradient id='star1' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23ffd98a' stop-opacity='1'/><stop offset='100%25' stop-color='%23ffd98a' stop-opacity='0'/></radialGradient>\
-      <radialGradient id='star2' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23caa7ff' stop-opacity='1'/><stop offset='100%25' stop-color='%23caa7ff' stop-opacity='0'/></radialGradient>\
-      <radialGradient id='star3' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%2395f0c0' stop-opacity='1'/><stop offset='100%25' stop-color='%2395f0c0' stop-opacity='0'/></radialGradient>\
-      <radialGradient id='star4' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%2386a8ff' stop-opacity='1'/><stop offset='100%25' stop-color='%2386a8ff' stop-opacity='0'/></radialGradient>\
-      <radialGradient id='star5' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23ff8b7d' stop-opacity='1'/><stop offset='100%25' stop-color='%23ff8b7d' stop-opacity='0'/></radialGradient>\
-    </defs>\
-    <!-- 星座连线（贝塞尔曲线，起伏穿过5星 -->\
-    <path d='M 20 8 C 80 3, 160 10, 200 5 S 320 9, 380 6' fill='none' stroke='rgba(255,217,138,0.38)' stroke-width='0.8' stroke-dasharray='2.5 2' stroke-linecap='round'/>\
-    <!-- 星 1（金星色 -->\
-    <circle cx='20' cy='8' r='2.2' fill='%23ffd98a'/>\
-    <circle cx='20' cy='8' r='4.5' fill='url(%23star1)' opacity='0.8'/>\
-    <!-- 星 2（木紫色 -->\
-    <circle cx='110' cy='4' r='1.7' fill='%23caa7ff'/>\
-    <circle cx='110' cy='4' r='3.6' fill='url(%23star2)' opacity='0.7'/>\
-    <!-- 星 3（中间绿主星 -->\
-    <circle cx='200' cy='5' r='2.8' fill='%2395f0c0'/>\
-    <circle cx='200' cy='5' r='5.6' fill='url(%23star3)' opacity='0.85'/>\
-    <!-- 星 4（蓝色 -->\
-    <circle cx='290' cy='9' r='1.5' fill='%2386a8ff'/>\
-    <circle cx='290' cy='9' r='3.2' fill='url(%23star4)' opacity='0.7'/>\
-    <!-- 星 5（珊瑚色末星 -->\
-    <circle cx='380' cy='6' r='2' fill='%23ff8b7d'/>\
-    <circle cx='380' cy='6' r='4.2' fill='url(%23star5)' opacity='0.75'/>\
-  </svg>");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 100%;
-  opacity: 0.92;
-  z-index: 0;
-}
-/* 双栏 ca-duo 内部的两个小 section 不要额外显示分隔符 */
-.ca-duo > section::before { display: none; }
+/* 双栏 ca-duo 布局 */
 .ca-duo > section { margin-top: 0; }
-.ca-duo { margin-top: 22px; }
+.ca-duo { margin-top: 0; }
 
 /* ═══ Hero Strip ═══ */
 .ca-hero-strip {
@@ -2145,70 +2131,104 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255,217,138,0.82);
 }
 
-/* ===== 【那一夜·五大气象维度条】用户说"去了很丑"，加回到夜观手记右栏底部 ===== */
-.ca-pt-meteo-five {
-  margin-top: 4px;
-  padding: 10px 12px;
-  background:
-    linear-gradient(120deg, rgba(134,168,255,0.045), rgba(202,167,255,0.04) 50%, rgba(255,217,138,0.05)),
-    rgba(0,0,0,0.2);
-  border: 1px solid rgba(134,168,255,0.1);
+/* ===== 【那一夜·五大气象维度紧凑版】一行5列小卡网格，替代5行横条（显著降低高度） ===== */
+.ca-meteo-compact {
+  margin-top: 6px;
+  padding: 8px 10px 10px;
+  background: rgba(255,255,255,0.018);
+  border: 1px solid rgba(255,255,255,0.045);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
-.ca-pt-meteo-title {
+.ca-mc-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.66rem;
+  gap: 5px;
+  font-size: 0.64rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.72);
-  letter-spacing: 0.05em;
-  padding-bottom: 5px;
-  border-bottom: 1px dashed rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.64);
+  letter-spacing: 0.04em;
 }
-.ca-pt-meteo-title svg { color: #86a8ff; opacity: 0.9; }
-.ca-pt-meteo-bars {
+.ca-mc-title svg { color: #86a8ff; opacity: 0.88; }
+.ca-mc-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ca-mc-item {
+  position: relative;
+  padding: 6px 7px 7px 20px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid color-mix(in srgb, var(--mc) 15%, transparent);
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  min-width: 0;
+  transition: border-color 0.2s ease;
 }
-.ca-pt-meteo-row {
-  display: grid;
-  grid-template-columns: 28px 1fr 58px;
-  align-items: center;
-  gap: 8px;
+.ca-mc-item:hover {
+  border-color: color-mix(in srgb, var(--mc) 28%, transparent);
 }
-.ca-pt-meteo-k {
-  font-size: 0.64rem;
+.ca-mc-dot {
+  position: absolute;
+  left: 7px;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mc);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--mc) 80%, transparent);
+}
+.ca-mc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ca-mc-k {
+  font-size: 0.62rem;
   font-weight: 700;
-  color: var(--mc, #86a8ff);
   letter-spacing: 0.08em;
+  color: var(--mc);
   font-family: "Inter", "PingFang SC", sans-serif;
 }
-.ca-pt-meteo-track {
-  position: relative;
-  height: 6px;
-  background: rgba(255,255,255,0.035);
-  border-radius: 20px;
+.ca-mc-v {
+  font-size: 0.60rem;
+  color: rgba(240,240,255,0.76);
+  white-space: nowrap;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.04);
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
-.ca-pt-meteo-fill {
-  height: 100%;
-  border-radius: 20px;
-  opacity: 0.92;
-  transition: width 0.4s ease;
-}
-.ca-pt-meteo-en {
-  font-size: 0.52rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: rgba(220,220,240,0.4);
+.ca-mc-en {
+  font-size: 0.48rem;
+  letter-spacing: 0.10em;
+  color: rgba(220,220,240,0.32);
   font-family: "SF Mono", "JetBrains Mono", monospace;
-  text-align: right;
+  line-height: 1.2;
+}
+.ca-mc-bar {
+  position: relative;
+  height: 2px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ca-mc-fill {
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mc) 30%, transparent), var(--mc));
+  border-radius: 2px;
+  opacity: 0.9;
+}
+/* 小屏适配：5列 → 2+3 两行 */
+@media (max-width: 900px) {
+  .ca-mc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .ca-mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* 五大气象条：标题/字体风格小微调 */
 .ca-dims-night .ca-dims-title {
@@ -4662,6 +4682,89 @@ function tagStyle(tag: string): Record<string, string> {
   box-shadow: 0 0 4px currentColor;
 }
 
+/* 心事投递 · 4 小格统计（紧凑不高） */
+.ca-et-stats {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ca-et-stat {
+  padding: 6px 7px 5px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.ca-et-stat:hover { transform: translateY(-1px); }
+.ca-et-stat-gold   { border-color: rgba(255,217,138,0.15); }
+.ca-et-stat-purple { border-color: rgba(202,167,255,0.15); }
+.ca-et-stat-blue   { border-color: rgba(134,168,255,0.15); }
+.ca-et-stat-green  { border-color: rgba(154,230,180,0.15); }
+.ca-et-stat-gold:hover   { border-color: rgba(255,217,138,0.32); }
+.ca-et-stat-purple:hover { border-color: rgba(202,167,255,0.32); }
+.ca-et-stat-blue:hover   { border-color: rgba(134,168,255,0.32); }
+.ca-et-stat-green:hover  { border-color: rgba(154,230,180,0.32); }
+.ca-es-k {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  color: rgba(220,220,240,0.42);
+  font-weight: 600;
+  font-family: "Inter", "PingFang SC", sans-serif;
+}
+.ca-es-v {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  line-height: 1.15;
+  color: rgba(250,250,255,0.86);
+}
+.ca-es-v span {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(220,220,240,0.5);
+  margin-left: 1px;
+}
+.ca-et-stat-gold   .ca-es-v { color: #ffd98a; }
+.ca-et-stat-purple .ca-es-v { color: #caa7ff; }
+.ca-et-stat-blue   .ca-es-v { color: #86a8ff; }
+.ca-et-stat-green  .ca-es-v { color: #9ae6b4; }
+.ca-es-sub {
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+  color: rgba(220,220,240,0.30);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 一句话说明条 */
+.ca-et-note {
+  margin: 8px 1px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(134,168,255,0.045), rgba(255,217,138,0.035));
+  border: 1px solid rgba(134,168,255,0.08);
+  font-size: 0.58rem;
+  line-height: 1.55;
+  color: rgba(220,220,240,0.56);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ca-et-note-icon {
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: rgba(255,217,138,0.8);
+  filter: drop-shadow(0 0 3px rgba(255,217,138,0.25));
+}
+@media (max-width: 620px) {
+  .ca-et-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 860px) {
   .ca-hero-body { grid-template-columns: 1fr; }
   .ca-hero-body-stats {
@@ -4687,25 +4790,37 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-h-left-block .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 150px; }
 }
 
-/* ===== 夜色流转 · 心事投递时间轨迹（双栏平级：左右均为独立ca-card，等高；左夜色加滚动条） ===== */
+/* ===== 夜色流转 · 心事投递时间轨迹（双栏平级：右卡按内容自然高为基准；左夜色严格=右高，溢出滚动） ===== */
 .ca-night-track-wrap {
   margin-top: 18px;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 14px;
-  align-items: stretch;   /* 关键：两栏等高 */
+  align-items: start;    /* 行高按内容最自然的计算（=右心事轨迹的内容高） */
   min-width: 0;
 }
-.ca-night-flow-left,
+/* 左夜色卡：拉伸到 grid 行高（=右卡的内容自然高），高度严格=右卡 */
+.ca-night-flow-left {
+  align-self: stretch;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* 右心事轨迹卡：按内容自然高度（不拉伸），作为左右高度的基准 */
 .ca-night-side-track {
-  height: 100%;
+  align-self: start;
+  height: auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-/* 夜色body：可滚动，高度跟随右栏 */
+/* 夜色body：在左卡被限制的高度里 overflow-y 滚动，超出的内容可翻 */
 .ca-night-scroll {
   flex: 1 1 auto;
+  height: 0;              /* 关键：配合 flex:1 + min-height:0，强制收缩后再由剩余空间撑开，保证内部溢出走滚动条 */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   /* 精细滚动条，贴合夜色主题 */
@@ -4732,10 +4847,10 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-emo-left-full {
   width: 100%;
 }
-/* 心事轨迹body：与卡片同高，内容垂直居中 */
+/* 心事轨迹body：自然高度，不做拉伸（右卡是高度基准） */
 .ca-track-body {
-  flex: 1 1 auto;
-  height: 100%;
+  flex: 0 1 auto;
+  height: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
