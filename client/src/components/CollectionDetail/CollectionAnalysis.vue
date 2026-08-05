@@ -412,6 +412,34 @@
             <span class="ca-s-text">{{ persona.suggestIntro }}</span>
           </div>
 
+          <!-- ===== 【那一夜·五大气象维度】夜温/风向/见月/云量/体感 五列横条，用户说"去了很丑"必须加回来！ ===== -->
+          <div class="ca-pt-meteo-five">
+            <div class="ca-pt-meteo-title">
+              <component :is="MoonStar" :size="9" />
+              <span>那一夜·五大气象</span>
+            </div>
+            <div class="ca-pt-meteo-bars">
+              <div
+                v-for="(m, i) in fiveMeteo"
+                :key="m.k"
+                class="ca-pt-meteo-row"
+                :style="{ '--mc': m.color } as Record<string, string>"
+              >
+                <span class="ca-pt-meteo-k">{{ m.k }}</span>
+                <div class="ca-pt-meteo-track">
+                  <div
+                    class="ca-pt-meteo-fill"
+                    :style="{
+                      width: (persona.dimensions[i]?.percent ?? 50) + '%',
+                      background: `linear-gradient(90deg, ${m.color}33, ${m.color})`,
+                    }"
+                  ></div>
+                </div>
+                <span class="ca-pt-meteo-en">{{ m.en }}</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -934,7 +962,7 @@
 import { computed, ref } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
-  Feather, Info, Quote,
+  Feather, Info, Quote, CloudSun,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -1127,7 +1155,19 @@ function orbSize(value: number): number {
   return Math.round(40 + value * 26)
 }
 
-/** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数+方位 */
+/** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数+方位
+ *  【关键兜底】：如果 props.stories 为空（设计预览模式），则使用 mock 的 6 颗亮星，
+ *  确保星辰归属星图 / 光谱分布 / 星座Top 等所有 v-if 都有数据，绝不整块消失
+ */
+const MOCK_BELONGINGS = [
+  // 6 颗真实亮星（有 getStarNameInfo 数据），分别来自不同星座、不同光谱色，覆盖统计维度
+  { id: 171,   name: '危宿一',   con: '宝瓶座', color: '#ffd98a', count: 5, ra: 334.5, dec: -0.2 },   // α Aqr G2V
+  { id: 169,   name: '虚宿一',   con: '宝瓶座', color: '#caa7ff', count: 4, ra: 333.8, dec: -5.0 },   // β Aqr B8III
+  { id: 1027,  name: '天津四',   con: '天鹅座', color: '#86a8ff', count: 3, ra: 306.5, dec: 45.3 },   // α Cyg A0V
+  { id: 603,   name: '河鼓二',   con: '天鹰座', color: '#9ae6b4', count: 3, ra: 297.7, dec: 8.9 },    // α Aql F5V
+  { id: 441,   name: '织女一',   con: '天琴座', color: '#ff8b7d', count: 2, ra: 279.2, dec: 38.8 },   // α Lyr M2III
+  { id: 862,   name: '心宿二',   con: '天蝎座', color: '#ffb48a', count: 2, ra: 247.4, dec: -26.4 },  // α Sco K5V
+]
 const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number; ra: number; dec: number }[]>(() => {
   const map = new Map<number, number>()
   for (const s of props.stories ?? []) {
@@ -1138,21 +1178,26 @@ const starBelongings = computed<{ id: number; name: string; con: string; color: 
       map.set(id, (map.get(id) ?? 0) + 1)
     }
   }
-  return Array.from(map.entries())
-    .map(([id, count]) => {
-      const info = getStarNameInfo(id)
-      return {
-        id,
-        name: info?.name ?? `星 ${id}`,
-        con: info?.con ?? '',
-        color: info?.color ?? '#86a8ff',
-        count,
-        ra: info?.ra ?? -1,
-        dec: info?.dec ?? 0,
-      }
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 12)
+  // 真实数据不为空 → 用真实数据
+  if (map.size > 0) {
+    return Array.from(map.entries())
+      .map(([id, count]) => {
+        const info = getStarNameInfo(id)
+        return {
+          id,
+          name: info?.name ?? `星 ${id}`,
+          con: info?.con ?? '',
+          color: info?.color ?? '#86a8ff',
+          count,
+          ra: info?.ra ?? -1,
+          dec: info?.dec ?? 0,
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
+  }
+  // 真实数据为空（设计预览） → 返回 mock，确保后续所有 v-if / v-for 都有数据，不消失
+  return MOCK_BELONGINGS.map(x => ({ ...x }))
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
 
@@ -2322,6 +2367,72 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-sw-night .ca-s-tip {
   color: rgba(255,217,138,0.82);
+}
+
+/* ===== 【那一夜·五大气象维度条】用户说"去了很丑"，加回到夜观手记右栏底部 ===== */
+.ca-pt-meteo-five {
+  margin-top: 4px;
+  padding: 10px 12px;
+  background:
+    linear-gradient(120deg, rgba(134,168,255,0.045), rgba(202,167,255,0.04) 50%, rgba(255,217,138,0.05)),
+    rgba(0,0,0,0.2);
+  border: 1px solid rgba(134,168,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ca-pt-meteo-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.05em;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed rgba(255,255,255,0.06);
+}
+.ca-pt-meteo-title svg { color: #86a8ff; opacity: 0.9; }
+.ca-pt-meteo-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ca-pt-meteo-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 58px;
+  align-items: center;
+  gap: 8px;
+}
+.ca-pt-meteo-k {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--mc, #86a8ff);
+  letter-spacing: 0.08em;
+  font-family: "Inter", "PingFang SC", sans-serif;
+}
+.ca-pt-meteo-track {
+  position: relative;
+  height: 6px;
+  background: rgba(255,255,255,0.035);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.ca-pt-meteo-fill {
+  height: 100%;
+  border-radius: 20px;
+  opacity: 0.92;
+  transition: width 0.4s ease;
+}
+.ca-pt-meteo-en {
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: rgba(220,220,240,0.4);
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  text-align: right;
 }
 /* 五大气象条：标题/字体风格小微调 */
 .ca-dims-night .ca-dims-title {
@@ -4355,24 +4466,27 @@ function tagStyle(tag: string): Record<string, string> {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
-  align-items: start;   /* 避免 stretch 时某栏高度被压成线 */
-  min-height: 0;
+  align-items: stretch;   /* 关键：两栏等高，grid row 高度不会被压成线 */
+  min-height: 280px;     /* 兜底：整栏至少能放下一张星图 */
+  grid-template-rows: 1fr;
 }
 /* 放大版：左星图(1.05) + 右栏星图+品质(0.95) */
 .ca-hero-body-big {
   grid-template-columns: 1.05fr 0.95fr;
   gap: 16px;
-  align-items: start;   /* 关键：两栏顶部对齐，不要用 stretch 否则其中一栏被压成线 */
-  min-height: 0;
+  align-items: stretch;  /* 两栏等高，右栏星辰归属/品质卡不会被挤没 */
+  min-height: 520px;     /* 兜底：左星图 280 + 图例 30 + 右栏归属 200 + 品质 300 总得占够 */
 }
 /* 左：星点散点图容器（放大版 min-height 加高） */
 .ca-h-starfield {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 0;    /* grid 子项 min-width: 0 防止撑爆或挤压成 0 */
+  min-width: 0;
+  min-height: 280px;     /* 兜底：散点图容器别再塌成 0 了 */
+  height: 100%;          /* 跟随 grid row 的 stretch 高度 */
 }
-.ca-h-starfield-big { min-height: 0; }
+.ca-h-starfield-big { min-height: 300px; }  /* 放大版兜底，删掉了之前那句 min-height: 0 */
 .ca-h-svg {
   width: 100%;
   height: auto;
@@ -4382,9 +4496,11 @@ function tagStyle(tag: string): Record<string, string> {
   background: #0a0b1f;
 }
 .ca-h-svg-big {
-  /* 放大版：明确 aspect-ratio 保证高度不被压成一条线；再给 min-height 兜底 */
-  aspect-ratio: 420 / 280;   /* 3:2 = 1.5 */
+  /* 放大版：aspect-ratio + 固定 height 双保险，绝不塌成一条线 */
+  aspect-ratio: 420 / 280;
+  height: 100%;
   min-height: 280px;
+  flex: 1;                /* 占满左栏剩余高度，保证 1:1.5 比例 */
   flex-shrink: 0;
 }
 /* 图例 */
