@@ -45,6 +45,7 @@
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
 | `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回 |
+| `collections.ts` | **合集路由**。CRUD 列表/创建/详情/更新/删除/公开列表。新增 **`GET /:id/analysis` 合集 AI 分析接口**（对齐单星分析三态）：authOptional 先 getCollectionDetail 校验可见性 private 仅 owner；storyCount<3 → 返回 `{ persona:null, emotion:null, nightscape:null, ready:false, tooFewStories:true, storyCount }` 前端直接显空态不轮询；storyCount≥3 → 调 `triggerAnalysisIfNeeded(id)` 懒触发（Phase 2 接 agent） + `readCollectionAnalysis(id)` 读缓存；响应包 `{ persona, emotion, nightscape, ready, generatedAt, tooFewStories:false, storyCount }` |
 
 ### 服务层 `src/services/`
 
@@ -57,6 +58,7 @@
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务。含 **`findMatchingStarsForContent(title, content, limit)`** 为未落库的新故事寻找 Top3 最契合的星辰（内核 Jaccard 相似度 Top10 + DeepSeek 语义重排给理由 + 匹配不到时降级选亮星）。**`extractSuggestedTagsForContent(title, content)`** 轻量接口：仅生成 3-5 个 AI 建议标签（不走星星匹配），配合前端 `POST /api/stories/ai-tags` 做实时标签推荐。`getSimilarStars(catalogStarId)` 星 vs 星内核相似度。`generateKernel()` AI 提取内核。 |
 | `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
+| `collectionAnalysis.ts` | **合集级 AI 分析服务（Phase 1 同步合成 + 缓存，Phase 2 可平滑接真实 agent pipeline）**。`readCollectionAnalysis(id)` 三步：① getStoriesLite → storyCount；② 查 `collection_analyses` 表命中 & story_hash/storyCount 一致 → 直接反序列化 persona/emotion/nightscape JSON 返回 ready=true；③ 未命中 → `computeHourlyAndThemes()` 做 SQL 聚合（24h时辰分布 UTC+8 + tag+正文关键词 Top8 主题）→ `buildPersona()`（5标签/汉名/金句/2段解读/5维度）+ `buildEmotion()`（思念/孤独/释然/希望/共鸣 5色球权重）+ `buildNightscape()`（合集独有：月相节气/五大气象/心事时间轨迹散点/天窗片段3摘录/时辰peakLow/5情绪洞察/主调3段叙事）→ 写缓存（INSERT...ON CONFLICT DO UPDATE，story_hash 由 md5(id:len:md5(content.slice(0,8))|...) 做内容变了才重算）→ 返回 ready=true。`triggerAnalysisIfNeeded(id)` Phase 1 空占位，Phase 2 接 agent 异步懒生成 ready=false + 写回表。hashStories 幂等保证同内容不会重复跑 |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
 | `emailService.ts` | 邮件发送服务 |
 
@@ -97,6 +99,7 @@
 | 文件 | 用途 |
 |---|---|
 | `starAnalysisAgent.ts` | **分析总控 Agent**。`ensureOne()` 单星懒生成（story_hash 幂等 + 1200ms 节流 + partial 入库）；`runAll()` 批量按故事数 DESC + 亮星优先级排序；`upsertAnalysis()` 写 catalog_star_analyses 表 |
+| `collectionAnalysisAgent.ts` | **合集级 AI 分析总控 Agent（Phase 2 预留，当前无文件，待接真实 pipeline）**。将复用 personaGen/emotionGen 并新增 nightscapeGen 做夜空意象/夜色流转/心事轨迹五大气象模型生成；`triggerAnalysisIfNeeded()` 会检查 ready=false → 启动异步任务 → 写 `collection_analyses` 表回 ready=true 给前端轮询拉到 |
 | `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读 |
 | `generators/emotionGen.ts` | 情感解构 + 故事摘录生成器。5 色情绪球 + 百分比洞察 + Top3 独白卡片 |
 | `generators/themeHourGen.ts` | 主题森林/时辰观察三段文生成器。forestNote（森林引导） + peakText（活跃时段） + lowText（沉睡时段） |
@@ -147,6 +150,8 @@
 | `StarDetail/BottomBar.vue` | 底部操作栏子组件（写故事、收藏、与古人共赏） |
 | `StarDetail/MobileTabSelect.vue` | 移动端下拉 Tab 选择器（替代 PC 端 Tab 栏） |
 | `StarDetail/MobileActionSheet.vue` | 移动端底部 Action Sheet（删除确认，3 秒倒计时） |
+| `CollectionDetail/index.vue` | **合集详情容器**（镜像 StarDetail 双栏布局）。PC 端左栏 tab（**AI 解读默认首个**/故事列表/合集列表）+ 右栏合集信息（描述/**4 列统计 故事/共鸣/浏览/收藏**/活跃时辰热力/故事时间轴/高频标签/编辑删除）；移动端底部抽屉 + 全屏故事详情。故事缩略/详细中 tag 上方显示**星星归属**（挂在哪颗星上）而非合集徽章（`showStarBelonging` 透传）。复用 StoryList/StoryDetail/CollectionAnalysis，内部处理共鸣/删除（optimistic）。从 ProfilePage 合集卡片和 SkyPage 故事详情合集徽章两处打开。**AI 解读 Tab PC/移动端都传 `collectionId` props**，保证 useCollectionAnalysis composable 能调后端 GET `/api/collections/:id/analysis` 接口 |
+| `CollectionDetail/CollectionAnalysis.vue` | **合集 AI 解读组件（已接入 agent）**。**三态切换 v-if**：① 故事数 <3 → StarDetail 同款 BookDashed 空态「心事不够多」不生成；② loading（ready=false轮询中） → Sparkle + skeleton-lines shimmer 骨架屏动画；③ ready=true → 全量真实内容渲染。内容板块：星辰归属散点星图（从 props.stories.catalogStarId 聚合，地平坐标 SVG 投影，hover 高亮）+ 四小指标+星辰速览+光谱主流+星座Top3品质标签、夜观手记（笺卷小卡+汉名+双段叙事+五大气象紧凑5列小卡）、夜色流转·心事投递时间轨迹双栏（夜色流转 overflow-y 滚动条蓝紫渐变 + 心事时间线连线散点+4格统计+说明条）、天窗片段（时辰贴纸+夜色小窗3种插画+摘录）、时辰热力（24珠子热力+高峰低谷洞察）、共鸣榜+情感轨迹双栏（Top3共鸣卡+时间线节点展开收起）。引入 `useCollectionAnalysis(collId)` composable 轮询接口，所有 computed（persona/fiveMeteo/emotions/emotionInsights/emotionNarrative/storyQuotes/heroStars/heroStats/hourly/nightSky/peakText/lowText）从 API 返回值兜底到 mock，保证绝不空白 |
 | `StarNarrative.vue` | AI 叙事展示组件（Markdown 渲染） |
 | `AncientChat.vue` | **与古人共赏**聊天抽屉。古人选择 → SSE 流式聊天 |
 | `StoryForm.vue` | 投递心事表单。两种 `mode` prop：**`bind-star`**（预绑定 catalogStarId，原行为） vs **`auto-match`**（未选星，点「寻找归属星辰」emit `requestMatch` 给父组件，匹配后父组件通过 ref 调 `doSubmit(catalogStarId)` 真正提交）。auto-match 模式下提供 3 步进度遮罩（提取内核 / 夜空寻星 / 判断缘分）。**实时 AI 标签推荐**：标题+正文变化 600ms debounce → `POST /api/stories/ai-tags`，推荐标签与匹配接口回传的 `suggestedTags` 合并去重后展示，两种模式都启用。暴露：`defineExpose({ doSubmit, resetForm })`。 |
@@ -163,7 +168,8 @@
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
 | `useKernel.ts` | 故事内核（情感标签）提取 |
-| **`useStarMatching.ts`** | **「记录」归属星辰匹配封装**。`matchStars(title, content, limit)` → POST `/api/stories/match-star` → 返回 Top3 `MatchCandidate[]`。`step` 1/2/3 进度自动推进（配合 StoryForm 匹配遮罩）。`reset()` 中断+清状态 |
+| `useStarMatching.ts` | **「记录」归属星辰匹配封装**。`matchStars(title, content, limit)` → POST `/api/stories/match-star` → 返回 Top3 `MatchCandidate[]`。`step` 1/2/3 进度自动推进（配合 StoryForm 匹配遮罩）。`reset()` 中断+清状态 |
+| `useCollectionAnalysis.ts` | **合集 AI 分析 composable（对齐 useStarAnalysis 三态模式）**。`useCollectionAnalysis(collectionId: Ref<number|null>, { pollIntervalMs=3000, maxPolls=20 })` → 轮询 GET `/api/collections/:id/analysis`。三态：① `tooFewStories=true`（故事<3后端明确返回） → 立即停，前端显空态；② `ready=false & not tooFew` → 每 POLL_INTERVAL 再拉直到 ready=true 或 MAX_POLLS 次；③ `ready=true` → 停。返回 `{ analysis, loading, error, fetchAnalysis, reset }`。`inflightSeq` 竞态保护（watch collectionId 变化时 reset + 新 id fetch，旧 inflight 结果丢弃），onBeforeUnmount 清 pollTimer + destroyed 标志防写 ref。`CollectionAnalysis` 类型 persona/emotion 复用 `useStarAnalysis` 的 PersonaPayload/EmotionPayload，`nightscape` 为合集独有 NightscapePayload |
 | `useSimilarStars.ts` | 相似星星推荐 |
 | `useAreaHighlights.ts` | 天区故事精选 |
 | `useAstroEvents.ts` | 天文事件计算（日月出没、行星可见性） |
@@ -232,6 +238,7 @@
 |---|---|
 | `2026-07-31-personal-space-ui-style-d-design.md` | **个人空间界面优化设计规范**。Style D（叙事沉浸式）完整 Spec：美学方向、颜色 token、字体层级、4 大段结构、交互流程、数据/API 映射、响应式规则、无障碍、验收清单 |
 | `2026-08-02-mobile-login-and-story-button-design.md` | **移动端登录页适配 + 凝听星语按钮设计规范**（issue #124）。登录页可滚动 + 移动端进入故事改用底部「凝听星语」按钮（吸附星辰后滑入）替代触屏点击 |
+| `2026-08-04-story-collection-folio-design.md` | **故事合集（星笺）设计规范**。合集=故事唯一系列标识（非收藏夹）：`collections` 表 + `stars.collection_id` 列；投递故事时选合集；合集 `visibility` 决定内含故事可见性（public/private）；与 favorites/星星归属正交。含数据模型、API、可见性过滤逻辑、前端模块、P1–P4 路线图与验收清单 |
 
 ### 实现计划 `docs/superpowers/plans/`
 

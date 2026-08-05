@@ -26,6 +26,17 @@
         <!-- STEP 1 -->
         <template v-if="step === 1">
           <div class="sf-group">
+            <!-- 合集归属（必选，置顶） -->
+            <div class="sf-field">
+              <label class="sf-label">
+                归属合集
+                <span class="sf-label-sub">必选 · 故事将收入此合集</span>
+              </label>
+              <CollectionPicker v-model="collectionSelection" />
+            </div>
+
+            <div class="sf-sep"></div>
+
             <!-- 标题 -->
             <div class="sf-field">
               <label class="sf-label">标题</label>
@@ -61,7 +72,7 @@
 
           <button
             class="sf-primary"
-            :disabled="!title.trim() || !content.trim()"
+            :disabled="!title.trim() || !content.trim() || !hasCollectionSelection"
             @click="step = 2"
           >
             <span>继续</span>
@@ -195,7 +206,7 @@
           <button
             class="sf-primary"
             :class="{ match: mode === 'auto-match' }"
-            :disabled="(submitting || matching) || !title.trim() || !content.trim()"
+            :disabled="(submitting || matching) || !title.trim() || !content.trim() || !hasCollectionSelection"
             @click="onPrimaryClick"
             type="button"
           >
@@ -241,6 +252,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineExpose, nextTick } from 'vue'
 import { X, Send, Check, ChevronRight, ArrowLeft, Sparkles, Star, AlertCircle, Plus, RefreshCw } from 'lucide-vue-next'
 import { useLocation } from '../composables/useLocation'
+import { useCollections } from '../composables/useCollections'
+import CollectionPicker from './CollectionPicker.vue'
 
 const props = withDefaults(defineProps<{
   starName: string
@@ -267,6 +280,8 @@ const emit = defineEmits<{
     locationLat: number | null; locationLng: number | null; type: string
     viewCount: number; origin: string | null; username: string | null
     tag: string | null; tags?: string[]; userId: number | null; imageUrl: string | null
+    collectionId: number | null; collectionName: string | null
+    collectionCoverColor: string | null; collectionVisibility: string | null
   }]
   requestMatch: [payload: {
     title: string; content: string; tag: string | null; tags: string[]
@@ -288,6 +303,13 @@ const userLocation = computed(() => {
 /** 已选标签（多选，上限 5；DB 目前只存第一个为主标签，其余留作 UI/未来扩展） */
 const selectedTags = ref<string[]>([])
 const isAnonymous = ref(false)
+/** 合集归属选择（投递时）：选已有 collectionId，或新建 collectionName+visibility，或 null 不归属 */
+const collectionSelection = ref<{ collectionId?: number; collectionName?: string; visibility?: 'public' | 'private' } | null>(null)
+/** 是否已选择合集（必填校验用） */
+const hasCollectionSelection = computed(() => {
+  const s = collectionSelection.value
+  return !!(s && (s.collectionId || (s.collectionName && s.collectionName.trim())))
+})
 const TAG_RE = /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/
 const customTagInput = ref('')
 const MAX_TAGS = 5
@@ -523,7 +545,32 @@ function onPrimaryClick() {
 
 onMounted(() => {
   textareaRef.value?.focus()
+  // 自动加载用户的合集列表，并预选默认合集（确保每个故事都归属一个合集）
+  loadAndPreselectCollection()
 })
+
+/** 共享合集列表状态（与 CollectionPicker 内部独立实例，仅用于预选默认合集） */
+const { list: collectionList, fetchList: fetchCollectionList } = useCollections()
+
+/** 拉取用户合集列表，预选默认合集（优先 isDefault=true，其次第一个公开合集） */
+async function loadAndPreselectCollection() {
+  try {
+    await fetchCollectionList()
+    const list = collectionList.value
+    if (!list.length) return
+    // 已有选择则不覆盖
+    if (collectionSelection.value?.collectionId) return
+    // 优先 isDefault=true（旧库字段），其次第一个公开合集，最后第一个
+    const def = list.find(c => (c as any).isDefault === 1 || (c as any).isDefault === true)
+      || list.find(c => c.visibility === 'public')
+      || list[0]
+    if (def) {
+      collectionSelection.value = { collectionId: def.id }
+    }
+  } catch (e) {
+    console.error('StoryForm: loadAndPreselectCollection failed', e)
+  }
+}
 
 watch(() => [props.mode, props.starName] as const, () => {
   step.value = 1
@@ -576,6 +623,13 @@ async function doSubmit(
       tags: finalTags,
       isAnonymous: isAnonymous.value,
     }
+    // 合集归属：选已有传 collectionId；新建传 collectionName + collectionVisibility
+    if (collectionSelection.value?.collectionId) {
+      body.collectionId = collectionSelection.value.collectionId
+    } else if (collectionSelection.value?.collectionName) {
+      body.collectionName = collectionSelection.value.collectionName
+      if (collectionSelection.value.visibility) body.collectionVisibility = collectionSelection.value.visibility
+    }
     const res = await fetch('/api/stories', {
       method: 'POST',
       headers,
@@ -605,6 +659,10 @@ async function doSubmit(
         tags: submittedTagsArr,
         userId: json.data.userId ?? null,
         imageUrl: null,
+        collectionId: json.data.collectionId ?? null,
+        collectionName: json.data.collectionName ?? null,
+        collectionCoverColor: json.data.collectionCoverColor ?? null,
+        collectionVisibility: json.data.collectionVisibility ?? null,
       }
       emit('submitted', submittedStory)
       submitting.value = false
@@ -632,6 +690,7 @@ function resetForm() {
   error.value = ''
   submitting.value = false
   customTagInput.value = ''
+  collectionSelection.value = null
 }
 
 defineExpose({ doSubmit, resetForm })

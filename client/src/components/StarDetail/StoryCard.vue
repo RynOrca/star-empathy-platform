@@ -43,11 +43,35 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
-    <!-- 标签行：三种 variant 统一放正文下方、meta 上方，空时隐藏 -->
+    <!-- 合集 / 星星归属 + 标签行：左侧归属、右侧标签，同一行；两者都空时隐藏 -->
     <div
-      v-if="displayTags.length"
+      v-if="(showStarBelonging && starBelonging) || story.collectionName || displayTags.length"
       class="story-tags-row"
     >
+      <!-- 星星归属（合集上下文：显示挂在哪颗星上） → 点击跳转 /sky?star=xxx -->
+      <span
+        v-if="showStarBelonging && starBelonging && mainStarCatalogId != null"
+        class="story-star-belong ssb-clickable"
+        :style="{ '--ssb-c': starBelonging.color } as Record<string, string>"
+        :title="`前往该星星：${starBelonging.name}`"
+        @click.stop="goToStar(mainStarCatalogId)"
+      >
+        <StarIcon :size="11" class="ssb-icon" />
+        <span class="ssb-name">{{ starBelonging.name }}</span>
+        <span v-if="starBelonging.con" class="ssb-con">· {{ starBelonging.con }}</span>
+      </span>
+      <!-- 合集徽章（非合集上下文） -->
+      <CollectionBadge
+        v-else-if="story.collectionName"
+        :collection-name="story.collectionName"
+        :cover-color="story.collectionCoverColor ?? null"
+        :collection-visibility="story.collectionVisibility ?? null"
+        :clickable="!!story.collectionId && !!collectionClickable"
+        @click="collectionClickable && $emit('collection-click', story)"
+      />
+      <!-- 分隔点：归属/合集和标签同时存在时 -->
+      <span v-if="(showStarBelonging ? !!starBelonging : !!story.collectionName) && displayTags.length" class="story-tag-sep"></span>
+      <!-- 标签（右侧） -->
       <span
         v-for="t in displayTags"
         :key="'tag-' + story.id + '-' + t"
@@ -81,12 +105,18 @@
 </template>
 
 <script setup lang="ts">
-import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { Sparkles, Check, Eye, Star } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import CollectionBadge from '../CollectionBadge.vue'
+import { getStarNameInfo } from '../../utils/starName'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
+const StarIcon = Star
+const router = useRouter()
+const route = useRoute()
 
 const props = defineProps<{
   story: {
@@ -97,6 +127,12 @@ const props = defineProps<{
     username: string | null
     tag: string | null
     tags?: string[] | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
+    catalogStarId?: number | null
+    catalogStarIds?: number[]
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -107,11 +143,16 @@ const props = defineProps<{
   formattedTime?: string
   formattedDistance?: { text: string; near: boolean } | null
   index: number
+  /** 合集 Badge 是否可点击打开合集详情；默认 false（仅展示） */
+  collectionClickable?: boolean
+  /** 合集上下文：显示星星归属（挂在哪颗星上）而非合集徽章 */
+  showStarBelonging?: boolean
 }>()
 
 defineEmits<{
   click: []
   resonate: []
+  'collection-click': [story: any]
 }>()
 
 /** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
@@ -120,6 +161,27 @@ const displayTags = computed<string[]>(() => {
   if (arr.length) return arr.slice(0, 5)
   return props.story.tag ? [props.story.tag] : []
 })
+
+/** 星星归属：取主星 catalogStarId，否则 catalogStarIds[0]；查 stars.json/planets 取名+星座+颜色 */
+const mainStarCatalogId = computed<number | null>(() => props.story.catalogStarId ?? props.story.catalogStarIds?.[0] ?? null)
+const starBelonging = computed(() => {
+  const id = mainStarCatalogId.value
+  if (id == null) return null
+  return getStarNameInfo(id) ?? null
+})
+
+/** 跳转星空页面并打开该星星详情（防止冒泡触发卡片 click）
+ *  关键兜底：当前 fullPath 与目标完全一致时 Vue Router 不会二次导航，
+ *  改为派发自定义事件 star-identity-click，让合集详情等监听方知道"重复点击了同星 → 要关闭/重聚焦"
+ */
+function goToStar(starId: number) {
+  const target = `/sky?star=${encodeURIComponent(String(starId))}`
+  if (route.fullPath !== target) {
+    router.push({ path: '/sky', query: { star: String(starId) } })
+  } else {
+    window.dispatchEvent(new CustomEvent('star-identity-click', { detail: { starId } }))
+  }
+}
 
 /** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
 function hashCode(s: string): number {
@@ -287,6 +349,42 @@ function tagStyle(tag: string): Record<string, string> {
   border-top: 0.5px dashed var(--rule);
   border-bottom: 0.5px dashed var(--rule);
 }
+
+/* 合集与标签之间的竖线分隔 */
+.story-tag-sep {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+/* ── 星星归属（合集上下文） ── */
+.story-star-belong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  padding: 2px 9px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--ssb-c, #fff) 8%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--ssb-c, #fff) 22%, transparent);
+  color: var(--ssb-c, var(--ink-secondary));
+  flex-shrink: 0;
+  line-height: 1.45;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+/* 可点击的星星归属徽章：cursor + hover 高亮（冒泡已 @click.stop 阻止） */
+.story-star-belong.ssb-clickable { cursor: pointer; user-select: none; }
+.story-star-belong.ssb-clickable:hover {
+  background: color-mix(in srgb, var(--ssb-c, #fff) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ssb-c, #fff) 36%, transparent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--ssb-c, #fff) 26%, transparent);
+  transform: translateY(-0.5px);
+}
+.ssb-icon { opacity: 0.85; flex-shrink: 0; }
+.ssb-name { font-weight: 500; }
+.ssb-con { opacity: 0.6; font-size: 0.64rem; }
 
 /* ─── Story Image ─── */
 .story-image {

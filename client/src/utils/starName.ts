@@ -25,6 +25,10 @@ export interface StarNameInfo {
   color: string
   /** 是否太阳系行星 */
   isPlanet: boolean
+  /** 赤经（0-24h）；行星为 -1 */
+  ra: number
+  /** 赤纬（-90~+90）；行星为 0 */
+  dec: number
 }
 
 interface RawStar {
@@ -33,6 +37,8 @@ interface RawStar {
   con: string
   mag: number
   color?: string
+  ra: number
+  dec: number
 }
 
 // ─── 内部查找表（懒构建，模块级常量） ───
@@ -70,6 +76,8 @@ export function getStarNameInfo(id: number): StarNameInfo | undefined {
       mag: 0,
       color: planetColorToHex(planet.color),
       isPlanet: true,
+      ra: -1,
+      dec: 0,
     }
   }
   const star = starById.get(id)
@@ -80,6 +88,8 @@ export function getStarNameInfo(id: number): StarNameInfo | undefined {
     mag: star.mag,
     color: star.color || '#fff',
     isPlanet: false,
+    ra: star.ra,
+    dec: star.dec,
   }
 }
 

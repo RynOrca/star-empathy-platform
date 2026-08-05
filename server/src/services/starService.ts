@@ -53,6 +53,40 @@ function normalizeTagsForStories(stories: any[]): any[] {
   });
 }
 
+// 为故事附加合集信息（collectionName/coverColor/visibility），批量查询避免 N+1
+function attachCollectionInfo(stories: any[]): any[] {
+  const ids = Array.from(new Set(
+    stories.map((s: any) => s.collection_id).filter((id: any) => id != null)
+  )) as number[];
+  if (ids.length === 0) {
+    return stories.map((s: any) => ({
+      ...s,
+      collectionName: null,
+      collectionCoverColor: null,
+      collectionVisibility: null,
+      collectionStoryCount: null,
+    }));
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT c.id, c.name, c.cover_color, c.visibility,
+       (SELECT COUNT(*) FROM stars s2 WHERE s2.collection_id = c.id AND s2.type = 'user') as story_count
+     FROM collections c WHERE c.id IN (${placeholders})`
+  ).all(...ids) as { id: number; name: string; cover_color: string | null; visibility: string; story_count: number }[];
+  const map = new Map<number, { name: string; cover_color: string | null; visibility: string; story_count: number }>();
+  for (const r of rows) map.set(r.id, r);
+  return stories.map((s: any) => {
+    const c = s.collection_id != null ? map.get(s.collection_id) : null;
+    return {
+      ...s,
+      collectionName: c?.name ?? null,
+      collectionCoverColor: c?.cover_color ?? null,
+      collectionVisibility: c?.visibility ?? null,
+      collectionStoryCount: c?.story_count ?? null,
+    };
+  });
+}
+
 // 为故事附加 catalogStarIds（从 story_catalog_stars 连接表读取多对多绑定）
 function attachCatalogStarIds(stories: any[]): any[] {
   if (stories.length === 0) return stories;
@@ -69,27 +103,35 @@ function attachCatalogStarIds(stories: any[]): any[] {
   }
 
   const withTags = normalizeTagsForStories(stories);
-  return withTags.map((s: any) => ({
+  const withIds = withTags.map((s: any) => ({
     ...s,
     catalogStarIds: map.get(s.id) || (s.catalog_star_id != null ? [s.catalog_star_id] : []),
   }));
+  return attachCollectionInfo(withIds);
 }
+
+// 可见性过滤：私有合集（collections.visibility='private'）内的故事仅作者本人可见；
+// 无合集故事（collection_id IS NULL）与公开合集故事对所有人可见。
+// 未登录时 currentUserId 传 null，`s.user_id = NULL` 永假，自动只剩公开内容。
+const VISIBILITY_FILTER = '(s.collection_id IS NULL OR c.visibility = \'public\' OR s.user_id = ?)';
 
 // 获取所有星星（含用户名、用户 ID 和标签）
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[] {
+export function getAllStars(currentUserId?: number): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[] {
   const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON c.id = s.collection_id
+    WHERE ${VISIBILITY_FILTER}
     ORDER BY s.created_at DESC
-  `).all() as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all(currentUserId ?? null) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
   return attachCatalogStarIds(rows);
 }
 
 // 分页获取所有星星
-export function getAllStarsPaged(page: number, limit: number): {
+export function getAllStarsPaged(page: number, limit: number, currentUserId?: number): {
   items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[];
   total: number;
   page: number;
@@ -99,8 +141,13 @@ export function getAllStarsPaged(page: number, limit: number): {
   const p = Math.max(1, Math.floor(page));
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
+  const uid = currentUserId ?? null;
 
-  const totalRow = db.prepare('SELECT COUNT(*) as cnt FROM stars').get() as { cnt: number };
+  const totalRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM stars s
+    LEFT JOIN collections c ON c.id = s.collection_id
+    WHERE ${VISIBILITY_FILTER}
+  `).get(uid) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l);
 
@@ -109,9 +156,11 @@ export function getAllStarsPaged(page: number, limit: number): {
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN collections c ON c.id = s.collection_id
+    WHERE ${VISIBILITY_FILTER}
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all(uid, l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 
   return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
 }
@@ -128,6 +177,7 @@ export function createStar(
   imageUrl?: string,
   catalogStarIds?: number[],
   tags?: string[],
+  collectionId?: number,
 ): Star & { username: string | null; userId: number | null; tags: string[] } {
   const pos = generatePosition();
   // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长
@@ -161,8 +211,8 @@ export function createStar(
   const effectiveCatalogStarId = catalogStarId ?? (catalogStarIds?.length ? catalogStarIds[0] : undefined);
 
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags, collection_id)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
@@ -176,6 +226,7 @@ export function createStar(
     isAnonymous ? 1 : 0,
     imageUrl ?? null,
     tagsJson,
+    collectionId ?? null,
   );
 
   const storyId = result.lastInsertRowid as number;
@@ -349,16 +400,30 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 }
 
 // 单星下的所有故事（通过连接表多对多查询）
-export function getStoriesByCatalogStarId(catalogStarId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
+export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
   const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
     FROM stars s
     JOIN story_catalog_stars scs ON s.id = scs.story_id
     LEFT JOIN users u ON s.user_id = u.id
-    WHERE scs.catalog_star_id = ?
+    LEFT JOIN collections c ON c.id = s.collection_id
+    WHERE scs.catalog_star_id = ? AND ${VISIBILITY_FILTER}
     ORDER BY s.created_at DESC
-  `).all(catalogStarId);
+  `).all(catalogStarId, currentUserId ?? null);
+  return attachCatalogStarIds(rows);
+}
+
+// 某合集下的所有故事（合集详情用；可见性由调用方 collectionService 校验）
+export function getStoriesByCollectionId(collectionId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
+  const rows = db.prepare(`
+    SELECT s.*,
+      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+    FROM stars s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.collection_id = ?
+    ORDER BY s.created_at DESC
+  `).all(collectionId);
   return attachCatalogStarIds(rows);
 }
 

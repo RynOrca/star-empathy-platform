@@ -71,13 +71,16 @@ function browserLocate(): Promise<LatLng | null> {
 /**
  * IP 地理位置兜底（无需权限，城市级精度足够天文观测）
  * 主：ipapi.co；备：ipwho.is
+ * 注：开发模式通过 vite 代理避免 localhost CORS（见 vite.config.ts /ip-api、/ip-who）
  */
 async function ipLocate(): Promise<LatLng | null> {
+  const DEV = import.meta.env.DEV
   // 主：ipapi.co
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
-    const res = await fetch('https://ipapi.co/json/', { signal: ctrl.signal })
+    const url = DEV ? '/ip-api/json' : 'https://ipapi.co/json/'
+    const res = await fetch(url, { signal: ctrl.signal })
     clearTimeout(t)
     if (res.ok) {
       const d = await res.json()
@@ -90,7 +93,8 @@ async function ipLocate(): Promise<LatLng | null> {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
-    const res = await fetch('https://ipwho.is/', { signal: ctrl.signal })
+    const url = DEV ? '/ip-who/' : 'https://ipwho.is/'
+    const res = await fetch(url, { signal: ctrl.signal })
     clearTimeout(t)
     if (res.ok) {
       const d = await res.json()

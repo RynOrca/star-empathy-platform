@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -67,6 +67,13 @@
         <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
         </button>
+        <!-- 星笺：打开我的合集 -->
+        <button v-if="username && !isGuest" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
+          <Library :size="18" />
+        </button>
+        <!-- 设置 -->
+        <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
+          <Settings :size="18" />
         <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线） -->
         <button v-if="locationReady" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
@@ -307,6 +314,31 @@
         @delete-story="onDeleteStory"
         @stories-mutated="onStarDetailStoriesMutated"
         @toggle-observe="onToggleObserve"
+        @collection-click="onCollectionClick"
+      />
+
+      <!-- 合集详情 overlay（从故事详情的合集徽章点击打开） -->
+      <CollectionDetail
+        v-if="showCollectionDetail"
+        :collection-id="collectionDetailId"
+        :collections="userCollections"
+        :current-user-id="currentUserId"
+        :is-owner="collectionDetailIsOwner"
+        :refresh-nonce="collectionDetailNonce"
+        @close="onCollectionDetailClose"
+        @collection-switch="onCollectionSwitch"
+        @edit="onCollectionEdit"
+        @delete="onCollectionDelete"
+      />
+
+      <!-- 星笺编辑模态框（从合集详情的编辑按钮触发） -->
+      <CollectionEditModal
+        :show="showCollectionEdit"
+        :collection="editingCollection"
+        :submitting="collectionSubmitting"
+        :error="collectionEditError"
+        @close="showCollectionEdit = false; editingCollection = null"
+        @submit="handleCollectionSubmit"
       />
 
       <StoryForm
@@ -510,11 +542,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Orbit, Crosshair, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Star } from 'lucide-vue-next'
+import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail/index.vue'
+import CollectionDetail from '../components/CollectionDetail/index.vue'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
 import StoryForm from '../components/StoryForm.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
@@ -524,6 +558,7 @@ import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
+import { useCollections, type Collection, type CollectionDetail as CollectionDetailType, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
 
 const { isMobile } = useMediaQuery()
@@ -535,6 +570,23 @@ const username = ref('')
 // 访客账号（体验账号）无个人主页，点用户按钮应跳登录页
 const isGuest = computed(() => username.value === '星穹访客')
 const currentUserId = ref<number | null>(null)
+
+// ─── 合集详情 overlay 状态 ───
+const { list: userCollections, fetchList: fetchUserCollections, update: updateCollection, remove: removeCollection } = useCollections()
+const showCollectionDetail = ref(false)
+const collectionDetailId = ref<number | null>(null)
+const collectionDetailIsOwner = ref(false)
+// 合集详情刷新令牌：编辑后自增以触发 CollectionDetail 重新拉取
+const collectionDetailNonce = ref(0)
+
+// ─── 合集编辑模态框状态 ───
+const showCollectionEdit = ref(false)
+const editingCollection = ref<Collection | null>(null)
+const collectionSubmitting = ref(false)
+const collectionEditError = ref<string | null>(null)
+
+const showMyStoriesOnly = ref(false)
+const myToggleFeedback = ref('')
 const locationCityToast = ref('')
 const favoriteStarIds = ref<number[]>([])
 
@@ -795,14 +847,24 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
-
+  // 兜底：当前 URL 与目标 URL 完全一致时（重复点击同星），仍要移动到星星位置
+  window.addEventListener('star-identity-click', onStarIdentityClick as EventListener)
   // 从个人主页收藏点击跳转过来：定位到指定星星
   focusOnQueryStar()
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('star-identity-click', onStarIdentityClick as EventListener)
+})
+function onStarIdentityClick(e: CustomEvent<{ starId: number }>) {
+  const id = e.detail?.starId
+  if (id == null || Number.isNaN(id)) return
+  focusOnQueryStar(id)
+}
 
 // 提取定位逻辑为独立函数，供 onMounted 和 watch 共用
-function focusOnQueryStar() {
-  const targetStarId = route.query.star
+// 新增 starIdOverride：当外部事件（非路由 query）需要触发相同定位时直接传 id，不走 route.query
+function focusOnQueryStar(starIdOverride?: number) {
+  const targetStarId = starIdOverride != null ? String(starIdOverride) : route.query.star
   if (!targetStarId) return
   const starId = parseInt(targetStarId as string, 10)
   if (isNaN(starId)) return
@@ -1027,8 +1089,11 @@ interface StoryData {
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; tags?: string[] | null; userId: number | null
   imageUrl: string | null
+  collectionId?: number | null; collectionName?: string | null
+  collectionCoverColor?: string | null; collectionVisibility?: string | null
+  collectionStoryCount?: number | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null, collectionId: null, collectionName: null, collectionCoverColor: null, collectionVisibility: null, collectionStoryCount: null }
 
 /** 统一 tags 字段归一化：tags[] 存在(且数组)→ 最多 5 条/去重；否则回退 tag 单列；最后兜底空数组
  *  避免任何端上出现 undefined/null → displayTags 兜底能保证显示，但是 SkyPage 主动构造 StoryData 时
@@ -1077,6 +1142,9 @@ function mergeStoriesIntoMap(
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, tags: normalizeStoryTags(s), userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
+      collectionId: s.collectionId ?? null, collectionName: s.collectionName ?? null,
+      collectionCoverColor: s.collectionCoverColor ?? null, collectionVisibility: s.collectionVisibility ?? null,
+      collectionStoryCount: s.collectionStoryCount ?? null,
     }
     for (const cid of cids) {
       if (cid == null) continue
@@ -1559,6 +1627,99 @@ function onToggleObserve() {
   planetObserveMode.value = !planetObserveMode.value
   skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
 }
+
+/**
+ * 右上角「星笺」按钮：打开当前用户的合集列表。
+ * 拉取用户合集后，默认打开第一个（默认合集），并在 overlay 内可通过合集列表 tab 切换。
+ */
+async function openMyCollections() {
+  if (isGuest.value) { goLogin(); return }
+  if (!username.value) { goLogin(); return }
+  await fetchUserCollections()
+  if (userCollections.value.length === 0) {
+    // 无合集则跳个人主页创建
+    router.push('/profile')
+    return
+  }
+  collectionDetailId.value = userCollections.value[0].id
+  collectionDetailIsOwner.value = true
+  showCollectionDetail.value = true
+}
+
+/**
+ * 合集徽章点击：从故事详情透传上来的合集点击事件。
+ * 打开 CollectionDetail overlay 展示合集内所有故事。
+ */
+async function onCollectionClick(data: { collectionId: number; collectionName: string | null }) {
+  collectionDetailId.value = data.collectionId
+  // 拉取用户合集列表，判断是否为 owner（控制编辑/删除按钮和合集列表 tab）
+  if (currentUserId.value && !isGuest.value) {
+    await fetchUserCollections()
+    collectionDetailIsOwner.value = userCollections.value.some(c => c.id === data.collectionId)
+  } else {
+    collectionDetailIsOwner.value = false
+  }
+  showCollectionDetail.value = true
+}
+
+/** 合集详情关闭 */
+function onCollectionDetailClose() {
+  showCollectionDetail.value = false
+  collectionDetailId.value = null
+}
+
+/** 合集详情内切换合集 */
+function onCollectionSwitch(id: number) {
+  collectionDetailId.value = id
+}
+
+/** 合集详情内编辑 → 打开编辑模态框（不关闭详情，保存后刷新） */
+function onCollectionEdit(c: CollectionDetailType) {
+  editingCollection.value = c as unknown as Collection
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+}
+
+/** 合集详情内删除 → 确认后删除 */
+async function onCollectionDelete(c: CollectionDetailType) {
+  if (typeof window !== 'undefined' && !window.confirm(`确认删除星笺「${c.name}」？\n合集内的故事会保留，但不再归属此星笺。`)) return
+  const ok = await removeCollection(c.id)
+  if (ok) {
+    showCollectionDetail.value = false
+    collectionDetailId.value = null
+    // 刷新合集列表
+    fetchUserCollections()
+  } else {
+    alert('删除失败，请重试')
+  }
+}
+
+/** 编辑模态框提交：更新星笺并刷新详情 */
+async function handleCollectionSubmit(payload: {
+  isEdit: boolean
+  id?: number
+  data: CreateCollectionInput | UpdateCollectionInput
+}) {
+  collectionSubmitting.value = true
+  collectionEditError.value = null
+  try {
+    if (payload.isEdit && payload.id != null) {
+      const ok = await updateCollection(payload.id, payload.data as UpdateCollectionInput)
+      if (!ok) {
+        collectionEditError.value = '保存失败，请重试'
+        return
+      }
+      // 刷新合集列表与详情
+      await fetchUserCollections()
+      collectionDetailNonce.value++
+    }
+    showCollectionEdit.value = false
+    editingCollection.value = null
+  } finally {
+    collectionSubmitting.value = false
+  }
+}
+
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标

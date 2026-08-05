@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { register, login, guestLogin, getUserById, updateSignature, changePassword, blacklistToken, forgotPassword, resetPassword, refreshToken } from '../services/userService';
 import { authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, send } from '../utils/response';
+import { ensureDefaultCollection } from '../services/collectionService';
 
 const router = Router();
 
@@ -16,6 +17,8 @@ router.post('/register', (req: Request, res: Response) => {
       return badRequest(res, '密码需 6~50 个字符');
     }
     const result = register(username.trim(), password, email);
+    // 注册即创建默认公开合集
+    try { ensureDefaultCollection(result.user.id); } catch (e) { console.error('ensureDefaultCollection(register) failed:', e); }
     ok(res, '注册成功', result);
   } catch (error: any) {
     send(res, 400, error.message || '注册失败');
@@ -30,6 +33,8 @@ router.post('/login', (req: Request, res: Response) => {
       return badRequest(res, '请填写用户名和密码');
     }
     const result = login(username, password, !!rememberMe);
+    // 登录时确保有默认合集（兼容老用户）
+    try { ensureDefaultCollection(result.user.id); } catch (e) { console.error('ensureDefaultCollection(login) failed:', e); }
     ok(res, '登录成功', result);
   } catch (error: any) {
     send(res, 400, error.message || '登录失败');
@@ -40,6 +45,8 @@ router.post('/login', (req: Request, res: Response) => {
 router.post('/guest', (_req: Request, res: Response) => {
   try {
     const result = guestLogin();
+    // 访客也确保有默认合集
+    try { ensureDefaultCollection(result.user.id); } catch (e) { console.error('ensureDefaultCollection(guest) failed:', e); }
     ok(res, '访客登录成功', result);
   } catch (error: any) {
     send(res, 500, error.message || '访客登录失败');
