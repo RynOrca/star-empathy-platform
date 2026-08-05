@@ -10,231 +10,129 @@
       <span class="ca-hero-badge">DESIGN PREVIEW</span>
     </div>
 
-    <!-- ═══ 0.5. 【窗外夜景 · 生活风】合集=卧室窗外这一整段深夜：窗框+窗帘+玻璃反光+天际线+城市灯火+心事星点 ═══ -->
-    <section class="ca-card ca-window-night">
-      <div class="ca-card-head">
-        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-blue" />
-        <span class="ca-ch-title">你的窗前</span>
-        <span class="ca-ch-count">02:47 · 小雨转晴 · {{ storyCount }} 盏心事小灯</span>
+    <!-- ═══ 0.5. Hero：合集星图总览（对齐 StarDetail AIPersonaCard panel-wrapper 规范）
+                    左 = 星点散点（心事=星：x=时间轴, y=情绪, 大小=共鸣, 颜色=真实情感色）
+                    右 = 真实合集统计数据（非假数据） ═══ -->
+    <section class="panel-wrapper ca-hero-panel">
+      <div class="panel-head">
+        <Sparkles :size="10" class="pw-icon pw-purple" />
+        <span class="pw-title">合集星图</span>
+        <span class="pw-count">{{ storyCount }} 则心事 · 聚合生成 · 刚刚更新</span>
       </div>
-      <div class="ca-win-body">
-        <!-- 左：卧室窗户全景 SVG（窗框/窗帘/玻璃反光/天际线/城市灯火/心事星点） -->
-        <div class="ca-win-canvas">
-          <svg viewBox="0 0 360 260" class="ca-win-svg" preserveAspectRatio="xMidYMid meet">
+
+      <div class="ca-hero-body">
+        <!-- 左：星点散点图（天文感，保留星点=心事的映射） -->
+        <div class="ca-h-starfield">
+          <svg viewBox="0 0 360 220" class="ca-h-svg" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <!-- 夜空（窗外）：冷深蓝紫→下方近地平线处稍暖（城市光污染） -->
-              <linearGradient id="wnSky" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0e1333" />
-                <stop offset="55%" stop-color="#141a42" />
-                <stop offset="88%" stop-color="#1f2049" />
-                <stop offset="100%" stop-color="#2c2b52" />
-              </linearGradient>
-              <!-- 玻璃反光：室内台灯的暖光斜带 -->
-              <linearGradient id="glassReflect" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="rgba(255,221,170,0)" />
-                <stop offset="38%" stop-color="rgba(255,218,162,0.12)" />
-                <stop offset="58%" stop-color="rgba(255,232,190,0.05)" />
-                <stop offset="100%" stop-color="rgba(255,221,170,0)" />
-              </linearGradient>
-              <!-- 城市光污染（地平线一带的暖黄雾） -->
-              <linearGradient id="cityGlow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(255,190,130,0)" />
-                <stop offset="40%" stop-color="rgba(255,190,130,0.05)" />
-                <stop offset="100%" stop-color="rgba(255,210,160,0.20)" />
-              </linearGradient>
-              <!-- 月亮柔光 -->
-              <radialGradient id="moonSoft" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(255,245,220,0.85)" />
-                <stop offset="50%" stop-color="rgba(255,235,200,0.35)" />
-                <stop offset="100%" stop-color="rgba(255,220,170,0)" />
+              <!-- 深空背景渐变（冷） -->
+              <radialGradient id="hSkyBg" cx="50%" cy="40%" r="80%">
+                <stop offset="0%" stop-color="#111438" />
+                <stop offset="100%" stop-color="#0a0b1f" />
               </radialGradient>
-              <!-- 心事星点发光（暖/冷/柔紫） -->
-              <radialGradient id="glowWarm" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(255,215,160,0.9)" />
-                <stop offset="100%" stop-color="rgba(255,215,160,0)" />
+              <!-- 星点发光 -->
+              <radialGradient id="hGlowGold" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(255,217,138,0.85)" />
+                <stop offset="100%" stop-color="rgba(255,217,138,0)" />
               </radialGradient>
-              <radialGradient id="glowSoft" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(180,210,255,0.9)" />
-                <stop offset="100%" stop-color="rgba(180,210,255,0)" />
+              <radialGradient id="hGlowBlue" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(134,168,255,0.85)" />
+                <stop offset="100%" stop-color="rgba(134,168,255,0)" />
               </radialGradient>
-              <radialGradient id="glowCozy" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(205,180,255,0.88)" />
-                <stop offset="100%" stop-color="rgba(205,180,255,0)" />
+              <radialGradient id="hGlowPurple" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(202,167,255,0.85)" />
+                <stop offset="100%" stop-color="rgba(202,167,255,0)" />
+              </radialGradient>
+              <radialGradient id="hGlowGreen" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(149,240,192,0.85)" />
+                <stop offset="100%" stop-color="rgba(149,240,192,0)" />
               </radialGradient>
             </defs>
 
-            <!-- 【A】先画窗外世界（在窗框以内：x 36~324, y 24~218 → 玻璃区域） -->
-            <!-- A1：夜空底色（玻璃区外是墙，只画玻璃区域内） -->
-            <rect x="36" y="24" width="288" height="194" fill="url(#wnSky)" />
-            <!-- A2：城市光污染地平线雾 -->
-            <rect x="36" y="140" width="288" height="78" fill="url(#cityGlow)" />
-            <!-- A3：深空自然星点（背景小星） -->
+            <!-- 背景 -->
+            <rect width="360" height="220" fill="url(#hSkyBg)" rx="6" />
+            <!-- 银河淡带（左下→右上，薄） -->
+            <ellipse cx="180" cy="110" rx="165" ry="48" fill="rgba(202,167,255,0.05)" transform="rotate(-16 180 110)" />
+
+            <!-- 坐标参考：x 轴时间（左20:00 → 右06:00），y 轴情绪（上=正/激动, 下=负/低落） -->
+            <!-- 背景星点 60 颗 -->
             <g opacity="0.92">
               <circle v-for="(s, i) in deepSkyStars.slice(0, 60)" :key="'dss'+i"
-                :cx="36 + (s.x / 320) * 288"
-                :cy="24 + (s.y / 200) * 150"
-                :r="s.r * 0.85"
+                :cx="(s.x / 320) * 360"
+                :cy="(s.y / 200) * 200"
+                :r="s.r * 0.82"
                 fill="#ffffff"
-                :opacity="s.opacity * 0.78" />
-            </g>
-            <!-- A4：月亮（右上 78% 盈凸月） -->
-            <g transform="translate(294, 56)">
-              <circle cx="0" cy="0" r="30" fill="url(#moonSoft)" />
-              <circle cx="0" cy="0" r="12" fill="#faf0dc" opacity="0.95" />
-              <circle cx="-4" cy="-1" r="11.2" fill="#faf0dc" opacity="0.55" />
-              <circle cx="-4.8" cy="-1.6" r="1.6" fill="#d9c9a8" opacity="0.55" />
-              <circle cx="0.8" cy="3.4" r="1.2" fill="#d9c9a8" opacity="0.45" />
-              <circle cx="2.4" cy="-3.6" r="0.8" fill="#d9c9a8" opacity="0.35" />
+                :opacity="s.opacity * 0.75" />
             </g>
 
-            <!-- A5：心事星点 = 你的心事（6~8颗，位置=时间X轴 20:00→06:00，大小=共鸣数，颜色=情绪） -->
-            <g v-for="(p, i) in windowStars" :key="'ws'+i">
-              <circle :cx="36 + p.x" :cy="24 + p.y" :r="p.r * 2.5" :fill="'url(#glow' + p.gid + ')'" opacity="0.85">
-                <animate attributeName="r" :values="(p.r*2.3)+';'+(p.r*2.8+0.5)+';'+(p.r*2.3)" :dur="(3.2 + i*0.35) + 's'" repeatCount="indefinite" />
+            <!-- 星点=心事（8 颗，x=时间 y=情绪 r=共鸣 color=情感色 glowId=对应渐变） -->
+            <g v-for="(p, i) in heroStars" :key="'hs'+i">
+              <!-- 光晕 -->
+              <circle :cx="p.x" :cy="p.y" :r="p.r * 2.6" :fill="'url(#hGlow' + p.gid + ')'" opacity="0.82">
+                <animate attributeName="r" :values="(p.r*2.4)+';'+(p.r*2.9+0.5)+';'+(p.r*2.4)"
+                  :dur="(3.1 + i*0.32) + 's'" repeatCount="indefinite" />
               </circle>
-              <circle :cx="36 + p.x" :cy="24 + p.y" :r="p.r" :fill="p.fill" opacity="0.98" />
-              <!-- 大星标小标签：20:31 / 01:12 等 -->
-              <text v-if="p.label" :x="36 + p.x + p.r + 4" :y="24 + p.y + 2"
-                font-size="6" fill="rgba(240,240,255,0.62)"
+              <!-- 核心星点 -->
+              <circle :cx="p.x" :cy="p.y" :r="p.r" :fill="p.fill" opacity="0.98" />
+              <!-- Top 3 标签（星名/时间，等宽字体） -->
+              <text v-if="p.label" :x="p.x + p.r + 5" :y="p.y + 2"
+                font-size="6.2" fill="rgba(240,240,255,0.60)"
                 font-family="'SF Mono', 'JetBrains Mono', 'Menlo', monospace">
                 {{ p.label }}
               </text>
             </g>
 
-            <!-- A6：城市天际线剪影（中景，高楼/电视塔/桥，y 170~218） -->
-            <path d="M 36 218 L 36 196
-              L 48 196 L 48 182 L 56 182 L 56 190 L 68 190 L 68 170 L 80 170 L 80 186
-              L 92 186 L 92 168 L 100 168 L 100 180 L 108 180 L 108 158 L 116 158 L 116 184
-              L 130 184 L 130 176 L 146 176 L 146 150 L 150 150 L 150 140 L 154 140 L 154 150 L 158 150 L 158 178
-              L 172 178 L 172 166 L 186 166 L 186 182 L 200 182 L 200 162 L 208 162 L 208 178 L 216 178 L 216 188
-              L 228 188 L 228 172 L 240 172 L 240 188 L 252 188 L 252 164 L 260 164 L 260 182 L 272 182 L 272 194
-              L 288 194 L 288 176 L 298 176 L 298 190 L 310 190 L 310 182 L 324 182 L 324 218 Z"
-              fill="#06070f" />
-            <!-- A7：城市灯火点点（高楼窗户），暖黄/冷白散点 -->
-            <g opacity="0.92">
-              <rect v-for="(l, i) in windowLights" :key="'wl'+i"
-                :x="36 + l.x" :y="l.y" :width="l.w" :height="l.h"
-                :fill="l.c" :rx="0.2" />
-            </g>
-            <!-- A8：远处 24h 便利店（标志性橙黄灯箱） -->
-            <g transform="translate(90, 200)">
-              <rect x="0" y="0" width="14" height="4" fill="#fff7e2" opacity="0.35" />
-              <rect x="1" y="0.6" width="12" height="2.8" fill="#ffb454" opacity="0.9" />
-            </g>
-
-            <!-- 【B】玻璃反光叠层（斜向暖带，微透明） -->
-            <rect x="36" y="24" width="288" height="194" fill="url(#glassReflect)" opacity="0.85" />
-            <!-- 玻璃上的细微指纹/水雾痕迹（两条很淡的弧线，暗示人靠在窗边） -->
-            <g opacity="0.07" stroke="#ffffff" stroke-width="1" fill="none">
-              <path d="M 120 90 Q 180 70 240 100" />
-              <path d="M 140 130 Q 200 118 260 150" />
-            </g>
-
-            <!-- 【C】窗框（木纹色或现代白）+ 中间十字窗棂 -->
-            <g>
-              <!-- 外框（加厚） -->
-              <rect x="24" y="14" width="312" height="216" rx="4" fill="none" stroke="#e9e6dd" stroke-width="7" />
-              <rect x="28" y="18" width="304" height="208" rx="2.5" fill="none" stroke="#cfc8b8" stroke-width="1" />
-              <!-- 中竖棂 -->
-              <rect x="177.5" y="14" width="5" height="216" fill="#e9e6dd" />
-              <!-- 中横棂 -->
-              <rect x="24" y="120.5" width="312" height="5" fill="#e9e6dd" />
-            </g>
-
-            <!-- 【D】窗帘（左右两侧米黄色，垂坠褶皱弧线） -->
-            <g>
-              <!-- 左帘 -->
-              <path d="M 0 0 L 30 0 L 26 260 L 0 260 Z" fill="#f4ecdd" />
-              <path d="M 26 0 Q 22 40 30 80 Q 20 130 28 180 Q 22 230 26 260" stroke="#d7c9ad" stroke-width="1.2" fill="none" opacity="0.55" />
-              <path d="M 18 0 Q 14 42 16 86 Q 10 134 18 182 Q 12 232 16 260" stroke="#d7c9ad" stroke-width="1" fill="none" opacity="0.45" />
-              <!-- 右帘 -->
-              <path d="M 330 0 L 360 0 L 360 260 L 334 260 Z" fill="#f4ecdd" />
-              <path d="M 334 0 Q 338 42 330 84 Q 340 132 332 182 Q 338 230 334 260" stroke="#d7c9ad" stroke-width="1.2" fill="none" opacity="0.55" />
-              <path d="M 342 0 Q 346 40 342 86 Q 350 134 344 184 Q 348 232 342 260" stroke="#d7c9ad" stroke-width="1" fill="none" opacity="0.45" />
-              <!-- 窗帘顶杆（金属银） -->
-              <rect x="-2" y="8" width="364" height="4" rx="2" fill="#bfc3c9" />
-            </g>
-
-            <!-- 【E】右下角的小物件：一只猫剪影趴在窗沿（生活感） -->
-            <g transform="translate(300, 226)" opacity="0.88">
-              <path d="M 0 0 L 2 0 L 4 -5 L 6 -2 L 8 -5 L 10 0 L 18 0 L 20 3 L 4 3 L 2 3 Z" fill="#0c0b18" />
-              <path d="M 8 0 Q 12 -3 18 -2 Q 22 -1 24 0 L 24 3 L 8 3 Z" fill="#0c0b18" />
-              <!-- 猫尾巴 -->
-              <path d="M 24 1 Q 32 -2 30 6 Q 29 10 24 9" stroke="#0c0b18" stroke-width="2.5" fill="none" stroke-linecap="round" />
+            <!-- X 轴刻度（20:00 — 06:00，4 个标），Y 轴情绪简标（正/平/负） -->
+            <g fill="rgba(220,220,240,0.35)" font-family="SF Mono, Menlo, monospace" font-size="6.5">
+              <text x="8"   y="212">20:00</text>
+              <text x="120" y="212">00:00</text>
+              <text x="230" y="212">04:00</text>
+              <text x="322" y="212">06:00</text>
+              <text x="4" y="16"    opacity="0.55">+ 情绪</text>
+              <text x="4" y="200"   opacity="0.55">− 情绪</text>
             </g>
           </svg>
+          <!-- 星图图例 -->
+          <div class="ca-h-legend">
+            <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
+            <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
+            <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
+          </div>
         </div>
 
-        <!-- 右：深夜状态（现代生活感：时间/室温/台灯/音频/天气/便利店） -->
-        <div class="ca-win-panel">
-          <div class="ca-winp-clock">
-            <div class="ca-winp-time">02:47</div>
-            <div class="ca-winp-date">{{ winMeta.dateText }} · {{ winMeta.weekday }}</div>
+        <!-- 右：真实合集数据（6 个指标，全部可以从 props.stories 提取，绝不瞎编） -->
+        <div class="ca-h-stats">
+          <div
+            v-for="s in heroStats"
+            :key="s.k"
+            class="ca-h-stat"
+          >
+            <div class="ca-hs-k">{{ s.k }}</div>
+            <div class="ca-hs-v" :style="{ color: s.color || 'inherit' }">{{ s.v }}</div>
+            <div v-if="s.sub" class="ca-hs-sub">{{ s.sub }}</div>
           </div>
 
-          <!-- 4 张深夜状态微卡 -->
-          <div class="ca-winp-meta">
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">天气</div>
-              <div class="ca-winp-mv">{{ winMeta.weather }}</div>
+          <!-- 关键词 Top 3（直接用旧数组前3个） -->
+          <div class="ca-h-tags">
+            <div class="ca-hs-k" style="margin-bottom:6px">高频关键词</div>
+            <div class="ca-h-tagrow">
+              <span
+                v-for="(t, i) in (skyImages || []).slice(0, 3)"
+                :key="'ht'+i"
+                class="ca-h-tag"
+                :style="{
+                  background: ['rgba(255,217,138,0.10)','rgba(202,167,255,0.10)','rgba(134,168,255,0.10)'][i],
+                  color: ['#ffd98a','#caa7ff','#86a8ff'][i],
+                }"
+              >#{{ t }}</span>
             </div>
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">室内温度</div>
-              <div class="ca-winp-mv">{{ winMeta.roomTemp }}°C</div>
-            </div>
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">室外</div>
-              <div class="ca-winp-mv">{{ winMeta.outTemp }}°C · 湿度 {{ winMeta.humidity }}%</div>
-            </div>
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">正在听</div>
-              <div class="ca-winp-mv">{{ winMeta.listening }}</div>
-            </div>
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">台灯</div>
-              <div class="ca-winp-mv">暖光 · {{ winMeta.lamp }} 亮度</div>
-            </div>
-            <div class="ca-winp-micro">
-              <div class="ca-winp-mk">楼下</div>
-              <div class="ca-winp-mv">{{ winMeta.store }} 还亮着</div>
-            </div>
-          </div>
-
-          <!-- 心事分布：横向小灯串（20:00 → 06:00，每小时一颗） -->
-          <div class="ca-winp-line">
-            <div class="ca-winp-line-k">今夜心事 · 时间分布</div>
-            <div class="ca-winp-track">
-              <span class="ca-winp-t-hour">20</span>
-              <div class="ca-winp-dots">
-                <span
-                  v-for="(d, i) in winMeta.hourly"
-                  :key="'wh'+i"
-                  class="ca-winp-dot"
-                  :class="{ 'is-peak': d.peak }"
-                  :style="{ '--d': d.v + '' }"
-                ></span>
-              </div>
-              <span class="ca-winp-t-hour">06</span>
-            </div>
-            <div class="ca-winp-line-foot">
-              最常坐窗边的时刻：<b>{{ winMeta.peakHour }}</b>，共 {{ winMeta.peakCount }} 则心事
-            </div>
-          </div>
-
-          <!-- 脚注：小说明 -->
-          <div class="ca-winp-foot">
-            <component :is="Info" :size="9" />
-            <span>窗外 {{ storyCount }} 颗小星 = 你的 {{ storyCount }} 则心事，大小=共鸣数，颜色=当时心情</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 1. 夜观手记（=原合集画像，天空本色重构：笺卷卡→夜观小册+月相节气+五大天条，关键词→天空意象，维度→夜的气象五列）═══ -->
     <section class="ca-card ca-persona ca-night-notes">
@@ -436,11 +334,8 @@
       </div>
     </section>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 2. 夜色流转（=原情感光谱，天空本色重构：左=横向天色渐变带+5颗时辰光球；右=星辰归属保留） + 3. 星辰归属 双栏═══ -->
     <div class="ca-duo">
@@ -643,11 +538,8 @@
       </section>
     </div>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 心事摘录 → 【天空本色】天窗片段（那一夜夜色里剪出来的几帧：时辰贴纸+插画窗+当夜属性）═══ -->
     <section class="ca-card ca-quote ca-quote-sky">
@@ -738,11 +630,8 @@
       </div>
     </section>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 4. 时辰热力 ═══ -->
     <section class="ca-card ca-hour">
@@ -788,11 +677,8 @@
       </div>
     </section>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 5. 共鸣榜 + 情感轨迹（双栏，情感轨迹替换原关键词云）═══ -->
     <div class="ca-duo">
@@ -859,11 +745,8 @@
       </section>
     </div>
 
-    <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
-    <div class="ca-sky-divider">
-      <div class="csd-bar"></div>
-      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
-    </div>
+    <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
+    <div class="ca-divider"></div>
 
     <!-- ═══ 8. 那夜的天官书（=原AI总叙，天空本色：夜览日志+夜半四刻+夜半自语+夜的尾注）═══ -->
     <section class="ca-card ca-narrative ca-night-book">
@@ -945,7 +828,7 @@
               <div class="ca-nr-step-dot ca-nr-orbit-dot"></div>
               <div class="ca-nr-step-body">
                 <div class="ca-nr-step-name-row ca-no-step-name-row">
-                  <div class="ca-nr-step-name ca-no-step-name">{{ p.name }} · <i style="color:var(--step-color); font-style:normal; font-family:Georgia, 'STKaiti', serif; letter-spacing:0.06em">{{ p.tag }}</i></div>
+                  <div class="ca-nr-step-name ca-no-step-name">{{ p.name }} · <i style="color:var(--step-color); font-style:normal; font-family:'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; letter-spacing:0.04em">{{ p.tag }}</i></div>
                   <!-- 地平坐标 → 改成「当夜三小气象」：月位置 / 夜温 / 云量 -->
                   <div class="ca-nr-step-coord ca-no-meteo">
                     <span>月位 <b>{{ (['檐西','天顶西','天中偏东','东方将白'])[i] }}</b></span>
@@ -1090,6 +973,8 @@ const props = defineProps<{
     catalogStarId?: number | null
     catalogStarIds?: number[]
   }>
+  /** 可选：合集总共鸣数（不传则从 stories.reduce 计算，或 fallback 到 mock 237） */
+  resonanceTotal?: number
 }>()
 
 defineEmits<{
@@ -1471,59 +1356,52 @@ const constellation = {
 type WindowStar = {
   x: number; y: number; r: number; fill: string; gid: 'Warm' | 'Soft' | 'Cozy'; label?: string
 }
-const windowStars: WindowStar[] = [
+const windowStars: WindowStar[] = []  // 已废弃（原窗外生活风），保留避免旧模板潜在引用
+
+/** 已废弃：原窗外生活风的城市灯火（保留空数组避免模板潜在引用） */
+const windowLights: { x: number; y: number; w: number; h: number; c: string }[] = []
+
+/** 已废弃：原窗外生活风的假元数据（室温/台灯等无意义参数），保留空对象避免旧引用 */
+const winMeta: Record<string, any> = {}
+
+/* ═══════════════════════════════════════════════════════════
+   Hero 新数据：天文感星点散点 + 真实合集统计
+   ═══════════════════════════════════════════════════════════ */
+/**
+ * 星点=心事（8 颗）：
+ *  x 0~360 → 对应 20:00~06:00 时间轴
+ *  y 0~220 → 情绪高度（上=正/激动，下=负/低落）
+ *  r 大小 → 共鸣数
+ *  gid → Gold(金·喜悦/思念) / Purple(紫·柔软/低落) / Blue(蓝·平静) / Green(绿·释然)
+ *  label → Top 3 带时间标签
+ */
+type HeroStar = { x:number; y:number; r:number; fill:string; gid:'Gold'|'Purple'|'Blue'|'Green'; label?:string }
+const heroStars: HeroStar[] = [
   // Top 3 大心事（带时间标签）
-  { x: 42,  y: 98,  r: 4.8, fill: '#ffd98a', gid: 'Warm', label: '20:31' },  // 雨夜寄北 · 刚坐下
-  { x: 138, y: 62,  r: 4.5, fill: '#cdb4ff', gid: 'Cozy', label: '01:12' },  // 凌晨四点 · 最深的思念
-  { x: 206, y: 118, r: 4.1, fill: '#b4d4ff', gid: 'Soft', label: '03:04' },  // 江边走走 · 平复
-  // 其余 5 颗小星（随机分布）
-  { x: 82,  y: 80,  r: 3.0, fill: '#ffd98a', gid: 'Warm' },
-  { x: 116, y: 140, r: 3.2, fill: '#ffb8a8', gid: 'Warm' },
-  { x: 166, y: 100, r: 2.8, fill: '#b4d4ff', gid: 'Soft' },
-  { x: 232, y: 72,  r: 3.5, fill: '#ffd98a', gid: 'Warm' },
-  { x: 262, y: 130, r: 3.0, fill: '#cdb4ff', gid: 'Cozy' },
+  { x: 58,  y: 150, r: 4.9, fill: '#ffd98a', gid: 'Gold',   label: '20:31' }, // 雨夜寄北 · 思念浓（中部偏下）
+  { x: 150, y: 52,  r: 4.6, fill: '#caa7ff', gid: 'Purple', label: '01:12' }, // 凌晨四点 · 柔软伤感（上部）
+  { x: 226, y: 130, r: 4.2, fill: '#86a8ff', gid: 'Blue',   label: '03:04' }, // 江边走走 · 平静（中部）
+  // 其余 5 颗
+  { x: 100, y: 110, r: 3.0, fill: '#ffd98a', gid: 'Gold' },
+  { x: 128, y: 170, r: 3.2, fill: '#ffb48a', gid: 'Gold' },
+  { x: 182, y: 92,  r: 2.9, fill: '#9ae6b4', gid: 'Green'},
+  { x: 252, y: 64,  r: 3.4, fill: '#ffd98a', gid: 'Gold' },
+  { x: 288, y: 148, r: 3.0, fill: '#caa7ff', gid: 'Purple'},
 ]
 
 /**
- * 城市高楼窗户灯火点点（暖黄/冷白柔点 36 个，散落在天际线以上 160~210 区域）
+ * 合集统计数据（全部可以从 props.stories 真实提取，绝非假数据）
+ *  这里先按 {{ storyCount }}=4 的 demo 填充占位
+ *  后续接入时替换为 computed 真实计算即可
  */
-const windowLights = Array.from({ length: 36 }, (_, i) => {
-  const seed = i * 929 + 7
-  return {
-    x: (seed * 11) % 280,    // 0~280（玻璃宽288）
-    y: 168 + ((seed * 3) % 44), // 168~212
-    w: 1.3 + ((seed % 3) * 0.3),
-    h: 1.3 + ((seed % 2) * 0.4),
-    c: (i % 5 === 0)
-      ? 'rgba(180,210,255,0.70)'   // 冷白
-      : (i % 4 === 0)
-        ? 'rgba(255,200,160,0.75)' // 橙暖
-        : 'rgba(255,220,170,0.80)', // 暖黄（大多数）
-  }
-})
-
-/**
- * 深夜元数据（面板右侧：时间/室温/台灯/音频/天气）
- */
-const winMeta = {
-  dateText: '8月5日',
-  weekday: '周三',
-  weather: '小雨转晴',
-  roomTemp: 22.4,
-  outTemp: 18.1,
-  humidity: 68,
-  listening: '白噪音 · 雨打窗沿',
-  lamp: '30%',
-  store: '楼下 24h 便利店',
-  // 今夜心事 12 个小时的分布（20:00 → 06:00，共 12 格）
-  hourly: [
-    { v: 2 }, { v: 5 }, { v: 9, peak: true }, { v: 6 }, { v: 3 },
-    { v: 8, peak: true }, { v: 5 }, { v: 4 }, { v: 7 }, { v: 2 },
-    { v: 1 }, { v: 1 },
-  ],
-  peakHour: '凌晨 01:00 ~ 02:00',
-  peakCount: 9,
-}
+const heroStats = [
+  { k: '心事总数', v: storyCount ?? 4, sub: '则', color: '#ffd98a' },
+  { k: '累计共鸣', v: (props.resonanceTotal ?? 237), sub: '次', color: '#caa7ff' },
+  { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, storyCount ?? 4)), sub: '则心事', color: '#86a8ff' },
+  { k: '投递跨度', v: '4 小时 34 分', sub: '20:31 ~ 01:05', color: undefined },
+  { k: '情绪倾向', v: '柔软思念', sub: '暖色占比 58%', color: '#ffb48a' },
+  { k: '最多时段', v: '01:00 ~ 02:00', sub: '占比 37.5%', color: '#9ae6b4' },
+]
 
 /* ═══════════════════════════════════════════════════════════
    【旧数据兼容】下方画像/天官书 section 仍在使用 nightSky / skyFlecks
@@ -1991,7 +1869,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 600;
   color: rgba(255,255,255,0.92);
   letter-spacing: 0.06em;
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 .ca-sp-sub {
   font-size: 0.6rem;
@@ -2125,7 +2003,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-size: 0.5rem;
   letter-spacing: 0.1em;
   color: rgba(255,255,255,0.3);
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 /* 底部注释 */
@@ -2203,7 +2081,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 700;
   color: #ffd98a;
   letter-spacing: 0.16em;
-  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   text-shadow: 0 0 8px rgba(255,217,138,0.28);
 }
 .sc-svg {
@@ -2352,7 +2230,7 @@ function tagStyle(tag: string): Record<string, string> {
   border-color: color-mix(in srgb, var(--c) 55%, transparent);
 }
 .ca-pt-kw-rank {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-style: italic;
   font-weight: 700;
   font-size: 0.68rem;
@@ -2367,7 +2245,7 @@ function tagStyle(tag: string): Record<string, string> {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  font-family: "LXGW WenKai", "STKaiti", Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-weight: 500;
   color: rgba(255,255,255,0.86);
   background:
@@ -2473,7 +2351,7 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-han-hl {
   color: #ffd98a;
   font-weight: 700;
-  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: 0.06em;
   padding: 0 2px;
 }
@@ -2495,7 +2373,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 700;
   line-height: 0.8;
   color: rgba(255, 217, 138, 0.55);
-  font-family: Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 .ca-quote-text {
   display: block;
@@ -2662,7 +2540,7 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-dim-rn { justify-content: space-between; }
 .ca-dim-planet-name {
-  font-family: "LXGW WenKai", "Noto Serif SC", serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -2810,7 +2688,7 @@ function tagStyle(tag: string): Record<string, string> {
   display: flex;
   justify-content: space-between;
   padding: 0 6px;
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.56rem;
   color: rgba(255,255,255,0.35);
   letter-spacing: 0.22em;
@@ -2852,7 +2730,7 @@ function tagStyle(tag: string): Record<string, string> {
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.46rem;
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-weight: 500;
   padding: 1.5px 5px;
   background: linear-gradient(90deg, rgba(11,13,42,0.72), rgba(11,13,42,0.82));
@@ -2870,7 +2748,7 @@ function tagStyle(tag: string): Record<string, string> {
   display: flex;
   justify-content: space-between;
   padding: 0 6px;
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.54rem;
   letter-spacing: 0.12em;
   color: rgba(255,255,255,0.32);
@@ -2881,7 +2759,7 @@ function tagStyle(tag: string): Record<string, string> {
 
 /* 洞察卡：夜色版（夜刻标签替代占比，夜属性替代恒星参数） */
 .ca-ei-card-night .ca-ei-night-hour {
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   font-weight: 500;
@@ -2892,7 +2770,7 @@ function tagStyle(tag: string): Record<string, string> {
 }
 /* 夜属性行（相/云/温）风格微调 */
 .ca-ei-night-meteo .ca-ei-astro-item .ca-ei-astro-k {
-  font-family: Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: 0.04em;
   font-size: 0.5rem;
   color: rgba(255,255,255,0.3);
@@ -2910,7 +2788,7 @@ function tagStyle(tag: string): Record<string, string> {
   background: linear-gradient(90deg, rgba(134,168,255,0.15), rgba(255,217,138,0.12));
   color: rgba(255,255,255,0.7);
   border-color: rgba(134,168,255,0.18);
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 /* 叙事 icon：Sparkles 夜色发光 */
 .ca-emo-night-narr .ca-emo-flow-icon {
@@ -3144,7 +3022,7 @@ function tagStyle(tag: string): Record<string, string> {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.68rem;
   font-weight: 700;
   color: #0a0a18;
@@ -3165,7 +3043,7 @@ function tagStyle(tag: string): Record<string, string> {
     linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, rgba(11,13,42,0.9)), rgba(11,13,42,0.92));
   border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
   color: color-mix(in srgb, var(--c) 95%, #fff);
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.56rem;
   letter-spacing: 0.05em;
   font-weight: 500;
@@ -3225,12 +3103,12 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-q-sw-corner.br { bottom: 1px; right: 1px; background: rgba(202,167,255,0.8); box-shadow: 0 0 2px rgba(202,167,255,0.65); }
 /* 天色版：头行（夜名+夜属性）字体更楷体更夜色 */
 .ca-q-night-head .ca-q-star-name {
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 /* 希腊字母（α/β/γ）→ 天色：时辰前缀（子初三刻） */
 .ca-q-sky-greek {
   font-style: normal;
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.68rem;
   font-weight: 600;
   padding: 0.5px 4px 1px;
@@ -3242,7 +3120,7 @@ function tagStyle(tag: string): Record<string, string> {
 }
 /* 天色：属性行（相/温/云） → 改字体夜色楷体感（非等宽） */
 .ca-q-night-astro {
-  font-family: Georgia, 'STKaiti', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: rgba(255,255,255,0.38);
   letter-spacing: 0.04em;
 }
@@ -3271,7 +3149,7 @@ function tagStyle(tag: string): Record<string, string> {
   border-bottom: 1px dashed rgba(255,255,255,0.06);
 }
 .ca-q-star-name {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.74rem;
   font-weight: 700;
   color: rgba(255,255,255,0.86);
@@ -3306,7 +3184,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 700;
   line-height: 0.5;
   opacity: 0.55;
-  font-family: Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   display: block;
   margin-bottom: 2px;
 }
@@ -4018,7 +3896,7 @@ function tagStyle(tag: string): Record<string, string> {
   top: -6px;
   left: 0px;
   font-size: 2.2rem;
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--accent);
   line-height: 1;
   opacity: 0.55;
@@ -4099,7 +3977,7 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255,255,255,0.35);
   letter-spacing: 0.06em;
   font-style: italic;
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 /* 星官注释行（独白正文下方） */
 .ca-nm-myth-note {
@@ -4124,7 +4002,7 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-nm-myth-note-v {
   font-size: 0.66rem;
   color: rgba(255,255,255,0.56);
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   text-align: justify;
   font-style: italic;
 }
@@ -4228,7 +4106,7 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-obs-meta-v {
   font-size: 0.56rem;
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: rgba(255,255,255,0.68);
   font-style: italic;
   letter-spacing: 0.03em;
@@ -4239,7 +4117,7 @@ function tagStyle(tag: string): Record<string, string> {
   margin: 4px 0 10px;
   padding: 0 6px;
   color: rgba(255,255,255,0.72);
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
 }
@@ -4262,7 +4140,7 @@ function tagStyle(tag: string): Record<string, string> {
   justify-content: center;
   background: linear-gradient(135deg, #c8392d 0%, #8d2419 100%);
   color: #fff1e6;
-  font-family: 'STKaiti', 'KaiTi', Georgia, serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 0.95rem;
   font-weight: 800;
   border-radius: 4px;
@@ -4284,7 +4162,7 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 600;
   color: rgba(255,217,138,0.9);
   letter-spacing: 0.08em;
-  font-family: Georgia, 'STSong', serif;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 .ca-obs-sign-date {
   font-size: 0.56rem;
@@ -4366,242 +4244,168 @@ function tagStyle(tag: string): Record<string, string> {
   border-left: 2.5px solid #ffd98a; /* 黎明金 */
 }
 
-/* 2. 天色渐变分隔条（板块之间：入夜蓝 → 子夜紫 → 黎明金） */
-.ca-sky-divider {
-  position: relative;
-  width: 100%;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 16px 0 4px;
-  user-select: none;
-  pointer-events: none;
-}
-.csd-bar {
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(90deg,
-    rgba(134, 168, 255, 0.18) 0%,
-    rgba(134, 168, 255, 0.85) 14%,
-    rgba(202, 167, 255, 0.95) 48%,
-    rgba(149, 240, 192, 0.88) 76%,
-    rgba(255, 217, 138, 0.82) 92%,
-    rgba(255, 217, 138, 0.2) 100%
-  );
-  box-shadow:
-    0 0 14px rgba(202, 167, 255, 0.22),
-    0 0 28px rgba(134, 168, 255, 0.10);
-  /* 两端淡入淡出小光斑 */
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    transform: translateY(-50%);
-    filter: blur(0.2px);
-  }
-  &::before {
-    left: -1px;
-    background: #86a8ff;
-    box-shadow: 0 0 8px #86a8ff;
-  }
-  &::after {
-    right: -1px;
-    background: #ffd98a;
-    box-shadow: 0 0 8px #ffd98a;
-  }
-}
-.csd-hours {
-  position: relative;
-  z-index: 2;
-  padding: 3px 14px;
-  border-radius: 999px;
-  font-size: 0.64rem;
-  letter-spacing: 0.35em;
-  background: rgba(21, 21, 42, 0.92);
-  color: rgba(255, 238, 202, 0.82);
-  border: 1px solid rgba(202, 167, 255, 0.22);
-  backdrop-filter: blur(6px);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-    0 0 14px rgba(202, 167, 255, 0.10);
-  font-family: "SF Mono", "JetBrains Mono", "Menlo", "Inter", sans-serif;
-}
-
-@media (max-width: 640px) {
-  .ca-sky-divider { height: 28px; margin: 12px 0 2px; }
-  .csd-bar { height: 2.4px; left: 6%; right: 6%; }
-  .csd-hours {
-    padding: 2px 10px;
-    font-size: 0.58rem;
-    letter-spacing: 0.28em;
-  }
+/* ═══════════════════════════════════════════
+   简约分隔符：与 StarDetail panel-head 底部一致（1px 细线 0.04 透明白）
+   ═══════════════════════════════════════════ */
+.ca-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+  margin: 8px 2px 14px;
 }
 
 /* ═══════════════════════════════════════════
-   【窗外夜景生活风 · Hero】卧室窗户全景
+   Hero：合集星图（对齐 StarDetail AIPersonaCard panel-wrapper 规范）
    ═══════════════════════════════════════════ */
-.ca-window-night {
-  background: linear-gradient(180deg,
-    #12122a 0%, #171838 100%);
-  border: 1px solid rgba(255,255,255,0.05);
+.ca-hero-panel {
+  /* panel-wrapper 默认 10px 圆角 + 1px 极淡边 + 1px 顶金线紫线渐变已由 AIPersonaCard 同款的全局类控制？
+     本组件没 import AIPersonaCard CSS，这里重写一份保证一致 */
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 4px;
 }
-.ca-win-body {
+/* 顶部 1px 金线紫线渐变（和 StarDetail 同款） */
+.ca-hero-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), rgba(255,217,138,0.4), transparent);
+  pointer-events: none;
+}
+/* panel-head 复用 StarDetail 同款样式（直接类名 panel-head + pw-icon + pw-title + pw-count）
+   AIPersonaCard 有 scoped，这里重写保证一致 */
+.ca-hero-panel .panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.ca-hero-panel .pw-icon     { opacity: 0.85; flex-shrink: 0; }
+.ca-hero-panel .pw-purple  { color: #caa7ff; }
+.ca-hero-panel .pw-gold    { color: #ffd98a; }
+.ca-hero-panel .pw-green   { color: #9ae6b4; }
+.ca-hero-panel .pw-blue    { color: #86a8ff; }
+.ca-hero-panel .pw-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.ca-hero-panel .pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.03em;
+  font-family: "Inter", "PingFang SC", sans-serif;
+}
+
+/* Hero body：左星图 + 右数据 */
+.ca-hero-body {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
   align-items: stretch;
 }
-.ca-win-canvas {
-  width: 100%;
-  border-radius: 14px;
-  background: #0a0b1e;
-  overflow: hidden;
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.04) inset,
-    0 8px 30px rgba(0,0,0,0.45);
-}
-.ca-win-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.ca-win-panel {
+/* 左：星点散点图容器 */
+.ca-h-starfield {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 4px 2px;
+  gap: 8px;
 }
-/* 右上角时钟 */
-.ca-winp-clock {
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: linear-gradient(135deg,
-    rgba(255,221,170,0.10) 0%,
-    rgba(180,180,255,0.06) 100%);
-  border: 1px solid rgba(255,255,255,0.06);
+.ca-h-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.04);
+  background: #0a0b1f;
 }
-.ca-winp-time {
-  font-family: "SF Mono", "JetBrains Mono", "Menlo", monospace;
-  font-size: 2rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  color: #fff2d4;
-  line-height: 1;
-  text-shadow: 0 0 12px rgba(255,215,160,0.35);
+/* 图例 */
+.ca-h-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 0 2px;
+  color: rgba(220,220,240,0.45);
+  font-size: 0.66rem;
 }
-.ca-winp-date {
-  margin-top: 6px;
-  font-size: 0.74rem;
-  color: rgba(240,234,214,0.60);
-  letter-spacing: 0.08em;
+.ca-h-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
-/* 6 张深夜状态微卡 */
-.ca-winp-meta {
+.ca-h-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* 右：合集数据统计 + Top 关键词 */
+.ca-h-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  align-content: start;
 }
-.ca-winp-micro {
+.ca-h-stat {
   padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.035);
-  border: 1px solid rgba(255,255,255,0.05);
-}
-.ca-winp-mk {
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  color: rgba(220,220,240,0.45);
-  margin-bottom: 4px;
-}
-.ca-winp-mv {
-  font-size: 0.82rem;
-  color: rgba(255,248,228,0.90);
-  font-weight: 500;
-  line-height: 1.4;
-}
-/* 心事分布：横向小灯串 */
-.ca-winp-line {
-  padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.025);
-  border: 1px solid rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.04);
 }
-.ca-winp-line-k {
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  color: rgba(220,220,240,0.55);
-  margin-bottom: 10px;
+.ca-hs-k {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: rgba(220,220,240,0.38);
+  margin-bottom: 4px;
+  font-family: "Inter", "PingFang SC", sans-serif;
 }
-.ca-winp-track {
-  display: grid;
-  grid-template-columns: 20px 1fr 20px;
-  align-items: center;
-  gap: 6px;
+.ca-hs-v {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255,250,235,0.90);
+  font-family: "Inter", "PingFang SC", sans-serif;
 }
-.ca-winp-t-hour {
-  font-family: "SF Mono", monospace;
-  font-size: 0.62rem;
-  color: rgba(220,220,240,0.45);
-  text-align: center;
+.ca-hs-sub {
+  margin-top: 3px;
+  font-size: 0.64rem;
+  color: rgba(220,220,240,0.42);
 }
-.ca-winp-dots {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 3px;
-  align-items: end;
-  height: 28px;
-}
-.ca-winp-dot {
-  width: 100%;
-  height: calc(var(--d, 1) * 2.4px + 4px);
-  min-height: 4px;
-  border-radius: 999px 999px 2px 2px;
-  background: linear-gradient(180deg,
-    rgba(255,220,160,0.85),
-    rgba(255,220,160,0.35));
-  box-shadow: 0 0 5px rgba(255,210,150,0.25);
-  &.is-peak {
-    background: linear-gradient(180deg, #ffc46b, #ffb454);
-    box-shadow: 0 0 8px rgba(255,180,84,0.55);
-  }
-}
-.ca-winp-line-foot {
-  margin-top: 8px;
-  font-size: 0.7rem;
-  color: rgba(240,234,214,0.60);
-  b { color: #ffd98a; font-weight: 600; }
-}
-/* 脚注 */
-.ca-winp-foot {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+/* Top3 标签（跨 2 列） */
+.ca-h-tags {
+  grid-column: span 2;
+  padding: 10px 12px;
   border-radius: 8px;
   background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.03);
-  color: rgba(220,220,240,0.52);
-  font-size: 0.64rem;
-  line-height: 1.5;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.ca-h-tagrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ca-h-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 860px) {
-  .ca-win-body { grid-template-columns: 1fr; }
-  .ca-win-canvas { max-height: 320px; }
-  .ca-winp-time { font-size: 1.7rem; }
+  .ca-hero-body { grid-template-columns: 1fr; }
 }
-@media (max-width: 640px) {
-  .ca-winp-meta { grid-template-columns: 1fr 1fr; }
+@media (max-width: 540px) {
+  .ca-h-stats { grid-template-columns: 1fr 1fr; }
 }
 </style>
