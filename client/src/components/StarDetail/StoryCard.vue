@@ -48,11 +48,13 @@
       v-if="(showStarBelonging && starBelonging) || story.collectionName || displayTags.length"
       class="story-tags-row"
     >
-      <!-- 星星归属（合集上下文：显示挂在哪颗星上） -->
+      <!-- 星星归属（合集上下文：显示挂在哪颗星上） → 点击跳转 /sky?star=xxx -->
       <span
-        v-if="showStarBelonging && starBelonging"
-        class="story-star-belong"
+        v-if="showStarBelonging && starBelonging && mainStarCatalogId != null"
+        class="story-star-belong ssb-clickable"
         :style="{ '--ssb-c': starBelonging.color } as Record<string, string>"
+        :title="`前往该星星：${starBelonging.name}`"
+        @click.stop="goToStar(mainStarCatalogId)"
       >
         <StarIcon :size="11" class="ssb-icon" />
         <span class="ssb-name">{{ starBelonging.name }}</span>
@@ -105,6 +107,7 @@
 <script setup lang="ts">
 import { Sparkles, Check, Eye, Star } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import CollectionBadge from '../CollectionBadge.vue'
 import { getStarNameInfo } from '../../utils/starName'
 
@@ -112,6 +115,8 @@ const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
 const StarIcon = Star
+const router = useRouter()
+const route = useRoute()
 
 const props = defineProps<{
   story: {
@@ -158,11 +163,25 @@ const displayTags = computed<string[]>(() => {
 })
 
 /** 星星归属：取主星 catalogStarId，否则 catalogStarIds[0]；查 stars.json/planets 取名+星座+颜色 */
+const mainStarCatalogId = computed<number | null>(() => props.story.catalogStarId ?? props.story.catalogStarIds?.[0] ?? null)
 const starBelonging = computed(() => {
-  const id = props.story.catalogStarId ?? props.story.catalogStarIds?.[0]
+  const id = mainStarCatalogId.value
   if (id == null) return null
   return getStarNameInfo(id) ?? null
 })
+
+/** 跳转星空页面并打开该星星详情（防止冒泡触发卡片 click）
+ *  关键兜底：当前 fullPath 与目标完全一致时 Vue Router 不会二次导航，
+ *  改为派发自定义事件 star-identity-click，让合集详情等监听方知道"重复点击了同星 → 要关闭/重聚焦"
+ */
+function goToStar(starId: number) {
+  const target = `/sky?star=${encodeURIComponent(String(starId))}`
+  if (route.fullPath !== target) {
+    router.push({ path: '/sky', query: { star: String(starId) } })
+  } else {
+    window.dispatchEvent(new CustomEvent('star-identity-click', { detail: { starId } }))
+  }
+}
 
 /** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
 function hashCode(s: string): number {
@@ -353,6 +372,15 @@ function tagStyle(tag: string): Record<string, string> {
   color: var(--ssb-c, var(--ink-secondary));
   flex-shrink: 0;
   line-height: 1.45;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+/* 可点击的星星归属徽章：cursor + hover 高亮（冒泡已 @click.stop 阻止） */
+.story-star-belong.ssb-clickable { cursor: pointer; user-select: none; }
+.story-star-belong.ssb-clickable:hover {
+  background: color-mix(in srgb, var(--ssb-c, #fff) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ssb-c, #fff) 36%, transparent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--ssb-c, #fff) 26%, transparent);
+  transform: translateY(-0.5px);
 }
 .ssb-icon { opacity: 0.85; flex-shrink: 0; }
 .ssb-name { font-weight: 500; }
