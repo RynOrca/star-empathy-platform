@@ -4450,63 +4450,68 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-hero-body-stats {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 16px;   /* 从20→16，更紧凑，减少呼吸空间 */
-  align-items: start; /* start代替stretch：左右栏按内容高度自然排布，不硬拉伸，避免右栏空白 */
+  gap: 18px;   /* 两张独立卡牌之间的呼吸间距，不用竖杠杠 */
+  align-items: start;
   justify-items: stretch;
-  /* 【移除 480px 硬 min-height】—— 让内容自然撑高，不强制溢出 */
   min-height: auto;
-  position: relative;
-  padding: 4px 2px 6px;
+  /* 去掉 relative：不再需要绝对定位的竖分隔线伪元素了 */
+  padding: 4px 0 6px;
   flex: 1;
   width: 100%;
 }
-/* 中间柔和垂直分隔线：顶底透明度渐变，中间实 —— 像一张画的折痕/裱画分格线 */
-.ca-hero-body-stats::before {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: calc(0.95fr);  /* 留底兜底，下面 calc 精确版覆盖 */
-  /* 0.95 / (0.95+1.05) = 47.5% 两栏分界处 */
-  left: 47.5%;
-  width: 1px;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,0) 0%,
-    rgba(134,168,255,0.08) 18%,
-    rgba(202,167,255,0.18) 50%,
-    rgba(255,217,138,0.08) 82%,
-    rgba(255,255,255,0) 100%
-  );
-  pointer-events: none;
-  filter: blur(0.3px);
-}
-/* 左：星辰归属星图区域 —— 无独立card背景/边框，直接放在大Panel里 */
+/* ═══════════════════════════════════════════
+   左右两张独立卡牌：星辰归属（左卡） + 星星品质（右卡）
+   中间无竖杠杠！用 grid gap 自然留白，和下面夜色流转/画像等section的 ca-card 风格完全一致
+   ═══════════════════════════════════════════ */
+/* 左：星辰归属卡（星图+星辰速览）—— 完全套用下方 ca-card 同款风格 */
 .ca-h-left-block {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
-  padding: 2px 6px 2px 2px;  /* 左贴大panel左，右留 6px 给分隔线呼吸感 */
+  /* 独立卡牌基础样式（和下方 ca-card 完全一致） */
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
   position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
 }
-/* 左的星图 SVG：放大到 420:300 比例，保证星图足够大气 */
+/* 左的星图 SVG：aspect-ratio 自适应，min-height 兜底防挤压 */
 .ca-h-left-block .ca-starmap-svg {
   aspect-ratio: 420 / 300;
-  /* 【降低 min-height:260 → 180】—— 以aspect-ratio为主，自然适配宽度，不硬撑高 */
-  min-height: 180px;
+  min-height: 160px;
+  width: 100%;
 }
-/* 星图容器在左栏：无边框加成（但保留本身 starmap-wrap 的深蓝底+蓝框，那个是星图本体的夜空感） */
+/* 星图容器在左卡牌内：只保留深蓝夜空底+径向微光，边框弱化（因为外已经有卡牌边框了） */
 .ca-h-left-block .ca-starmap-wrap {
-  /* 去掉 starmap-wrap 的蓝边框也可以，让星图直接融入大面板，但保留深蓝底让星空有"夜"的容器感 */
-  border-color: rgba(134,168,255,0.055);
+  border-color: rgba(134,168,255,0.04);
   background:
-    radial-gradient(ellipse at 50% 30%, rgba(202,167,255,0.05), transparent 70%),
-    rgba(10,12,35,0.4);
+    radial-gradient(ellipse at 50% 30%, rgba(202,167,255,0.045), transparent 72%),
+    rgba(10,12,35,0.42);
   border-radius: 8px;
   padding: 10px 8px 8px;
+}
+
+/* 右：星星品质卡 —— 同样独立卡牌风格 */
+.ca-h-right-block {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+  min-height: 0;
+  /* 独立卡牌基础样式（和下方 ca-card、左卡一致） */
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  flex: 1;
 }
 
 /* 【星辰分布速览】：星图下方信息块，平衡左右栏高度差 + 增加信息密度 */
@@ -4627,17 +4632,6 @@ function tagStyle(tag: string): Record<string, string> {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   opacity: 0.9;
-}
-
-/* 右：星星品质区域 —— 无独立card背景/边框，内容自然展开 */
-.ca-h-right-block {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;   /* 从 12 → 9，更紧凑，减少段间空白 */
-  min-width: 0;
-  min-height: 0;
-  padding: 0 2px 2px 6px;  /* 右贴大panel右，左留 6px 给分隔线呼吸感，顶padding去掉 */
-  flex: 1;
 }
 
 /* ============ 星图容器本体 & starmap-svg 默认比例（保留，星辰归属仍使用 .ca-starmap-wrap） ============ */
@@ -4951,30 +4945,11 @@ function tagStyle(tag: string): Record<string, string> {
     grid-template-columns: 1fr;
     min-height: auto;
     gap: 14px;
-    padding: 2px 2px 8px;
+    padding: 2px 0 8px;
   }
-  /* 单列：隐藏中间竖分隔线，上星图下品质之间换一条柔和横分隔线 */
-  .ca-hero-body-stats::before { display: none; }
-  .ca-hero-body-stats::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 12%;
-    right: 12%;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      rgba(255,255,255,0) 0%,
-      rgba(134,168,255,0.1) 30%,
-      rgba(202,167,255,0.22) 50%,
-      rgba(255,217,138,0.1) 70%,
-      rgba(255,255,255,0) 100%
-    );
-    pointer-events: none;
-    filter: blur(0.3px);
-  }
-  .ca-h-left-block { padding: 4px 2px; }
-  .ca-h-right-block { padding: 6px 2px 2px; }
+  /* 移动端单列：两张卡牌各自独立，不需要任何横/竖分隔线，gap自然分开 */
+  .ca-h-left-block { padding: 12px 14px 14px; }
+  .ca-h-right-block { padding: 12px 14px 14px; }
   .ca-emotion-body-double { grid-template-columns: 1fr; }
 }
 @media (max-width: 540px) {
