@@ -21,7 +21,7 @@
       </div>
 
       <div class="ca-hero-body ca-hero-body-stats">
-        <!-- 左：星辰归属地平星图（融合到大Hero里，不再单独包card） -->
+        <!-- 左：【只有星辰归属黑色星空板块 .ca-starmap-wrap】（其他信息全部移到右栏！） -->
         <div class="ca-h-left-block">
           <div class="ca-starmap-wrap ca-h-starmap-wrap">
             <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`"
@@ -84,14 +84,38 @@
               </span>
             </div>
           </div>
+        </div>
 
-          <!-- 【星辰分布速览】：星图下方信息块，平衡左右栏高度差 + 增加信息密度
-               左栏原来只有星图249px，右栏419px，这里加一块约150px的信息卡补齐视觉落差 -->
-          <div v-if="starBelongings.length > 0" class="ca-h-stardust">
-            <div class="ca-hsd-head">
-              <span class="ca-hsd-dot" style="background:#ffd98a;box-shadow:0 0 4px #ffd98a"></span>
-              <span class="ca-hsd-title">星辰分布速览</span>
+        <!-- 右：【所有其他信息全部堆到这里！】：指标 → 星辰速览(从左移来) → 光谱色 → 星座Top+标签云 -->
+        <div class="ca-h-right-block">
+          <!-- ① 四小顶栏指标：每星故事数 / 平均星等 / 地平比例 / 最亮星  -->
+          <div class="ca-h-ss-quad">
+            <div class="ca-h-ss-q">
+              <div class="ca-hs-k">每星心事</div>
+              <div class="ca-hs-v" style="color:#ffd98a">{{ starStatistics.avg || '—' }}</div>
+              <div class="ca-hs-sub">篇 / 星</div>
             </div>
+            <div class="ca-h-ss-q">
+              <div class="ca-hs-k">平均星等</div>
+              <div class="ca-hs-v" style="color:#caa7ff">m{{ starStatistics.avgMag }}</div>
+              <div class="ca-hs-sub">越小越亮</div>
+            </div>
+            <div class="ca-h-ss-q">
+              <div class="ca-hs-k">地平线</div>
+              <div class="ca-hs-v" style="color:#86a8ff">{{ starStatistics.horizonPct }}%</div>
+              <div class="ca-hs-sub">{{ starStatistics.sm.aboveHorizon }}↑/{{ starStatistics.sm.belowHorizon }}↓</div>
+            </div>
+            <div class="ca-h-ss-q">
+              <div class="ca-hs-k">最亮星</div>
+              <div class="ca-hs-v" :style="{color: starStatistics.brightest?.color ?? '#ffd98a'}">
+                m{{ starStatistics.brightest?.mag ?? '—' }}
+              </div>
+              <div class="ca-hs-sub">{{ starStatistics.brightest?.name ?? '—' }}</div>
+            </div>
+          </div>
+
+          <!-- ② 星辰分布速览：从左栏移过来！ -->
+          <div v-if="starBelongings.length > 0" class="ca-h-stardust">
             <div class="ca-hsd-grid">
               <div class="ca-hsd-cell">
                 <div class="ca-hsd-k">恒星总数</div>
@@ -129,37 +153,8 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 右：星星统计信息（融合到大Hero里，不再单独包card） -->
-        <div class="ca-h-right-block">
-          <!-- 四小顶栏指标：每星故事数 / 平均星等 / 地平比例 / 最亮星  -->
-          <div class="ca-h-ss-quad">
-            <div class="ca-h-ss-q">
-              <div class="ca-hs-k">每星心事</div>
-              <div class="ca-hs-v" style="color:#ffd98a">{{ starStatistics.avg || '—' }}</div>
-              <div class="ca-hs-sub">篇 / 星</div>
-            </div>
-            <div class="ca-h-ss-q">
-              <div class="ca-hs-k">平均星等</div>
-              <div class="ca-hs-v" style="color:#caa7ff">m{{ starStatistics.avgMag }}</div>
-              <div class="ca-hs-sub">越小越亮</div>
-            </div>
-            <div class="ca-h-ss-q">
-              <div class="ca-hs-k">地平线</div>
-              <div class="ca-hs-v" style="color:#86a8ff">{{ starStatistics.horizonPct }}%</div>
-              <div class="ca-hs-sub">{{ starStatistics.sm.aboveHorizon }}↑/{{ starStatistics.sm.belowHorizon }}↓</div>
-            </div>
-            <div class="ca-h-ss-q">
-              <div class="ca-hs-k">最亮星</div>
-              <div class="ca-hs-v" :style="{color: starStatistics.brightest?.color ?? '#ffd98a'}">
-                m{{ starStatistics.brightest?.mag ?? '—' }}
-              </div>
-              <div class="ca-hs-sub">{{ starStatistics.brightest?.name ?? '—' }}</div>
-            </div>
-          </div>
-
-          <!-- 光谱色分布 -->
+          <!-- ③ 光谱色分布 -->
           <div class="ca-h-ss-section">
             <div class="ca-hs-k ca-h-ss-sec-k">光谱色分布 · SPECTRAL COLOR</div>
             <div v-if="starStatistics.spectral.length > 0" class="ca-h-ss-bars">
@@ -178,7 +173,7 @@
             <div v-else class="ca-h-ss-empty">尚无归属恒星数据</div>
           </div>
 
-          <!-- 星座 Top3 + 星群品质标签 -->
+          <!-- ④ 星座 Top3 + 星群品质标签 -->
           <div class="ca-h-ss-section ca-h-ss-bottom">
             <div class="ca-hs-k ca-h-ss-sec-k">星座 / 星群气质</div>
             <div class="ca-h-ss-cons">
@@ -4450,105 +4445,71 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-hero-body-stats {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 18px;   /* 两张独立卡牌之间的呼吸间距，不用竖杠杠 */
-  align-items: start;
+  gap: 24px;
+  align-items: stretch;   /* 【关键】左右强制等高：右内容文字有多高，左黑块就有多高 */
   justify-items: stretch;
   min-height: auto;
-  /* 去掉 relative：不再需要绝对定位的竖分隔线伪元素了 */
   padding: 4px 0 6px;
   flex: 1;
   width: 100%;
 }
 /* ═══════════════════════════════════════════
-   左右两张独立卡牌：星辰归属（左卡） + 星星品质（右卡）
-   中间无竖杠杠！用 grid gap 自然留白，和下面夜色流转/画像等section的 ca-card 风格完全一致
+   左：纯容器 + 里面只有一个黑色星空板块（.ca-starmap-wrap）
+   右：纯容器 + 所有信息裸内容平铺（不做任何嵌套卡/框）
    ═══════════════════════════════════════════ */
-/* 左：星辰归属卡（星图+星辰速览）—— 完全套用下方 ca-card 同款风格 */
+/* 左：纯flex容器，彻底删掉ca-card卡牌背景/边框/圆角/内边距，只负责定位 */
 .ca-h-left-block {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 12px;
   min-width: 0;
   min-height: 0;
-  /* 独立卡牌基础样式（和下方 ca-card 完全一致） */
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 14px 16px 16px;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
+  height: 100%;   /* 撑满grid高度，等于右内容高度 */
 }
-/* 左的星图 SVG：aspect-ratio 自适应，min-height 兜底防挤压 */
-.ca-h-left-block .ca-starmap-svg {
-  aspect-ratio: 420 / 300;
-  min-height: 160px;
-  width: 100%;
-}
-/* 星图容器在左卡牌内：只保留深蓝夜空底+径向微光，边框弱化（因为外已经有卡牌边框了） */
+/* 左里面的唯一元素：【黑色星空板块】 height:100% —— 跟随右内容高度响应式变化！ */
 .ca-h-left-block .ca-starmap-wrap {
-  border-color: rgba(134,168,255,0.04);
+  height: 100%;
+  /* 保留本体深蓝夜空底+细边框（这就是用户说的"黑色板块"，不是嵌套框，是本体） */
+  border-color: rgba(134,168,255,0.08);
   background:
     radial-gradient(ellipse at 50% 30%, rgba(202,167,255,0.045), transparent 72%),
-    rgba(10,12,35,0.42);
-  border-radius: 8px;
+    rgba(10,12,35,0.55);
+  border-radius: 7px;
   padding: 10px 8px 8px;
 }
+/* 左黑块里的星图SVG：aspect-ratio保持星图比例不变形，上下留夜空黑底 */
+.ca-h-left-block .ca-starmap-svg {
+  aspect-ratio: 420 / 300;
+  /* 不加硬min-height，让SVG根据宽度自适应，黑块上下自然留夜空底 */
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+  flex-shrink: 0;
+}
 
-/* 右：星星品质卡 —— 同样独立卡牌风格 */
+/* 右：纯flex容器，彻底删掉ca-card卡牌背景/边框/圆角/内边距！信息裸内容平铺，只留 gap 控制段间距 */
 .ca-h-right-block {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 13px;  /* 信息块之间的柔和间距（指标/速览/光谱/星座） */
   min-width: 0;
   min-height: 0;
-  /* 独立卡牌基础样式（和下方 ca-card、左卡一致） */
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 14px 16px 16px;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-  flex: 1;
+  height: auto;
 }
 
-/* 【星辰分布速览】：星图下方信息块，平衡左右栏高度差 + 增加信息密度 */
+/* 【星辰分布速览（从左移过来）】：彻底删掉独立卡的背景/边框/圆角/内边距 → 裸信息块！ */
 .ca-h-stardust {
   position: relative;
-  border: 1px solid rgba(255,255,255,0.045);
-  background:
-    radial-gradient(ellipse at 15% 0%, rgba(255,217,138,0.05), transparent 55%),
-    radial-gradient(ellipse at 85% 100%, rgba(134,168,255,0.05), transparent 55%),
-    rgba(255,255,255,0.012);
-  border-radius: 8px;
-  padding: 9px 10px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.ca-hsd-head {
-  display: flex;
-  align-items: center;
   gap: 6px;
 }
-.ca-hsd-dot {
-  display: inline-block;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.ca-hsd-title {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  color: rgba(220, 220, 240, 0.7);
-  font-weight: 500;
-}
+/* 速览网格：信息密度稍增，gap缩一点，让内容紧凑 */
 .ca-hsd-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 10px;
+  gap: 7px 10px;
 }
 .ca-hsd-cell {
   min-width: 0;
@@ -4944,12 +4905,13 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-hero-body-stats {
     grid-template-columns: 1fr;
     min-height: auto;
-    gap: 14px;
+    gap: 16px;
     padding: 2px 0 8px;
   }
-  /* 移动端单列：两张卡牌各自独立，不需要任何横/竖分隔线，gap自然分开 */
-  .ca-h-left-block { padding: 12px 14px 14px; }
-  .ca-h-right-block { padding: 12px 14px 14px; }
+  /* 移动端：纯容器，不需要额外padding */
+  .ca-h-left-block { padding: 0; height: auto; }
+  .ca-h-left-block .ca-starmap-wrap { height: auto; }
+  .ca-h-right-block { padding: 0; gap: 11px; }
   .ca-emotion-body-double { grid-template-columns: 1fr; }
 }
 @media (max-width: 540px) {
