@@ -229,134 +229,187 @@
       </div>
     </section>
 
-    <!-- ═══ 1. 星座肖像（=原合集画像，升级星空绑定：笺卷卡加天文参数、关键词→亮星、性格光谱→星座五曜）═══ -->
-    <section class="ca-card ca-persona">
+    <!-- ═══ 1. 夜观手记（=原合集画像，天空本色重构：笺卷卡→夜观小册+月相节气+五大天条，关键词→天空意象，维度→夜的气象五列）═══ -->
+    <section class="ca-card ca-persona ca-night-notes">
       <div class="ca-card-head">
-        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">星座肖像</span>
-        <span class="ca-ch-count">星格凝意 · {{ persona.dimensions.length }} 五曜 · {{ storyCount }} 主星</span>
+        <component :is="Sparkles" :size="12" class="ca-ch-icon ca-ch-blue" />
+        <span class="ca-ch-title">夜观手记</span>
+        <span class="ca-ch-count">{{ nightSky.phase }} · {{ nightSky.term }} · {{ storyCount }} 处光斑</span>
       </div>
       <div class="ca-persona-body">
-        <!-- 左：笺卷小卡（加入天文参数条：赤经/赤纬/视星等/距离） -->
-        <div class="ca-scroll-card">
+        <!-- 左：夜观小册笺卷（不再有星格/天文参数，改成夜的五个小条：时跨/夜温/风向/见月/云量） -->
+        <div class="ca-scroll-card ca-sc-night">
           <div class="sc-corner sc-tl"></div>
           <div class="sc-corner sc-tr"></div>
           <div class="sc-corner sc-bl"></div>
           <div class="sc-corner sc-br"></div>
 
           <div class="sc-top">
-            <div class="sc-collection">{{ persona.constellation }}</div>
+            <div class="sc-collection">{{ nightSky.name }}</div>
             <div class="sc-name-han">{{ persona.hanName }}</div>
           </div>
 
-          <!-- SVG 笺卷插画：卷起来的星笺 + 月亮 + 散落星点 -->
-          <svg viewBox="0 0 120 120" class="sc-svg">
-            <circle v-for="(s, i) in bgStars" :key="'ps'+i"
-              :cx="s.x" :cy="s.y" :r="s.r" fill="#fff" :opacity="s.opacity" />
-            <!-- 月亮 -->
-            <path d="M82 34 a18 18 0 1 0 0 24 a14 14 0 1 1 0 -24z"
-              fill="#ffd98a" opacity="0.88" />
-            <!-- 卷轴主体 -->
-            <rect x="16" y="58" width="88" height="42" rx="3"
-              fill="rgba(30,24,52,0.85)" stroke="rgba(255,217,138,0.35)" stroke-width="0.8" />
-            <!-- 卷轴上下轴 -->
-            <rect x="12" y="54" width="96" height="6" rx="3" fill="rgba(202,167,255,0.25)" stroke="rgba(202,167,255,0.45)" stroke-width="0.6" />
-            <rect x="12" y="98" width="96" height="6" rx="3" fill="rgba(202,167,255,0.25)" stroke="rgba(202,167,255,0.45)" stroke-width="0.6" />
-            <!-- 卷轴内容：三行短横线模拟文字 -->
-            <rect x="24" y="68" width="54" height="1.6" rx="0.8" fill="rgba(255,217,138,0.35)" />
-            <rect x="24" y="74" width="72" height="1.6" rx="0.8" fill="rgba(255,217,138,0.28)" />
-            <rect x="24" y="80" width="42" height="1.6" rx="0.8" fill="rgba(255,217,138,0.22)" />
-            <rect x="24" y="86" width="62" height="1.6" rx="0.8" fill="rgba(255,217,138,0.18)" />
-            <!-- 卷轴印章 -->
-            <rect x="88" y="82" width="10" height="10" rx="1.5" fill="rgba(255,139,125,0.35)" stroke="rgba(255,139,125,0.55)" stroke-width="0.6" />
-            <text x="93" y="90" text-anchor="middle" font-size="5" fill="rgba(255,255,255,0.55)" font-weight="700">笺</text>
-            <!-- 连线星 -->
-            <path d="M10 22 L42 46" stroke="rgba(255,255,255,0.5)" stroke-width="0.8" stroke-linecap="round" />
-            <circle cx="42" cy="46" r="1.4" fill="#fff" />
+          <!-- 夜观小册 SVG：迷你夜空剖面（月眉+银河微带+地平+1盏灯），不再是卷轴 -->
+          <svg viewBox="0 0 120 120" class="sc-svg sc-svg-night">
+            <!-- 背景天色渐变：入夜→子夜 -->
+            <defs>
+              <linearGradient id="nightMini" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"  stop-color="#0b0d2a" />
+                <stop offset="100%" stop-color="#1f2046" />
+              </linearGradient>
+              <linearGradient id="galMini" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="rgba(202,167,255,0.0)" />
+                <stop offset="50%" stop-color="rgba(202,167,255,0.5)" />
+                <stop offset="100%" stop-color="rgba(255,217,138,0.0)" />
+              </linearGradient>
+            </defs>
+            <rect x="8"  y="24" width="104" height="76" rx="4" fill="url(#nightMini)"
+              stroke="rgba(134,168,255,0.25)" stroke-width="0.6" />
+            <!-- 银河斜带 -->
+            <rect x="8"  y="30" width="104" height="18" fill="url(#galMini)" transform="rotate(-8 60 40)" opacity="0.8" />
+            <!-- 背景散星 -->
+            <circle v-for="(s, i) in bgStars.slice(0,12)" :key="'psn'+i"
+              :cx="8 + (s.x % 104)" :cy="26 + (s.y % 72)" :r="s.r * 0.7" fill="#fff" :opacity="s.opacity * 0.9" />
+            <!-- 残月蛾眉（月相22%） -->
+            <g transform="translate(96, 46)">
+              <circle cx="0" cy="0" r="6.5" fill="rgba(245,240,228,0.9)" />
+              <circle cx="2" cy="-1.2" r="6.1" fill="url(#nightMini)" />
+            </g>
+            <!-- 3 颗光斑（心事缩影） -->
+            <circle cx="34" cy="68" r="2" fill="#ffd98a" opacity="0.95" style="filter: drop-shadow(0 0 2px #ffd98a)" />
+            <circle cx="56" cy="56" r="1.5" fill="#caa7ff" opacity="0.9" style="filter: drop-shadow(0 0 1.5px #caa7ff)" />
+            <circle cx="76" cy="80" r="1.3" fill="#95f0c0" opacity="0.9" style="filter: drop-shadow(0 0 1.5px #95f0c0)" />
+            <!-- 地平线剪影 + 一盏窗灯（=孤灯） -->
+            <path d="M8 92 L 0 92 L 0 100 L 120 100 L 120 92 L 112 92 L 106 84 L 96 88 L 88 80 L 78 86 L 68 78 L 58 86 L 46 82 L 36 88 L 24 84 L 16 90 Z"
+              fill="#05060f" />
+            <rect x="60" y="86" width="2.2" height="2.2" fill="rgba(255,217,138,0.85)" style="filter: drop-shadow(0 0 1px #ffd98a)" />
           </svg>
 
-          <!-- 【新增】天文参数条（小卡中部：赤经/赤纬/视星等/光年） -->
-          <div class="sc-astro">
+          <!-- 【天空本色】夜的五条小参数（替换RA/Dec/m/ly天文条）：时跨/夜温/风向/见月/云量 -->
+          <div class="sc-astro sc-astro-night">
             <div class="sc-astro-row">
-              <span class="sc-astro-k">RA</span>
-              <span class="sc-astro-v">{{ constellation.ra.replace('RA ', '') }}</span>
+              <span class="sc-astro-k">时</span>
+              <span class="sc-astro-v sc-astro-v-vg">{{ nightSky.timeSpan.split(' ')[0] }} ~{{ nightSky.timeSpan.split('~')[1].trim().substring(0,5) }}</span>
             </div>
             <div class="sc-astro-row">
-              <span class="sc-astro-k">Dec</span>
-              <span class="sc-astro-v">{{ constellation.dec.replace('Dec ', '') }}</span>
+              <span class="sc-astro-k">温</span>
+              <span class="sc-astro-v" style="color: #86a8ff">{{ nightSky.meteo[1].v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
-              <span class="sc-astro-k">m</span>
-              <span class="sc-astro-v">{{ constellation.avgMag }}</span>
+              <span class="sc-astro-k">风</span>
+              <span class="sc-astro-v" style="color: #caa7ff">{{ nightSky.meteo[2].v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
-              <span class="sc-astro-k">ly</span>
-              <span class="sc-astro-v">{{ constellation.distance }}</span>
+              <span class="sc-astro-k">月</span>
+              <span class="sc-astro-v" style="color: #ffd98a">{{ nightSky.moonIllum }}</span>
             </div>
           </div>
 
-          <!-- 标签：从通用标签改成「主要亮星」αβγ -->
-          <div class="sc-tags sc-tags-brights">
-            <span class="ca-pt-kw-bright" v-for="b in brightStars" :key="b.rank" :style="{ '--c': b.color }">
-              <i class="ca-pt-kw-rank">{{ b.rank }}</i>{{ b.name }}
+          <!-- 标签：从αβγ亮星→改为天空意象徽章（夜雨/孤灯/江风/远乡…） -->
+          <div class="sc-tags sc-tags-images">
+            <span
+              v-for="(im, i) in skyImages.slice(0, 5)"
+              :key="'skyIm'+i"
+              class="ca-pt-kw ca-pt-kw-sky"
+              :style="{ '--c': im.color, fontSize: im.size === 'lg' ? '0.64rem' : (im.size === 'md' ? '0.58rem' : '0.52rem'), padding: im.size === 'lg' ? '3px 7px' : '2px 6px' }"
+            >
+              {{ im.word }}
             </span>
           </div>
         </div>
 
-        <!-- 右：文字解读（星区简介 + 双段 + 金句 + 关键词·亮星云 + 引导条 + 星座五曜） -->
+        <!-- 右：手记文字（不再是星座主人叙事，改成当夜"你"的视角：从子初坐到卯初，8处光斑散在夜里） -->
         <div class="ca-persona-text">
-          <!-- 【新增】星区简介条（天文志口吻） -->
-          <div class="ca-pt-intro">
-            <component :is="Orbit" :size="10" />
-            <span>春夜南天第 ⅰ 星区 · 凝神静视可见 · 属「温吞思念」之格</span>
+          <!-- 观夜简介条：从星区→改为「当夜观览·开篇」 -->
+          <div class="ca-pt-intro ca-pt-intro-night">
+            <component :is="CloudSun" :size="10" />
+            <span>{{ nightSky.season }} · {{ nightSky.timeSpan }} · 共收 {{ storyCount }} 处光斑</span>
           </div>
           <p class="ca-pt-para first">
-            这卷名为<span class="ca-han-hl">「{{ persona.hanName }}」</span>的星笺，收着
-            <b>{{ storyCount }}</b> 主星——
+            这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——你从
+            <b style="color: #ffd98a">{{ nightSky.timeSpan.split(' ')[0] }}</b>
+            一直坐到
+            <b style="color: #86a8ff">{{ nightSky.timeSpan.split('~')[1] }}</b>，
+            8 处心事像灯火一样浮在夜里。
             {{ persona.paragraphFirst }}
           </p>
-          <p class="ca-pt-para">{{ persona.paragraphSecond }}</p>
+          <p class="ca-pt-para">
+            {{ persona.paragraphSecond }}
+            月是一弯蛾眉，云是四分散卷；你说话的声音很轻，像江风掠过时带起的槐花。
+          </p>
 
-          <!-- 金句卡片（引用块） -->
-          <div class="ca-quote-card">
-            <span class="ca-quote-mark">"</span>
+          <!-- 金句卡片：引用号从 " → 改为「残灯」视觉（左上角小灯 + 夜色边） -->
+          <div class="ca-quote-card ca-qc-night">
+            <svg viewBox="0 0 16 16" width="18" height="18" class="ca-qc-lamp">
+              <circle cx="8" cy="6" r="3.5" fill="#ffd98a" opacity="0.85" />
+              <rect x="6" y="9" width="4" height="4" rx="1" fill="rgba(255,217,138,0.35)" />
+            </svg>
             <span class="ca-quote-text">{{ persona.quote }}</span>
           </div>
 
-          <!-- 【新增】关键词云 → 改名为「意象·亮星」云（主标签+亮星混合） -->
+          <!-- 关键词云：意象·亮星 → 改为「天空意象」：夜雨/江风/孤灯/远乡/独坐/槐花/种子/残卷 -->
           <div class="ca-pt-keywords">
-            <div class="ca-pt-kw-title">意象 · 亮星</div>
+            <div class="ca-pt-kw-title ca-pt-kw-title-sky">天空意象 · 那一夜的风物</div>
             <div class="ca-pt-kw-cloud">
-              <span class="ca-pt-kw ca-pt-kw-tag" v-for="t in persona.tags" :key="t">#{{ t }}</span>
-              <span class="ca-pt-kw ca-pt-kw-bright" v-for="b in brightStars" :key="'k'+b.rank" :style="{ '--c': b.color }">
-                <i class="ca-pt-kw-rank">{{ b.rank }}</i>{{ b.name }}
+              <span
+                v-for="(im, i) in skyImages"
+                :key="'skyImM'+i"
+                class="ca-pt-kw ca-pt-kw-sky"
+                :style="{ '--c': im.color, fontSize: im.size === 'lg' ? '0.74rem' : (im.size === 'md' ? '0.66rem' : '0.58rem'), padding: im.size === 'lg' ? '5px 10px' : '4px 8px' }"
+              >
+                {{ im.word }}
               </span>
+              <!-- 同时保留主标签（#独属于你 …）但改风格为淡灰透明 -->
+              <span class="ca-pt-kw ca-pt-kw-tag ca-pt-kw-tag-ghost" v-for="t in persona.tags" :key="'tag'+t">#{{ t }}</span>
             </div>
           </div>
 
-          <!-- 引导条（参考星格画像的 pt-suggest-wrap） -->
-          <div class="ca-suggest-wrap">
-            <span class="ca-s-tip">📜 给这卷星笺的注脚</span>
+          <!-- 引导条：📜 给这卷星笺的注脚 → 🌙 给那一夜的注脚 -->
+          <div class="ca-suggest-wrap ca-sw-night">
+            <span class="ca-s-tip">🌙 给那一夜的注脚</span>
             <span class="ca-s-text">{{ persona.suggestIntro }}</span>
           </div>
 
-          <!-- 维度条：性格光谱 → 星座五曜（金木水火土，五行星对应五维） -->
-          <div class="ca-dims-card">
+          <!-- 维度条：星座五曜 → 夜的五大「气象属性」（夜温/风向/见月/云量/体感）
+               保留原来的左右对极条风格，但把行星图标换成夜的气象小符号：温度计/风/月/云/体感 -->
+          <div class="ca-dims-card ca-dims-night">
             <div class="ca-dims-title">
-              <component :is="Orbit" :size="9" />
-              <span>星座五曜</span>
-              <span class="ca-dims-sub">金 · 木 · 水 · 火 · 土 — 守护星格</span>
+              <component :is="Wind" :size="9" />
+              <span>那一夜的五大气象</span>
+              <span class="ca-dims-sub">时 · 温 · 风 · 月 · 云 — 组成你的夜</span>
             </div>
-            <div class="ca-dims ca-dims-five">
-              <div v-for="(d, i) in persona.dimensions" :key="d.left + d.right" class="ca-dim ca-dim-five">
-                <div class="ca-dim-planet" :style="{ '--pc': fivePlanets[i].color }">
-                  <div class="ca-dim-planet-orb" :style="{ background: fivePlanets[i].color }"></div>
+            <div class="ca-dims ca-dims-five ca-dims-night-five">
+              <div v-for="(d, i) in persona.dimensions" :key="d.left + d.right" class="ca-dim ca-dim-five ca-dim-night-item">
+                <!-- 左侧不再是行星，而是夜的气象符号（温度计/风/月/云/体感） -->
+                <div class="ca-dim-planet ca-dim-night-icon" :style="{ '--pc': fiveMeteo[i].color }">
+                  <!-- 5 个不同小图标：第0=温度计 第1=风叶 第2=月眉 第3=云 第4=体感（心） -->
+                  <svg v-if="i === 0" viewBox="0 0 14 14" width="14" height="14">
+                    <path d="M6 2 a1 1 0 0 1 2 0 v6.2 a2.5 2.5 0 1 1 -2 0 z" fill="#86a8ff" opacity="0.92" />
+                  </svg>
+                  <svg v-else-if="i === 1" viewBox="0 0 14 14" width="14" height="14">
+                    <path d="M7 7 L 7 1.5"   stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
+                    <path d="M7 7 L 12 9.5"  stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
+                    <path d="M7 7 L 2.2 10.8" stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
+                    <circle cx="7" cy="7" r="1.4" fill="#caa7ff" opacity="0.95" />
+                  </svg>
+                  <svg v-else-if="i === 2" viewBox="0 0 14 14" width="14" height="14">
+                    <circle cx="7" cy="7" r="4.8" fill="#ffd98a" opacity="0.95" />
+                    <circle cx="9" cy="5.8" r="4.4" fill="#14153a" />
+                  </svg>
+                  <svg v-else-if="i === 3" viewBox="0 0 14 14" width="14" height="14">
+                    <path d="M3 9 a2.5 2.5 0 0 1 0.2 -4.8 a3.5 3.5 0 0 1 6.8 0 a2.5 2.5 0 0 1 0.4 5 z"
+                      fill="#95f0c0" opacity="0.92" />
+                  </svg>
+                  <svg v-else viewBox="0 0 14 14" width="14" height="14">
+                    <path d="M7 12 C 3.5 9 2 6.5 2 4.5 A3 3 0 0 1 7 3 A3 3 0 0 1 12 4.5 C 12 6.5 10.5 9 7 12 z"
+                      fill="#ff8b7d" opacity="0.92" />
+                  </svg>
                 </div>
                 <div class="ca-dim-main">
                   <div class="ca-dim-labels ca-dim-labels-five">
                     <div class="ca-dim-ln">
-                      <span class="ca-dim-planet-name" :style="{ color: fivePlanets[i].color }">{{ fivePlanets[i].cn }}</span>
-                      <span class="ca-dim-planet-en" :style="{ color: fivePlanets[i].color }">{{ fivePlanets[i].en }}</span>
+                      <span class="ca-dim-planet-name" :style="{ color: fiveMeteo[i].color }">{{ fiveMeteo[i].k }}</span>
+                      <span class="ca-dim-planet-en" :style="{ color: fiveMeteo[i].color }">{{ fiveMeteo[i].en }}</span>
                       <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
                     </div>
                     <div class="ca-dim-rn">
@@ -364,9 +417,9 @@
                       <span class="ca-dim-pct">{{ d.percent }}%</span>
                     </div>
                   </div>
-                  <div class="ca-dim-track ca-dim-track-five" :style="{ '--ptc': fivePlanets[i].color }">
-                    <div class="ca-dim-fill" :style="{ width: d.percent + '%', background: fivePlanets[i].color }"></div>
-                    <div class="ca-dim-knob" :style="{ left: d.percent + '%', background: fivePlanets[i].color, boxShadow: `0 0 6px ${fivePlanets[i].color}` }"></div>
+                  <div class="ca-dim-track ca-dim-track-five" :style="{ '--ptc': fiveMeteo[i].color }">
+                    <div class="ca-dim-fill" :style="{ width: d.percent + '%', background: fiveMeteo[i].color }"></div>
+                    <div class="ca-dim-knob" :style="{ left: d.percent + '%', background: fiveMeteo[i].color, boxShadow: `0 0 6px ${fiveMeteo[i].color}` }"></div>
                   </div>
                 </div>
               </div>
@@ -1011,6 +1064,31 @@ const fivePlanets = [
   { cn: '水', en: 'Mercury', color: '#86a8ff' },   // 水星：流动→沉静/炽烈
   { cn: '火', en: 'Mars',    color: '#ff8b7d' },   // 火星：热情→现实/梦幻
   { cn: '土', en: 'Saturn',  color: '#caa7ff' },   // 土星：沉淀→慢热/热切
+]
+
+/** 【天空本色】合集画像：天空意象数组（替换α/β/γ亮星），从诗/故事/风物中提取
+ *  size: 字大小权重，color: 字形光晕
+ */
+const skyImages = [
+  { word: '夜雨',   size: 'md', color: '#86a8ff' },
+  { word: '江风',   size: 'md', color: '#95f0c0' },
+  { word: '孤灯',   size: 'lg', color: '#ffd98a' },
+  { word: '远乡',   size: 'md', color: '#ffd98a' },
+  { word: '独坐',   size: 'md', color: '#caa7ff' },
+  { word: '槐花',   size: 'sm', color: '#ffd98a' },
+  { word: '种子',   size: 'sm', color: '#86a8ff' },
+  { word: '残卷',   size: 'sm', color: '#95f0c0' },
+]
+
+/** 【天空本色】合集画像：夜的五大「气象属性」（替换金木水火土五曜）
+ *  对应 persona.dimensions 5维的天文重命名，每维带气象名+颜色
+ */
+const fiveMeteo = [
+  { k: '夜温',   en: 'T · NIGHT',    color: '#86a8ff' },  // 温度：凉润
+  { k: '风向',   en: 'W · NORTHW',   color: '#caa7ff' },  // 风：西北二级
+  { k: '见月',   en: 'M · WANING',   color: '#ffd98a' },  // 月：残月蛾眉
+  { k: '云量',   en: 'C · FOURTH',   color: '#95f0c0' },  // 云：4/8散云
+  { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },  // 体感：衣薄微寒
 ]
 
 
@@ -2140,6 +2218,104 @@ function tagStyle(tag: string): Record<string, string> {
   line-height: 1;
   padding: 0 1px 0 2px;
 }
+/* 【天空本色】天空意象徽章（夜雨/江风/孤灯…）：夜色边 + 小发光，字体偏楷体偏柔 */
+.ca-pt-kw-sky {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  font-family: "LXGW WenKai", "STKaiti", Georgia, serif;
+  font-weight: 500;
+  color: rgba(255,255,255,0.86);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 10%, transparent), rgba(11,13,42,0.4));
+  border: 1px solid color-mix(in srgb, var(--c) 26%, transparent);
+  border-radius: 18px;
+  letter-spacing: 0.04em;
+  transition: all 0.22s ease;
+  box-shadow:
+    0 0 0 color-mix(in srgb, var(--c) 0%, transparent),
+    inset 0 0 6px color-mix(in srgb, var(--c) 8%, transparent);
+}
+.ca-pt-kw-sky:hover {
+  transform: translateY(-0.5px);
+  border-color: color-mix(in srgb, var(--c) 55%, transparent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--c) 18%, transparent);
+}
+/* 原主标签 (#独属于你 …) 的 ghost 风格：淡灰透明低调（别抢天空意象的戏） */
+.ca-pt-kw-tag-ghost {
+  opacity: 0.38;
+  background: rgba(255,255,255,0.02);
+  border-color: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.55);
+  font-size: 0.56rem;
+  padding: 3px 7px;
+  text-shadow: none;
+}
+.ca-pt-kw-title-sky {
+  color: #ffd98a;
+  opacity: 0.92;
+}
+/* 观夜简介条：夜色淡边（替换原星区Orbit图标紫边） */
+.ca-pt-intro-night {
+  background: linear-gradient(90deg, rgba(134,168,255,0.07), rgba(255,217,138,0.04));
+  border: 1px solid rgba(134,168,255,0.12);
+  color: rgba(255,255,255,0.62);
+}
+/* 引导条：🌙 给那一夜的注脚（冷蓝→暖金） */
+.ca-sw-night {
+  background: linear-gradient(90deg, rgba(255,217,138,0.06), rgba(134,168,255,0.04));
+  border-left: 2px solid rgba(255,217,138,0.35);
+}
+.ca-sw-night .ca-s-tip {
+  color: rgba(255,217,138,0.82);
+}
+/* 五大气象条：标题/字体风格小微调 */
+.ca-dims-night .ca-dims-title {
+  background: linear-gradient(90deg, rgba(134,168,255,0.05), rgba(202,167,255,0.04), rgba(149,240,192,0.04));
+  border: 1px solid rgba(134,168,255,0.1);
+  color: rgba(255,255,255,0.72);
+}
+.ca-dims-night .ca-dims-title .ca-dims-sub {
+  color: rgba(255,255,255,0.38);
+}
+/* 左侧气象符号：尺寸稍大，发光色来自 --pc（保持原行星icon容器大小） */
+.ca-dim-night-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--pc) 30%, transparent), transparent 75%),
+    rgba(255,255,255,0.02);
+  border: 1px solid color-mix(in srgb, var(--pc) 22%, transparent);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--pc) 35%, transparent));
+}
+/* 金句卡：残灯版（灯替换双引号，夜色底） */
+.ca-qc-night {
+  padding: 10px 14px 10px 36px;
+  background:
+    linear-gradient(90deg, rgba(255,217,138,0.04), rgba(11,13,42,0.5)),
+    rgba(0,0,0,0.18);
+  border-left: 2px solid rgba(255,217,138,0.35);
+  border-top: 1px solid rgba(134,168,255,0.08);
+  border-right: 1px solid rgba(134,168,255,0.05);
+  border-bottom: 1px solid rgba(202,167,255,0.05);
+}
+.ca-qc-night .ca-quote-mark { display: none; }
+.ca-qc-lamp {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 4px rgba(255,217,138,0.55));
+}
+/* 夜观小册笺卷：细节微调 */
+.ca-sc-night .sc-top { margin-bottom: 6px; }
+.ca-sc-night .sc-collection { font-size: 0.58rem; color: rgba(255,217,138,0.72); }
+.ca-sc-night .sc-name-han { font-size: 0.86rem; color: rgba(255,255,255,0.9); }
 .ca-pt-para {
   margin: 0;
   font-size: 0.76rem;
