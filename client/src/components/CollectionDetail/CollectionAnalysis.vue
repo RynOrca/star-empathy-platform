@@ -645,23 +645,50 @@
       </section>
     </div>
 
-    <!-- ═══ 8. AI 总叙（结构化三段卡 + 独白卡 + 寄语条，替代原纯 Markdown）═══ -->
+    <!-- ═══ 8. 观星手记（原AI总叙，星空绑定：星图总志+星轨运行+星座神话+观星者手记）═══ -->
     <section class="ca-card ca-narrative">
       <div class="ca-card-head">
-        <component :is="Feather" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">AI 总叙</span>
-        <span class="ca-ch-count">星笺综述 · 3 段式解读</span>
+        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
+        <span class="ca-ch-title">观星手记</span>
+        <span class="ca-ch-count">星图总志 · 四星轨 · 星官注</span>
       </div>
       <div class="ca-narr-body">
-        <!-- 第一段：星笺概览（夜半低语）—— 左图标 + 标题金条 + 正文 -->
+        <!-- ===== 第一段：星图总志（原概览，左图标 + 标题 + 观测参数卡 + 正文） ===== -->
         <div class="ca-narr-section ca-narr-overview">
           <div class="ca-nr-head">
             <div class="ca-nr-icon ca-nr-icon-gold">
-              <component :is="MoonStar" :size="13" />
+              <component :is="Orbit" :size="13" />
             </div>
             <div class="ca-nr-title-wrap">
               <div class="ca-nr-title">{{ narrative.overview.title }}</div>
-              <div class="ca-nr-sub">总览 · {{ narrative.overview.storyCount }} 则 · {{ narrative.overview.time }}</div>
+              <div class="ca-nr-sub">星图总志 · {{ narrative.overview.storyCount }}星 · {{ narrative.overview.time }}</div>
+            </div>
+          </div>
+          <!-- 【星空绑定】观测参数卡（天文观测记录风格） -->
+          <div class="ca-nr-obs-card">
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">赤经</span>
+              <span class="ca-nr-obs-v ca-nr-obs-v-gold">RA 22h 14m</span>
+            </div>
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">赤纬</span>
+              <span class="ca-nr-obs-v ca-nr-obs-v-purple">Dec +37°21′</span>
+            </div>
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">银纬</span>
+              <span class="ca-nr-obs-v">b -12.4°</span>
+            </div>
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">星数</span>
+              <span class="ca-nr-obs-v ca-nr-obs-v-gold">8 ★</span>
+            </div>
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">能见度</span>
+              <span class="ca-nr-obs-v">V ~4.2 等</span>
+            </div>
+            <div class="ca-nr-obs-item">
+              <span class="ca-nr-obs-k">观测地</span>
+              <span class="ca-nr-obs-v">北纬 31.2° · 江边</span>
             </div>
           </div>
           <div class="ca-nr-content">{{ narrative.overview.content }}</div>
@@ -670,65 +697,95 @@
           </div>
         </div>
 
-        <!-- 第二段：情绪流转分析（弧线分析卡）—— 三阶段步点图 + 正文 -->
+        <!-- ===== 第二段：星轨运行（原情绪弧线：4步东升/中天/西沉/入夜，带方位角/高度角参数） ===== -->
         <div class="ca-narr-section ca-narr-arc">
           <div class="ca-nr-head">
-            <div class="ca-nr-icon ca-nr-icon-purple">
+            <div class="ca-nr-icon ca-nr-icon-blue">
               <component :is="Route" :size="13" />
             </div>
             <div class="ca-nr-title-wrap">
               <div class="ca-nr-title">{{ narrative.arc.title }}</div>
-              <div class="ca-nr-sub">情绪弧线 · {{ narrative.arc.phases.length }} 阶段</div>
+              <div class="ca-nr-sub">星轨四步 · 地平坐标记录 · AZ方位角 ALT高度角</div>
             </div>
           </div>
-          <!-- 步点图（三阶段） -->
-          <div class="ca-nr-arc-steps">
+          <!-- 【星空绑定】星轨步点图（4步，每步带天文坐标） -->
+          <div class="ca-nr-arc-steps ca-nr-orb-steps">
             <div
-              class="ca-nr-step"
+              class="ca-nr-step ca-nr-orbit-step"
               v-for="(p, i) in narrative.arc.phases"
               :key="i"
               :style="{ '--step-color': p.color } as Record<string, string>"
             >
-              <div class="ca-nr-step-dot"></div>
+              <div class="ca-nr-step-dot ca-nr-orbit-dot"></div>
               <div class="ca-nr-step-body">
-                <div class="ca-nr-step-name">{{ p.name }}</div>
+                <div class="ca-nr-step-name-row">
+                  <div class="ca-nr-step-name">{{ p.name }}</div>
+                  <!-- 天文坐标：方位角AZ / 高度角ALT -->
+                  <div class="ca-nr-step-coord" v-if="p.coord">
+                    <span>AZ <b>{{ p.coord.az }}</b></span>
+                    <span>ALT <b>{{ p.coord.alt }}</b></span>
+                  </div>
+                </div>
                 <div class="ca-nr-step-anchor" v-if="p.anchor">「{{ p.anchor }}」</div>
                 <div class="ca-nr-step-desc">{{ p.desc }}</div>
               </div>
-              <div v-if="i < narrative.arc.phases.length - 1" class="ca-nr-step-line"></div>
+              <div v-if="i < narrative.arc.phases.length - 1" class="ca-nr-step-line ca-nr-orbit-line"></div>
             </div>
           </div>
           <p class="ca-nr-summary">{{ narrative.arc.summary }}</p>
         </div>
 
-        <!-- 第三段：独立独白卡（引用金句，参考心事摘录风格） -->
-        <div class="ca-narr-monologue">
+        <!-- ===== 第三段：星座神话（原独白卡，加「星官注」标签，像古代天文书注释） ===== -->
+        <div class="ca-narr-monologue ca-narr-myth">
           <div class="sc-corner sc-tl"></div>
           <div class="sc-corner sc-tr"></div>
           <div class="sc-corner sc-bl"></div>
           <div class="sc-corner sc-br"></div>
-          <!-- 左小插画：星灯 -->
+          <!-- 【星空绑定】顶部星官注标签 -->
+          <div class="ca-nm-myth-tag">
+            <span class="ca-nm-myth-seal">星官注</span>
+            <span class="ca-nm-myth-sub">《夜雨孤灯座·天官书》卷三</span>
+          </div>
+          <!-- 左小插画：星座连线图（提灯替换成小星图 -->
           <svg viewBox="0 0 60 60" class="ca-nm-illus">
             <circle cx="10" cy="14" r="0.8" fill="#fff" opacity="0.5" />
             <circle cx="50" cy="10" r="0.6" fill="#fff" opacity="0.4" />
             <circle cx="52" cy="46" r="0.7" fill="#fff" opacity="0.45" />
             <circle cx="14" cy="48" r="0.6" fill="#fff" opacity="0.38" />
-            <!-- 提灯 -->
-            <path d="M30 10 L30 14" stroke="rgba(202,167,255,0.5)" stroke-width="0.8" />
-            <path d="M24 14 L36 14 L34 40 L26 40 Z"
-              fill="rgba(255,217,138,0.18)" stroke="rgba(255,217,138,0.55)" stroke-width="0.9" />
-            <line x1="24" y1="20" x2="36" y2="20" stroke="rgba(255,217,138,0.4)" stroke-width="0.4" />
-            <line x1="24" y1="28" x2="36" y2="28" stroke="rgba(255,217,138,0.35)" stroke-width="0.4" />
-            <line x1="24" y1="36" x2="36" y2="36" stroke="rgba(255,217,138,0.3)" stroke-width="0.4" />
-            <rect x="22" y="40" width="16" height="2.5" rx="0.8"
-              fill="rgba(202,167,255,0.35)" stroke="rgba(202,167,255,0.55)" stroke-width="0.6" />
-            <!-- 光晕 -->
-            <circle cx="30" cy="28" r="12" fill="rgba(255,217,138,0.08)" />
-            <circle cx="30" cy="28" r="7" fill="rgba(255,217,138,0.12)" />
+            <!-- 星座8星简图（α/β/γ/δ/ε/ζ/η/θ 连线 -->
+            <!-- α 雨夜寄北 (18,16) → β 凌晨四点 (42,20) → γ 江边走走 (48,36) → δ 阳台种子 (36,50) → ε 槐花再开 (20,46) → ζ 末班车 (10,30) → η 陌生人的话 (24,28) → θ 合上这卷 (28,22) -->
+            <path d="M18,16 L42,20 L48,36 L36,50 L20,46 L10,30 L24,28 L28,22 Z"
+              fill="none" stroke="rgba(255,217,138,0.45)" stroke-width="0.8"
+              stroke-dasharray="2 1.5" stroke-linejoin="round" />
+            <!-- α 亮星 (雨夜寄北）主星 -->
+            <circle cx="18" cy="16" r="3" fill="rgba(255,217,138,0.92)">
+              <animate attributeName="r" values="3;3.6;3" dur="2.8s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="18" cy="16" r="5" fill="rgba(255,217,138,0.15)" />
+            <!-- β 次亮 -->
+            <circle cx="42" cy="20" r="2.4" fill="rgba(202,167,255,0.9)" />
+            <circle cx="42" cy="20" r="4" fill="rgba(202,167,255,0.12)" />
+            <!-- γ 第三 -->
+            <circle cx="48" cy="36" r="2" fill="rgba(149,240,192,0.88)" />
+            <!-- 其余 δ~θ -->
+            <circle cx="36" cy="50" r="1.2" fill="rgba(255,255,255,0.7)" />
+            <circle cx="20" cy="46" r="1.2" fill="rgba(255,255,255,0.7)" />
+            <circle cx="10" cy="30" r="1" fill="rgba(255,255,255,0.55)" />
+            <circle cx="24" cy="28" r="1" fill="rgba(255,255,255,0.6)" />
+            <circle cx="28" cy="22" r="0.9" fill="rgba(255,255,255,0.5)" />
+            <!-- 星名文字 -->
+            <text x="13" y="12" font-size="3.2" fill="rgba(255,217,138,0.95)" font-family="Georgia,serif" font-weight="700">α</text>
+            <text x="45" y="18" font-size="3" fill="rgba(202,167,255,0.9)" font-family="Georgia,serif" font-weight="700">β</text>
+            <text x="50" y="34" font-size="2.8" fill="rgba(149,240,192,0.9)" font-family="Georgia,serif" font-weight="700">γ</text>
           </svg>
           <div class="ca-nm-body">
             <div class="ca-nm-mark">"</div>
             <p class="ca-nm-text">{{ narrative.monologue.text }}</p>
+            <!-- 【星空绑定】星官注释行 -->
+            <div class="ca-nm-myth-note">
+              <span class="ca-nm-myth-note-k">星官按：</span>
+              <span class="ca-nm-myth-note-v">{{ narrative.monologue.mythNote }}</span>
+            </div>
             <div class="ca-nm-meta">
               <span class="ca-nm-tag">{{ narrative.monologue.tag }}</span>
               <span class="ca-nm-spacer"></span>
@@ -737,13 +794,38 @@
           </div>
         </div>
 
-        <!-- 第四段：写作者寄语（引导条风格） -->
-        <div class="ca-narr-postscript">
-          <span class="ca-ps-tip">
-            <component :is="Feather" :size="10" />
-            {{ narrative.postscript.tag }}
-          </span>
-          <span class="ca-ps-text">{{ narrative.postscript.content }}</span>
+        <!-- ===== 第四段：观星者手记（原寄语条，天文学者手写笔记风格，带日期/仪器/气象） ===== -->
+        <div class="ca-narr-postscript ca-narr-obs-log">
+          <div class="ca-obs-header">
+            <span class="ca-obs-tip">
+              <component :is="Feather" :size="10" />
+              {{ narrative.postscript.tag }}
+            </span>
+            <!-- 观测元数据：日期 / 仪器 / 气象 -->
+            <div class="ca-obs-meta">
+              <div class="ca-obs-meta-item">
+                <span class="ca-obs-meta-k">观测日</span>
+                <span class="ca-obs-meta-v">甲辰 · 春分后三日</span>
+              </div>
+              <div class="ca-obs-meta-item">
+                <span class="ca-obs-meta-k">仪器</span>
+                <span class="ca-obs-meta-v">心之所感 · 六分仪</span>
+              </div>
+              <div class="ca-obs-meta-item">
+                <span class="ca-obs-meta-k">气象</span>
+                <span class="ca-obs-meta-v">夜雨初霁 · 视宁度 良</span>
+              </div>
+            </div>
+          </div>
+          <p class="ca-ps-text ca-obs-text">{{ narrative.postscript.content }}</p>
+          <!-- 签名落款：观星者 -->
+          <div class="ca-obs-sign">
+            <div class="ca-obs-sign-seal">观</div>
+            <div class="ca-obs-sign-name">
+              <span>夜雨孤灯座 · 观测记录</span>
+              <span class="ca-obs-sign-date">子时 · 露结为霜</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1167,60 +1249,65 @@ const trajectory = [
   { emotion: '释然', color: '#95f0c0', date: '04/30', title: '合上这一卷', snippet: '把散落的纸页收好，灯灭了，雨也停了。' },
 ]
 
-/** AI 总叙结构化数据（替代原纯 Markdown）—— 概览卡 + 情绪弧线 + 独白卡 + 寄语条 */
+/** AI 总叙结构化数据（【观星手记】星空绑定版本：星图总志 + 星轨四步 + 星座神话 + 观星者手记） */
 const narrative = {
-  // 第一段：星笺概览（夜半低语）
+  // 第一段：星图总志（原概览）
   overview: {
-    title: '夜半的低语',
+    title: '夜雨孤灯 · 星图总志',
     storyCount: 8,
-    time: '多写于子时前后',
-    keywords: ['雨声', '灯影', '不肯寄出的话'],
+    time: '子时中天 · 赤经 22h 天区',
+    keywords: ['主序稳定', 'G型主星', '银河纬度-12°', '8星构形'],
     content:
-      '这卷星笺收着 8 则心事，多落在子时之后、天还未亮的那段安静里。反复出现的三种意象：雨声（洗涤却不带走）、灯影（点亮又按灭）、未寄出的话（折成纸船随水漂走）。思念是底色，却并不尖锐——更像一盏不肯熄灭的灯，温吞地亮到天明。',
+      '本星座位于赤经 22h 14m / 赤纬 +37° 21′ 天区，共 8 颗恒星构形：α 雨夜寄北（G2V 主序）最亮，β 凌晨四点（K5V）伴其侧，γ 江边走走（F8V）位于连线末端。银纬 b = -12.4°，紧邻银河北岸，能见度约 4.2 等。夜越深，光越稳——像主序阶段的恒星，在核心静静燃烧数十亿年。',
   },
-  // 第二段：情绪弧线分析
+  // 第二段：星轨四步（原情绪弧线，4步：东升 → 中天 → 西沉 → 入夜）
   arc: {
-    title: '情绪的流转',
+    title: '星轨四步 · 地平坐标记录',
     phases: [
       {
-        name: '浓稠的思念',
+        name: '① 东升 · 浓思出地平',
         anchor: '雨夜寄北',
-        desc: '开篇就落在最深的雨里，心事以「未寄出」开篇，带着不敢投递的重量。',
+        desc: '从东方地平线升起，方位角 NE 72°——刚升起来的星带着雾气，像刚写好的心事，连字都是湿的。',
         color: '#ffd98a',
+        coord: { az: 'NE 72°', alt: '+18°' },
       },
       {
-        name: '短暂的释然',
-        anchor: '江边走走',
-        desc: '中间出现几次松动：帽子被风吹走时的笑、种子冒出的一点绿——风一拂，有些事就松了绑。',
-        color: '#95f0c0',
-      },
-      {
-        name: '再度回望',
+        name: '② 中天 · 孤独至天顶',
         anchor: '凌晨四点',
-        desc: '整个弧线的最低点：只有一盏台灯、一座空城市、和一个人还醒着。但谷底之后，就开始上扬。',
+        desc: '运行至天顶最高处，方位角 180° 正南——整座城市都睡了，只有它和你对望着，高度角 +74° 最近也最远。',
         color: '#caa7ff',
+        coord: { az: 'S 180°', alt: '+74°' },
       },
       {
-        name: '轻轻合上',
+        name: '③ 西沉 · 释然入西方',
+        anchor: '江边走走',
+        desc: '缓缓向西方落下，方位角 NW 288°，高度角回落 +29°——风把帽子吹进水里的那一秒，你突然就笑了，那是星在落之前最后的闪耀。',
+        color: '#95f0c0',
+        coord: { az: 'NW 288°', alt: '+29°' },
+      },
+      {
+        name: '④ 入夜 · 归于星野',
         anchor: '合上这一卷',
-        desc: '末章「灯灭了，雨也停了」——没有刻意的大喜大悲，只是把散落的纸页收起来，放回原来的位置。',
+        desc: '高度角 < 0°，隐入西北地平线之下——星没有灭，只是走到了地球的另一边，等着明天同一个子时，再从东升起。',
         color: '#86a8ff',
+        coord: { az: 'NW 315°', alt: '-06°' },
       },
     ],
     summary:
-      '从最浓的雨到最淡的晴，情绪没有急转弯，而是悄悄起变化。弧线最低点在「凌晨四点」，但那之后每一则都比前一则更轻一点——像湿透的纸，在阳光里慢慢变干。',
+      '从东升到西沉，四星轨走完一个恒星日约 23h 56m。最高点在「凌晨四点」（中天 +74°），但西沉之后的每一次东升，都会比前一天早 4 分钟——心事也是这样，今天放不下的，明天会更容易放下一点。',
   },
-  // 第三段：独白卡（参考心事摘录风格，四角装饰 + 左提灯插画）
+  // 第三段：星座神话（原独白卡 + 星官注）
   monologue: {
-    tag: '摘录 · 独白',
-    text: '孤独不是没有人，而是有些话找不到人说。可当我把它写下来、再收进这卷星笺的时候，我好像终于找到那个愿意听完的人了。',
-    author: '夜雨孤灯 · 第 8 则末',
+    tag: '《天官书》摘录',
+    text: '孤独不是没有人，而是有些话找不到人说。可当我把它写下来、再挂到这颗星上的时候，我好像终于找到那个愿意听完的人了。',
+    mythNote: '昔有旅人夜渡江，舟中独语，忽见北岸有灯如豆，不移不动。至晓乃悟，灯即此星也。后人以心语寄星，星辄亮一度——心语积久，遂成夜雨孤灯座。',
+    author: '出自《星经通考·外篇》卷十二',
   },
-  // 第四段：写作者寄语（引导条风格）
+  // 第四段：观星者手记（原寄语条）
   postscript: {
-    tag: '📜 给这卷星笺的写作者',
+    tag: '🌌 观星者手记 · 给你的星',
     content:
-      '你习惯把情绪写下来再收起来，像把雨折好放进抽屉。这卷星笺就是你的抽屉——别急着合上。那些没说完的话、没亮透的灯、没漂到对岸的纸船，只要还在，就总会有个人愿意把它们再翻开。',
+      '这 8 颗星构成的形状，在北天会停留 2100 年——直到公元 4100 年岁差把它推到隔壁的天区。你不用急着看完，也不用急着懂，就像星不用急着烧完。只要在某个子时至丑时的夜里，你抬头还能看见它，它就已经完成了自己的使命。',
   },
 }
 
@@ -2910,6 +2997,12 @@ function tagStyle(tag: string): Record<string, string> {
   color: var(--star-purple);
   box-shadow: 0 0 8px rgba(202, 167, 255, 0.12);
 }
+/* 【星空绑定】星轨图标：蓝色 */
+.ca-nr-icon-blue {
+  background: rgba(134, 168, 255, 0.12);
+  color: #86a8ff;
+  box-shadow: 0 0 8px rgba(134, 168, 255, 0.12);
+}
 .ca-nr-title-wrap { display: flex; flex-direction: column; gap: 2px; }
 .ca-nr-title {
   font-size: 0.86rem;
@@ -2945,6 +3038,44 @@ function tagStyle(tag: string): Record<string, string> {
   border-radius: 20px;
   letter-spacing: 0.04em;
 }
+/* 【星空绑定】星图总志：观测参数卡（2行3列网格） */
+.ca-nr-obs-card {
+  margin: 2px 0 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 9px 11px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+  backdrop-filter: blur(2px);
+}
+.ca-nr-obs-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.015);
+  border-radius: 4px;
+  border-left: 1.5px solid rgba(255,255,255,0.08);
+}
+.ca-nr-obs-k {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.32);
+  font-weight: 500;
+}
+.ca-nr-obs-v {
+  font-size: 0.62rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+}
+.ca-nr-obs-v-gold { color: var(--accent); opacity: 0.95; }
+.ca-nr-obs-v-purple { color: var(--star-purple); opacity: 0.95; }
 
 /* 情绪弧线步点图：四阶段竖向时间线 */
 .ca-nr-arc-steps {
@@ -3016,6 +3147,55 @@ function tagStyle(tag: string): Record<string, string> {
   border-left: 2px solid rgba(202, 167, 255, 0.35);
   border-radius: 0 8px 8px 0;
   text-align: justify;
+}
+/* 【星空绑定】星轨运行：步点头部（名称 + 地平坐标） */
+.ca-nr-step-name-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.ca-nr-step-name-row .ca-nr-step-name { margin-bottom: 0; }
+.ca-nr-step-coord {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.52rem;
+  font-family: 'Courier New', monospace;
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ca-nr-step-coord b {
+  color: var(--step-color);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.95;
+}
+/* 星轨步点dot：外环发光 */
+.ca-nr-orbit-dot {
+  box-shadow:
+    0 0 8px var(--step-color),
+    0 0 0 3px rgba(255,255,255,0.025),
+    inset 0 0 0 1.5px rgba(255,255,255,0.25);
+  animation: orbit-pulse 2.8s ease-in-out infinite;
+}
+.ca-nr-orbit-step:nth-child(1) .ca-nr-orbit-dot { animation-delay: 0s; }
+.ca-nr-orbit-step:nth-child(2) .ca-nr-orbit-dot { animation-delay: 0.7s; }
+.ca-nr-orbit-step:nth-child(3) .ca-nr-orbit-dot { animation-delay: 1.4s; }
+.ca-nr-orbit-step:nth-child(4) .ca-nr-orbit-dot { animation-delay: 2.1s; }
+@keyframes orbit-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+/* 星轨连线：虚线弧线感 */
+.ca-nr-orbit-line {
+  background:
+    linear-gradient(180deg, var(--step-color) 0%, rgba(255,255,255,0.06) 100%);
+  opacity: 0.5;
+  border-left: 1px dashed var(--step-color);
 }
 
 /* 独白卡（参考心事摘录风格，四角装饰 + 左提灯 SVG） */
@@ -3092,6 +3272,78 @@ function tagStyle(tag: string): Record<string, string> {
   letter-spacing: 0.04em;
   font-style: italic;
 }
+/* 【星空绑定】星座神话：独白卡改造 */
+.ca-narr-myth {
+  /* 整体神话卡片背景：更偏古卷纹理 */
+  background:
+    radial-gradient(ellipse at 18% 15%, rgba(255, 217, 138, 0.07), transparent 60%),
+    radial-gradient(ellipse at 82% 85%, rgba(202, 167, 255, 0.06), transparent 60%),
+    rgba(255,255,255,0.018);
+  padding-top: 26px;
+  padding-bottom: 20px;
+}
+/* 神话标签头部（星官注印章） */
+.ca-nm-myth-tag {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  z-index: 3;
+}
+.ca-nm-myth-seal {
+  /* 朱红印章风格：星官注 */
+  display: inline-block;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #fff1e6;
+  background: linear-gradient(135deg, #c8392d 0%, #8d2419 100%);
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  box-shadow:
+    inset 0 0 0 0.8px rgba(255,220,210,0.55),
+    0 2px 5px rgba(200,57,45,0.35);
+  opacity: 0.95;
+  transform: rotate(-2deg);
+}
+.ca-nm-myth-sub {
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.06em;
+  font-style: italic;
+  font-family: Georgia, 'STSong', serif;
+}
+/* 星官注释行（独白正文下方） */
+.ca-nm-myth-note {
+  margin: 2px 0 14px 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 9px;
+  background: rgba(255,217,138,0.035);
+  border-left: 1.8px solid rgba(202,167,255,0.4);
+  border-radius: 0 5px 5px 0;
+  line-height: 1.75;
+}
+.ca-nm-myth-note-k {
+  font-size: 0.6rem;
+  color: var(--star-purple);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.ca-nm-myth-note-v {
+  font-size: 0.66rem;
+  color: rgba(255,255,255,0.56);
+  font-family: Georgia, 'STSong', serif;
+  text-align: justify;
+  font-style: italic;
+}
 
 /* 寄语条（引导条风格，参考画像 section 末尾） */
 .ca-narr-postscript {
@@ -3126,6 +3378,136 @@ function tagStyle(tag: string): Record<string, string> {
   color: var(--ink-secondary);
   text-align: justify;
 }
+/* 【星空绑定】观星者手记：寄语条 → 天文观测日志风格 */
+.ca-narr-obs-log {
+  position: relative;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  background:
+    /* 像旧观测本的横纹纸 */
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 28px,
+      rgba(134,168,255,0.05) 28px,
+      rgba(134,168,255,0.05) 29px
+    ),
+    linear-gradient(100deg, rgba(134,168,255,0.06), rgba(255,217,138,0.05) 70%, transparent),
+    rgba(255,255,255,0.015);
+  border-left: 2.5px solid rgba(134,168,255,0.55);
+}
+.ca-obs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ca-obs-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #86a8ff;
+  padding: 5px 10px;
+  background: rgba(134,168,255,0.1);
+  border: 1px solid rgba(134,168,255,0.25);
+  border-radius: 6px;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 0 5px rgba(134,168,255,0.06);
+}
+.ca-obs-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.ca-obs-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+.ca-obs-meta-k {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.32);
+  text-transform: uppercase;
+}
+.ca-obs-meta-v {
+  font-size: 0.56rem;
+  font-family: Georgia, 'STSong', serif;
+  color: rgba(255,255,255,0.68);
+  font-style: italic;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+}
+/* 手记正文：稍微加大一点缩进，像手写 */
+.ca-obs-text {
+  margin: 4px 0 10px;
+  padding: 0 6px;
+  color: rgba(255,255,255,0.72);
+  font-family: Georgia, 'STSong', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+/* 手记签名落款：观字印章 + 名称日期 */
+.ca-obs-sign {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255,255,255,0.05);
+}
+.ca-obs-sign-seal {
+  /* 「观」字印章，方形朱印 */
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #c8392d 0%, #8d2419 100%);
+  color: #fff1e6;
+  font-family: 'STKaiti', 'KaiTi', Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 4px;
+  transform: rotate(-3deg);
+  box-shadow:
+    inset 0 0 0 1.2px rgba(255,220,210,0.55),
+    0 2px 6px rgba(200,57,45,0.3);
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+.ca-obs-sign-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+.ca-obs-sign-name > span:first-child {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: rgba(255,217,138,0.9);
+  letter-spacing: 0.08em;
+  font-family: Georgia, 'STSong', serif;
+}
+.ca-obs-sign-date {
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.32);
+  letter-spacing: 0.08em;
+  font-style: italic;
+}
 
 /* ═══ Foot Note ═══ */
 .ca-foot-note {
@@ -3150,20 +3532,35 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-constellation-body { grid-template-columns: 1fr; gap: 12px; }
   .ca-cs-svg { max-height: 220px; }
   .ca-cs-grid { padding: 8px 10px; }
-  /* 心事摘录：单列 */
-  .ca-q-item { grid-template-columns: 52px 1fr; gap: 10px; padding: 12px 12px; }
-  .ca-q-illus { width: 48px; height: 48px; }
+  /* 心事摘录：亮星独白 三列紧凑 */
+  .ca-q-item { grid-template-columns: 20px 42px 1fr; gap: 8px; padding: 10px 10px; }
+  .ca-q-rank { width: 18px; height: 18px; font-size: 0.62rem; margin-top: 1px; }
+  .ca-q-illus { width: 42px; height: 42px; }
+  .ca-q-star-head { flex-wrap: wrap; gap: 4px; }
+  .ca-q-star-astro { justify-content: flex-start; flex: 1 1 100%; order: 2; }
   .ca-q-meta { flex-wrap: wrap; gap: 6px; }
   .ca-q-spacer { display: none; }
-  /* AI 总叙：独白卡单列、寄语条竖排 */
-  .ca-narr-monologue { grid-template-columns: 56px 1fr; padding: 14px 14px; gap: 8px; }
+  /* 【星空绑定】星图总志：观测卡 2列 */
+  .ca-nr-obs-card { grid-template-columns: repeat(2, 1fr); padding: 7px 8px; gap: 5px; }
+  /* AI 总叙（观星手记）：独白卡单列 + 神话标签紧凑 */
+  .ca-narr-monologue { grid-template-columns: 56px 1fr; padding: 22px 12px 14px; gap: 8px; }
+  .ca-narr-myth { padding-top: 30px; }
+  .ca-nm-myth-tag { flex-direction: column; gap: 3px; }
+  .ca-nm-myth-sub { text-align: center; }
+  .ca-nm-myth-note { margin-left: 18px; padding: 5px 7px; }
   .ca-nm-illus { width: 52px; height: 52px; }
   .ca-nm-mark { font-size: 1.7rem; }
   .ca-nm-text { margin-left: 18px; font-size: 0.78rem; }
   .ca-nm-meta { padding-left: 18px; flex-wrap: wrap; }
   .ca-nm-spacer { display: none; }
-  .ca-narr-postscript { flex-direction: column; gap: 8px; padding: 12px 12px; }
-  /* 情绪步点线修正 */
+  /* 星轨运行：步点头部换行（名称+坐标） */
+  .ca-nr-step-name-row { flex-wrap: wrap; }
+  .ca-nr-step-coord { order: 2; flex: 1 1 100%; }
   .ca-nr-step-line { left: 10px; }
+  /* 观星者手记：竖排紧凑 */
+  .ca-narr-postscript { flex-direction: column; gap: 8px; padding: 12px 12px; }
+  .ca-obs-header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .ca-obs-meta { justify-content: flex-start; }
+  .ca-obs-sign { flex-wrap: wrap; }
 }
 </style>
