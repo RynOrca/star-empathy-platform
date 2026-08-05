@@ -10,27 +10,25 @@
       <span class="ca-hero-badge">DESIGN PREVIEW</span>
     </div>
 
-    <!-- ═══ 0.5. Hero：合集星图总览（对齐 StarDetail AIPersonaCard panel-wrapper 规范）
-                    左 = 星点散点（心事=星：x=时间轴, y=情绪, 大小=共鸣, 颜色=真实情感色）
-                    右 = 真实合集统计数据（非假数据） ═══ -->
+    <!-- ═══ 0.5. Hero：合集星图总览 + 星辰归属置顶（对齐 StarDetail AIPersonaCard 规范）
+                    左 = 星点散点图（放大：心事=星 x=时间 y=情绪 r=共鸣 color=情感色）
+                    右 = 上·星辰归属地平星图 + 下·星星统计信息（光谱/星等/星座/地平，从 props 真实派生） ═══ -->
     <section class="panel-wrapper ca-hero-panel">
       <div class="panel-head">
         <Sparkles :size="10" class="pw-icon pw-purple" />
-        <span class="pw-title">合集星图</span>
-        <span class="pw-count">{{ storyCount }} 则心事 · 聚合生成 · 刚刚更新</span>
+        <span class="pw-title">合集星图 · 星辰归属</span>
+        <span class="pw-count">{{ storyCount }} 则心事 · {{ starBelongings.length }} 颗星 · 刚刚更新</span>
       </div>
 
-      <div class="ca-hero-body">
-        <!-- 左：星点散点图（天文感，保留星点=心事的映射） -->
-        <div class="ca-h-starfield">
-          <svg viewBox="0 0 360 220" class="ca-h-svg" preserveAspectRatio="xMidYMid meet">
+      <div class="ca-hero-body ca-hero-body-big">
+        <!-- 左：星点散点图（放大，viewBox 420×280） -->
+        <div class="ca-h-starfield ca-h-starfield-big">
+          <svg viewBox="0 0 420 280" class="ca-h-svg ca-h-svg-big" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <!-- 深空背景渐变（冷） -->
               <radialGradient id="hSkyBg" cx="50%" cy="40%" r="80%">
                 <stop offset="0%" stop-color="#111438" />
                 <stop offset="100%" stop-color="#0a0b1f" />
               </radialGradient>
-              <!-- 星点发光 -->
               <radialGradient id="hGlowGold" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stop-color="rgba(255,217,138,0.85)" />
                 <stop offset="100%" stop-color="rgba(255,217,138,0)" />
@@ -44,87 +42,226 @@
                 <stop offset="100%" stop-color="rgba(202,167,255,0)" />
               </radialGradient>
               <radialGradient id="hGlowGreen" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(149,240,192,0.85)" />
-                <stop offset="100%" stop-color="rgba(149,240,192,0)" />
+                <stop offset="0%" stop-color="rgba(154,230,180,0.85)" />
+                <stop offset="100%" stop-color="rgba(154,230,180,0)" />
               </radialGradient>
             </defs>
 
-            <!-- 背景 -->
-            <rect width="360" height="220" fill="url(#hSkyBg)" rx="6" />
-            <!-- 银河淡带（左下→右上，薄） -->
-            <ellipse cx="180" cy="110" rx="165" ry="48" fill="rgba(202,167,255,0.05)" transform="rotate(-16 180 110)" />
+            <!-- 背景 + 银河斜带（放大版） -->
+            <rect width="420" height="280" fill="url(#hSkyBg)" rx="6" />
+            <ellipse cx="210" cy="140" rx="195" ry="60" fill="rgba(202,167,255,0.055)" transform="rotate(-16 210 140)" />
+            <ellipse cx="210" cy="145" rx="160" ry="36" fill="rgba(134,168,255,0.035)" transform="rotate(-16 210 145)" />
 
-            <!-- 坐标参考：x 轴时间（左20:00 → 右06:00），y 轴情绪（上=正/激动, 下=负/低落） -->
-            <!-- 背景星点 60 颗 -->
+            <!-- 背景星点 80 颗 -->
             <g opacity="0.92">
-              <circle v-for="(s, i) in deepSkyStars.slice(0, 60)" :key="'dss'+i"
-                :cx="(s.x / 320) * 360"
-                :cy="(s.y / 200) * 200"
-                :r="s.r * 0.82"
+              <circle v-for="(s, i) in deepSkyStars.slice(0, 80)" :key="'dss'+i"
+                :cx="(s.x / 320) * 420"
+                :cy="(s.y / 200) * 260 + 10"
+                :r="s.r * 0.92"
                 fill="#ffffff"
-                :opacity="s.opacity * 0.75" />
+                :opacity="s.opacity * 0.78" />
             </g>
 
-            <!-- 星点=心事（8 颗，x=时间 y=情绪 r=共鸣 color=情感色 glowId=对应渐变） -->
+            <!-- 星点=心事（8 颗，坐标按 420×280 重新缩放：x 1.17倍，y 1.27倍 + 偏移） -->
             <g v-for="(p, i) in heroStars" :key="'hs'+i">
-              <!-- 光晕 -->
-              <circle :cx="p.x" :cy="p.y" :r="p.r * 2.6" :fill="'url(#hGlow' + p.gid + ')'" opacity="0.82">
-                <animate attributeName="r" :values="(p.r*2.4)+';'+(p.r*2.9+0.5)+';'+(p.r*2.4)"
+              <circle :cx="Math.round(p.x * 420 / 360)" :cy="Math.round(p.y * 280 / 220)" :r="p.r * 1.1"
+                :fill="'url(#hGlow' + p.gid + ')'" opacity="0.82">
+                <animate attributeName="r" :values="((p.r*2.4*1.1))+';'+((p.r*2.9+0.8)*1.1)+';'+((p.r*2.4*1.1))"
                   :dur="(3.1 + i*0.32) + 's'" repeatCount="indefinite" />
               </circle>
-              <!-- 核心星点 -->
-              <circle :cx="p.x" :cy="p.y" :r="p.r" :fill="p.fill" opacity="0.98" />
-              <!-- Top 3 标签（星名/时间，等宽字体） -->
-              <text v-if="p.label" :x="p.x + p.r + 5" :y="p.y + 2"
-                font-size="6.2" fill="rgba(240,240,255,0.60)"
+              <circle :cx="Math.round(p.x * 420 / 360)" :cy="Math.round(p.y * 280 / 220)" :r="p.r * 1.1"
+                :fill="p.fill" opacity="0.98" />
+              <text v-if="p.label" :x="Math.round(p.x * 420 / 360) + p.r * 1.1 + 6"
+                :y="Math.round(p.y * 280 / 220) + 3"
+                font-size="7.8" fill="rgba(240,240,255,0.62)"
                 font-family="'SF Mono', 'JetBrains Mono', 'Menlo', monospace">
                 {{ p.label }}
               </text>
             </g>
 
-            <!-- X 轴刻度（20:00 — 06:00，4 个标），Y 轴情绪简标（正/平/负） -->
-            <g fill="rgba(220,220,240,0.35)" font-family="SF Mono, Menlo, monospace" font-size="6.5">
-              <text x="8"   y="212">20:00</text>
-              <text x="120" y="212">00:00</text>
-              <text x="230" y="212">04:00</text>
-              <text x="322" y="212">06:00</text>
-              <text x="4" y="16"    opacity="0.55">+ 情绪</text>
-              <text x="4" y="200"   opacity="0.55">− 情绪</text>
+            <!-- 坐标轴（20:00 → 06:00；情绪 +/−） -->
+            <g fill="rgba(220,220,240,0.38)" font-family="SF Mono, Menlo, monospace" font-size="8">
+              <text x="10"  y="270">20:00</text>
+              <text x="140" y="270">00:00</text>
+              <text x="268" y="270">04:00</text>
+              <text x="375" y="270">06:00</text>
+              <text x="6" y="18"   opacity="0.6">+ 情绪</text>
+              <text x="6" y="258"  opacity="0.6">− 情绪</text>
+              <text x="10" y="145"  opacity="0.28" font-size="7">情绪轴</text>
+              <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">时间轴 · 投递时刻</text>
             </g>
+
+            <!-- 星群轮廓线（按时间顺序连接 8 颗星 → 迷你星座连线！） -->
+            <polyline
+              :points="heroStars.map(p => `${Math.round(p.x*420/360)},${Math.round(p.y*280/220)}`).join(' ')"
+              fill="none" stroke="rgba(255,217,138,0.25)" stroke-width="0.8"
+              stroke-dasharray="2 3" stroke-linecap="round"
+              style="filter: drop-shadow(0 0 2px rgba(255,217,138,0.2))" />
           </svg>
-          <!-- 星图图例 -->
-          <div class="ca-h-legend">
+          <div class="ca-h-legend ca-h-legend-big">
             <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
             <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
             <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
+            <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
+            <span class="ca-h-legend-note">· 连线=心事投递的时间轨迹</span>
           </div>
         </div>
 
-        <!-- 右：真实合集数据（6 个指标，全部可以从 props.stories 提取，绝不瞎编） -->
-        <div class="ca-h-stats">
-          <div
-            v-for="s in heroStats"
-            :key="s.k"
-            class="ca-h-stat"
-          >
-            <div class="ca-hs-k">{{ s.k }}</div>
-            <div class="ca-hs-v" :style="{ color: s.color || 'inherit' }">{{ s.v }}</div>
-            <div v-if="s.sub" class="ca-hs-sub">{{ s.sub }}</div>
+        <!-- 右：上·星辰归属地平星图 + 下·星星统计信息 -->
+        <div class="ca-h-right">
+          <!-- 上：星辰归属星图（置顶） -->
+          <div class="ca-h-belong">
+            <div class="ca-h-belong-head">
+              <component :is="Orbit" :size="10" class="pw-icon pw-blue" />
+              <span class="ca-h-bh-title">星辰归属</span>
+              <span class="ca-h-bh-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
+            </div>
+            <div class="ca-starmap-wrap ca-h-starmap-wrap">
+              <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`"
+                class="ca-starmap-svg" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient :id="'skyGrad'" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(10,10,30,0.15)" />
+                    <stop offset="100%" stop-color="rgba(10,10,30,0)" />
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="0" :width="MAP_W" :height="HORIZON_Y" fill="url(#skyGrad)" />
+                <circle v-for="(bg, i) in bgStars" :key="'bg'+i" :cx="bg.x" :cy="bg.y" :r="bg.r"
+                  fill="#fff" :opacity="bg.opacity" />
+                <line :x1="0" :y1="HORIZON_Y" :x2="MAP_W" :y2="HORIZON_Y"
+                  stroke="rgba(134,168,255,0.25)" stroke-width="0.5" stroke-dasharray="4 3" />
+                <rect x="0" :y="HORIZON_Y" :width="MAP_W" :height="MAP_H - HORIZON_Y" fill="rgba(0,0,0,0.25)" />
+                <text x="14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
+                <text :x="MAP_W * 0.25 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">E</text>
+                <text :x="MAP_W * 0.5 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">S</text>
+                <text :x="MAP_W * 0.75 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">W</text>
+                <text :x="MAP_W - 14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
+                <text :x="MAP_W / 2" y="8" text-anchor="middle" class="ca-sm-compass" fill="rgba(255,255,255,0.15)">天顶</text>
+                <line v-for="(l, i) in starMapData.lines" :key="'l'+i"
+                  :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+                  :stroke="l.color" stroke-width="0.4" opacity="0.18" stroke-dasharray="2 2" />
+                <g v-for="s in starMapData.stars" :key="s.id"
+                  class="ca-sm-star"
+                  :class="{
+                    active: hoveredStarId === s.id,
+                    dimmed: hoveredStarId !== null && hoveredStarId !== s.id,
+                    below: !s.aboveHorizon,
+                  }"
+                  @mouseenter="hoveredStarId = s.id"
+                  @mouseleave="hoveredStarId = null">
+                  <circle :cx="s.x" :cy="s.y" :r="s.radius * 3" :fill="s.color" opacity="0.06" />
+                  <circle :cx="s.x" :cy="s.y" :r="s.radius * 1.8" :fill="s.color" opacity="0.14" />
+                  <circle :cx="s.x" :cy="s.y" :r="s.radius" :fill="s.color" opacity="0.9">
+                    <animate attributeName="opacity" :values="`0.7;1;0.7`" :dur="3 + (s.id % 3) + 's'"
+                      repeatCount="indefinite" />
+                  </circle>
+                  <circle :cx="s.x" :cy="s.y" :r="s.radius * 0.35" fill="#fff" opacity="0.85" />
+                  <template v-if="s.showLabel && hoveredStarId === null">
+                    <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label" :fill="s.color">{{ s.name }}</text>
+                    <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count">{{ s.count }}篇</text>
+                  </template>
+                  <template v-if="hoveredStarId === s.id">
+                    <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label ca-sm-label-hover" :fill="s.color">{{ s.name }}</text>
+                    <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count ca-sm-count-hover">
+                      {{ s.count }}篇 · {{ s.aboveHorizon ? '地平线上' : '地平线下' }} · alt {{ Math.round(s.alt) }}°
+                    </text>
+                  </template>
+                </g>
+              </svg>
+              <div v-else class="ca-stars-empty">故事尚未挂上星辰</div>
+              <div v-if="starBelongings.length > 0" class="ca-sm-legend">
+                <span class="ca-sm-legend-item"><i class="ca-sm-dot"></i>大小=故事数</span>
+                <span class="ca-sm-legend-item"><i class="ca-sm-dash"></i>星座连线</span>
+                <span v-if="starMapData.belowHorizon > 0" class="ca-sm-legend-item ca-sm-below">
+                  {{ starMapData.aboveHorizon }}↑ / {{ starMapData.belowHorizon }}↓
+                </span>
+              </div>
+            </div>
           </div>
 
-          <!-- 关键词 Top 3（直接用旧数组前3个） -->
-          <div class="ca-h-tags">
-            <div class="ca-hs-k" style="margin-bottom:6px">高频关键词</div>
-            <div class="ca-h-tagrow">
-              <span
-                v-for="(t, i) in (skyImages || []).slice(0, 3)"
-                :key="'ht'+i"
-                class="ca-h-tag"
-                :style="{
-                  background: ['rgba(255,217,138,0.10)','rgba(202,167,255,0.10)','rgba(134,168,255,0.10)'][i],
-                  color: ['#ffd98a','#caa7ff','#86a8ff'][i],
-                }"
-              >#{{ t }}</span>
+          <!-- 下：星星统计信息（从 starBelongings 真实派生：星等品质/光谱色分布/星座Top/地平比例/每星平均） -->
+          <div class="ca-h-starstats">
+            <div class="ca-h-stats-head">
+              <Sparkles :size="9" class="pw-icon pw-gold" />
+              <span class="ca-h-bh-title">这组星的品质</span>
+            </div>
+
+            <!-- 四小顶栏指标：每星故事数 / 平均星等 / 地平比例 / 最亮星  -->
+            <div class="ca-h-ss-quad">
+              <div class="ca-h-ss-q">
+                <div class="ca-hs-k">每星心事</div>
+                <div class="ca-hs-v" style="color:#ffd98a">{{ starStatistics.avg || '—' }}</div>
+                <div class="ca-hs-sub">篇 / 星</div>
+              </div>
+              <div class="ca-h-ss-q">
+                <div class="ca-hs-k">平均星等</div>
+                <div class="ca-hs-v" style="color:#caa7ff">m{{ starStatistics.avgMag }}</div>
+                <div class="ca-hs-sub">越小越亮</div>
+              </div>
+              <div class="ca-h-ss-q">
+                <div class="ca-hs-k">地平线</div>
+                <div class="ca-hs-v" style="color:#86a8ff">{{ starStatistics.horizonPct }}%</div>
+                <div class="ca-hs-sub">{{ starStatistics.sm.aboveHorizon }}↑/{{ starStatistics.sm.belowHorizon }}↓</div>
+              </div>
+              <div class="ca-h-ss-q">
+                <div class="ca-hs-k">最亮星</div>
+                <div class="ca-hs-v" :style="{color: starStatistics.brightest?.color ?? '#ffd98a'}">
+                  m{{ starStatistics.brightest?.mag ?? '—' }}
+                </div>
+                <div class="ca-hs-sub">{{ starStatistics.brightest?.name ?? '—' }}</div>
+              </div>
+            </div>
+
+            <!-- 光谱色分布（条形图，横向：颜色→光谱型标签） -->
+            <div class="ca-h-ss-section">
+              <div class="ca-hs-k ca-h-ss-sec-k">光谱色分布 · SPECTRAL COLOR</div>
+              <div v-if="starStatistics.spectral.length > 0" class="ca-h-ss-bars">
+                <div v-for="s in starStatistics.spectral.slice(0, 4)" :key="s.spec" class="ca-h-ss-bar">
+                  <div class="ca-h-ss-bar-labels">
+                    <span class="ca-h-ss-bar-color" :style="{ background: s.color, boxShadow: `0 0 4px ${s.color}` }"></span>
+                    <span class="ca-h-ss-bar-spec">{{ s.spec }}</span>
+                    <span class="ca-h-ss-bar-cn">{{ s.cn }}</span>
+                    <span class="ca-h-ss-bar-pct" :style="{ color: s.color }">{{ s.pct }}%</span>
+                  </div>
+                  <div class="ca-h-ss-bar-track">
+                    <div class="ca-h-ss-bar-fill" :style="{ width: s.pct + '%', background: s.color }"></div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="ca-h-ss-empty">尚无归属恒星数据</div>
+            </div>
+
+            <!-- 星座 Top3 + 星星性格小标签（暖色/冷色/明亮/稀疏等品质） -->
+            <div class="ca-h-ss-section ca-h-ss-bottom">
+              <div class="ca-hs-k ca-h-ss-sec-k">星座 / 星群气质</div>
+              <div class="ca-h-ss-cons">
+                <template v-if="starStatistics.topCons.length > 0">
+                  <span v-for="(c, i) in starStatistics.topCons" :key="c.con" class="ca-h-ss-con">
+                    <i class="ca-h-ss-con-rank"
+                      :style="{ background: ['#ffd98a','#caa7ff','#86a8ff'][i] }">{{ i+1 }}</i>
+                    <span class="ca-h-ss-con-name">{{ c.con }}</span>
+                    <span class="ca-h-ss-con-pct">{{ c.pct }}%</span>
+                  </span>
+                </template>
+                <span v-else class="ca-h-ss-empty">—</span>
+              </div>
+              <!-- 星群品质标签（从 stats 推断：亮星占比→明亮；暖色多→柔软；蓝绿多→平静；平均星等小→密集） -->
+              <div class="ca-h-ss-tags">
+                <template v-if="starStatistics.brightest">
+                  <span class="ca-h-ss-tag ca-h-ss-tag-gold">
+                    最亮·{{ starStatistics.brightest.name }}
+                  </span>
+                </template>
+                <template v-if="starStatistics.dimmest">
+                  <span class="ca-h-ss-tag ca-h-ss-tag-blue">
+                    最暗·{{ starStatistics.dimmest.name }} m{{ starStatistics.dimmest.mag }}
+                  </span>
+                </template>
+                <span v-if="starStatistics.avgMag < 3.5" class="ca-h-ss-tag ca-h-ss-tag-gold2">整体明亮</span>
+                <span v-else class="ca-h-ss-tag ca-h-ss-tag-purple">整体清疏</span>
+                <span v-if="starStatistics.horizonPct >= 60" class="ca-h-ss-tag ca-h-ss-tag-green">多在地平线上·可见</span>
+                <span v-else class="ca-h-ss-tag ca-h-ss-tag-dim">藏于地平线下·私密</span>
+              </div>
             </div>
           </div>
         </div>
@@ -275,61 +412,6 @@
             <span class="ca-s-text">{{ persona.suggestIntro }}</span>
           </div>
 
-          <!-- 维度条：星座五曜 → 夜的五大「气象属性」（夜温/风向/见月/云量/体感）
-               保留原来的左右对极条风格，但把行星图标换成夜的气象小符号：温度计/风/月/云/体感 -->
-          <div class="ca-dims-card ca-dims-night">
-            <div class="ca-dims-title">
-              <component :is="Wind" :size="9" />
-              <span>那一夜的五大气象</span>
-              <span class="ca-dims-sub">时 · 温 · 风 · 月 · 云 — 组成你的夜</span>
-            </div>
-            <div class="ca-dims ca-dims-five ca-dims-night-five">
-              <div v-for="(d, i) in persona.dimensions" :key="d.left + d.right" class="ca-dim ca-dim-five ca-dim-night-item">
-                <!-- 左侧不再是行星，而是夜的气象符号（温度计/风/月/云/体感） -->
-                <div class="ca-dim-planet ca-dim-night-icon" :style="{ '--pc': fiveMeteo[i].color }">
-                  <!-- 5 个不同小图标：第0=温度计 第1=风叶 第2=月眉 第3=云 第4=体感（心） -->
-                  <svg v-if="i === 0" viewBox="0 0 14 14" width="14" height="14">
-                    <path d="M6 2 a1 1 0 0 1 2 0 v6.2 a2.5 2.5 0 1 1 -2 0 z" fill="#86a8ff" opacity="0.92" />
-                  </svg>
-                  <svg v-else-if="i === 1" viewBox="0 0 14 14" width="14" height="14">
-                    <path d="M7 7 L 7 1.5"   stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
-                    <path d="M7 7 L 12 9.5"  stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
-                    <path d="M7 7 L 2.2 10.8" stroke="#caa7ff" stroke-width="1.2" stroke-linecap="round" />
-                    <circle cx="7" cy="7" r="1.4" fill="#caa7ff" opacity="0.95" />
-                  </svg>
-                  <svg v-else-if="i === 2" viewBox="0 0 14 14" width="14" height="14">
-                    <circle cx="7" cy="7" r="4.8" fill="#ffd98a" opacity="0.95" />
-                    <circle cx="9" cy="5.8" r="4.4" fill="#14153a" />
-                  </svg>
-                  <svg v-else-if="i === 3" viewBox="0 0 14 14" width="14" height="14">
-                    <path d="M3 9 a2.5 2.5 0 0 1 0.2 -4.8 a3.5 3.5 0 0 1 6.8 0 a2.5 2.5 0 0 1 0.4 5 z"
-                      fill="#95f0c0" opacity="0.92" />
-                  </svg>
-                  <svg v-else viewBox="0 0 14 14" width="14" height="14">
-                    <path d="M7 12 C 3.5 9 2 6.5 2 4.5 A3 3 0 0 1 7 3 A3 3 0 0 1 12 4.5 C 12 6.5 10.5 9 7 12 z"
-                      fill="#ff8b7d" opacity="0.92" />
-                  </svg>
-                </div>
-                <div class="ca-dim-main">
-                  <div class="ca-dim-labels ca-dim-labels-five">
-                    <div class="ca-dim-ln">
-                      <span class="ca-dim-planet-name" :style="{ color: fiveMeteo[i].color }">{{ fiveMeteo[i].k }}</span>
-                      <span class="ca-dim-planet-en" :style="{ color: fiveMeteo[i].color }">{{ fiveMeteo[i].en }}</span>
-                      <span :class="{ active: d.side === 'left' }">{{ d.left }}</span>
-                    </div>
-                    <div class="ca-dim-rn">
-                      <span :class="{ active: d.side === 'right' }">{{ d.right }}</span>
-                      <span class="ca-dim-pct">{{ d.percent }}%</span>
-                    </div>
-                  </div>
-                  <div class="ca-dim-track ca-dim-track-five" :style="{ '--ptc': fiveMeteo[i].color }">
-                    <div class="ca-dim-fill" :style="{ width: d.percent + '%', background: fiveMeteo[i].color }"></div>
-                    <div class="ca-dim-knob" :style="{ left: d.percent + '%', background: fiveMeteo[i].color, boxShadow: `0 0 6px ${fiveMeteo[i].color}` }"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -337,10 +419,10 @@
     <!-- 简约分隔符：与 StarDetail panel-head 分割线一致 -->
     <div class="ca-divider"></div>
 
-    <!-- ═══ 2. 夜色流转（=原情感光谱，天空本色重构：左=横向天色渐变带+5颗时辰光球；右=星辰归属保留） + 3. 星辰归属 双栏═══ -->
-    <div class="ca-duo">
+    <!-- ═══ 2. 夜色流转（=原情感光谱，单栏全宽：横向天色渐变带+5颗时辰光球） ═══ -->
+    <div class="ca-single">
       <!-- 夜色流转（横向天色渐变带：入夜→子夜→黎明；5颗光球按时辰散落+时辰标签；洞察卡=夜刻叙述；主调→夜色主调） -->
-      <section class="ca-card ca-emotion ca-night-flow">
+      <section class="ca-card ca-emotion ca-night-flow ca-night-flow-wide">
         <div class="ca-card-head">
           <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
           <span class="ca-ch-title">夜色流转</span>
@@ -436,104 +518,6 @@
               {{ emotionNarrative.flow }}
             </p>
           </div>
-        </div>
-      </section>
-
-      <!-- 星辰归属（真实地平坐标星图：alt/az + 地平线 + hover 高亮）—— 保留在双栏右栏 -->
-      <section class="ca-card ca-stars">
-        <div class="ca-card-head">
-          <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
-          <span class="ca-ch-title">星辰归属</span>
-          <span class="ca-ch-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
-        </div>
-        <div class="ca-starmap-wrap">
-          <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`" class="ca-starmap-svg" preserveAspectRatio="xMidYMid meet">
-            <!-- 天空背景渐变 -->
-            <defs>
-              <linearGradient :id="'skyGrad'" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(10,10,30,0.15)" />
-                <stop offset="100%" stop-color="rgba(10,10,30,0)" />
-              </linearGradient>
-            </defs>
-            <rect x="0" y="0" :width="MAP_W" :height="HORIZON_Y" fill="url(#skyGrad)" />
-
-            <!-- 背景星点（仅天空区域） -->
-            <circle v-for="(bg, i) in bgStars" :key="'bg'+i" :cx="bg.x" :cy="bg.y" :r="bg.r" fill="#fff" :opacity="bg.opacity" />
-
-            <!-- 地平线 -->
-            <line :x1="0" :y1="HORIZON_Y" :x2="MAP_W" :y2="HORIZON_Y" stroke="rgba(134,168,255,0.25)" stroke-width="0.5" stroke-dasharray="4 3" />
-            <!-- 地平线下方暗色遮罩 -->
-            <rect x="0" :y="HORIZON_Y" :width="MAP_W" :height="MAP_H - HORIZON_Y" fill="rgba(0,0,0,0.25)" />
-
-            <!-- 罗盘方位标 -->
-            <text x="14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
-            <text :x="MAP_W * 0.25 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">E</text>
-            <text :x="MAP_W * 0.5 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">S</text>
-            <text :x="MAP_W * 0.75 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">W</text>
-            <text :x="MAP_W - 14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
-            <!-- 天顶标 -->
-            <text :x="MAP_W / 2" y="8" text-anchor="middle" class="ca-sm-compass" fill="rgba(255,255,255,0.15)">天顶</text>
-
-            <!-- 星座连线（仅地平线上） -->
-            <line
-              v-for="(l, i) in starMapData.lines"
-              :key="'l'+i"
-              :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
-              :stroke="l.color" stroke-width="0.4" opacity="0.18" stroke-dasharray="2 2"
-            />
-
-            <!-- 主星：hover 高亮 + 防遮挡标签 -->
-            <g
-              v-for="s in starMapData.stars"
-              :key="s.id"
-              class="ca-sm-star"
-              :class="{
-                active: hoveredStarId === s.id,
-                dimmed: hoveredStarId !== null && hoveredStarId !== s.id,
-                below: !s.aboveHorizon,
-              }"
-              @mouseenter="hoveredStarId = s.id"
-              @mouseleave="hoveredStarId = null"
-            >
-              <!-- 外发光晕 -->
-              <circle :cx="s.x" :cy="s.y" :r="s.radius * 3" :fill="s.color" opacity="0.06" />
-              <circle :cx="s.x" :cy="s.y" :r="s.radius * 1.8" :fill="s.color" opacity="0.14" />
-              <!-- 主体 -->
-              <circle :cx="s.x" :cy="s.y" :r="s.radius" :fill="s.color" opacity="0.9">
-                <animate attributeName="opacity" :values="`0.7;1;0.7`" :dur="3 + (s.id % 3) + 's'" repeatCount="indefinite" />
-              </circle>
-              <!-- 高光核心 -->
-              <circle :cx="s.x" :cy="s.y" :r="s.radius * 0.35" fill="#fff" opacity="0.85" />
-
-              <!-- 默认标签：仅 top 3 星显示，交替上下避免遮挡 -->
-              <template v-if="s.showLabel && hoveredStarId === null">
-                <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label" :fill="s.color">{{ s.name }}</text>
-                <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count">{{ s.count }}篇</text>
-              </template>
-
-              <!-- hover 时：显示完整信息浮窗 -->
-              <template v-if="hoveredStarId === s.id">
-                <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label ca-sm-label-hover" :fill="s.color">{{ s.name }}</text>
-                <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count ca-sm-count-hover">{{ s.count }}篇 · {{ s.aboveHorizon ? '地平线上' : '地平线下' }} · alt {{ Math.round(s.alt) }}°</text>
-              </template>
-            </g>
-          </svg>
-          <div v-else class="ca-stars-empty">
-            故事尚未挂上星辰
-          </div>
-          <!-- 图例 + 地平线统计 -->
-          <div v-if="starBelongings.length > 0" class="ca-sm-legend">
-            <span class="ca-sm-legend-item"><i class="ca-sm-dot"></i>大小=故事数</span>
-            <span class="ca-sm-legend-item"><i class="ca-sm-dash"></i>星座连线</span>
-            <span v-if="starMapData.belowHorizon > 0" class="ca-sm-legend-item ca-sm-below">{{ starMapData.aboveHorizon }}↑ / {{ starMapData.belowHorizon }}↓</span>
-          </div>
-        </div>
-        <div class="ca-stars-insight">
-          <component :is="Orbit" :size="10" class="ca-stars-flow-icon" />
-          <span v-if="starBelongings.length > 0">
-            心事散落于 {{ starBelongings.length }} 颗星，最密处在「{{ starBelongings[0].name }}」
-          </span>
-          <span v-else>等待第一则心事找到它的星辰</span>
         </div>
       </section>
     </div>
@@ -1402,6 +1386,54 @@ const heroStats = [
   { k: '情绪倾向', v: '柔软思念', sub: '暖色占比 58%', color: '#ffb48a' },
   { k: '最多时段', v: '01:00 ~ 02:00', sub: '占比 37.5%', color: '#9ae6b4' },
 ]
+
+/** 星星统计：光谱色分布 / 星等品质 / 星座Top / 地平等全部从 starBelongings 真实派生 */
+const colorToSpectral: Record<string, { label:string; cn:string }> = {
+  '#ffd98a': { label: 'G2V',  cn: '黄·主序星（太阳型）' },
+  '#ffb48a': { label: 'K5V',  cn: '橙·冷主序' },
+  '#caa7ff': { label: 'B8III',cn: '蓝紫·巨星' },
+  '#86a8ff': { label: 'A0V',  cn: '蓝白·主序' },
+  '#9ae6b4': { label: 'F5V',  cn: '蓝绿·主序' },
+  '#95f0c0': { label: 'F2III',cn: '青绿·巨星' },
+  '#ff8b7d': { label: 'M2III',cn: '红·红巨星' },
+}
+const starStatistics = computed(() => {
+  const stars = starBelongings.value
+  const total = starBelongTotal.value
+  const avg = stars.length > 0 ? Math.round((total / stars.length) * 10) / 10 : 0
+
+  // 光谱色分布：按 color 分组
+  const byColor = new Map<string, number>()
+  for (const s of stars) byColor.set(s.color, (byColor.get(s.color) ?? 0) + s.count)
+  const spectral = Array.from(byColor.entries())
+    .map(([c, n]) => ({ color: c, n, pct: total > 0 ? Math.round(n / total * 100) : 0,
+      spec: colorToSpectral[c]?.label ?? 'G5V', cn: colorToSpectral[c]?.cn ?? '黄矮星' }))
+    .sort((a, b) => b.n - a.n)
+
+  // 星座 Top3
+  const byCon = new Map<string, number>()
+  for (const s of stars) {
+    if (!s.con) continue
+    byCon.set(s.con, (byCon.get(s.con) ?? 0) + s.count)
+  }
+  const topCons = Array.from(byCon.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([con, n]) => ({ con, n, pct: total > 0 ? Math.round(n / total * 100) : 0 }))
+
+  // 地平线上比例 + 最亮星
+  const sm = starMapData.value
+  const horizonPct = stars.length > 0 ? Math.round(sm.aboveHorizon / stars.length * 100) : 0
+  // 故事星等：故事数 n → 星等 m = 5 − 3·log₂(1+n)，范围约 2.0 ~ 5.0，越小越亮
+  const toMag = (n: number) => Math.max(1.5, Math.round((5 - 3 * Math.log2(1 + n)) * 10) / 10)
+  const brightest = stars.length > 0 ? { ...stars[0], mag: toMag(stars[0].count) } : null
+  const dimmest = stars.length > 1 ? { ...stars[stars.length - 1], mag: toMag(stars[stars.length - 1].count) } : null
+  const avgMag = stars.length > 0
+    ? Math.round(stars.reduce((s, x) => s + toMag(x.count), 0) / stars.length * 10) / 10
+    : 4.0
+
+  return { avg, spectral, topCons, horizonPct, sm, brightest, dimmest, avgMag }
+})
 
 /* ═══════════════════════════════════════════════════════════
    【旧数据兼容】下方画像/天官书 section 仍在使用 nightSky / skyFlecks
@@ -2719,9 +2751,18 @@ function tagStyle(tag: string): Record<string, string> {
 /* 光球：相对渐变带绝对定位 */
 .ca-nt-orb {
   position: absolute;
+  display: flex;            /* 覆盖 ca-emo-orb，明确 flex 使 label/val 居中 */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   margin: 0 !important;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);   /* 这个绝对定位居中不能被 orbFloat 动画覆盖 */
+  animation: none !important;         /* 禁用 orbFloat，否则 translateY 会破坏 left/top 锚点 */
   z-index: 1;
+}
+/* hover 时锚点不变，只额外加 scale */
+.ca-nt-orb:hover {
+  transform: translate(-50%, -50%) scale(1.12) !important;
 }
 /* 时辰小标签（替代光谱型 badge）：右上角贴带 */
 .ca-nt-hour-tag {
@@ -4314,12 +4355,18 @@ function tagStyle(tag: string): Record<string, string> {
   gap: 18px;
   align-items: stretch;
 }
-/* 左：星点散点图容器 */
+/* 放大版：左星图(1.05) + 右栏星图+品质(0.95) */
+.ca-hero-body-big {
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 16px;
+}
+/* 左：星点散点图容器（放大版 min-height 加高） */
 .ca-h-starfield {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+.ca-h-starfield-big { min-height: 0; }
 .ca-h-svg {
   width: 100%;
   height: auto;
@@ -4327,6 +4374,10 @@ function tagStyle(tag: string): Record<string, string> {
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.04);
   background: #0a0b1f;
+}
+.ca-h-svg-big {
+  /* 放大版：让散点图视觉占比更大 */
+  min-height: 280px;
 }
 /* 图例 */
 .ca-h-legend {
@@ -4336,6 +4387,12 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 0 2px;
   color: rgba(220,220,240,0.45);
   font-size: 0.66rem;
+}
+.ca-h-legend-big { font-size: 0.68rem; gap: 10px 14px; }
+.ca-h-legend-note {
+  margin-left: auto;
+  color: rgba(220,220,240,0.28);
+  letter-spacing: 0.03em;
 }
 .ca-h-legend span {
   display: inline-flex;
@@ -4350,62 +4407,243 @@ function tagStyle(tag: string): Record<string, string> {
   box-shadow: 0 0 4px currentColor;
 }
 
-/* 右：合集数据统计 + Top 关键词 */
-.ca-h-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* 右栏：上·星辰归属 + 下·星星品质（双列上下堆叠） */
+.ca-h-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* 上：星辰归属（小星图卡片） */
+.ca-h-belong {
+  background: rgba(255,255,255,0.018);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 9px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-content: start;
 }
-.ca-h-stat {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid rgba(255,255,255,0.04);
+.ca-h-belong-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
 }
-.ca-hs-k {
-  font-size: 0.6rem;
+.ca-h-bh-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.82);
+  font-family: "Inter", "PingFang SC", sans-serif;
+  flex: 1;
+}
+.ca-h-bh-count {
+  font-size: 0.58rem;
+  color: rgba(220,220,240,0.28);
+  letter-spacing: 0.04em;
+}
+.ca-h-starmap-wrap {
+  position: relative;
+  background: rgba(10,12,35,0.55);
+  border: 1px solid rgba(134,168,255,0.08);
+  border-radius: 7px;
+  padding: 6px 4px 4px;
+}
+
+/* 下：星星品质/统计 */
+.ca-h-starstats {
+  background: rgba(255,255,255,0.016);
+  border: 1px solid rgba(255,255,255,0.045);
+  border-radius: 9px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.ca-h-stats-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
+}
+/* 四顶栏指标 */
+.ca-h-ss-quad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.ca-h-ss-q {
+  padding: 7px 7px 6px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.035);
+  border-radius: 6px;
+}
+.ca-h-ss-q .ca-hs-k {
+  font-size: 0.54rem;
   letter-spacing: 0.1em;
   color: rgba(220,220,240,0.38);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+}
+.ca-h-ss-q .ca-hs-v {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
   font-family: "Inter", "PingFang SC", sans-serif;
 }
-.ca-hs-v {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: rgba(255,250,235,0.90);
-  font-family: "Inter", "PingFang SC", sans-serif;
+.ca-h-ss-q .ca-hs-sub {
+  margin-top: 2px;
+  font-size: 0.58rem;
+  color: rgba(220,220,240,0.35);
+  letter-spacing: 0.02em;
 }
-.ca-hs-sub {
-  margin-top: 3px;
-  font-size: 0.64rem;
+/* section 小标题 */
+.ca-h-ss-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-h-ss-bottom { padding-top: 2px; border-top: 1px dashed rgba(255,255,255,0.04); }
+.ca-h-ss-sec-k {
+  margin-bottom: 0;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  color: rgba(220,220,240,0.34);
+}
+/* 光谱色分布条 */
+.ca-h-ss-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ca-h-ss-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ca-h-ss-bar-labels {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.62rem;
+}
+.ca-h-ss-bar-color {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ca-h-ss-bar-spec {
+  font-weight: 700;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.02em;
+}
+.ca-h-ss-bar-cn {
   color: rgba(220,220,240,0.42);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-/* Top3 标签（跨 2 列） */
-.ca-h-tags {
-  grid-column: span 2;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.04);
+.ca-h-ss-bar-pct {
+  font-weight: 700;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  font-size: 0.6rem;
 }
-.ca-h-tagrow {
+.ca-h-ss-bar-track {
+  height: 4px;
+  background: rgba(255,255,255,0.035);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ca-h-ss-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  opacity: 0.9;
+  transition: width 0.3s;
+}
+.ca-h-ss-empty {
+  color: rgba(220,220,240,0.32);
+  font-size: 0.68rem;
+  text-align: center;
+  padding: 10px 0;
+}
+/* 星座Top */
+.ca-h-ss-cons {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
 }
-.ca-h-tag {
-  padding: 3px 9px;
+.ca-h-ss-con {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 4px;
+  background: rgba(255,255,255,0.022);
+  border: 1px solid rgba(255,255,255,0.04);
   border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: 0.68rem;
 }
+.ca-h-ss-con-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #0a0b1f;
+  font-weight: 800;
+  font-size: 0.56rem;
+  font-family: "Inter", sans-serif;
+}
+.ca-h-ss-con-name { color: rgba(255,255,255,0.74); font-weight: 600; }
+.ca-h-ss-con-pct {
+  color: rgba(220,220,240,0.4);
+  font-family: "SF Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+/* 星群气质标签 */
+.ca-h-ss-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.ca-h-ss-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: "Inter", "PingFang SC", sans-serif;
+}
+.ca-h-ss-tag-gold   { background: rgba(255,217,138,0.12); color: #ffd98a; border: 1px solid rgba(255,217,138,0.2); }
+.ca-h-ss-tag-gold2  { background: rgba(255,217,138,0.08); color: #f8cf7a; border: 1px solid rgba(255,217,138,0.14); }
+.ca-h-ss-tag-purple { background: rgba(202,167,255,0.1); color: #caa7ff; border: 1px solid rgba(202,167,255,0.18); }
+.ca-h-ss-tag-blue   { background: rgba(134,168,255,0.1); color: #86a8ff; border: 1px solid rgba(134,168,255,0.18); }
+.ca-h-ss-tag-green  { background: rgba(154,230,180,0.1); color: #9ae6b4; border: 1px solid rgba(154,230,180,0.18); }
+.ca-h-ss-tag-dim    { background: rgba(255,255,255,0.03); color: rgba(220,220,240,0.5); border: 1px solid rgba(255,255,255,0.06); }
+
+/* ca-single：单栏容器（夜色流转全宽用） */
+.ca-single { margin-top: 18px; }
+.ca-single > section { width: 100%; }
+.ca-night-flow-wide .ca-nt-band { min-height: 120px; }
 
 @media (max-width: 860px) {
   .ca-hero-body { grid-template-columns: 1fr; }
+  .ca-hero-body-big { grid-template-columns: 1fr; }
+  .ca-h-svg-big { min-height: auto; }
 }
 @media (max-width: 540px) {
   .ca-h-stats { grid-template-columns: 1fr 1fr; }
+  .ca-h-ss-quad { grid-template-columns: 1fr 1fr; }
 }
 </style>
