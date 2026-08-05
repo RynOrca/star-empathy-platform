@@ -21,13 +21,8 @@
       </div>
 
       <div class="ca-hero-body ca-hero-body-stats">
-        <!-- 左：星辰归属地平星图（原右栏上） -->
-        <div class="ca-h-belong ca-h-belong-left">
-          <div class="ca-h-belong-head">
-            <component :is="Orbit" :size="10" class="pw-icon pw-blue" />
-            <span class="ca-h-bh-title">星辰归属</span>
-            <span class="ca-h-bh-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
-          </div>
+        <!-- 左：星辰归属地平星图（融合到大Hero里，不再单独包card） -->
+        <div class="ca-h-left-block">
           <div class="ca-starmap-wrap ca-h-starmap-wrap">
             <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`"
               class="ca-starmap-svg" preserveAspectRatio="xMidYMid meet">
@@ -91,13 +86,8 @@
           </div>
         </div>
 
-        <!-- 右：星星统计信息（原右栏下） -->
-        <div class="ca-h-starstats ca-h-starstats-right">
-          <div class="ca-h-stats-head">
-            <Sparkles :size="9" class="pw-icon pw-gold" />
-            <span class="ca-h-bh-title">这组星的品质</span>
-          </div>
-
+        <!-- 右：星星统计信息（融合到大Hero里，不再单独包card） -->
+        <div class="ca-h-right-block">
           <!-- 四小顶栏指标：每星故事数 / 平均星等 / 地平比例 / 最亮星  -->
           <div class="ca-h-ss-quad">
             <div class="ca-h-ss-q">
@@ -4393,51 +4383,77 @@ function tagStyle(tag: string): Record<string, string> {
   min-height: 280px;     /* 兜底：整栏至少能放下一张星图 */
   grid-template-rows: 1fr;
 }
-/* Hero body stats 新版：左=星辰归属(0.95) + 右=星星品质(1.05) 横铺双栏 */
+/* Hero body stats：融合版 —— 左星图/右品质自然融为一体，不再两张独立card
+   用一条柔和的垂直渐变分割线（代替两个硬box边界），营造统一的"一张大图"的感觉 */
 .ca-hero-body-stats {
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 16px;
+  gap: 20px;   /* 中间留足空间给垂直分隔线，视觉上不挤也不飘 */
   align-items: stretch;
-  min-height: 520px;
+  min-height: 480px;
+  position: relative;
+  padding: 6px 2px 8px;
 }
-/* 左：星辰归属（现在是grid直接子项，需自己撑满高度） */
-.ca-h-belong-left {
+/* 中间柔和垂直分隔线：顶底透明度渐变，中间实 —— 像一张画的折痕/裱画分格线 */
+.ca-hero-body-stats::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: calc(0.95fr);  /* 留底兜底，下面 calc 精确版覆盖 */
+  /* 0.95 / (0.95+1.05) = 47.5% 两栏分界处 */
+  left: 47.5%;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0) 0%,
+    rgba(134,168,255,0.08) 18%,
+    rgba(202,167,255,0.18) 50%,
+    rgba(255,217,138,0.08) 82%,
+    rgba(255,255,255,0) 100%
+  );
+  pointer-events: none;
+  filter: blur(0.3px);
+}
+/* 左：星辰归属星图区域 —— 无独立card背景/边框，直接放在大Panel里 */
+.ca-h-left-block {
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
   min-height: 0;
-  flex-shrink: 0;
-  align-self: stretch;
+  padding: 2px 6px 2px 2px;  /* 左贴大panel左，右留 6px 给分隔线呼吸感 */
+  position: relative;
 }
-/* 左的星图 SVG 放大：从280:180 → 420:300（14:10），更有星辰归属的仪式感 */
-.ca-h-belong-left .ca-starmap-svg {
+/* 左的星图 SVG：放大到 420:300 比例，保证星图足够大气 */
+.ca-h-left-block .ca-starmap-svg {
   aspect-ratio: 420 / 300;
   min-height: 260px;
 }
-/* 右：星星品质（grid直接子项，撑满高度） */
-.ca-h-starstats-right {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  align-self: stretch;
+/* 星图容器在左栏：无边框加成（但保留本身 starmap-wrap 的深蓝底+蓝框，那个是星图本体的夜空感） */
+.ca-h-left-block .ca-starmap-wrap {
+  /* 去掉 starmap-wrap 的蓝边框也可以，让星图直接融入大面板，但保留深蓝底让星空有"夜"的容器感 */
+  border-color: rgba(134,168,255,0.055);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(202,167,255,0.05), transparent 70%),
+    rgba(10,12,35,0.4);
+  border-radius: 8px;
+  padding: 10px 8px 8px;
 }
 
-/* ============ 恢复：星辰归属卡片样式（ca-h-belong + starmap-wrap） ============ */
-.ca-h-belong {
-  background: rgba(255,255,255,0.018);
-  border: 1px solid rgba(255,255,255,0.045);
-  border-radius: 9px;
-  padding: 10px 12px 12px;
+/* 右：星星品质区域 —— 无独立card背景/边框，内容自然展开 */
+.ca-h-right-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
+  min-height: 0;
+  padding: 2px 2px 2px 6px;  /* 右贴大panel右，左留 6px 给分隔线呼吸感 */
+  align-self: stretch;
+  flex: 1;
 }
-/* 星图 SVG 容器：宽高按比例撑，不允许被压成 0 */
+
+/* ============ 星图容器本体 & starmap-svg 默认比例（保留，星辰归属仍使用 .ca-starmap-wrap） ============ */
 .ca-starmap-wrap {
   position: relative;
   background: rgba(10,12,35,0.55);
@@ -4448,12 +4464,9 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-h-starmap-wrap .ca-starmap-svg {
   width: 100%;
-  aspect-ratio: 280 / 180;
   height: auto;
   display: block;
-  min-height: 150px;
 }
-/* ca-starmap-svg 默认也给个比例兜底 */
 .ca-starmap-svg {
   width: 100%;
   height: auto;
@@ -4747,13 +4760,40 @@ function tagStyle(tag: string): Record<string, string> {
 
 @media (max-width: 860px) {
   .ca-hero-body { grid-template-columns: 1fr; }
-  .ca-hero-body-stats { grid-template-columns: 1fr; min-height: auto; }
+  .ca-hero-body-stats {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    gap: 14px;
+    padding: 2px 2px 8px;
+  }
+  /* 单列：隐藏中间竖分隔线，上星图下品质之间换一条柔和横分隔线 */
+  .ca-hero-body-stats::before { display: none; }
+  .ca-hero-body-stats::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0) 0%,
+      rgba(134,168,255,0.1) 30%,
+      rgba(202,167,255,0.22) 50%,
+      rgba(255,217,138,0.1) 70%,
+      rgba(255,255,255,0) 100%
+    );
+    pointer-events: none;
+    filter: blur(0.3px);
+  }
+  .ca-h-left-block { padding: 4px 2px; }
+  .ca-h-right-block { padding: 6px 2px 2px; }
   .ca-emotion-body-double { grid-template-columns: 1fr; }
 }
 @media (max-width: 540px) {
   .ca-h-stats { grid-template-columns: 1fr 1fr; }
   .ca-h-ss-quad { grid-template-columns: 1fr 1fr; }
   .ca-et-svg { min-height: 180px; }
-  .ca-h-belong-left .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 200px; }
+  .ca-h-left-block .ca-starmap-svg { aspect-ratio: 420 / 340; min-height: 200px; }
 }
 </style>
