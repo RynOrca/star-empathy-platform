@@ -49,7 +49,7 @@
 
     <!-- ═══ 2. 情感光谱 + 3. 主题脉络（双栏）═══ -->
     <div class="ca-duo">
-      <!-- 情感光谱（发光球体 orb 风格，学习 StarDetail） -->
+      <!-- 情感光谱（发光球体 + 正文叙事，不用 quoteblock） -->
       <section class="ca-card ca-emotion">
         <div class="ca-card-head">
           <component :is="HeartPulse" :size="12" class="ca-ch-icon ca-ch-red" />
@@ -57,6 +57,7 @@
           <span class="ca-ch-count">5 色情绪</span>
         </div>
         <div class="ca-emotion-body">
+          <!-- 球体展示 -->
           <div class="ca-emo-orbs">
             <span
               v-for="e in emotions"
@@ -68,14 +69,35 @@
                 background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}44 65%, transparent)`,
                 boxShadow: `0 0 ${8 + e.value * 14}px ${e.color}55`,
               }"
+              :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
             >
               <span class="ca-emo-orb-label">{{ e.name }}</span>
               <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
             </span>
           </div>
-          <div class="ca-emo-insight">
-            <span class="ca-emo-insight-lead">主调</span>
-            <span class="ca-emo-insight-text">{{ topInsight.title }} {{ topInsight.pct }} — {{ topInsight.desc }}</span>
+
+          <!-- 情绪明细列表 -->
+          <div class="ca-emo-list">
+            <div v-for="e in emotions" :key="e.name" class="ca-emo-item">
+              <span class="ca-emo-dot" :style="{ background: e.color, boxShadow: `0 0 4px ${e.color}88` }"></span>
+              <span class="ca-emo-item-name" :style="{ color: e.color }">{{ e.name }}</span>
+              <span class="ca-emo-item-desc">{{ e.desc }}</span>
+              <span class="ca-emo-item-val">{{ Math.round(e.value * 100) }}</span>
+            </div>
+          </div>
+
+          <!-- 主调叙事（正文段落，非引用块） -->
+          <div class="ca-emo-narrative">
+            <p class="ca-emo-para">
+              <span class="ca-emo-lead">{{ emotionNarrative.dominant }}</span>
+              <span class="ca-emo-lead-pct">{{ emotionNarrative.dominantPct }}</span>
+              {{ emotionNarrative.summary }}
+            </p>
+            <p class="ca-emo-para ca-emo-para-sub">{{ emotionNarrative.contrast }}</p>
+            <p class="ca-emo-para ca-emo-para-flow">
+              <component :is="HeartPulse" :size="10" class="ca-emo-flow-icon" />
+              {{ emotionNarrative.flow }}
+            </p>
           </div>
         </div>
       </section>
@@ -358,16 +380,18 @@ const persona = {
 }
 
 const emotions = [
-  { name: '思念', value: 0.78, color: '#ffd98a' },
-  { name: '孤独', value: 0.62, color: '#caa7ff' },
-  { name: '释然', value: 0.41, color: '#95f0c0' },
-  { name: '希望', value: 0.35, color: '#86a8ff' },
-  { name: '共鸣', value: 0.28, color: '#ff8b7d' },
+  { name: '思念', value: 0.78, color: '#ffd98a', desc: '远方的人与未寄出的话' },
+  { name: '孤独', value: 0.62, color: '#caa7ff', desc: '末班车与空荡的街' },
+  { name: '释然', value: 0.41, color: '#95f0c0', desc: '雨停后的第一缕晨光' },
+  { name: '希望', value: 0.35, color: '#86a8ff', desc: '纸船顺流而下的方向' },
+  { name: '共鸣', value: 0.28, color: '#ff8b7d', desc: '陌生人留下的温度' },
 ]
-const topInsight = {
-  title: '思念',
-  pct: '42.3%',
-  desc: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
+const emotionNarrative = {
+  dominant: '思念',
+  dominantPct: '42.3%',
+  summary: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
+  contrast: '孤独紧随其后，但释然与希望的微光已在地平线上浮现——心事虽重，并未沉没。',
+  flow: '从夜雨到晨光，情绪由浓转淡；思念与孤独交织，却在共鸣中找到出口。',
 }
 
 /** 情感球体尺寸：按值映射 28~52px */
@@ -404,12 +428,13 @@ const starBelongings = computed<{ id: number; name: string; con: string; color: 
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
 
-/** SVG 星图：用真实地平坐标(alt/az)排布，地平线 + hover 高亮 + 防遮挡 */
+/** SVG 星图：用真实地平坐标(alt/az)排布，地平线居中上下对称 + hover 高亮 + 防遮挡 */
 const MAP_W = 280
-const MAP_H = 170
-const HORIZON_Y = 125  // 地平线 y 坐标（alt=0°）
-const ZENITH_Y = 12    // 天顶 y 坐标（alt=90°）
-const BELOW_Y = 158    // 地平线下最大深度（alt≈-30°）
+const MAP_H = 180
+const MAP_PAD = 14          // 上下留白
+const HORIZON_Y = MAP_H / 2 // 地平线居中（alt=0°）
+const ZENITH_Y = MAP_PAD    // 天顶（alt=+90°）
+const NADIR_Y = MAP_H - MAP_PAD // 地底（alt=-90°），与天顶对称
 
 const { lat, lng } = useLocation()
 
@@ -443,14 +468,15 @@ const starMapData = computed(() => {
 
     // 方位角 0-360° → x：北在左、东、南、西、北在右（全周展开）
     const x = 14 + (az / 360) * (MAP_W - 28)
-    // 高度角 → y：90°→ZENITH_Y, 0°→HORIZON_Y, -30°→BELOW_Y
+    // 高度角 → y：上下对称（+90°→ZENITH_Y, 0°→HORIZON_Y, -90°→NADIR_Y）
+    const halfRange = HORIZON_Y - ZENITH_Y // 上下各 halfRange，对称
     let y: number
     if (alt >= 0) {
-      y = HORIZON_Y - (alt / 90) * (HORIZON_Y - ZENITH_Y)
+      y = HORIZON_Y - (alt / 90) * halfRange
     } else {
-      y = HORIZON_Y + Math.min(1, -alt / 30) * (BELOW_Y - HORIZON_Y)
+      y = HORIZON_Y + (-alt / 90) * halfRange
     }
-    y = Math.max(6, Math.min(MAP_H - 4, y))
+    y = Math.max(ZENITH_Y, Math.min(NADIR_Y, y))
 
     const radius = 2.5 + (s.count / maxCount) * 5 // 2.5~7.5px
     // 标签位置：交替上下，避免遮挡
@@ -513,7 +539,7 @@ const bgStars = Array.from({ length: 24 }, (_, i) => {
   const seed = i * 7919 + 13
   return {
     x: (seed * 13) % MAP_W,
-    y: ZENITH_Y + ((seed * 17) % (HORIZON_Y - ZENITH_Y - 4)),
+    y: ZENITH_Y + 2 + ((seed * 17) % (HORIZON_Y - ZENITH_Y - 6)),
     r: 0.3 + ((seed % 4) * 0.25),
     opacity: 0.1 + ((seed % 6) * 0.04),
   }
@@ -891,27 +917,94 @@ function tagStyle(tag: string): Record<string, string> {
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.ca-emo-insight {
+/* 情绪明细列表 */
+.ca-emo-list {
   display: flex;
-  gap: 7px;
-  padding: 9px 10px;
-  border-radius: 6px;
-  background: rgba(255, 139, 125, 0.04);
-  border-left: 2px solid rgba(255, 139, 125, 0.3);
-  margin-top: 4px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 0;
+  border-top: 0.5px dashed rgba(255, 255, 255, 0.06);
+  border-bottom: 0.5px dashed rgba(255, 255, 255, 0.06);
 }
-.ca-emo-insight-lead {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: #ff8b7d;
-  letter-spacing: 0.04em;
+.ca-emo-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+}
+.ca-emo-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   flex-shrink: 0;
+}
+.ca-emo-item-name {
+  font-size: 0.66rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  width: 28px;
+}
+.ca-emo-item-desc {
+  flex: 1;
+  font-size: 0.64rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ca-emo-item-val {
+  font-size: 0.62rem;
+  color: var(--muted-light);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: right;
+}
+
+/* 叙事段落（正文，非引用块） */
+.ca-emo-narrative {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   margin-top: 2px;
 }
-.ca-emo-insight-text {
-  font-size: 0.7rem;
+.ca-emo-para {
+  font-size: 0.68rem;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+.ca-emo-lead {
+  font-weight: 700;
+  color: #ffd98a;
+  margin-right: 3px;
+}
+.ca-emo-lead-pct {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #ffd98a;
+  opacity: 0.7;
+  margin-right: 5px;
+}
+.ca-emo-para-sub {
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.4);
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.5);
+}
+.ca-emo-para-flow {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 0.63rem;
+  color: rgba(255, 139, 125, 0.6);
+  font-style: italic;
+  line-height: 1.65;
+}
+.ca-emo-flow-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #ff8b7d;
+  opacity: 0.7;
 }
 
 /* ═══ 3. Stars Belonging（真实地平坐标星图） ═══ */
