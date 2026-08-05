@@ -49,7 +49,7 @@
 
     <!-- ═══ 2. 情感光谱 + 3. 主题脉络（双栏）═══ -->
     <div class="ca-duo">
-      <!-- 情感光谱 -->
+      <!-- 情感光谱（发光球体 orb 风格，学习 StarDetail） -->
       <section class="ca-card ca-emotion">
         <div class="ca-card-head">
           <component :is="HeartPulse" :size="12" class="ca-ch-icon ca-ch-red" />
@@ -57,15 +57,21 @@
           <span class="ca-ch-count">5 色情绪</span>
         </div>
         <div class="ca-emotion-body">
-          <div v-for="e in emotions" :key="e.name" class="ca-emo-row">
-            <span class="ca-emo-name">{{ e.name }}</span>
-            <div class="ca-emo-bar">
-              <div
-                class="ca-emo-fill"
-                :style="{ width: Math.round(e.value * 100) + '%', background: e.color }"
-              ></div>
-            </div>
-            <span class="ca-emo-val">{{ Math.round(e.value * 100) }}</span>
+          <div class="ca-emo-orbs">
+            <span
+              v-for="e in emotions"
+              :key="e.name"
+              class="ca-emo-orb"
+              :style="{
+                width: orbSize(e.value) + 'px',
+                height: orbSize(e.value) + 'px',
+                background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}44 65%, transparent)`,
+                boxShadow: `0 0 ${8 + e.value * 14}px ${e.color}55`,
+              }"
+            >
+              <span class="ca-emo-orb-label">{{ e.name }}</span>
+              <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
+            </span>
           </div>
           <div class="ca-emo-insight">
             <span class="ca-emo-insight-lead">主调</span>
@@ -74,33 +80,48 @@
         </div>
       </section>
 
-      <!-- 星辰归属（重新设计：星轨发光列表） -->
+      <!-- 星辰归属（SVG 星图散布：ra/dec 方位 + 大小=故事数 + 星座连线） -->
       <section class="ca-card ca-stars">
         <div class="ca-card-head">
           <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
           <span class="ca-ch-title">星辰归属</span>
           <span class="ca-ch-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
         </div>
-        <div class="ca-stars-list">
-          <div
-            v-for="s in starBelongings"
-            :key="s.id"
-            class="ca-star-item"
-            :style="{ '--star-c': s.color } as Record<string, string>"
-            :title="`${s.name}${s.con ? ' · ' + s.con : ''} · ${s.count} 篇`"
-          >
-            <span class="ca-star-glow" :style="glowStyle(s.count)"></span>
-            <div class="ca-star-info">
-              <span class="ca-star-name">{{ s.name }}</span>
-              <span v-if="s.con" class="ca-star-con">{{ s.con }}</span>
-            </div>
-            <div class="ca-star-bar-wrap">
-              <div class="ca-star-bar" :style="{ width: starBarWidth(s.count) + '%' }"></div>
-            </div>
-            <span class="ca-star-count">{{ s.count }}</span>
-          </div>
-          <div v-if="starBelongings.length === 0" class="ca-stars-empty">
+        <div class="ca-starmap-wrap">
+          <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`" class="ca-starmap-svg" preserveAspectRatio="xMidYMid meet">
+            <!-- 背景星点 -->
+            <circle v-for="(bg, i) in bgStars" :key="'bg'+i" :cx="bg.x" :cy="bg.y" :r="bg.r" fill="#fff" :opacity="bg.opacity" />
+            <!-- 星座连线 -->
+            <line
+              v-for="(l, i) in starMapData.lines"
+              :key="'l'+i"
+              :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
+              :stroke="l.color" stroke-width="0.4" opacity="0.18" stroke-dasharray="2 2"
+            />
+            <!-- 主星：外发光 + 主体 + 高光核心 + 标签 -->
+            <g v-for="s in starMapData.stars" :key="s.id" class="ca-sm-star">
+              <!-- 外发光晕 -->
+              <circle :cx="s.x" :cy="s.y" :r="s.radius * 3" :fill="s.color" opacity="0.06" />
+              <circle :cx="s.x" :cy="s.y" :r="s.radius * 1.8" :fill="s.color" opacity="0.14" />
+              <!-- 主体 -->
+              <circle :cx="s.x" :cy="s.y" :r="s.radius" :fill="s.color" opacity="0.9">
+                <animate attributeName="opacity" values="0.7;1;0.7" :dur="3 + (s.id % 3) + 's'" repeatCount="indefinite" />
+              </circle>
+              <!-- 高光核心 -->
+              <circle :cx="s.x" :cy="s.y" :r="s.radius * 0.35" fill="#fff" opacity="0.85" />
+              <!-- 星名标签 -->
+              <text :x="s.x" :y="s.y + s.radius + 9" text-anchor="middle" class="ca-sm-label" :fill="s.color">{{ s.name }}</text>
+              <!-- 故事数 -->
+              <text :x="s.x" :y="s.y + s.radius + 18" text-anchor="middle" class="ca-sm-count">{{ s.count }}篇</text>
+            </g>
+          </svg>
+          <div v-else class="ca-stars-empty">
             故事尚未挂上星辰
+          </div>
+          <!-- 图例 -->
+          <div v-if="starBelongings.length > 0" class="ca-sm-legend">
+            <span class="ca-sm-legend-item"><i class="ca-sm-dot"></i>圆点大小 = 故事数</span>
+            <span class="ca-sm-legend-item"><i class="ca-sm-dash"></i>虚线 = 星座连线</span>
           </div>
         </div>
         <div class="ca-stars-insight">
@@ -302,8 +323,13 @@ const topInsight = {
   desc: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
 }
 
-/** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数 */
-const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number }[]>(() => {
+/** 情感球体尺寸：按值映射 28~52px */
+function orbSize(value: number): number {
+  return Math.round(28 + value * 24)
+}
+
+/** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数+方位 */
+const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number; ra: number; dec: number }[]>(() => {
   const map = new Map<number, number>()
   for (const s of props.stories ?? []) {
     const ids: number[] = []
@@ -322,24 +348,109 @@ const starBelongings = computed<{ id: number; name: string; con: string; color: 
         con: info?.con ?? '',
         color: info?.color ?? '#86a8ff',
         count,
+        ra: info?.ra ?? -1,
+        dec: info?.dec ?? 0,
       }
     })
     .sort((a, b) => b.count - a.count)
     .slice(0, 12)
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
-/** 发光圆点尺寸：按故事数映射 6px ~ 14px */
-function glowStyle(count: number): Record<string, string> {
-  const max = Math.max(1, ...starBelongings.value.map(s => s.count))
-  const ratio = max > 0 ? count / max : 0
-  const size = Math.round(6 + ratio * 8)
-  return { width: size + 'px', height: size + 'px' }
-}
-/** 进度条宽度：按故事数占比 */
-function starBarWidth(count: number): number {
-  const max = Math.max(1, ...starBelongings.value.map(s => s.count))
-  return max > 0 ? Math.round((count / max) * 100) : 0
-}
+
+/** SVG 星图：用 ra/dec 投影到 2D 平面，圆点大小=故事数 */
+const MAP_W = 280
+const MAP_H = 150
+const starMapData = computed(() => {
+  const stars = starBelongings.value
+  if (stars.length === 0) return { stars: [], lines: [] }
+
+  // 有方位数据的星（ra >= 0）
+  const withPos = stars.filter(s => s.ra >= 0)
+  // 无方位的星（行星等 ra=-1）：均匀散布在外圈
+  const noPos = stars.filter(s => s.ra < 0)
+
+  // 计算质心
+  let cx = 12, cy = 0
+  if (withPos.length > 0) {
+    cx = withPos.reduce((a, s) => a + s.ra, 0) / withPos.length
+    cy = withPos.reduce((a, s) => a + s.dec, 0) / withPos.length
+  }
+
+  // 计算最大距离用于缩放
+  let maxDist = 0
+  for (const s of withPos) {
+    const d = Math.sqrt((s.ra - cx) ** 2 + (s.dec - cy) ** 2)
+    if (d > maxDist) maxDist = d
+  }
+  maxDist = Math.max(maxDist, 2) // 避免除零
+
+  const pad = 28
+  const scale = Math.min((MAP_W - pad * 2) / 2, (MAP_H - pad * 2) / 2) / maxDist
+  const maxCount = Math.max(1, ...stars.map(s => s.count))
+
+  // 映射有方位的星
+  const mapped = withPos.map(s => ({
+    ...s,
+    x: MAP_W / 2 + (s.ra - cx) * scale,
+    y: MAP_H / 2 - (s.dec - cy) * scale,
+    radius: 2.5 + (s.count / maxCount) * 5, // 2.5~7.5px
+  }))
+
+  // 无方位的星（行星）：在顶部弧形散布
+  const noMapped = noPos.map((s, i) => {
+    const angle = (i / Math.max(1, noPos.length)) * Math.PI - Math.PI / 2
+    return {
+      ...s,
+      x: MAP_W / 2 + Math.cos(angle) * (MAP_W / 2 - pad),
+      y: MAP_H / 2 + Math.sin(angle) * (MAP_H / 2 - pad) * 0.5,
+      radius: 2.5 + (s.count / maxCount) * 5,
+    }
+  })
+
+  const all = [...mapped, ...noMapped]
+
+  // 星座连线：同星座的星用最近邻连线
+  const conGroups = new Map<string, typeof all>()
+  for (const s of all) {
+    if (!s.con) continue
+    if (!conGroups.has(s.con)) conGroups.set(s.con, [])
+    conGroups.get(s.con)!.push(s)
+  }
+  const lines: { x1: number; y1: number; x2: number; y2: number; color: string }[] = []
+  const seen = new Set<string>()
+  for (const [, group] of conGroups) {
+    if (group.length < 2) continue
+    for (let i = 0; i < group.length; i++) {
+      let nearest = -1, minD = Infinity
+      for (let j = 0; j < group.length; j++) {
+        if (i === j) continue
+        const d = (group[i].x - group[j].x) ** 2 + (group[i].y - group[j].y) ** 2
+        if (d < minD) { minD = d; nearest = j }
+      }
+      if (nearest >= 0) {
+        const a = group[i], b = group[nearest]
+        const key = [a.x, a.y, b.x, b.y].map(Math.round).join(',')
+        if (!seen.has(key)) {
+          seen.add(key)
+          lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, color: a.color })
+        }
+      }
+    }
+  }
+
+  return { stars: all, lines }
+})
+
+/** 背景装饰星点（确定性伪随机） */
+const bgStars = Array.from({ length: 28 }, (_, i) => {
+  const seed = i * 7919 + 13
+  return {
+    x: (seed * 13) % MAP_W,
+    y: (seed * 17) % MAP_H,
+    r: 0.3 + ((seed % 4) * 0.25),
+    opacity: 0.1 + ((seed % 6) * 0.04),
+  }
+})
 
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
 const trajExpanded = ref(false)
@@ -668,42 +779,50 @@ function tagStyle(tag: string): Record<string, string> {
   transition: left 0.5s ease;
 }
 
-/* ═══ 2. Emotion ═══ */
+/* ═══ 2. Emotion（发光球体 orb） ═══ */
 .ca-emotion-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
-.ca-emo-row {
+.ca-emo-orbs {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 6px 2px 10px;
+  min-height: 70px;
 }
-.ca-emo-name {
-  font-size: 0.72rem;
-  color: var(--ink-secondary);
-  width: 32px;
-  flex-shrink: 0;
+.ca-emo-orb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: default;
+  transition: transform 0.2s;
+  animation: orbFloat 4s ease-in-out infinite;
 }
-.ca-emo-bar {
-  flex: 1;
-  height: 5px;
-  border-radius: 100px;
-  background: rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+.ca-emo-orb:nth-child(2n) { animation-delay: 0.8s; }
+.ca-emo-orb:nth-child(3n) { animation-delay: 1.6s; }
+.ca-emo-orb:hover { transform: scale(1.12); }
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
-.ca-emo-fill {
-  height: 100%;
-  border-radius: 100px;
-  transition: width 0.5s ease;
+.ca-emo-orb-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1;
+  margin-bottom: 1px;
 }
-.ca-emo-val {
-  font-size: 0.66rem;
-  color: var(--muted);
-  width: 22px;
-  text-align: right;
+.ca-emo-orb-val {
+  font-size: 0.56rem;
+  color: rgba(255, 255, 255, 0.5);
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  line-height: 1;
 }
 .ca-emo-insight {
   display: flex;
@@ -728,97 +847,74 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* ═══ 3. Stars Belonging（星轨发光列表） ═══ */
-.ca-stars-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  min-height: 40px;
+/* ═══ 3. Stars Belonging（SVG 星图散布） ═══ */
+.ca-starmap-wrap {
+  position: relative;
+  border-radius: 8px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(134, 168, 255, 0.04), rgba(10, 10, 26, 0.5));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
-.ca-star-item {
+.ca-starmap-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  min-height: 120px;
+}
+.ca-sm-star {
+  cursor: pointer;
+  transition: transform 0.2s;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.ca-sm-star:hover {
+  transform: scale(1.15);
+}
+.ca-sm-label {
+  font-size: 5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.ca-sm-count {
+  font-size: 4px;
+  fill: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+.ca-sm-legend {
+  display: flex;
+  gap: 12px;
+  padding: 5px 10px;
+  font-size: 0.56rem;
+  color: var(--muted-light);
+  letter-spacing: 0.02em;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.15);
+}
+.ca-sm-legend-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 3px 2px;
-  border-radius: 6px;
-  transition: background 0.15s;
-  cursor: default;
+  gap: 4px;
 }
-.ca-star-item:hover {
-  background: color-mix(in srgb, var(--star-c, #86a8ff) 6%, transparent);
-}
-/* 发光圆点：径向渐变 + 多层 box-shadow 模拟星光 */
-.ca-star-glow {
+.ca-sm-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  flex-shrink: 0;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--star-c, #86a8ff) 95%, white) 0%,
-    var(--star-c, #86a8ff) 45%,
-    transparent 75%
-  );
-  box-shadow:
-    0 0 6px color-mix(in srgb, var(--star-c, #86a8ff) 70%, transparent),
-    0 0 12px color-mix(in srgb, var(--star-c, #86a8ff) 35%, transparent);
-  animation: starPulse 3s ease-in-out infinite;
+  background: #ffd98a;
+  box-shadow: 0 0 4px #ffd98a;
 }
-@keyframes starPulse {
-  0%, 100% { opacity: 0.85; }
-  50% { opacity: 1; box-shadow: 0 0 8px var(--star-c, #86a8ff), 0 0 16px color-mix(in srgb, var(--star-c, #86a8ff) 40%, transparent); }
-}
-.ca-star-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex-shrink: 0;
-  width: 56px;
-}
-.ca-star-name {
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-.ca-star-con {
-  font-size: 0.58rem;
-  color: var(--muted-light);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-  margin-top: 1px;
-}
-.ca-star-bar-wrap {
-  flex: 1;
-  height: 2px;
-  border-radius: 100px;
-  background: rgba(255, 255, 255, 0.04);
-  overflow: hidden;
-  min-width: 20px;
-}
-.ca-star-bar {
-  height: 100%;
-  border-radius: 100px;
-  background: linear-gradient(90deg, var(--star-c, #86a8ff), color-mix(in srgb, var(--star-c, #86a8ff) 40%, transparent));
-  box-shadow: 0 0 4px color-mix(in srgb, var(--star-c, #86a8ff) 50%, transparent);
-  transition: width 0.5s ease;
-}
-.ca-star-count {
-  font-size: 0.66rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  width: 18px;
-  text-align: right;
+.ca-sm-dash {
+  display: inline-block;
+  width: 10px;
+  height: 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.3);
 }
 .ca-stars-empty {
   font-size: 0.7rem;
   color: var(--muted-light);
   font-style: italic;
-  padding: 8px 0;
+  padding: 28px 0;
   text-align: center;
 }
 .ca-stars-insight {
@@ -1018,7 +1114,7 @@ function tagStyle(tag: string): Record<string, string> {
   -webkit-box-orient: vertical;
 }
 
-/* ═══ 6. Rank ═══ */
+/* ═══ 6. Rank（共鸣榜，增强发光质感） ═══ */
 .ca-rank-body {
   display: flex;
   flex-direction: column;
@@ -1030,31 +1126,57 @@ function tagStyle(tag: string): Record<string, string> {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008));
   border: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.ca-rank-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 .ca-rank-item:hover {
-  background: rgba(255, 217, 138, 0.05);
-  border-color: rgba(255, 217, 138, 0.15);
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.08), rgba(255, 217, 138, 0.02));
+  border-color: rgba(255, 217, 138, 0.18);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 217, 138, 0.08);
 }
+.ca-rank-item:hover::before { opacity: 1; }
 .ca-rank-no {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  position: relative;
 }
-.ca-rank-no-1 { background: rgba(255, 217, 138, 0.18); color: #ffd98a; }
-.ca-rank-no-2 { background: rgba(202, 202, 220, 0.12); color: #cac4dc; }
-.ca-rank-no-3 { background: rgba(255, 139, 125, 0.12); color: #ff8b7d; }
+.ca-rank-no-1 {
+  background: radial-gradient(circle, rgba(255, 217, 138, 0.25), rgba(255, 217, 138, 0.08));
+  color: #ffd98a;
+  box-shadow: 0 0 8px rgba(255, 217, 138, 0.35), inset 0 0 4px rgba(255, 217, 138, 0.15);
+}
+.ca-rank-no-2 {
+  background: radial-gradient(circle, rgba(202, 202, 220, 0.18), rgba(202, 202, 220, 0.06));
+  color: #cac4dc;
+  box-shadow: 0 0 6px rgba(202, 202, 220, 0.25), inset 0 0 4px rgba(202, 202, 220, 0.1);
+}
+.ca-rank-no-3 {
+  background: radial-gradient(circle, rgba(255, 139, 125, 0.18), rgba(255, 139, 125, 0.06));
+  color: #ff8b7d;
+  box-shadow: 0 0 6px rgba(255, 139, 125, 0.25), inset 0 0 4px rgba(255, 139, 125, 0.1);
+}
 .ca-rank-main { flex: 1; min-width: 0; }
 .ca-rank-title {
   font-size: 0.76rem;
@@ -1081,6 +1203,10 @@ function tagStyle(tag: string): Record<string, string> {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 100px;
+  background: rgba(255, 139, 125, 0.08);
+  border: 0.5px solid rgba(255, 139, 125, 0.15);
 }
 
 /* ═══ 7. Narrative ═══ */
