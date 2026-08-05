@@ -1525,6 +1525,52 @@ const winMeta = {
   peakCount: 9,
 }
 
+/* ═══════════════════════════════════════════════════════════
+   【旧数据兼容】下方画像/天官书 section 仍在使用 nightSky / skyFlecks
+   暂未重构，保留原定义避免渲染崩溃；下一轮重构时同步替换
+   ═══════════════════════════════════════════════════════════ */
+/** 合集 = 你自己的「那一夜」整片夜空 */
+const nightSky = {
+  name: '夜雨孤灯 · 那一夜',
+  season: '甲辰年 · 春分后第三夜',
+  timeSpan: '子初 22:47 ~ 卯初 05:21',
+  phase: '残月 · 蛾眉',
+  moonIllum: '22%',
+  moonAge: '26.4 日龄',
+  term: '春分后三',
+  ecliptic: 'λ 3°12′',
+  termDeg: 3 + 12 / 60 * 15,
+  meteo: [
+    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
+    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
+    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
+    { k: '能见度', v: '薄云 · 7.2km', color: '#95f0c0' },
+    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
+    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
+  ],
+  hourDots: [
+    { pos: 10,  size: 12, color: '#ffd98a' },
+    { pos: 22,  size: 8,  color: '#ffd98a' },
+    { pos: 38,  size: 10, color: '#caa7ff' },
+    { pos: 52,  size: 5,  color: '#95f0c0' },
+    { pos: 66,  size: 7,  color: '#caa7ff' },
+    { pos: 78,  size: 6,  color: '#95f0c0' },
+    { pos: 88,  size: 4,  color: '#86a8ff' },
+  ],
+}
+
+/** 8 则心事 = 那一夜里的 8 道光斑 */
+const skyFlecks: { x: number; y: number; r: number; color: string; glowId: 'Gold' | 'Purple' | 'Green' | 'Blue'; tag?: string }[] = [
+  { x: 68,  y: 140, r: 4.8, color: '#ffd98a', glowId: 'Gold',   tag: '子初三刻' },
+  { x: 188, y: 78,  r: 4.5, color: '#caa7ff', glowId: 'Purple', tag: '丑正二刻' },
+  { x: 152, y: 54,  r: 4.2, color: '#95f0c0', glowId: 'Green',  tag: '寅初一刻' },
+  { x: 106, y: 102, r: 3.0, color: '#ffd98a', glowId: 'Gold'   },
+  { x: 86,  y: 164, r: 3.4, color: '#ff8b7d', glowId: 'Blue'   },
+  { x: 214, y: 118, r: 2.8, color: '#86a8ff', glowId: 'Blue'   },
+  { x: 238, y: 158, r: 3.6, color: '#ffd98a', glowId: 'Gold'   },
+  { x: 224, y: 188, r: 3.2, color: '#95f0c0', glowId: 'Green'  },
+]
+
 /** Top3 亮星名录（α/β/γ） */
 const brightStars = computed(() =>
   [...constellation.stars]
