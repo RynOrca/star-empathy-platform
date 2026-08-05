@@ -10,220 +10,221 @@
       <span class="ca-hero-badge">DESIGN PREVIEW</span>
     </div>
 
-    <!-- ═══ 0.5. 【天空本色】那一夜·你的天空（合集=整片夜空剖面：地平线/银河/月相/时辰刻度/8则心事散点=夜色光斑）═══ -->
-    <section class="ca-card ca-sky-night">
+    <!-- ═══ 0.5. 【窗外夜景 · 生活风】合集=卧室窗外这一整段深夜：窗框+窗帘+玻璃反光+天际线+城市灯火+心事星点 ═══ -->
+    <section class="ca-card ca-window-night">
       <div class="ca-card-head">
         <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-blue" />
-        <span class="ca-ch-title">你的那片天空</span>
-        <span class="ca-ch-count">{{ nightSky.timeSpan }} · {{ nightSky.phase }} · {{ storyCount }} 道光斑</span>
+        <span class="ca-ch-title">你的窗前</span>
+        <span class="ca-ch-count">02:47 · 小雨转晴 · {{ storyCount }} 盏心事小灯</span>
       </div>
-      <div class="ca-sky-body">
-        <!-- 左：夜空剖面 SVG（地平面 → 天顶，含银河斜带/月相/时辰刻度/8光斑散点） -->
-        <div class="ca-sky-canvas">
-          <svg viewBox="0 0 320 240" class="ca-sky-svg" preserveAspectRatio="xMidYMid meet">
-            <!-- ① 天空底色：分层渐变（入夜→子夜→黎明，从上到下对应 子→丑→寅→卯） -->
+      <div class="ca-win-body">
+        <!-- 左：卧室窗户全景 SVG（窗框/窗帘/玻璃反光/天际线/城市灯火/心事星点） -->
+        <div class="ca-win-canvas">
+          <svg viewBox="0 0 360 260" class="ca-win-svg" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-                <!-- 天顶（子时23点）：深午夜蓝紫 -->
-                <stop offset="0%" stop-color="#0b0d2a" />
-                <stop offset="20%" stop-color="#12163e" />
-                <stop offset="45%" stop-color="#1b1a47" />
-                <!-- 中下（丑时→寅时）：带一丝寒气的蓝紫 -->
-                <stop offset="72%" stop-color="#1f2046" />
-                <!-- 近地平（卯时 黎明将至）：透一点淡金 -->
-                <stop offset="100%" stop-color="#2a2540" />
+              <!-- 夜空（窗外）：冷深蓝紫→下方近地平线处稍暖（城市光污染） -->
+              <linearGradient id="wnSky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0e1333" />
+                <stop offset="55%" stop-color="#141a42" />
+                <stop offset="88%" stop-color="#1f2049" />
+                <stop offset="100%" stop-color="#2c2b52" />
               </linearGradient>
-              <!-- 银河斜带（从左上 90,30 到右下 240,200） -->
-              <radialGradient id="milkyWay" cx="50%" cy="40%" r="60%">
-                <stop offset="0%" stop-color="rgba(255,245,230,0.18)" />
-                <stop offset="45%" stop-color="rgba(202,167,255,0.09)" />
-                <stop offset="100%" stop-color="rgba(134,168,255,0)" />
-              </radialGradient>
-              <!-- 地平线大气光（黎明淡金） -->
-              <linearGradient id="horizonGlow" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(255,217,138,0)" />
-                <stop offset="60%" stop-color="rgba(255,217,138,0.04)" />
-                <stop offset="100%" stop-color="rgba(255,179,120,0.12)" />
+              <!-- 玻璃反光：室内台灯的暖光斜带 -->
+              <linearGradient id="glassReflect" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="rgba(255,221,170,0)" />
+                <stop offset="38%" stop-color="rgba(255,218,162,0.12)" />
+                <stop offset="58%" stop-color="rgba(255,232,190,0.05)" />
+                <stop offset="100%" stop-color="rgba(255,221,170,0)" />
               </linearGradient>
-              <!-- 光斑（心事）发光 -->
-              <radialGradient id="glowGold" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(255,217,138,0.9)" />
-                <stop offset="100%" stop-color="rgba(255,217,138,0)" />
+              <!-- 城市光污染（地平线一带的暖黄雾） -->
+              <linearGradient id="cityGlow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(255,190,130,0)" />
+                <stop offset="40%" stop-color="rgba(255,190,130,0.05)" />
+                <stop offset="100%" stop-color="rgba(255,210,160,0.20)" />
+              </linearGradient>
+              <!-- 月亮柔光 -->
+              <radialGradient id="moonSoft" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(255,245,220,0.85)" />
+                <stop offset="50%" stop-color="rgba(255,235,200,0.35)" />
+                <stop offset="100%" stop-color="rgba(255,220,170,0)" />
               </radialGradient>
-              <radialGradient id="glowPurple" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(202,167,255,0.88)" />
-                <stop offset="100%" stop-color="rgba(202,167,255,0)" />
+              <!-- 心事星点发光（暖/冷/柔紫） -->
+              <radialGradient id="glowWarm" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(255,215,160,0.9)" />
+                <stop offset="100%" stop-color="rgba(255,215,160,0)" />
               </radialGradient>
-              <radialGradient id="glowGreen" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(149,240,192,0.85)" />
-                <stop offset="100%" stop-color="rgba(149,240,192,0)" />
+              <radialGradient id="glowSoft" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(180,210,255,0.9)" />
+                <stop offset="100%" stop-color="rgba(180,210,255,0)" />
               </radialGradient>
-              <radialGradient id="glowBlue" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgba(134,168,255,0.85)" />
-                <stop offset="100%" stop-color="rgba(134,168,255,0)" />
+              <radialGradient id="glowCozy" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(205,180,255,0.88)" />
+                <stop offset="100%" stop-color="rgba(205,180,255,0)" />
               </radialGradient>
             </defs>
 
-            <!-- 天空底色矩形 -->
-            <rect x="0" y="0" width="320" height="210" fill="url(#skyGrad)" />
-            <!-- 银河斜带：先画椭圆然后裁剪斜矩形 -->
-            <ellipse cx="160" cy="90" rx="145" ry="42" fill="url(#milkyWay)" transform="rotate(-14 160 90)" />
-            <!-- 近地平线曙光（淡金在底部） -->
-            <rect x="0" y="160" width="320" height="50" fill="url(#horizonGlow)" />
-            <!-- 背景随机星点（深空微闪，100颗） -->
-            <circle v-for="(s, i) in deepSkyStars.slice(0, 80)" :key="'ds'+i"
-              :cx="s.x" :cy="s.y * 0.92" :r="s.r * 0.85" fill="#fff" :opacity="s.opacity * 0.85" />
-
-            <!-- 时辰刻度（左侧竖排：子 丑 寅 卯 对应 高度 0%~100%） -->
-            <!-- 子时（23-1）：天顶附近 → 上 -->
-            <g font-family="Georgia, 'STKaiti', serif" fill="rgba(255,255,255,0.45)" font-size="8" font-weight="500">
-              <g transform="translate(10, 42)">
-                <text x="0" y="0" style="letter-spacing: 0.2em">子</text>
-                <line x1="14" y1="-2" x2="22" y2="-2" stroke="rgba(255,255,255,0.15)" stroke-width="0.6" />
-              </g>
-              <g transform="translate(10, 96)">
-                <text x="0" y="0" style="letter-spacing: 0.2em">丑</text>
-                <line x1="14" y1="-2" x2="22" y2="-2" stroke="rgba(255,255,255,0.12)" stroke-width="0.6" />
-              </g>
-              <g transform="translate(10, 148)">
-                <text x="0" y="0" style="letter-spacing: 0.2em">寅</text>
-                <line x1="14" y1="-2" x2="22" y2="-2" stroke="rgba(255,255,255,0.12)" stroke-width="0.6" />
-              </g>
-              <g transform="translate(10, 196)">
-                <text x="0" y="0" style="letter-spacing: 0.2em">卯</text>
-                <line x1="14" y1="-2" x2="22" y2="-2" stroke="rgba(255,217,138,0.3)" stroke-width="0.6" />
-              </g>
+            <!-- 【A】先画窗外世界（在窗框以内：x 36~324, y 24~218 → 玻璃区域） -->
+            <!-- A1：夜空底色（玻璃区外是墙，只画玻璃区域内） -->
+            <rect x="36" y="24" width="288" height="194" fill="url(#wnSky)" />
+            <!-- A2：城市光污染地平线雾 -->
+            <rect x="36" y="140" width="288" height="78" fill="url(#cityGlow)" />
+            <!-- A3：深空自然星点（背景小星） -->
+            <g opacity="0.92">
+              <circle v-for="(s, i) in deepSkyStars.slice(0, 60)" :key="'dss'+i"
+                :cx="36 + (s.x / 320) * 288"
+                :cy="24 + (s.y / 200) * 150"
+                :r="s.r * 0.85"
+                fill="#ffffff"
+                :opacity="s.opacity * 0.78" />
+            </g>
+            <!-- A4：月亮（右上 78% 盈凸月） -->
+            <g transform="translate(294, 56)">
+              <circle cx="0" cy="0" r="30" fill="url(#moonSoft)" />
+              <circle cx="0" cy="0" r="12" fill="#faf0dc" opacity="0.95" />
+              <circle cx="-4" cy="-1" r="11.2" fill="#faf0dc" opacity="0.55" />
+              <circle cx="-4.8" cy="-1.6" r="1.6" fill="#d9c9a8" opacity="0.55" />
+              <circle cx="0.8" cy="3.4" r="1.2" fill="#d9c9a8" opacity="0.45" />
+              <circle cx="2.4" cy="-3.6" r="0.8" fill="#d9c9a8" opacity="0.35" />
             </g>
 
-            <!-- 残月（左上，22% 照明度，蛾眉月） -->
-            <g transform="translate(252, 38)">
-              <!-- 月光晕 -->
-              <circle cx="0" cy="0" r="24" fill="url(#glowBlue)" opacity="0.5" />
-              <!-- 残月本体（用两个圆 mask：大圆减偏的小圆） -->
-              <circle cx="0" cy="0" r="11" fill="rgba(245,240,228,0.88)" />
-              <circle cx="3.2" cy="-1.8" r="10.4" fill="url(#skyGrad)" />
-              <!-- 月面的暗纹 -->
-              <circle cx="-4" cy="-2" r="1.2" fill="rgba(210,200,180,0.4)" />
-              <circle cx="-1" cy="3" r="0.9" fill="rgba(210,200,180,0.35)" />
-              <circle cx="2" cy="-4" r="0.6" fill="rgba(210,200,180,0.3)" />
-            </g>
-
-            <!-- 8 则心事 = 你在这夜里留下的 8 道光斑（时辰Y轴 + 随机X分布，大小=共鸣/长度） -->
-            <g v-for="(s, i) in skyFlecks" :key="'sf'+i">
-              <!-- 外层发光晕 -->
-              <circle :cx="s.x" :cy="s.y" :r="s.r * 2.4" :fill="'url(#glow' + s.glowId + ')'">
-                <animate attributeName="r" :values="s.r*2.2 + ';' + (s.r*2.6+0.4) + ';' + s.r*2.2"
-                  :dur="(2.8 + i * 0.3) + 's'" repeatCount="indefinite" />
+            <!-- A5：心事星点 = 你的心事（6~8颗，位置=时间X轴 20:00→06:00，大小=共鸣数，颜色=情绪） -->
+            <g v-for="(p, i) in windowStars" :key="'ws'+i">
+              <circle :cx="36 + p.x" :cy="24 + p.y" :r="p.r * 2.5" :fill="'url(#glow' + p.gid + ')'" opacity="0.85">
+                <animate attributeName="r" :values="(p.r*2.3)+';'+(p.r*2.8+0.5)+';'+(p.r*2.3)" :dur="(3.2 + i*0.35) + 's'" repeatCount="indefinite" />
               </circle>
-              <!-- 核心光斑（实际光） -->
-              <circle :cx="s.x" :cy="s.y" :r="s.r" :fill="s.color" opacity="0.95"
-                style="filter: drop-shadow(0 0 2px currentColor)" />
-              <!-- 标签：仅最大 3 颗标时间（子初三刻/丑时四刻） -->
-              <text v-if="s.tag" :x="s.x + s.r + 4" :y="s.y + 2"
-                font-size="5.5" fill="rgba(255,255,255,0.65)"
-                font-family="'Courier New', monospace">
-                {{ s.tag }}
+              <circle :cx="36 + p.x" :cy="24 + p.y" :r="p.r" :fill="p.fill" opacity="0.98" />
+              <!-- 大星标小标签：20:31 / 01:12 等 -->
+              <text v-if="p.label" :x="36 + p.x + p.r + 4" :y="24 + p.y + 2"
+                font-size="6" fill="rgba(240,240,255,0.62)"
+                font-family="'SF Mono', 'JetBrains Mono', 'Menlo', monospace">
+                {{ p.label }}
               </text>
             </g>
 
-            <!-- 地平线剪影：底部 30px 房屋/江岸/树（夜中黑色轮廓，上稍透） -->
-            <path d="M 0 210 L 0 200 L 14 200 L 20 188 L 30 192 L 36 182 L 48 186 L 54 178 L 66 180 L 74 172 L 82 180 L 94 176 L 106 184 L 118 180 L 128 172 L 138 178 L 148 170 L 160 176 L 174 170 L 186 178 L 200 172 L 212 182 L 224 176 L 238 184 L 250 178 L 264 186 L 278 180 L 290 188 L 304 184 L 320 190 L 320 240 L 0 240 Z"
-              fill="#05060f" />
-            <!-- 江上一排漏灯（窗户的光，在地平线处） -->
-            <rect x="28" y="194" width="1.6" height="1.6" fill="rgba(255,217,138,0.6)" />
-            <rect x="76" y="190" width="1.4" height="1.4" fill="rgba(255,217,138,0.5)" />
-            <rect x="150" y="187" width="1.6" height="1.6" fill="rgba(255,217,138,0.65)" />
-            <rect x="188" y="192" width="1.2" height="1.2" fill="rgba(202,167,255,0.55)" />
-            <rect x="256" y="191" width="1.5" height="1.5" fill="rgba(255,217,138,0.6)" />
-            <rect x="302" y="194" width="1.3" height="1.3" fill="rgba(202,167,255,0.5)" />
+            <!-- A6：城市天际线剪影（中景，高楼/电视塔/桥，y 170~218） -->
+            <path d="M 36 218 L 36 196
+              L 48 196 L 48 182 L 56 182 L 56 190 L 68 190 L 68 170 L 80 170 L 80 186
+              L 92 186 L 92 168 L 100 168 L 100 180 L 108 180 L 108 158 L 116 158 L 116 184
+              L 130 184 L 130 176 L 146 176 L 146 150 L 150 150 L 150 140 L 154 140 L 154 150 L 158 150 L 158 178
+              L 172 178 L 172 166 L 186 166 L 186 182 L 200 182 L 200 162 L 208 162 L 208 178 L 216 178 L 216 188
+              L 228 188 L 228 172 L 240 172 L 240 188 L 252 188 L 252 164 L 260 164 L 260 182 L 272 182 L 272 194
+              L 288 194 L 288 176 L 298 176 L 298 190 L 310 190 L 310 182 L 324 182 L 324 218 Z"
+              fill="#06070f" />
+            <!-- A7：城市灯火点点（高楼窗户），暖黄/冷白散点 -->
+            <g opacity="0.92">
+              <rect v-for="(l, i) in windowLights" :key="'wl'+i"
+                :x="36 + l.x" :y="l.y" :width="l.w" :height="l.h"
+                :fill="l.c" :rx="0.2" />
+            </g>
+            <!-- A8：远处 24h 便利店（标志性橙黄灯箱） -->
+            <g transform="translate(90, 200)">
+              <rect x="0" y="0" width="14" height="4" fill="#fff7e2" opacity="0.35" />
+              <rect x="1" y="0.6" width="12" height="2.8" fill="#ffb454" opacity="0.9" />
+            </g>
+
+            <!-- 【B】玻璃反光叠层（斜向暖带，微透明） -->
+            <rect x="36" y="24" width="288" height="194" fill="url(#glassReflect)" opacity="0.85" />
+            <!-- 玻璃上的细微指纹/水雾痕迹（两条很淡的弧线，暗示人靠在窗边） -->
+            <g opacity="0.07" stroke="#ffffff" stroke-width="1" fill="none">
+              <path d="M 120 90 Q 180 70 240 100" />
+              <path d="M 140 130 Q 200 118 260 150" />
+            </g>
+
+            <!-- 【C】窗框（木纹色或现代白）+ 中间十字窗棂 -->
+            <g>
+              <!-- 外框（加厚） -->
+              <rect x="24" y="14" width="312" height="216" rx="4" fill="none" stroke="#e9e6dd" stroke-width="7" />
+              <rect x="28" y="18" width="304" height="208" rx="2.5" fill="none" stroke="#cfc8b8" stroke-width="1" />
+              <!-- 中竖棂 -->
+              <rect x="177.5" y="14" width="5" height="216" fill="#e9e6dd" />
+              <!-- 中横棂 -->
+              <rect x="24" y="120.5" width="312" height="5" fill="#e9e6dd" />
+            </g>
+
+            <!-- 【D】窗帘（左右两侧米黄色，垂坠褶皱弧线） -->
+            <g>
+              <!-- 左帘 -->
+              <path d="M 0 0 L 30 0 L 26 260 L 0 260 Z" fill="#f4ecdd" />
+              <path d="M 26 0 Q 22 40 30 80 Q 20 130 28 180 Q 22 230 26 260" stroke="#d7c9ad" stroke-width="1.2" fill="none" opacity="0.55" />
+              <path d="M 18 0 Q 14 42 16 86 Q 10 134 18 182 Q 12 232 16 260" stroke="#d7c9ad" stroke-width="1" fill="none" opacity="0.45" />
+              <!-- 右帘 -->
+              <path d="M 330 0 L 360 0 L 360 260 L 334 260 Z" fill="#f4ecdd" />
+              <path d="M 334 0 Q 338 42 330 84 Q 340 132 332 182 Q 338 230 334 260" stroke="#d7c9ad" stroke-width="1.2" fill="none" opacity="0.55" />
+              <path d="M 342 0 Q 346 40 342 86 Q 350 134 344 184 Q 348 232 342 260" stroke="#d7c9ad" stroke-width="1" fill="none" opacity="0.45" />
+              <!-- 窗帘顶杆（金属银） -->
+              <rect x="-2" y="8" width="364" height="4" rx="2" fill="#bfc3c9" />
+            </g>
+
+            <!-- 【E】右下角的小物件：一只猫剪影趴在窗沿（生活感） -->
+            <g transform="translate(300, 226)" opacity="0.88">
+              <path d="M 0 0 L 2 0 L 4 -5 L 6 -2 L 8 -5 L 10 0 L 18 0 L 20 3 L 4 3 L 2 3 Z" fill="#0c0b18" />
+              <path d="M 8 0 Q 12 -3 18 -2 Q 22 -1 24 0 L 24 3 L 8 3 Z" fill="#0c0b18" />
+              <!-- 猫尾巴 -->
+              <path d="M 24 1 Q 32 -2 30 6 Q 29 10 24 9" stroke="#0c0b18" stroke-width="2.5" fill="none" stroke-linecap="round" />
+            </g>
           </svg>
         </div>
 
-        <!-- 右：这一夜的天空属性（月相/节气/夜温/风向/云量 等，不是恒星参数） -->
-        <div class="ca-sky-panel">
-          <!-- 夜名：夜雨孤灯 · 春分第三夜 -->
-          <div class="ca-sp-title">
-            <span class="ca-sp-name">{{ nightSky.name }}</span>
-            <span class="ca-sp-sub">{{ nightSky.season }}</span>
+        <!-- 右：深夜状态（现代生活感：时间/室温/台灯/音频/天气/便利店） -->
+        <div class="ca-win-panel">
+          <div class="ca-winp-clock">
+            <div class="ca-winp-time">02:47</div>
+            <div class="ca-winp-date">{{ winMeta.dateText }} · {{ winMeta.weekday }}</div>
           </div>
 
-          <!-- 天象：月相 + 节气（横向两个大卡） -->
-          <div class="ca-sp-phenomena">
-            <!-- 月相卡 -->
-            <div class="ca-sp-phenom">
-              <div class="ca-sp-ph-k">月相</div>
-              <div class="ca-sp-ph-moon">
-                <!-- 独立 SVG 月相小图 -->
-                <svg viewBox="-16 -16 32 32" width="40" height="40">
-                  <circle cx="0" cy="0" r="13" fill="rgba(245,240,228,0.9)" />
-                  <circle cx="3.8" cy="-2.2" r="12.3" fill="#14153a" />
-                </svg>
-                <div class="ca-sp-ph-moon-text">
-                  <div class="ca-sp-ph-moon-name">{{ nightSky.phase }}</div>
-                  <div class="ca-sp-ph-moon-pct">照度 {{ nightSky.moonIllum }}</div>
-                </div>
+          <!-- 4 张深夜状态微卡 -->
+          <div class="ca-winp-meta">
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">天气</div>
+              <div class="ca-winp-mv">{{ winMeta.weather }}</div>
+            </div>
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">室内温度</div>
+              <div class="ca-winp-mv">{{ winMeta.roomTemp }}°C</div>
+            </div>
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">室外</div>
+              <div class="ca-winp-mv">{{ winMeta.outTemp }}°C · 湿度 {{ winMeta.humidity }}%</div>
+            </div>
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">正在听</div>
+              <div class="ca-winp-mv">{{ winMeta.listening }}</div>
+            </div>
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">台灯</div>
+              <div class="ca-winp-mv">暖光 · {{ winMeta.lamp }} 亮度</div>
+            </div>
+            <div class="ca-winp-micro">
+              <div class="ca-winp-mk">楼下</div>
+              <div class="ca-winp-mv">{{ winMeta.store }} 还亮着</div>
+            </div>
+          </div>
+
+          <!-- 心事分布：横向小灯串（20:00 → 06:00，每小时一颗） -->
+          <div class="ca-winp-line">
+            <div class="ca-winp-line-k">今夜心事 · 时间分布</div>
+            <div class="ca-winp-track">
+              <span class="ca-winp-t-hour">20</span>
+              <div class="ca-winp-dots">
+                <span
+                  v-for="(d, i) in winMeta.hourly"
+                  :key="'wh'+i"
+                  class="ca-winp-dot"
+                  :class="{ 'is-peak': d.peak }"
+                  :style="{ '--d': d.v + '' }"
+                ></span>
               </div>
+              <span class="ca-winp-t-hour">06</span>
             </div>
-            <!-- 节气卡 -->
-            <div class="ca-sp-phenom">
-              <div class="ca-sp-ph-k">节气</div>
-              <div class="ca-sp-ph-term">
-                <!-- 小节气罗盘：24 节气点 + 标春分 -->
-                <svg viewBox="-20 -20 40 40" width="40" height="40">
-                  <!-- 24节气刻度盘 -->
-                  <circle cx="0" cy="0" r="17" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.6" />
-                  <g v-for="(a, i) in 24" :key="'s'+i">
-                    <line x1="0" y1="-17" x2="0" :y2="i % 3 === 0 ? -13.5 : -15"
-                      stroke="rgba(255,255,255,0.2)" stroke-width="0.4"
-                      :transform="`rotate(${i * 15})`" />
-                  </g>
-                  <!-- 春分指针（当前节气） -->
-                  <line x1="0" y1="0" x2="0" y2="-15" stroke="rgba(255,217,138,0.85)" stroke-width="1.2"
-                    :transform="`rotate(${nightSky.termDeg})`" stroke-linecap="round" />
-                  <circle cx="0" cy="0" r="2.2" fill="rgba(255,217,138,0.95)" />
-                </svg>
-                <div class="ca-sp-ph-moon-text">
-                  <div class="ca-sp-ph-moon-name">{{ nightSky.term }}</div>
-                  <div class="ca-sp-ph-moon-pct">黄经 {{ nightSky.ecliptic }}</div>
-                </div>
-              </div>
+            <div class="ca-winp-line-foot">
+              最常坐窗边的时刻：<b>{{ winMeta.peakHour }}</b>，共 {{ winMeta.peakCount }} 则心事
             </div>
           </div>
 
-          <!-- 夜的五大气象：时辰 夜温 风向 能见度 云量（网格） -->
-          <div class="ca-sp-meteo">
-            <div class="ca-sp-cell" v-for="m in nightSky.meteo" :key="m.k">
-              <div class="ca-sp-cell-k">{{ m.k }}</div>
-              <div class="ca-sp-cell-v" :style="{ color: m.color || 'inherit' }">{{ m.v }}</div>
-            </div>
-          </div>
-
-          <!-- 这一夜你留下的时辰分布（5 个时辰点：子时最密） -->
-          <div class="ca-sp-hours">
-            <div class="ca-sp-h-title">心事落点 · 时位</div>
-            <div class="ca-sp-h-track">
-              <!-- 横向小时带：子 丑 寅 卯 辰 -->
-              <div
-                v-for="(h, i) in nightSky.hourDots"
-                :key="'h'+i"
-                class="ca-sp-h-dot"
-                :style="{
-                  left: h.pos + '%',
-                  '--hd': h.color,
-                  width: h.size + 'px',
-                  height: h.size + 'px',
-                }"
-              ></div>
-            </div>
-            <div class="ca-sp-h-scale">
-              <span>子初</span><span>丑正</span><span>寅正</span><span>卯初</span>
-            </div>
-          </div>
-
-          <!-- 底部注释（不再提"虚拟星座"，而是说这是你那一夜的天空剖面） -->
-          <div class="ca-sp-foot">
+          <!-- 脚注：小说明 -->
+          <div class="ca-winp-foot">
             <component :is="Info" :size="9" />
-            <span>天空剖面：8 道光斑 = 你在子时到卯时留下的心事，大小=共鸣数，颜色=当时心情</span>
+            <span>窗外 {{ storyCount }} 颗小星 = 你的 {{ storyCount }} 则心事，大小=共鸣数，颜色=当时心情</span>
           </div>
         </div>
       </div>
@@ -232,7 +233,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 1. 夜观手记（=原合集画像，天空本色重构：笺卷卡→夜观小册+月相节气+五大天条，关键词→天空意象，维度→夜的气象五列）═══ -->
@@ -438,7 +439,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 2. 夜色流转（=原情感光谱，天空本色重构：左=横向天色渐变带+5颗时辰光球；右=星辰归属保留） + 3. 星辰归属 双栏═══ -->
@@ -645,7 +646,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 心事摘录 → 【天空本色】天窗片段（那一夜夜色里剪出来的几帧：时辰贴纸+插画窗+当夜属性）═══ -->
@@ -740,7 +741,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 4. 时辰热力 ═══ -->
@@ -790,7 +791,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 5. 共鸣榜 + 情感轨迹（双栏，情感轨迹替换原关键词云）═══ -->
@@ -861,7 +862,7 @@
     <!-- 【天色渐变分隔条】入夜 → 子夜 → 黎明 -->
     <div class="ca-sky-divider">
       <div class="csd-bar"></div>
-      <span class="csd-hours">子 · 丑 · 寅 · 卯</span>
+      <span class="csd-hours">20:00  —  02:47  —  06:00</span>
     </div>
 
     <!-- ═══ 8. 那夜的天官书（=原AI总叙，天空本色：夜览日志+夜半四刻+夜半自语+夜的尾注）═══ -->
@@ -1456,56 +1457,73 @@ const constellation = {
   ] as ConstellationStar[],
 }
 
-/** 【天空本色】合集 = 你自己的「那一夜」整片夜空（非编号星座，是真实的气象/时辰/月相/节气） */
-const nightSky = {
-  name: '夜雨孤灯 · 那一夜',
-  season: '甲辰年 · 春分后第三夜',
-  timeSpan: '子初 22:47 ~ 卯初 05:21',
-  // 月相：残月（春分后第三夜约为农历廿六，蛾眉月约22%照明）
-  phase: '残月 · 蛾眉',
-  moonIllum: '22%',
-  moonAge: '26.4 日龄',
-  // 节气：春分后 3 日（黄经 3°）
-  term: '春分后三',
-  ecliptic: 'λ 3°12′',
-  termDeg: 3 + 12 / 60 * 15,  // 黄经 3°12′ → 换算为节气盘角度（春分=0°，每15°一节）
-  // 五大夜天气象属性（对应原 5 个性格维度的重命名：不是行星，是夜本身）
-  meteo: [
-    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
-    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
-    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
-    { k: '能见度', v: '薄云 · 7.2km', color: '#95f0c0' },
-    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
-    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
-  ],
-  // 心事在时辰轴上的横向落点分布：子→丑→寅→卯 (0~100%)
-  hourDots: [
-    { pos: 10,  size: 12, color: '#ffd98a' },  // 子初 最密 思念
-    { pos: 22,  size: 8,  color: '#ffd98a' },  // 子正
-    { pos: 38,  size: 10, color: '#caa7ff' },  // 丑正 独坐
-    { pos: 52,  size: 5,  color: '#95f0c0' },  // 丑末
-    { pos: 66,  size: 7,  color: '#caa7ff' },  // 寅初 凌晨四点
-    { pos: 78,  size: 6,  color: '#95f0c0' },  // 寅正
-    { pos: 88,  size: 4,  color: '#86a8ff' },  // 卯初
-  ],
-}
-
-/** 【天空本色】8 则心事 = 那一夜里的 8 道光斑（不是编号星，是天空里真实的"亮痕"）
- *  x/y 对应 SVG viewBox 320x240 的夜剖面位置，y 越高=离天顶越近（子时）
- *  glowId 映射到 SVG 里的 radialGradient 名 Gold/Purple/Green/Blue
+/* ═══════════════════════════════════════════════════════════
+   【窗外夜景 · 生活风】Hero & 全局深夜元数据
+   ═══════════════════════════════════════════════════════════ */
+/**
+ * 心事星点 = 卧室窗户玻璃后的夜空小星
+ * 坐标区域：玻璃内 x=0~288, y=0~194（外层模板会自动加 36/24 的窗框偏移）
+ * x 横向对应时间 20:00 → 06:00（左=20点，右=6点）
+ * y 竖向 = 情绪高度（越靠上=情绪越亮/开心，越靠下=情绪越低落）
+ * r 大小 = 共鸣数（越大越亮）
+ * gid = Warm(暖黄·快乐) / Soft(柔蓝·平静) / Cozy(柔紫·思念)
  */
-const skyFlecks: { x: number; y: number; r: number; color: string; glowId: 'Gold' | 'Purple' | 'Green' | 'Blue'; tag?: string }[] = [
-  // Top 3 亮斑 + 时辰标签（子初三刻 / 丑正 / 寅正）
-  { x: 68,  y: 140, r: 4.8, color: '#ffd98a', glowId: 'Gold',   tag: '子初三刻' },  // 雨夜寄北 · 浓思
-  { x: 188, y: 78,  r: 4.5, color: '#caa7ff', glowId: 'Purple', tag: '丑正二刻' },  // 凌晨四点 · 独坐
-  { x: 152, y: 54,  r: 4.2, color: '#95f0c0', glowId: 'Green',  tag: '寅初一刻' },  // 江边走走 · 释然
-  // 剩下 5 颗（无时辰标签，散落在夜里不同时位）
-  { x: 106, y: 102, r: 3.0, color: '#ffd98a', glowId: 'Gold'   },  // 旧照片
-  { x: 86,  y: 164, r: 3.4, color: '#ff8b7d', glowId: 'Blue'   },  // 陌生人的话（红→映射Blue渐变，视觉OK）
-  { x: 214, y: 118, r: 2.8, color: '#86a8ff', glowId: 'Blue'   },  // 阳台种子
-  { x: 238, y: 158, r: 3.6, color: '#ffd98a', glowId: 'Gold'   },  // 故乡槐花
-  { x: 224, y: 188, r: 3.2, color: '#95f0c0', glowId: 'Green'  },  // 合上这一卷
+type WindowStar = {
+  x: number; y: number; r: number; fill: string; gid: 'Warm' | 'Soft' | 'Cozy'; label?: string
+}
+const windowStars: WindowStar[] = [
+  // Top 3 大心事（带时间标签）
+  { x: 42,  y: 98,  r: 4.8, fill: '#ffd98a', gid: 'Warm', label: '20:31' },  // 雨夜寄北 · 刚坐下
+  { x: 138, y: 62,  r: 4.5, fill: '#cdb4ff', gid: 'Cozy', label: '01:12' },  // 凌晨四点 · 最深的思念
+  { x: 206, y: 118, r: 4.1, fill: '#b4d4ff', gid: 'Soft', label: '03:04' },  // 江边走走 · 平复
+  // 其余 5 颗小星（随机分布）
+  { x: 82,  y: 80,  r: 3.0, fill: '#ffd98a', gid: 'Warm' },
+  { x: 116, y: 140, r: 3.2, fill: '#ffb8a8', gid: 'Warm' },
+  { x: 166, y: 100, r: 2.8, fill: '#b4d4ff', gid: 'Soft' },
+  { x: 232, y: 72,  r: 3.5, fill: '#ffd98a', gid: 'Warm' },
+  { x: 262, y: 130, r: 3.0, fill: '#cdb4ff', gid: 'Cozy' },
 ]
+
+/**
+ * 城市高楼窗户灯火点点（暖黄/冷白柔点 36 个，散落在天际线以上 160~210 区域）
+ */
+const windowLights = Array.from({ length: 36 }, (_, i) => {
+  const seed = i * 929 + 7
+  return {
+    x: (seed * 11) % 280,    // 0~280（玻璃宽288）
+    y: 168 + ((seed * 3) % 44), // 168~212
+    w: 1.3 + ((seed % 3) * 0.3),
+    h: 1.3 + ((seed % 2) * 0.4),
+    c: (i % 5 === 0)
+      ? 'rgba(180,210,255,0.70)'   // 冷白
+      : (i % 4 === 0)
+        ? 'rgba(255,200,160,0.75)' // 橙暖
+        : 'rgba(255,220,170,0.80)', // 暖黄（大多数）
+  }
+})
+
+/**
+ * 深夜元数据（面板右侧：时间/室温/台灯/音频/天气）
+ */
+const winMeta = {
+  dateText: '8月5日',
+  weekday: '周三',
+  weather: '小雨转晴',
+  roomTemp: 22.4,
+  outTemp: 18.1,
+  humidity: 68,
+  listening: '白噪音 · 雨打窗沿',
+  lamp: '30%',
+  store: '楼下 24h 便利店',
+  // 今夜心事 12 个小时的分布（20:00 → 06:00，共 12 格）
+  hourly: [
+    { v: 2 }, { v: 5 }, { v: 9, peak: true }, { v: 6 }, { v: 3 },
+    { v: 8, peak: true }, { v: 5 }, { v: 4 }, { v: 7 }, { v: 2 },
+    { v: 1 }, { v: 1 },
+  ],
+  peakHour: '凌晨 01:00 ~ 02:00',
+  peakCount: 9,
+}
 
 /** Top3 亮星名录（α/β/γ） */
 const brightStars = computed(() =>
@@ -4370,7 +4388,7 @@ function tagStyle(tag: string): Record<string, string> {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.02) inset,
     0 0 14px rgba(202, 167, 255, 0.10);
-  font-family: "STKaiti", "KaiTi", "楷体", serif;
+  font-family: "SF Mono", "JetBrains Mono", "Menlo", "Inter", sans-serif;
 }
 
 @media (max-width: 640px) {
@@ -4381,5 +4399,163 @@ function tagStyle(tag: string): Record<string, string> {
     font-size: 0.58rem;
     letter-spacing: 0.28em;
   }
+}
+
+/* ═══════════════════════════════════════════
+   【窗外夜景生活风 · Hero】卧室窗户全景
+   ═══════════════════════════════════════════ */
+.ca-window-night {
+  background: linear-gradient(180deg,
+    #12122a 0%, #171838 100%);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.ca-win-body {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 18px;
+  align-items: stretch;
+}
+.ca-win-canvas {
+  width: 100%;
+  border-radius: 14px;
+  background: #0a0b1e;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 8px 30px rgba(0,0,0,0.45);
+}
+.ca-win-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ca-win-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px;
+}
+/* 右上角时钟 */
+.ca-winp-clock {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg,
+    rgba(255,221,170,0.10) 0%,
+    rgba(180,180,255,0.06) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.ca-winp-time {
+  font-family: "SF Mono", "JetBrains Mono", "Menlo", monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: #fff2d4;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255,215,160,0.35);
+}
+.ca-winp-date {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  color: rgba(240,234,214,0.60);
+  letter-spacing: 0.08em;
+}
+/* 6 张深夜状态微卡 */
+.ca-winp-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ca-winp-micro {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.ca-winp-mk {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: rgba(220,220,240,0.45);
+  margin-bottom: 4px;
+}
+.ca-winp-mv {
+  font-size: 0.82rem;
+  color: rgba(255,248,228,0.90);
+  font-weight: 500;
+  line-height: 1.4;
+}
+/* 心事分布：横向小灯串 */
+.ca-winp-line {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.045);
+}
+.ca-winp-line-k {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: rgba(220,220,240,0.55);
+  margin-bottom: 10px;
+}
+.ca-winp-track {
+  display: grid;
+  grid-template-columns: 20px 1fr 20px;
+  align-items: center;
+  gap: 6px;
+}
+.ca-winp-t-hour {
+  font-family: "SF Mono", monospace;
+  font-size: 0.62rem;
+  color: rgba(220,220,240,0.45);
+  text-align: center;
+}
+.ca-winp-dots {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 28px;
+}
+.ca-winp-dot {
+  width: 100%;
+  height: calc(var(--d, 1) * 2.4px + 4px);
+  min-height: 4px;
+  border-radius: 999px 999px 2px 2px;
+  background: linear-gradient(180deg,
+    rgba(255,220,160,0.85),
+    rgba(255,220,160,0.35));
+  box-shadow: 0 0 5px rgba(255,210,150,0.25);
+  &.is-peak {
+    background: linear-gradient(180deg, #ffc46b, #ffb454);
+    box-shadow: 0 0 8px rgba(255,180,84,0.55);
+  }
+}
+.ca-winp-line-foot {
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: rgba(240,234,214,0.60);
+  b { color: #ffd98a; font-weight: 600; }
+}
+/* 脚注 */
+.ca-winp-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+  color: rgba(220,220,240,0.52);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .ca-win-body { grid-template-columns: 1fr; }
+  .ca-win-canvas { max-height: 320px; }
+  .ca-winp-time { font-size: 1.7rem; }
+}
+@media (max-width: 640px) {
+  .ca-winp-meta { grid-template-columns: 1fr 1fr; }
 }
 </style>
