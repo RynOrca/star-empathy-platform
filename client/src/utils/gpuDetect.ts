@@ -77,7 +77,6 @@ export function getRenderParams(tier: RenderTier): {
   instancedMesh: boolean
   bloom: boolean
   vignette: boolean
-  meteorParticles: number
   /** 设备像素比上限（OPT-29）：限制 DPR 防止高分屏 GPU 过载 */
   maxDpr: number
   /** 标签显示模式（OPT-26）：'all' 显示所有标签，'major-only' 仅主要天体，'none' 低端降级 */
@@ -88,9 +87,9 @@ export function getRenderParams(tier: RenderTier): {
   antialias: boolean
 } {
   switch (tier) {
-    case 'high':   return { sphereSegments: [64, 32], starCount: 2000, instancedMesh: true,  bloom: true,  vignette: true,  meteorParticles: 60, maxDpr: 3, antialias: true,  labelMode: 'all',         labelLODDistance: 280 }
-    case 'medium': return { sphereSegments: [32, 16], starCount: 1000, instancedMesh: true,  bloom: true,  vignette: false, meteorParticles: 40, maxDpr: 2, antialias: false, labelMode: 'major-only',  labelLODDistance: 200 }
-    case 'low':    return { sphereSegments: [16, 12], starCount: 512,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 20, maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
-    case 'fallback': return { sphereSegments: [8, 6], starCount: 256,  instancedMesh: false, bloom: false, vignette: false, meteorParticles: 0,  maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
+    case 'high':   return { sphereSegments: [64, 32], starCount: 2000, instancedMesh: true,  bloom: true,  vignette: true,  maxDpr: 3, antialias: true,  labelMode: 'all',         labelLODDistance: 280 }
+    case 'medium': return { sphereSegments: [32, 16], starCount: 1000, instancedMesh: true,  bloom: true,  vignette: false, maxDpr: 2, antialias: false, labelMode: 'major-only',  labelLODDistance: 200 }
+    case 'low':    return { sphereSegments: [16, 12], starCount: 512,  instancedMesh: false, bloom: false, vignette: false, maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
+    case 'fallback': return { sphereSegments: [8, 6], starCount: 256,  instancedMesh: false, bloom: false, vignette: false, maxDpr: 1, antialias: false, labelMode: 'none',        labelLODDistance: 0 }
   }
 }

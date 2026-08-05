@@ -180,7 +180,6 @@
 | `starInfo.ts` | 恒星附加信息（星座中文名、距离） |
 | `asteroids.ts` | 小行星数据 |
 | `comets.ts` | 彗星数据 |
-| `meteorShowers.ts` | 流星雨数据 |
 
 ### 工具 `src/utils/`
 
