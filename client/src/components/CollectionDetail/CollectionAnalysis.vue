@@ -1,74 +1,47 @@
 <template>
   <div class="ca-wrap">
-    <!-- ─── 全局三态：Too Few Stories（< 3，不生成） ─── -->
-    <div v-if="tooFewStories" class="ca-state-wrap">
-      <div class="panel-wrapper ca-state-card ca-state-scant">
-        <div class="panel-head">
-          <Sparkles :size="10" class="pw-icon pw-purple" />
-          <span class="pw-title">AI 星笺解读</span>
-          <span class="pw-count">未生成</span>
-        </div>
-        <div class="persona-empty empty-scant">
-          <div class="pe-icon-wrap pe-scant">
-            <BookDashed :size="14" />
-          </div>
-          <div class="pe-text">
-            <div class="pe-title">心事还不够多</div>
-            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 将为这卷星笺生成专属解读</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── 全局三态：Loading（生成中骨架） ─── -->
-    <div v-else-if="isLoading" class="ca-state-wrap">
-      <div class="panel-wrapper ca-state-card ca-state-loading">
-        <div class="panel-head">
-          <Sparkles :size="10" class="pw-icon pw-purple" />
-          <span class="pw-title">AI 星笺解读</span>
-          <span class="pw-count">生成中</span>
-        </div>
-        <div class="persona-empty empty-loading">
-          <div class="pe-icon-wrap pe-loading">
-            <Sparkle :size="14" class="spin-slow" />
-          </div>
-          <div class="pe-text">
-            <div class="pe-title">AI 星笺解读生成中…</div>
-            <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合夜色轨迹与情绪光谱</div>
-          </div>
-          <div class="skeleton-lines">
-            <span class="sk-line sk-1"></span>
-            <span class="sk-line sk-2"></span>
-            <span class="sk-line sk-3"></span>
-            <span class="sk-line sk-2"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── 全局三态：Real（ready=true，所有真实内容） ─── -->
-    <template v-else>
-    <!-- ═══ 0. 顶部标识条 ═══ -->
+    <!-- 顶部 LIVE 标识条（全局显示） -->
     <div class="ca-hero-strip">
       <div class="ca-hero-left">
         <Sparkles :size="13" class="ca-hero-spark" />
         <span class="ca-hero-label">AI 星笺解读</span>
         <span class="ca-hero-sub">· 基于 {{ displayStoryCount }} 则心事的聚合凝视</span>
       </div>
-      <span class="ca-hero-badge">LIVE</span>
+      <span class="ca-hero-badge"
+        :class="hasError ? 'is-error' : tooFewStories ? 'is-standby' : isLoading ? 'is-loading' : 'is-live'">
+        {{ hasError ? '失败' : tooFewStories ? '待生成' : isLoading ? '生成中' : 'LIVE' }}
+      </span>
     </div>
 
-    <!-- ═══ 0.5. Hero：合集星图总览 + 星辰归属置顶（对齐 StarDetail AIPersonaCard 规范）
-                    左 = 星点散点图（放大：心事=星 x=时间 y=情绪 r=共鸣 color=情感色）
-                    右 = 这组星的品质（光谱/星等/星座/地平，从props真实派生） ═══ -->
+    <!-- 全局错误条：API 失败时显示（带重试按钮） -->
+    <div v-if="hasError" class="ca-error-strip">
+      <div class="ca-error-left">
+        <AlertTriangle :size="13" class="ca-error-icon" />
+        <span class="ca-error-label">解读加载失败</span>
+        <span class="ca-error-msg">{{ collAnalysis.error.value }}</span>
+      </div>
+      <button class="ca-error-retry" @click="onRetryAnalysis">
+        <RotateCcw :size="11" />
+        重试
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         ① 星辰归属 · 这组星的品质（独立三态 panel）
+         ═══════════════════════════════════════════════════════════ -->
     <section class="panel-wrapper ca-hero-panel">
       <div class="panel-head">
         <Sparkles :size="10" class="pw-icon pw-purple" />
         <span class="pw-title">星辰归属 · 这组星的品质</span>
-        <span class="pw-count">{{ storyCount }} 则心事 · {{ starBelongings.length }} 颗星 · 刚刚更新</span>
+        <span class="pw-count">{{
+          hasReal
+            ? `${storyCount} 则心事 · ${starBelongings.length} 颗星 · 刚刚更新`
+            : tooFewStories ? '未生成' : '生成中'
+        }}</span>
       </div>
 
-      <div class="ca-hero-body ca-hero-body-stats">
+      <!-- 真实态：星辰星图 + 右栏 4小指标 + 光谱 + 星座Top -->
+      <div v-if="hasReal" class="ca-hero-body ca-hero-body-stats">
         <!-- 左：【只有星辰归属黑色星空板块 .ca-starmap-wrap】（其他信息全部移到右栏！） -->
         <div class="ca-h-left-block">
           <div class="ca-starmap-wrap ca-h-starmap-wrap">
@@ -235,18 +208,50 @@
           </div>
         </div>
       </div>
+
+      <!-- tooFew：空态 -->
+      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+        <div class="pe-icon-wrap pe-scant">
+          <BookDashed :size="14" />
+        </div>
+        <div class="pe-text">
+          <div class="pe-title">心事还不够多</div>
+          <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 将为这卷星笺生成「星辰归属 · 星图」</div>
+        </div>
+      </div>
+
+      <!-- loading：骨架屏 -->
+      <div v-else class="persona-empty empty-loading">
+        <div class="pe-icon-wrap pe-loading">
+          <Sparkle :size="14" class="spin-slow" />
+        </div>
+        <div class="pe-text">
+          <div class="pe-title">星辰归属星图生成中…</div>
+          <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合星名、星座连线与星品信息</div>
+        </div>
+        <div class="skeleton-lines">
+          <span class="sk-line sk-1"></span>
+          <span class="sk-line sk-2"></span>
+          <span class="sk-line sk-3"></span>
+        </div>
+      </div>
     </section>
 
 
 
-    <!-- ═══ 1. 夜观手记（=原合集画像，天空本色重构：笺卷卡→夜观小册+月相节气+五大天条，关键词→天空意象，维度→夜的气象五列）═══ -->
-    <section class="ca-card ca-persona ca-night-notes">
-      <div class="ca-card-head">
-        <component :is="Sparkles" :size="12" class="ca-ch-icon ca-ch-blue" />
-        <span class="ca-ch-title">夜观手记</span>
-        <span class="ca-ch-count">{{ nightSky.phase }} · {{ nightSky.term }} · {{ storyCount }} 处光斑</span>
+    <!-- ═══ 1. 夜观手记（独立三态 panel） ═══ -->
+    <section class="panel-wrapper ca-night-notes">
+      <div class="panel-head">
+        <Sparkles :size="10" class="pw-icon pw-blue" />
+        <span class="pw-title">夜观手记</span>
+        <span class="pw-count">{{
+          hasReal
+            ? `${nightSky.phase} · ${nightSky.term} · ${storyCount} 处光斑`
+            : tooFewStories ? '未生成' : '生成中'
+        }}</span>
       </div>
-      <div class="ca-persona-body">
+
+      <div v-if="hasReal" class="ca-persona-body">
         <!-- 左：夜观小册笺卷（不再有星格/天文参数，改成夜的五个小条：时跨/夜温/风向/见月/云量） -->
         <div class="ca-scroll-card ca-sc-night">
           <div class="sc-corner sc-tl"></div>
@@ -369,20 +374,47 @@
 
         </div>
       </div>
+
+      <!-- tooFew 空态 -->
+      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+        <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+        <div class="pe-text">
+          <div class="pe-title">心事还不够多</div>
+          <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 生成「夜观手记 · 月色与气象」</div>
+        </div>
+      </div>
+      <!-- loading 骨架屏 -->
+      <div v-else class="persona-empty empty-loading">
+        <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+        <div class="pe-text">
+          <div class="pe-title">夜观手记生成中…</div>
+          <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合月相、节气、夜温与五大气象</div>
+        </div>
+        <div class="skeleton-lines">
+          <span class="sk-line sk-1"></span>
+          <span class="sk-line sk-2"></span>
+          <span class="sk-line sk-3"></span>
+        </div>
+      </div>
     </section>
 
 
 
-    <!-- ═══ 2. 夜色流转 + 心事投递时间轨迹（双栏平级：左=夜色流转卡带滚动条；右=心事轨迹卡，两卡等高） ═══ -->
+    <!-- ═══ 2. 夜色流转 + 心事投递时间轨迹（双栏：左右都是独立三态 panel） ═══ -->
     <div class="ca-night-track-wrap">
-      <!-- 左：夜色流转（独立卡片，内部overflow滚动条） -->
-      <section class="ca-card ca-emotion ca-night-flow ca-night-flow-left">
-        <div class="ca-card-head">
-          <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-          <span class="ca-ch-title">夜色流转</span>
-          <span class="ca-ch-count">子流 → 卯散 · {{ emotions.length }} 种夜色</span>
+      <!-- 左：夜色流转（独立三态 panel，内部 overflow 滚动条） -->
+      <section class="panel-wrapper ca-night-flow ca-night-flow-left">
+        <div class="panel-head">
+          <MoonStar :size="10" class="pw-icon pw-gold" />
+          <span class="pw-title">夜色流转</span>
+          <span class="pw-count">{{
+            hasReal
+              ? `子流 → 卯散 · ${emotions.length} 种夜色`
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
         </div>
-        <div class="ca-emotion-body ca-night-scroll">
+
+        <div v-if="hasReal" class="ca-emotion-body ca-night-scroll">
           <div class="ca-emo-left ca-emo-left-full">
             <!-- 发光球展示：完全对齐 StarDetail emotion-orbs 结构 → flex row 水平一条线均匀分布 -->
             <div class="emotion-orbs ca-night-orbs">
@@ -403,32 +435,16 @@
               </span>
             </div>
 
-            <!-- 情绪洞察卡：夜刻头标签 + 夜色属性 -->
+            <!-- 情绪回顾卡：情感名 · 占% + 故事内容回顾（不再有天文/时辰装饰） -->
             <div class="ca-emo-insights">
-              <div class="ca-ei-card ca-ei-card-night" v-for="(ins, i) in emotionInsights" :key="i">
-                <span class="ca-ei-dot" :style="{ background: ins.color, boxShadow: `0 0 5px ${ins.color}` }"></span>
-                <div class="ca-ei-text">
-                  <div class="ca-ei-title" :style="`--c:${ins.color}`">
-                    <span class="ca-ei-title-name" v-html="ins.title"></span>
-                    <span class="ca-ei-night-hour" :style="{ color: ins.color }">
-                      {{ (['子时末','丑正二刻','寅初一刻','寅正三刻'])[i] ?? '卯初初刻' }}
-                    </span>
+              <div class="ca-ei-card ca-ei-card-night ca-ei-review" v-for="(c, i) in emotionReviewCards" :key="i">
+                <span class="ca-ei-dot ca-ei-dot-review" :style="{ background: c.color, boxShadow: `0 0 6px ${c.color}88` }"></span>
+                <div class="ca-ei-text ca-ei-text-review">
+                  <div class="ca-ei-title ca-ei-title-review" :style="`--c:${c.color}`">
+                    <span class="ca-ei-title-name ca-ei-name-pct">{{ c.name }} · {{ c.pct }}</span>
+                    <span v-if="c.tag" class="ca-ei-story-tag" :style="{ color: c.color, borderColor: c.color + '66' }">#{{ c.tag }}</span>
                   </div>
-                  <div class="ca-ei-astro ca-ei-night-meteo">
-                    <span class="ca-ei-astro-item">
-                      <i class="ca-ei-astro-k">相</i>
-                      <i class="ca-ei-astro-v" :style="{ color: ins.color }">{{ (['残月','残月','蛾眉','蛾眉','上弦'])[i] ?? '残月' }}</i>
-                    </span>
-                    <span class="ca-ei-astro-item">
-                      <i class="ca-ei-astro-k">云</i>
-                      <i class="ca-ei-astro-v">{{ (['3/8','4/8','2/8','4/8','1/8'])[i] ?? '3/8' }}</i>
-                    </span>
-                    <span class="ca-ei-astro-item">
-                      <i class="ca-ei-astro-k">温</i>
-                      <i class="ca-ei-astro-v">{{ ([11.4,10.8,11.2,12.1,12.9])[i] ?? 11 }}℃</i>
-                    </span>
-                  </div>
-                  <div class="ca-ei-desc">{{ ins.desc }}</div>
+                  <div class="ca-ei-desc ca-ei-desc-review">{{ c.desc }}</div>
                 </div>
               </div>
             </div>
@@ -441,10 +457,6 @@
                 是这一夜的底色，
                 {{ emotionNarrative.summary }}
               </p>
-              <p class="ca-emo-para ca-emo-para-sub">
-                <i class="ca-emo-ms-label ca-emo-nl-label">夜 · 浓淡</i>
-                {{ emotionNarrative.contrast }}
-              </p>
               <p class="ca-emo-para ca-emo-para-flow">
                 <component :is="Sparkles" :size="10" class="ca-emo-flow-icon" />
                 {{ emotionNarrative.flow }}
@@ -452,16 +464,44 @@
             </div>
           </div>
         </div>
+
+        <!-- tooFew 空态 -->
+        <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+          <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+          <div class="pe-text">
+            <div class="pe-title">心事还不够多</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 生成「夜色流转 · 情绪光谱」</div>
+          </div>
+        </div>
+        <!-- loading 骨架 -->
+        <div v-else class="persona-empty empty-loading">
+          <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+          <div class="pe-text">
+            <div class="pe-title">夜色情绪光谱生成中…</div>
+            <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合情感光谱、夜色叙事与情绪球</div>
+          </div>
+          <div class="skeleton-lines">
+            <span class="sk-line sk-1"></span>
+            <span class="sk-line sk-2"></span>
+            <span class="sk-line sk-3"></span>
+          </div>
+        </div>
       </section>
 
-      <!-- 右：心事投递时间轨迹（平级独立卡片，与左等高） -->
-      <section class="ca-card ca-night-side-track">
-        <div class="ca-card-head">
-          <component :is="Clock3" :size="11" class="ca-ch-icon ca-ch-purple" />
-          <span class="ca-ch-title">心事投递时间轨迹</span>
-          <span class="ca-ch-count">{{ heroStars.length }} 段 · 连线=时间轨迹</span>
+      <!-- 右：心事投递时间轨迹（独立三态 panel，与左等高） -->
+      <section class="panel-wrapper ca-night-side-track">
+        <div class="panel-head">
+          <Clock3 :size="10" class="pw-icon pw-purple" />
+          <span class="pw-title">心事投递时间轨迹</span>
+          <span class="pw-count">{{
+            hasReal
+              ? `${heroStars.length} 段 · 连线=时间轨迹`
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
         </div>
-        <div class="ca-emotion-body ca-track-body">
+
+        <!-- 真实态：轨迹图 + 图例 + 4统计 + 说明 -->
+        <div v-if="hasReal" class="ca-emotion-body ca-track-body">
           <div class="ca-emo-right ca-emo-side-track ca-track-inner">
             <svg viewBox="0 0 420 280" class="ca-et-svg" preserveAspectRatio="xMidYMid meet">
               <defs>
@@ -577,110 +617,50 @@
             </p>
           </div>
         </div>
+
+        <!-- tooFew：空态（所有框都要显示，只是内部提示不够） -->
+        <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+          <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+          <div class="pe-text">
+            <div class="pe-title">心事还不够多</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 画出「投递时刻 × 情绪」的时间轨迹</div>
+          </div>
+        </div>
+
+        <!-- loading：骨架屏 -->
+        <div v-else class="persona-empty empty-loading">
+          <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+          <div class="pe-text">
+            <div class="pe-title">心事时间轨迹生成中…</div>
+            <div class="pe-sub">正在按投递时辰串起 {{ displayStoryCount }} 则心事的星群轨迹线</div>
+          </div>
+          <div class="skeleton-lines">
+            <span class="sk-line sk-1"></span>
+            <span class="sk-line sk-2"></span>
+            <span class="sk-line sk-3"></span>
+          </div>
+        </div>
       </section>
     </div>
 
 
 
-    <!-- ═══ 心事摘录 → 【天空本色】天窗片段（那一夜夜色里剪出来的几帧：时辰贴纸+插画窗+当夜属性）═══ -->
-    <section class="ca-card ca-quote ca-quote-sky">
-      <div class="ca-card-head">
-        <component :is="MoonStar" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">天窗片段</span>
-        <span class="ca-ch-count">子·丑·寅·卯 · {{ storyQuotes.length }} 帧 · 心事剪成的夜色</span>
-      </div>
-      <div class="ca-q-body">
-        <div class="ca-q-list">
-          <div class="ca-q-item ca-q-item-sky" v-for="(q, i) in storyQuotes" :key="i">
-            <!-- 左上：α/β/γ 亮星徽章 → 改成「时辰贴纸」（子初三刻 / 丑正二刻 / 寅初一刻） -->
-            <span class="ca-q-rank ca-q-sticker" :style="{ '--c': q.color }">
-              <i>{{ (['子初三刻','丑正二刻','寅初一刻'])[i % 3] }}</i>
-            </span>
-
-            <!-- 左 SVG 插画：保留月/屋/花，但套一层「夜色小窗」方形外框（把插画嵌进窗里，窗内=天色） -->
-            <!-- 窗 = 4px 边框 + 内部天色渐变（夜色蓝紫） + 边角残灯点 -->
-            <div class="ca-q-skywindow">
-              <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="ca-q-illus">
-                <circle cx="14" cy="18" r="1" fill="#fff" opacity="0.5" />
-                <circle cx="45" cy="44" r="0.7" fill="#fff" opacity="0.4" />
-                <circle cx="30" cy="10" r="0.5" fill="#fff" opacity="0.3" />
-                <circle cx="50" cy="28" r="0.8" fill="#fff" opacity="0.45" />
-                <path d="M42 28 a16 16 0 1 0 0 20 a12 12 0 1 1 0 -20z" fill="#ffd98a" opacity="0.62" />
-              </svg>
-              <svg v-else-if="q.illus === 'house'" viewBox="0 0 60 60" class="ca-q-illus">
-                <circle cx="10" cy="20" r="0.7" fill="#fff" opacity="0.35" />
-                <circle cx="52" cy="16" r="0.6" fill="#fff" opacity="0.3" />
-                <path d="M30 14 L14 28 L18 28 L18 48 L42 48 L42 28 L46 28 Z"
-                  fill="none" stroke="rgba(255,217,138,0.55)" stroke-width="1.2" stroke-linejoin="round" />
-                <rect x="26" y="36" width="8" height="12" fill="none" stroke="rgba(255,217,138,0.42)" stroke-width="1" />
-                <rect x="21" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
-                <rect x="34" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
-                <path d="M36 14 Q34 10 38 8 Q40 6 36 4" fill="none" stroke="rgba(202,167,255,0.45)" stroke-width="0.8" stroke-linecap="round" />
-              </svg>
-              <svg v-else viewBox="0 0 60 60" class="ca-q-illus">
-                <circle cx="16" cy="50" r="0.7" fill="#fff" opacity="0.35" />
-                <circle cx="48" cy="52" r="0.6" fill="#fff" opacity="0.3" />
-                <g stroke="rgba(251,182,206,0.58)" stroke-width="0.85" fill="none">
-                  <path d="M30 52 L30 20" />
-                  <path d="M30 32 L18 24 M30 28 L44 18 M30 38 L22 32" />
-                </g>
-                <g fill="rgba(251,182,206,0.7)">
-                  <circle cx="18" cy="24" r="1.5" /><circle cx="44" cy="18" r="1.3" />
-                  <circle cx="22" cy="32" r="1.2" /><circle cx="38" cy="36" r="1.1" />
-                  <circle cx="30" cy="18" r="1.2" /><circle cx="26" cy="26" r="1" />
-                </g>
-                <circle cx="20" cy="44" r="0.9" fill="rgba(251,182,206,0.55)" />
-                <circle cx="40" cy="46" r="0.8" fill="rgba(251,182,206,0.48)" />
-              </svg>
-              <!-- 夜色窗的 4 角 窗棂点（残灯/光斑） -->
-              <i class="ca-q-sw-corner tl"></i>
-              <i class="ca-q-sw-corner tr"></i>
-              <i class="ca-q-sw-corner bl"></i>
-              <i class="ca-q-sw-corner br"></i>
-            </div>
-
-            <!-- 右：正文（顶部新增「当夜时间 + 夜属性」行，替代亮星星名+天文参数） -->
-            <div class="ca-q-body-inner">
-              <div class="ca-q-mark" :style="{ color: q.color }">"</div>
-              <!-- 那一夜的时间 + 夜属性（残月 / 11.4℃ / 云量 3成）：替代 MAG/DIST -->
-              <div class="ca-q-star-head ca-q-night-head">
-                <span class="ca-q-star-name" :style="{ color: q.color }">
-                  <!-- 左侧时辰名替代 α 雨夜寄北：子初三刻 + 星名（原星名保留，颜色+楷体）-->
-                  <i class="ca-q-star-greek ca-q-sky-greek" :style="{ color: q.color }">
-                    {{ (['子初三刻','丑正二刻','寅初一刻'])[i % 3] }}
-                  </i>
-                  · {{ q.starName }}
-                </span>
-                <span class="ca-q-star-astro ca-q-night-astro">
-                  <!-- 替代 MAG/DIST/TYPE：月相 / 夜温 / 云量 -->
-                  <span><i>相</i>{{ (['残月','残月','蛾眉'])[i % 3] }}</span>
-                  <span><i>温</i>{{ ([11.4, 10.8, 11.6])[i % 3] }}℃</span>
-                  <span><i>云</i>{{ (['3/8','4/8','2/8'])[i % 3] }}</span>
-                </span>
-              </div>
-              <div class="ca-q-text">{{ q.text }}</div>
-              <div class="ca-q-meta">
-                <span class="ca-q-tag" v-for="t in q.tags" :key="t">#{{ t }}</span>
-                <span class="ca-q-spacer"></span>
-                <span class="ca-q-author">{{ q.author }}</span>
-                <span class="ca-q-date">· {{ q.date }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
 
 
     <!-- ═══ 4. 时辰热力 ═══ -->
-    <section class="ca-card ca-hour">
-      <div class="ca-card-head">
-        <component :is="Clock3" :size="12" class="ca-ch-icon ca-ch-purple" />
-        <span class="ca-ch-title">时辰热力</span>
-        <span class="ca-ch-count">高峰 {{ pad(peakHour) }}:00 · 低谷 {{ pad(lowHour) }}:00</span>
+    <section class="panel-wrapper ca-hour">
+      <div class="panel-head">
+        <Clock3 :size="10" class="pw-icon pw-purple" />
+        <span class="pw-title">时辰热力</span>
+        <span class="pw-count">{{
+          hasReal
+            ? `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`
+            : tooFewStories ? '未生成' : '生成中'
+        }}</span>
       </div>
-      <div class="ca-hour-body">
+
+      <!-- 真实态：珠子热力图 + 十二地支轴 + 高峰低谷洞察 -->
+      <div v-if="hasReal" class="ca-hour-body">
         <div class="ca-hour-beads">
           <span
             v-for="(v, h) in hourly"
@@ -715,6 +695,29 @@
           </div>
         </div>
       </div>
+
+      <!-- tooFew：空态（所有框都要显示，只是内部提示不够） -->
+      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+        <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+        <div class="pe-text">
+          <div class="pe-title">心事还不够多</div>
+          <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 画出「子丑寅卯…」十二时辰热力珠</div>
+        </div>
+      </div>
+
+      <!-- loading：骨架屏 -->
+      <div v-else class="persona-empty empty-loading">
+        <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+        <div class="pe-text">
+          <div class="pe-title">时辰热力生成中…</div>
+          <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合 24 时辰投递高峰</div>
+        </div>
+        <div class="skeleton-lines">
+          <span class="sk-line sk-1"></span>
+          <span class="sk-line sk-2"></span>
+          <span class="sk-line sk-3"></span>
+        </div>
+      </div>
     </section>
 
 
@@ -722,13 +725,17 @@
     <!-- ═══ 5. 共鸣榜 + 情感轨迹（双栏，情感轨迹替换原关键词云）═══ -->
     <div class="ca-duo">
       <!-- 共鸣榜 -->
-      <section class="ca-card ca-rank">
-        <div class="ca-card-head">
-          <component :is="Flame" :size="12" class="ca-ch-icon ca-ch-orange" />
-          <span class="ca-ch-title">共鸣榜</span>
-          <span class="ca-ch-count">Top {{ rankList.length }}</span>
+      <section class="panel-wrapper ca-rank">
+        <div class="panel-head">
+          <Flame :size="10" class="pw-icon" style="color: #ffb877" />
+          <span class="pw-title">共鸣榜</span>
+          <span class="pw-count">{{
+            hasReal ? `Top ${rankList.length}` : tooFewStories ? '未生成' : '生成中'
+          }}</span>
         </div>
-        <div class="ca-rank-body">
+
+        <!-- 真实态：共鸣 Top3 列表 -->
+        <div v-if="hasReal" class="ca-rank-body">
           <article
             v-for="(r, i) in rankList"
             :key="r.id"
@@ -741,26 +748,55 @@
               <div class="ca-rank-summary">{{ r.summary }}</div>
             </div>
             <div class="ca-rank-res">
-              <component :is="Heart" :size="11" />
+              <Heart :size="11" />
               <span>{{ r.resonance }}</span>
             </div>
           </article>
         </div>
+
+        <!-- tooFew 空态 -->
+        <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+          <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+          <div class="pe-text">
+            <div class="pe-title">心事还不够多</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 排出 Top3 共鸣榜</div>
+          </div>
+        </div>
+
+        <!-- loading 骨架 -->
+        <div v-else class="persona-empty empty-loading">
+          <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+          <div class="pe-text">
+            <div class="pe-title">共鸣榜生成中…</div>
+            <div class="pe-sub">正在按共鸣值排序 {{ displayStoryCount }} 则心事</div>
+          </div>
+          <div class="skeleton-lines">
+            <span class="sk-line sk-1"></span>
+            <span class="sk-line sk-2"></span>
+            <span class="sk-line sk-3"></span>
+          </div>
+        </div>
       </section>
 
       <!-- 情感轨迹（从原独立全宽位移入双栏，限高滚动+渐隐+展开） -->
-      <section class="ca-card ca-trajectory">
-        <div class="ca-card-head">
-          <component :is="Route" :size="12" class="ca-ch-icon ca-ch-green" />
-          <span class="ca-ch-title">情感轨迹</span>
-          <span class="ca-ch-count">{{ trajectory.length }} 则</span>
+      <section class="panel-wrapper ca-trajectory">
+        <div class="panel-head">
+          <Route :size="10" class="pw-icon pw-green" />
+          <span class="pw-title">情感轨迹</span>
+          <span class="pw-count">{{
+            hasReal
+              ? (hasReal ? `${trajectory.length} 则` : '')
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
           <button
-            v-if="trajectory.length > 3"
+            v-if="hasReal && trajectory.length > 3"
             class="ca-traj-toggle"
             @click="trajExpanded = !trajExpanded"
           >{{ trajExpanded ? '收起' : '展开' }}</button>
         </div>
-        <div class="ca-traj-scroll" :class="{ expanded: trajExpanded }">
+
+        <!-- 真实态：轨迹时间线 -->
+        <div v-if="hasReal" class="ca-traj-scroll" :class="{ expanded: trajExpanded }">
           <div class="ca-traj-body">
             <div class="ca-traj-line"></div>
             <div
@@ -781,6 +817,29 @@
             </div>
           </div>
         </div>
+
+        <!-- tooFew 空态 -->
+        <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+          <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
+          <div class="pe-text">
+            <div class="pe-title">心事还不够多</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 串联情感时间线</div>
+          </div>
+        </div>
+
+        <!-- loading 骨架 -->
+        <div v-else class="persona-empty empty-loading">
+          <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
+          <div class="pe-text">
+            <div class="pe-title">情感轨迹生成中…</div>
+            <div class="pe-sub">正在按时间串联 {{ displayStoryCount }} 则心事的情绪节点</div>
+          </div>
+          <div class="skeleton-lines">
+            <span class="sk-line sk-1"></span>
+            <span class="sk-line sk-2"></span>
+            <span class="sk-line sk-3"></span>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -788,11 +847,9 @@
 
     <!-- 底部说明（设计预览标记）-->
     <div class="ca-foot-note">
-      <component :is="Info" :size="11" />
+      <Info :size="11" />
       <span>AI 解读内容由 agent 根据合集中的心事实时聚合生成。</span>
     </div>
-    </template>
-    <!-- /v-else real state -->
   </div>
 </template>
 
@@ -800,7 +857,7 @@
 import { computed, ref, toRef } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
-  Feather, Info, Quote, CloudSun, Sparkle, BookDashed,
+  Feather, Info, Quote, CloudSun, Sparkle, BookDashed, AlertTriangle, RotateCcw,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -837,30 +894,38 @@ defineEmits<{
 const collId = toRef(props, 'collectionId')
 const collAnalysis = useCollectionAnalysis(collId)
 
-// ─── 三态开关（与 StarDetail AIPersonaCard 保持完全一致的优先级） ───
-// 1) 后端 tooFewStories=true OR props.storyCount < 3 → 心事不够多，不生成
-// 2) collAnalysis.loading=true OR (analysis ready=false AND not tooFew) → 生成中骨架
-// 3) else → 真实数据
-const tooFewStories = computed(() => {
-  if (hasReal.value) return false
-  const fromApi = collAnalysis.analysis.value?.tooFewStories
-  if (fromApi === true) return true
-  if (collAnalysis.analysis.value?.ready) return false // API 明确 ready 但没 tooFew → 认为可以
-  return (props.storyCount ?? 0) < 3
-})
+// ─── 三态开关（优先级：hasError > hasReal > tooFewStories > isLoading） ───
+// 1) hasError：API 请求失败 → 全局红色 error 条 + 每个 section 内部 v-else 显示错误
+// 2) hasReal：analysis.ready=true 且 nightscape 存在（合集核心） → 真实数据（persona 可空，有兜底）
+// 3) tooFewStories：后端 tooFew=true 或 props.storyCount<3 → 心事不够多
+// 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew） → 生成中骨架
+const hasError = computed(() => !!collAnalysis.error.value)
 
 const hasReal = computed(() => {
   const a = collAnalysis.analysis.value
-  if (!a || !a.ready) return false
-  return !!(a.nightscape && a.persona)
+  if (!a) return false
+  // ready=true 视为 AI 已生成结束；至少 nightscape（合集核心）存在即可；persona 为空不影响（computed 有兜底）
+  if (a.ready) return !!a.nightscape
+  return false
+})
+
+const tooFewStories = computed(() => {
+  if (hasError.value || hasReal.value) return false
+  const fromApi = collAnalysis.analysis.value?.tooFewStories
+  if (fromApi === true) return true
+  if (collAnalysis.analysis.value?.ready) return false // API 明确 ready → 不为 tooFew
+  // API 未返回时用 props 兜底（可能是尚未请求到）
+  return (props.storyCount ?? 0) < 3
 })
 
 const isLoading = computed(() => {
-  if (tooFewStories.value || hasReal.value) return false
-  // loading OR ready=false 且故事>=3 → 显示骨架
+  if (hasError.value || tooFewStories.value || hasReal.value) return false
+  // loading=true（首次/轮询中） OR ready=false 且后端明确说故事数>=3 → 骨架
   if (collAnalysis.loading.value) return true
   const a = collAnalysis.analysis.value
   if (a && !a.ready && !a.tooFewStories) return true
+  // 兜底：尚未请求到 analysis（例如轮询间隙）且 故事>=3 → 仍视为生成中（避免三态都 false 卡死）
+  if (!a && (props.storyCount ?? 0) >= 3) return true
   return false
 })
 
@@ -869,6 +934,12 @@ const displayStoryCount = computed(() => {
   if (typeof fromApi === 'number') return fromApi
   return props.storyCount ?? 0
 })
+
+/** 全局重试按钮：重置状态 + 重新拉取 analysis */
+function onRetryAnalysis() {
+  collAnalysis.reset()
+  collAnalysis.fetchAnalysis()
+}
 
 // ─── 从 API 返回值取值（兜底到旧 mock 避免突然空白） ───
 const _p = computed(() => collAnalysis.analysis.value?.persona)
@@ -927,6 +998,46 @@ const emotionNarrative = computed(() => _n.value?.emotionNarrative ?? {
   summary: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
   contrast: '夜虽沉，主序却稳——就像恒星在主序阶段停留最久，你的思念也在最深处静静燃烧，虽然暗但最持久。',
   flow: '从东升（浓思）→ 中天（孤独回望）→ 西沉（释然微光），星轨虽慢，但终究划过了整个夜。',
+})
+
+/**
+ * 夜色流转 · 情感回顾卡（替代原 emotionInsights）
+ *  每条 = 情感名 · 占比% + 从 storyQuotes / props.stories 抽内容拼出回顾感描述
+ *  不再有天文参数/时辰标签，只讲心事回顾
+ */
+const emotionReviewCards = computed(() => {
+  const emos = emotions.value
+  const quotes = storyQuotes.value
+  const realStories = props.stories ?? []
+  const rawInsights = emotionInsights.value
+
+  return emos.map((e, i) => {
+    const ins = rawInsights[i]
+    const pctNum = Math.round(e.value * 100)
+    const pct = (ins?.pct && /^\d/.test(ins.pct)) ? ins.pct : pctNum + '%'
+    const quote = quotes[i] ?? quotes[i % quotes.length]
+    const realStory = realStories[i] ?? realStories[i % Math.max(1, realStories.length)]
+
+    // 抽回顾元素：标签1个 + 故事片段1句 + 星名/出处
+    const tagSrc = (quote?.tags?.length ? quote.tags : (realStory?.content?.match(/[\u4e00-\u9fa5]{2,4}/g) ?? []))
+    const tag = tagSrc[i % Math.max(1, tagSrc.length)] ?? e.name
+    const storySnippet = (quote?.text ?? realStory?.content ?? (e as any).desc ?? '').slice(0, 18)
+    const storyRef = quote?.starName ?? realStory?.title ?? `心事第 ${i + 1} 则`
+
+    // 原描述里抽一句做回顾感，不要文艺化天文词
+    const baseDesc = (ins?.desc ?? (e as any).desc ?? '').replace(/[，,]?[子丑寅卯辰巳午未申酉戌亥].{0,4}刻[，,]?/g, '').replace(/夜的第.{0,6}重/g, '')
+    const firstSentence = baseDesc.split(/[。；]/)[0] || baseDesc || e.name
+
+    return {
+      name: e.name,
+      pct,
+      color: ins?.color ?? e.color,
+      tag,
+      storySnippet,
+      storyRef,
+      desc: `${firstSentence}。想起「${storySnippet}${storySnippet.length >= 18 ? '…' : ''}」那页（${storyRef}），#${tag} 的浓度最清晰。`,
+    }
+  })
 })
 
 const storyQuotes = computed(() => {
@@ -1575,6 +1686,44 @@ function tagStyle(tag: string): Record<string, string> {
   border: 1px solid rgba(255, 217, 138, 0.2);
   flex-shrink: 0;
 }
+/* hero badge 三态：live 绿 / standby 灰 / loading 紫 / error 红 */
+.ca-hero-badge.is-live { background: rgba(154,230,180,0.14); color: #9ae6b4; border-color: rgba(154,230,180,0.28); }
+.ca-hero-badge.is-standby { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45); border-color: rgba(255,255,255,0.06); }
+.ca-hero-badge.is-loading { background: rgba(202,167,255,0.13); color: #caa7ff; border-color: rgba(202,167,255,0.28); }
+.ca-hero-badge.is-error { background: rgba(255,139,125,0.13); color: #ff8b7d; border-color: rgba(255,139,125,0.3); }
+
+/* 全局错误条：API 失败时显示（与 hero strip 风格对齐） */
+.ca-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 139, 125, 0.06);
+  border: 1px solid rgba(255, 139, 125, 0.18);
+  flex-shrink: 0;
+}
+.ca-error-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.ca-error-icon { color: #ff8b7d; flex-shrink: 0; }
+.ca-error-label {
+  font-size: 0.72rem; font-weight: 700; color: #ff8b7d;
+  letter-spacing: 0.03em; flex-shrink: 0;
+}
+.ca-error-msg {
+  font-size: 0.68rem; color: rgba(255, 210, 205, 0.7);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.ca-error-retry {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255, 139, 125, 0.14);
+  color: #ffd2cd; border: 1px solid rgba(255, 139, 125, 0.3);
+  padding: 3px 9px; border-radius: 100px;
+  font-size: 0.66rem; font-weight: 600; cursor: pointer;
+  transition: background .2s; flex-shrink: 0;
+}
+.ca-error-retry:hover { background: rgba(255, 139, 125, 0.24); }
+.ca-error-retry:active { transform: translateY(1px); }
 
 /* ═══ Card Base ═══ */
 .ca-card {
@@ -2670,12 +2819,7 @@ function tagStyle(tag: string): Record<string, string> {
   border: 1px solid rgba(134,168,255,0.08);
   border-top-color: rgba(255,217,138,0.08);
 }
-.ca-emo-nl-label {
-  background: linear-gradient(90deg, rgba(134,168,255,0.15), rgba(255,217,138,0.12));
-  color: rgba(255,255,255,0.7);
-  border-color: rgba(134,168,255,0.18);
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-}
+.ca-emo-nl-label { /* 已删除：旧的夜·浓淡气泡样式 */ }
 /* 叙事 icon：Sparkles 夜色发光 */
 .ca-emo-night-narr .ca-emo-flow-icon {
   color: rgba(255,217,138,0.7);
@@ -2762,6 +2906,65 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255,255,255,0.42);
   text-align: justify;
 }
+/* ══════════ 夜色流转 · 情感回顾卡（emotionReviewCards 新样式） ══════════ */
+.ca-ei-review.ca-ei-card-night {
+  padding: 11px 13px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.032), rgba(255,255,255,0.008)) padding-box,
+    linear-gradient(120deg, rgba(134,168,255,0.18), rgba(202,167,255,0.08)) border-box;
+  border: 1px solid transparent;
+}
+.ca-ei-dot-review {
+  margin-top: 5px;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+}
+.ca-ei-text-review {
+  min-width: 0;
+}
+.ca-ei-title-review {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.92);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.ca-ei-name-pct {
+  color: var(--c, #fff);
+  text-shadow: 0 0 4px var(--c, #ffd98a)66;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.ca-ei-story-tag {
+  font-size: 0.58rem;
+  padding: 1px 6px;
+  border: 1px solid;
+  border-radius: 99px;
+  opacity: 0.85;
+  background: rgba(255,255,255,0.025);
+  font-family: "Inter", "PingFang SC", sans-serif;
+  letter-spacing: 0.02em;
+}
+.ca-ei-desc-review {
+  font-size: 0.7rem;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.50);
+  text-align: left;
+  word-break: break-word;
+}
+.ca-ei-desc-review::first-letter {
+  /* 轻微的首字亮色，有回顾感像翻旧书 */
+  font-weight: 600;
+  color: rgba(255,217,138,0.72);
+}
+/* 旧的夜色时辰标签 & 天文参数栏样式（已从模板删除）置空，防止 CSS 冗余警告 + 覆盖原视觉残留 */
+.ca-ei-night-hour, .ca-ei-night-meteo, .ca-ei-astro-k, .ca-ei-astro-v { display: none !important; }
+
 /* 【星空绑定】洞察卡天文参数行（恒星类型 / 星等 / 距离光年） */
 .ca-ei-astro {
   margin-top: 5px;
@@ -2845,261 +3048,19 @@ function tagStyle(tag: string): Record<string, string> {
   color: #ff8b7d;
   opacity: 0.75;
 }
-/* 【星空绑定】主序阶段标签（情绪球体右下角浮层） */
-.ca-emo-ms-label {
-  position: absolute;
-  left: -4px;
-  top: -4px;
-  font-size: 0.48rem;
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  color: rgba(255,255,255,0.9);
-  background: rgba(0,0,0,0.45);
-  padding: 1px 3.5px;
-  border-radius: 3px;
-  letter-spacing: 0.06em;
-  border: 1px solid rgba(255,217,138,0.38);
-  backdrop-filter: blur(2px);
-  z-index: 2;
-  white-space: nowrap;
-  opacity: 0.92;
-}
+/* 已删除：旧的「夜·浓淡」左上角气泡（ca-emo-ms-label） */
 
 /* 删除旧的未用 class */
 .ca-emo-list, .ca-emo-item, .ca-emo-dot, .ca-emo-item-name, .ca-emo-item-desc, .ca-emo-item-val { display: none; }
 
-/* ═══ 2.5 心事摘录（ca-quote，全宽卡片，参考 AIRadarWordcloud quote-list） ═══ */
-.ca-q-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+/* 天窗片段（心事摘录 ca-q*）整块 section 已从模板删除，CSS 也一并移除，避免冗余警告 */
+.ca-q-body, .ca-q-list, .ca-q-item, .ca-q-rank, .ca-q-sticker, .ca-q-skywindow,
+.ca-q-skywindow .ca-q-illus, .ca-q-sw-corner, .ca-q-night-head, .ca-q-night-head .ca-q-star-name,
+.ca-q-sky-greek, .ca-q-night-astro, .ca-q-night-astro span i, .ca-q-illus, .ca-q-body-inner,
+.ca-q-star-head, .ca-q-star-name, .ca-q-star-astro, .ca-q-star-astro-item, .ca-q-star-astro-k,
+.ca-q-mark, .ca-q-text, .ca-q-meta, .ca-q-tag, .ca-q-spacer, .ca-q-author, .ca-q-date {
+  display: none !important;
 }
-.ca-q-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.ca-q-item {
-  display: grid;
-  grid-template-columns: 26px 48px 1fr;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 7px;
-  background: rgba(255,255,255,0.016);
-  border: 1px solid rgba(255,255,255,0.035);
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
-}
-.ca-q-item:hover {
-  background: rgba(255,217,138,0.04);
-  border-color: rgba(255,217,138,0.12);
-  transform: translateY(-1px);
-}
-/* 【星空绑定】αβγ 亮星徽章（第一列） */
-.ca-q-rank {
-  align-self: flex-start;
-  justify-self: center;
-  margin-top: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--rk, #ffd98a) 0%, rgba(0,0,0,0.35) 100%);
-  border: 1px solid var(--rk, #ffd98a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #0a0a18;
-  text-shadow: 0 0 3px rgba(255,255,255,0.35);
-  box-shadow:
-    0 0 6px var(--rk, #ffd98a)66,
-    inset 0 0 4px rgba(255,255,255,0.25);
-  z-index: 1;
-}
-/* 【天空本色】天窗片段：左上圆形徽章 → 改成「时辰贴纸」（横椭圆微贴纸风） */
-.ca-q-sticker {
-  width: auto;
-  height: auto;
-  min-width: 48px;
-  padding: 3px 7px;
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, rgba(11,13,42,0.9)), rgba(11,13,42,0.92));
-  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent);
-  color: color-mix(in srgb, var(--c) 95%, #fff);
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.56rem;
-  letter-spacing: 0.05em;
-  font-weight: 500;
-  justify-content: center;
-  align-items: center;
-  display: flex;
-  box-shadow:
-    0 0 6px color-mix(in srgb, var(--c) 22%, transparent),
-    inset 0 1px 0 rgba(255,255,255,0.06);
-  text-shadow: 0 0 2px rgba(0,0,0,0.5);
-  margin-top: 0;
-}
-.ca-q-sticker i {
-  font-style: normal;
-  font-family: inherit;
-  color: inherit;
-}
-/* 【天空本色】天窗片段：左侧插画 → 套一层「夜色小窗」（方形窗框+内部天色） */
-.ca-q-skywindow {
-  position: relative;
-  align-self: center;
-  width: 54px;
-  height: 54px;
-  flex-shrink: 0;
-  padding: 3px;
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(134,168,255,0.35), rgba(202,167,255,0.3)),
-    linear-gradient(180deg, #0b0d2a, #1f2046);
-  border: 1px solid rgba(134,168,255,0.22);
-  box-shadow:
-    inset 0 0 6px rgba(11,13,42,0.8),
-    0 0 8px rgba(134,168,255,0.1);
-}
-/* 夜色窗内嵌 svg 插画 */
-.ca-q-skywindow .ca-q-illus {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: 5px;
-  background: linear-gradient(180deg, rgba(11,13,42,0.6), rgba(31,32,70,0.5));
-  opacity: 1;
-}
-/* 夜色窗的 4 角窗棂光斑（残灯/星） */
-.ca-q-sw-corner {
-  position: absolute;
-  width: 1.6px;
-  height: 1.6px;
-  background: rgba(255,217,138,0.85);
-  border-radius: 50%;
-  box-shadow: 0 0 2px rgba(255,217,138,0.7);
-  pointer-events: none;
-}
-.ca-q-sw-corner.tl { top: 1px;   left: 1px; }
-.ca-q-sw-corner.tr { top: 1px;   right: 1px; }
-.ca-q-sw-corner.bl { bottom: 1px; left: 1px; background: rgba(134,168,255,0.8); box-shadow: 0 0 2px rgba(134,168,255,0.65); }
-.ca-q-sw-corner.br { bottom: 1px; right: 1px; background: rgba(202,167,255,0.8); box-shadow: 0 0 2px rgba(202,167,255,0.65); }
-/* 天色版：头行（夜名+夜属性）字体更楷体更夜色 */
-.ca-q-night-head .ca-q-star-name {
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-}
-/* 希腊字母（α/β/γ）→ 天色：时辰前缀（子初三刻） */
-.ca-q-sky-greek {
-  font-style: normal;
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 0.5px 4px 1px;
-  margin-right: 2px;
-  background: color-mix(in srgb, var(--c) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
-  border-radius: 6px;
-  letter-spacing: 0.04em;
-}
-/* 天色：属性行（相/温/云） → 改字体夜色楷体感（非等宽） */
-.ca-q-night-astro {
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: rgba(255,255,255,0.38);
-  letter-spacing: 0.04em;
-}
-.ca-q-night-astro span i {
-  font-style: normal;
-  font-family: inherit;
-  letter-spacing: 0.06em;
-  margin-right: 2px;
-}
-.ca-q-illus {
-  width: 48px;
-  height: 48px;
-  align-self: center;
-  opacity: 0.95;
-  flex-shrink: 0;
-  position: relative;
-}
-.ca-q-body-inner { position: relative; padding: 0; }
-/* 【星空绑定】亮星星名 + 天文参数行（头部） */
-.ca-q-star-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 4px;
-  padding-bottom: 3px;
-  border-bottom: 1px dashed rgba(255,255,255,0.06);
-}
-.ca-q-star-name {
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.86);
-  letter-spacing: 0.05em;
-}
-.ca-q-star-astro {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.54rem;
-  font-family: 'Courier New', monospace;
-  color: rgba(255,255,255,0.42);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.ca-q-star-astro-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
-}
-.ca-q-star-astro-k {
-  color: rgba(255,255,255,0.28);
-  letter-spacing: 0.04em;
-  font-size: 0.5rem;
-}
-.ca-q-mark {
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 0.5;
-  opacity: 0.55;
-  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
-  display: block;
-  margin-bottom: 2px;
-}
-.ca-q-text {
-  font-size: 0.76rem;
-  line-height: 1.75;
-  color: rgba(255,255,255,0.65);
-  margin: 2px 0 6px;
-  font-style: italic;
-}
-.ca-q-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 0.56rem;
-  color: rgba(255,255,255,0.28);
-}
-.ca-q-tag {
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(255,255,255,0.03);
-  border: 0.5px solid rgba(255,255,255,0.05);
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.02em;
-}
-.ca-q-spacer { flex: 1; }
-.ca-q-author { color: rgba(255,255,255,0.4); font-weight: 500; }
-.ca-q-date { color: rgba(255,255,255,0.24); }
 
 /* ═══ 3. Stars Belonging（真实地平坐标星图） ═══ */
 .ca-starmap-wrap {
@@ -4986,4 +4947,40 @@ function tagStyle(tag: string): Record<string, string> {
 .sk-line.sk-1 { width: 92%; }
 .sk-line.sk-2 { width: 76%; }
 .sk-line.sk-3 { width: 58%; }
+
+/* ═══════════════════════════════════════════════════════════
+   各 section 面板 min-height 兜底（保证 story<3 / loading 时框的高度与真实态接近，不会塌陷成一条线）
+   每个 section 的真实态内容都较多，空态时至少接近一半的真实态高度
+   ═══════════════════════════════════════════════════════════ */
+/* Hero 星辰归属 + 夜观手记已有三态，高度由内部 persona-empty + flex:1 自动撑满 */
+
+/* 心事轨迹（右栏是左右双栏的高度基准，需要显式 min-height，保证左夜色流转跟着有足够高度） */
+.ca-night-side-track { min-height: 420px; }
+
+/* 天窗片段（3 帧夜色小窗，内容比较多） */
+.ca-quote-sky { min-height: 600px; }
+
+/* 时辰热力：24 珠子 + 12 地支 + 高峰低谷双卡 */
+/* ═══ 多余硬编码 min-height 已删除：让共鸣榜/时辰热力/情感轨迹跟随内容高度自适应 ═══ */
+/* 旧值（已移除）： .ca-hour 340px / .ca-rank 300px / .ca-trajectory 380px */
+
+/* 双栏：共鸣榜（Top3 列表） + 情感轨迹（时间线内容较多） */
+
+/* 展开/收起按钮（在 panel-head 末尾） */
+.ca-traj-toggle {
+  font-size: 0.56rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(154, 230, 180, 0.1);
+  border: 1px solid rgba(154, 230, 180, 0.22);
+  color: rgba(154, 230, 180, 0.75);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  font-family: 'Inter', 'PingFang SC', sans-serif;
+  transition: all .2s ease;
+}
+.ca-traj-toggle:hover {
+  background: rgba(154, 230, 180, 0.16);
+  color: rgba(154, 230, 180, 0.92);
+}
 </style>
