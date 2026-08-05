@@ -106,17 +106,17 @@
       </div>
     </section>
 
-    <!-- ═══ 2. 情感光谱 + 3. 主题脉络（双栏）═══ -->
+    <!-- ═══ 2. 情感光谱 + 3. 星辰归属（双栏，原主题脉络被心事摘录全宽卡片替代）═══ -->
     <div class="ca-duo">
-      <!-- 情感光谱（发光球体 + 正文叙事，不用 quoteblock） -->
+      <!-- 情感光谱（参考星星 AIRadarWordcloud：发光球体 + 情绪洞察卡 + 主调叙事） -->
       <section class="ca-card ca-emotion">
         <div class="ca-card-head">
           <component :is="HeartPulse" :size="12" class="ca-ch-icon ca-ch-red" />
           <span class="ca-ch-title">情感光谱</span>
-          <span class="ca-ch-count">5 色情绪</span>
+          <span class="ca-ch-count">5 维模型 · {{ storyCount }} 则心事采样</span>
         </div>
         <div class="ca-emotion-body">
-          <!-- 球体展示 -->
+          <!-- 球体展示（加大尺寸 + 底部对齐） -->
           <div class="ca-emo-orbs">
             <span
               v-for="e in emotions"
@@ -125,8 +125,8 @@
               :style="{
                 width: orbSize(e.value) + 'px',
                 height: orbSize(e.value) + 'px',
-                background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}44 65%, transparent)`,
-                boxShadow: `0 0 ${8 + e.value * 14}px ${e.color}55`,
+                background: `radial-gradient(circle at 35% 30%, ${e.color}dd, ${e.color}33 70%, transparent)`,
+                boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
               }"
               :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
             >
@@ -135,17 +135,21 @@
             </span>
           </div>
 
-          <!-- 情绪明细列表 -->
-          <div class="ca-emo-list">
-            <div v-for="e in emotions" :key="e.name" class="ca-emo-item">
-              <span class="ca-emo-dot" :style="{ background: e.color, boxShadow: `0 0 4px ${e.color}88` }"></span>
-              <span class="ca-emo-item-name" :style="{ color: e.color }">{{ e.name }}</span>
-              <span class="ca-emo-item-desc">{{ e.desc }}</span>
-              <span class="ca-emo-item-val">{{ Math.round(e.value * 100) }}</span>
+          <!-- 情绪洞察卡片（替代原先明细列表，参考星星 e-para 结构：彩点+高亮标题%+描述） -->
+          <div class="ca-emo-insights">
+            <div class="ca-ei-card" v-for="(ins, i) in emotionInsights" :key="i">
+              <span class="ca-ei-dot" :style="{ background: ins.color, boxShadow: `0 0 5px ${ins.color}` }"></span>
+              <div class="ca-ei-text">
+                <div class="ca-ei-title" :style="`--c:${ins.color}`">
+                  <span class="ca-ei-title-name" v-html="ins.title"></span>
+                  <span class="ca-ei-pct" :style="{ color: ins.color }">{{ ins.pct }}</span>
+                </div>
+                <div class="ca-ei-desc">{{ ins.desc }}</div>
+              </div>
             </div>
           </div>
 
-          <!-- 主调叙事（正文段落，非引用块） -->
+          <!-- 主调叙事（保留 + 加左紫条） -->
           <div class="ca-emo-narrative">
             <p class="ca-emo-para">
               <span class="ca-emo-lead">{{ emotionNarrative.dominant }}</span>
@@ -161,7 +165,7 @@
         </div>
       </section>
 
-      <!-- 星辰归属（真实地平坐标星图：alt/az + 地平线 + hover 高亮） -->
+      <!-- 星辰归属（真实地平坐标星图：alt/az + 地平线 + hover 高亮）—— 保留在双栏右栏 -->
       <section class="ca-card ca-stars">
         <div class="ca-card-head">
           <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
@@ -259,6 +263,65 @@
         </div>
       </section>
     </div>
+
+    <!-- ═══ 心事摘录（全宽，参考 AIRadarWordcloud 故事摘录：左SVG插画 + 右引号 + 作者日期）═══ -->
+    <section class="ca-card ca-quote">
+      <div class="ca-card-head">
+        <component :is="Quote" :size="12" class="ca-ch-icon ca-ch-gold" />
+        <span class="ca-ch-title">心事摘录</span>
+        <span class="ca-ch-count">AI 精选 {{ storyQuotes.length }} 段独白</span>
+      </div>
+      <div class="ca-q-body">
+        <div class="ca-q-list">
+          <div class="ca-q-item" v-for="(q, i) in storyQuotes" :key="i">
+            <!-- 左 SVG 插画：根据 illus 渲染月亮 / 家屋 / 花枝 -->
+            <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="ca-q-illus">
+              <circle cx="14" cy="18" r="1" fill="#fff" opacity="0.5" />
+              <circle cx="45" cy="44" r="0.7" fill="#fff" opacity="0.4" />
+              <circle cx="30" cy="10" r="0.5" fill="#fff" opacity="0.3" />
+              <circle cx="50" cy="28" r="0.8" fill="#fff" opacity="0.45" />
+              <path d="M42 28 a16 16 0 1 0 0 20 a12 12 0 1 1 0 -20z" fill="#ffd98a" opacity="0.62" />
+            </svg>
+            <svg v-else-if="q.illus === 'house'" viewBox="0 0 60 60" class="ca-q-illus">
+              <circle cx="10" cy="20" r="0.7" fill="#fff" opacity="0.35" />
+              <circle cx="52" cy="16" r="0.6" fill="#fff" opacity="0.3" />
+              <path d="M30 14 L14 28 L18 28 L18 48 L42 48 L42 28 L46 28 Z"
+                fill="none" stroke="rgba(255,217,138,0.55)" stroke-width="1.2" stroke-linejoin="round" />
+              <rect x="26" y="36" width="8" height="12" fill="none" stroke="rgba(255,217,138,0.42)" stroke-width="1" />
+              <rect x="21" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
+              <rect x="34" y="32" width="5" height="5" fill="rgba(255,217,138,0.12)" stroke="rgba(255,217,138,0.25)" stroke-width="0.6" />
+              <path d="M36 14 Q34 10 38 8 Q40 6 36 4" fill="none" stroke="rgba(202,167,255,0.45)" stroke-width="0.8" stroke-linecap="round" />
+            </svg>
+            <svg v-else viewBox="0 0 60 60" class="ca-q-illus">
+              <circle cx="16" cy="50" r="0.7" fill="#fff" opacity="0.35" />
+              <circle cx="48" cy="52" r="0.6" fill="#fff" opacity="0.3" />
+              <g stroke="rgba(251,182,206,0.58)" stroke-width="0.85" fill="none">
+                <path d="M30 52 L30 20" />
+                <path d="M30 32 L18 24 M30 28 L44 18 M30 38 L22 32" />
+              </g>
+              <g fill="rgba(251,182,206,0.7)">
+                <circle cx="18" cy="24" r="1.5" /><circle cx="44" cy="18" r="1.3" />
+                <circle cx="22" cy="32" r="1.2" /><circle cx="38" cy="36" r="1.1" />
+                <circle cx="30" cy="18" r="1.2" /><circle cx="26" cy="26" r="1" />
+              </g>
+              <circle cx="20" cy="44" r="0.9" fill="rgba(251,182,206,0.55)" />
+              <circle cx="40" cy="46" r="0.8" fill="rgba(251,182,206,0.48)" />
+            </svg>
+            <!-- 右：正文 -->
+            <div class="ca-q-body-inner">
+              <div class="ca-q-mark" :style="{ color: q.color }">"</div>
+              <div class="ca-q-text">{{ q.text }}</div>
+              <div class="ca-q-meta">
+                <span class="ca-q-tag" v-for="t in q.tags" :key="t">#{{ t }}</span>
+                <span class="ca-q-spacer"></span>
+                <span class="ca-q-author">{{ q.author }}</span>
+                <span class="ca-q-date">· {{ q.date }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- ═══ 4. 时辰热力 ═══ -->
     <section class="ca-card ca-hour">
@@ -391,7 +454,7 @@
 import { computed, ref } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
-  Feather, Info,
+  Feather, Info, Quote,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -449,6 +512,39 @@ const emotions = [
   { name: '希望', value: 0.35, color: '#86a8ff', desc: '纸船顺流而下的方向' },
   { name: '共鸣', value: 0.28, color: '#ff8b7d', desc: '陌生人留下的温度' },
 ]
+/** 情绪洞察卡片（参考星星 emotionGen：彩点 + 加粗高亮情绪词标题 + 百分比 + 叙事描述） */
+const emotionInsights = [
+  {
+    title: '<b>浓稠思念</b>，是这卷星笺的底色',
+    pct: '42.3%',
+    desc: '雨夜、灯影、未寄出的信是反复出现的三种意象——思念并不尖锐，更像一盏不肯熄灭的灯，温吞地亮到天明。',
+    color: '#ffd98a',
+  },
+  {
+    title: '<b>深夜独行</b>的孤独，紧随思念之后',
+    pct: '33.6%',
+    desc: '末班车、空街道、凌晨四点的台灯——它们不是悲伤的注脚，而是独自面对自己时安静的背景音。',
+    color: '#caa7ff',
+  },
+  {
+    title: '<b>微光释然</b>，是最意外的情绪角落',
+    pct: '22.2%',
+    desc: '虽然整体偏暗，但从「阳台种子」「江边走走」等片段能看见：风一吹，有些事就悄悄松了绑。',
+    color: '#95f0c0',
+  },
+  {
+    title: '<b>微光希望</b>，在叙事末尾悄然抬头',
+    pct: '18.9%',
+    desc: '纸船顺流、种子发芽、槐花再开——时间没有直接给出答案，但它让一些事变得可以放下。',
+    color: '#86a8ff',
+  },
+  {
+    title: '<b>陌生人的共鸣</b>，是最轻也最暖的部分',
+    pct: '15.1%',
+    desc: '一句话、一个点赞、一次擦肩而过的善意——它们不解决问题，但会让某个夜晚变得没那么难熬。',
+    color: '#ff8b7d',
+  },
+]
 const emotionNarrative = {
   dominant: '思念',
   dominantPct: '42.3%',
@@ -457,9 +553,37 @@ const emotionNarrative = {
   flow: '从夜雨到晨光，情绪由浓转淡；思念与孤独交织，却在共鸣中找到出口。',
 }
 
-/** 情感球体尺寸：按值映射 28~52px */
+/** 心事摘录（参考星星 emotionGen.quotes：左插画 + 引号 + 正文 + 标签 + 作者日期） */
+const storyQuotes = [
+  {
+    illus: 'moon',
+    color: '#ffd98a',
+    text: '把没寄出的话折成纸船，放进窗外的雨里——不知道它会漂去哪里，但至少今晚，它不用再困在我心里。',
+    tags: ['思念', '夜雨', '纸船'],
+    author: '匿名星客',
+    date: '03/12 子时',
+  },
+  {
+    illus: 'house',
+    color: '#caa7ff',
+    text: '翻到那张合影，才发现你笑得比我记得的还要年轻。屋里很安静，只有我一个人，却好像听见厨房里还飘着切菜的声音。',
+    tags: ['回忆', '家', '旧照片'],
+    author: '夜归人',
+    date: '03/25 丑时',
+  },
+  {
+    illus: 'flower',
+    color: '#95f0c0',
+    text: '风把帽子吹进水里，我居然笑了出来。有些东西抓不住就是抓不住，没关系——下次换一顶帽子就是了。',
+    tags: ['释然', '风', '江边'],
+    author: '桥上客',
+    date: '04/30 辰时',
+  },
+]
+
+/** 情感球体尺寸：按值映射 40~66px（参考星星 orbSize 映射区间） */
 function orbSize(value: number): number {
-  return Math.round(28 + value * 24)
+  return Math.round(40 + value * 26)
 }
 
 /** 星辰归属：从真实故事派生，聚合 catalogStarId/catalogStarIds → 星名+星座+颜色+故事数+方位 */
@@ -1074,7 +1198,7 @@ function tagStyle(tag: string): Record<string, string> {
 /* 删除旧的未用 class */
 .ca-han-name, .ca-han-sub, .ca-tags, .ca-tag, .ca-quote, .ca-intro { display: none; }
 
-/* ═══ 2. Emotion（发光球体 orb） ═══ */
+/* ═══ 2. Emotion（参考星星 AIRadarWordcloud：发光球体 + 洞察卡 + 叙事） ═══ */
 .ca-emotion-body {
   display: flex;
   flex-direction: column;
@@ -1082,12 +1206,11 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-emo-orbs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 2px 10px;
-  min-height: 70px;
+  align-items: flex-end;
+  justify-content: space-around;
+  padding: 4px 2px 8px;
+  min-height: 82px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
 }
 .ca-emo-orb {
   display: flex;
@@ -1098,6 +1221,8 @@ function tagStyle(tag: string): Record<string, string> {
   cursor: default;
   transition: transform 0.2s;
   animation: orbFloat 4s ease-in-out infinite;
+  flex-shrink: 0;
+  position: relative;
 }
 .ca-emo-orb:nth-child(2n) { animation-delay: 0.8s; }
 .ca-emo-orb:nth-child(3n) { animation-delay: 1.6s; }
@@ -1107,107 +1232,192 @@ function tagStyle(tag: string): Record<string, string> {
   50% { transform: translateY(-3px); }
 }
 .ca-emo-orb-label {
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 .ca-emo-orb-val {
-  font-size: 0.56rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.78);
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
   line-height: 1;
-}
-/* 情绪明细列表 */
-.ca-emo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 6px 0;
-  border-top: 0.5px dashed rgba(255, 255, 255, 0.06);
-  border-bottom: 0.5px dashed rgba(255, 255, 255, 0.06);
-}
-.ca-emo-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 2px 0;
-}
-.ca-emo-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.ca-emo-item-name {
-  font-size: 0.66rem;
-  font-weight: 600;
-  flex-shrink: 0;
-  width: 28px;
-}
-.ca-emo-item-desc {
-  flex: 1;
-  font-size: 0.64rem;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ca-emo-item-val {
-  font-size: 0.62rem;
-  color: var(--muted-light);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  width: 20px;
-  text-align: right;
+  opacity: 0.82;
 }
 
-/* 叙事段落（正文，非引用块） */
+/* 情绪洞察卡片（替代原先明细列表，参考星星 e-para） */
+.ca-emo-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 0;
+}
+.ca-ei-card {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.ca-ei-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 0 5px currentColor;
+}
+.ca-ei-text { flex: 1; min-width: 0; }
+.ca-ei-title {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 3px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.68);
+  line-height: 1.55;
+}
+.ca-ei-title :deep(b),
+.ca-ei-title :deep(strong) { color: #ffd98a; font-weight: 700; }
+.ca-ei-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  margin-left: auto;
+  opacity: 0.92;
+}
+.ca-ei-desc {
+  font-size: 0.72rem;
+  line-height: 1.72;
+  color: rgba(255,255,255,0.42);
+  text-align: justify;
+}
+
+/* 叙事段落（主调叙事 + 左紫条包裹） */
 .ca-emo-narrative {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-top: 2px;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
+  border-left: 2px solid rgba(202,167,255,0.38);
 }
 .ca-emo-para {
-  font-size: 0.68rem;
-  line-height: 1.75;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.7rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.56);
   margin: 0;
 }
 .ca-emo-lead {
   font-weight: 700;
   color: #ffd98a;
   margin-right: 3px;
+  letter-spacing: 0.04em;
 }
 .ca-emo-lead-pct {
   font-size: 0.6rem;
   font-weight: 600;
   color: #ffd98a;
-  opacity: 0.7;
+  opacity: 0.72;
   margin-right: 5px;
 }
 .ca-emo-para-sub {
-  font-size: 0.64rem;
-  color: rgba(255, 255, 255, 0.4);
-  line-height: 1.7;
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.42);
+  line-height: 1.75;
 }
 .ca-emo-para-flow {
   display: flex;
   align-items: flex-start;
   gap: 5px;
-  font-size: 0.63rem;
-  color: rgba(255, 139, 125, 0.6);
+  font-size: 0.64rem;
+  color: rgba(255, 139, 125, 0.65);
   font-style: italic;
-  line-height: 1.65;
+  line-height: 1.7;
+  margin: 0;
 }
 .ca-emo-flow-icon {
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
   color: #ff8b7d;
-  opacity: 0.7;
+  opacity: 0.75;
 }
+
+/* 删除旧的未用 class */
+.ca-emo-list, .ca-emo-item, .ca-emo-dot, .ca-emo-item-name, .ca-emo-item-desc, .ca-emo-item-val { display: none; }
+
+/* ═══ 2.5 心事摘录（ca-quote，全宽卡片，参考 AIRadarWordcloud quote-list） ═══ */
+.ca-q-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ca-q-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ca-q-item {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.016);
+  border: 1px solid rgba(255,255,255,0.035);
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.ca-q-item:hover {
+  background: rgba(255,217,138,0.04);
+  border-color: rgba(255,217,138,0.12);
+  transform: translateY(-1px);
+}
+.ca-q-illus {
+  width: 48px;
+  height: 48px;
+  align-self: center;
+  opacity: 0.95;
+  flex-shrink: 0;
+}
+.ca-q-body-inner { position: relative; padding: 0; }
+.ca-q-mark {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 0.5;
+  opacity: 0.55;
+  font-family: Georgia, serif;
+  display: block;
+  margin-bottom: 2px;
+}
+.ca-q-text {
+  font-size: 0.76rem;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.65);
+  margin: 2px 0 6px;
+  font-style: italic;
+}
+.ca-q-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.56rem;
+  color: rgba(255,255,255,0.28);
+}
+.ca-q-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.03);
+  border: 0.5px solid rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.02em;
+}
+.ca-q-spacer { flex: 1; }
+.ca-q-author { color: rgba(255,255,255,0.4); font-weight: 500; }
+.ca-q-date { color: rgba(255,255,255,0.24); }
 
 /* ═══ 3. Stars Belonging（真实地平坐标星图） ═══ */
 .ca-starmap-wrap {
