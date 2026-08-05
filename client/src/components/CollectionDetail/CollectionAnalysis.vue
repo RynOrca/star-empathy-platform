@@ -10,6 +10,115 @@
       <span class="ca-hero-badge">DESIGN PREVIEW</span>
     </div>
 
+    <!-- ═══ 0.5. 【星空绑定】星座迷你星图（合集=一个自定义星座：8则心事=8颗星，按时间顺序连成星座图案）═══ -->
+    <section class="ca-card ca-constellation">
+      <div class="ca-card-head">
+        <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-purple" />
+        <span class="ca-ch-title">你的私人星座</span>
+        <span class="ca-ch-count">{{ constellation.name }} · {{ constellation.stars.length }} 主星 · {{ constellation.ra }}</span>
+      </div>
+      <div class="ca-constellation-body">
+        <!-- 左：星座星图 SVG（8 颗星按时间顺序连线 → 自定义星座图案） -->
+        <div class="ca-cs-map">
+          <!-- 背景星点 -->
+          <svg viewBox="0 0 280 220" class="ca-cs-svg">
+            <!-- 背景深空星（20颗随机小点） -->
+            <circle v-for="(s, i) in deepSpaceStars" :key="'ds'+i"
+              :cx="s.x" :cy="s.y" :r="s.r" fill="#fff" :opacity="s.opacity" />
+            <!-- 赤道/赤纬参考线（极淡） -->
+            <ellipse cx="140" cy="110" rx="125" ry="18" fill="none"
+              stroke="rgba(202,167,255,0.08)" stroke-width="0.6" stroke-dasharray="2 4" />
+            <ellipse cx="140" cy="110" rx="100" ry="58" fill="none"
+              stroke="rgba(202,167,255,0.06)" stroke-width="0.5" stroke-dasharray="2 4" />
+            <!-- 星座连线（按时间顺序把8颗星串成你的"私人星座"图案） -->
+            <path :d="constellationLinePath" fill="none"
+              stroke="rgba(255,217,138,0.55)" stroke-width="0.9" stroke-linecap="round"
+              stroke-dasharray="3 2.5" style="filter: drop-shadow(0 0 3px rgba(255,217,138,0.25))" />
+            <!-- 8 颗主星：大小=共鸣数(星等)，颜色=情绪 -->
+            <g v-for="(star, i) in constellation.stars" :key="'st'+i">
+              <!-- 光晕 -->
+              <circle :cx="star.x" :cy="star.y" :r="star.size * 2.2" fill="none"
+                :stroke="star.color + '33'" stroke-width="1" />
+              <circle :cx="star.x" :cy="star.y" :r="star.size * 1.4"
+                :fill="star.color" opacity="0.12" />
+              <!-- 星本体 -->
+              <circle :cx="star.x" :cy="star.y" :r="star.size"
+                :fill="star.color" :stroke="star.color" stroke-width="0.4"
+                style="filter: drop-shadow(0 0 2px currentColor)" />
+              <!-- 四角星芒（仅亮星 α/β/γ） -->
+              <g v-if="star.rank" :transform="`translate(${star.x}, ${star.y})`">
+                <path d="M0,-16 L1.2,-3 L16,-1.2 L3,1.2 L1.3,16 L-1.3,3 L-16,1.2 L-3,-1.2 Z"
+                  :fill="star.color" opacity="0.2" />
+              </g>
+              <!-- α/β/γ 编号徽章（亮星） -->
+              <g v-if="star.rank" :transform="`translate(${star.x}, ${star.y})`">
+                <text :x="star.size + 3" :y="-(star.size + 1)"
+                  font-size="8" font-weight="700"
+                  :fill="star.color" opacity="0.95"
+                  style="font-family: Georgia, 'Times New Roman', serif; font-style: italic">
+                  {{ star.rank }}
+                </text>
+              </g>
+              <!-- 星名（悬停显示，但这里轻量地把 α 星名标上） -->
+              <text v-if="star.rank === 'α'"
+                :x="star.x" :y="star.y + star.size + 10"
+                text-anchor="middle"
+                font-size="6.5" fill="rgba(255,255,255,0.7)"
+                style="letter-spacing: 0.08em">
+                {{ star.name }}
+              </text>
+            </g>
+          </svg>
+        </div>
+        <!-- 右：星图参数面板 -->
+        <div class="ca-cs-panel">
+          <div class="ca-cs-row">
+            <span class="ca-cs-k">星座名</span>
+            <span class="ca-cs-v ca-cs-v-gold">{{ constellation.name }}</span>
+          </div>
+          <div class="ca-cs-row">
+            <span class="ca-cs-k">汉名</span>
+            <span class="ca-cs-v">{{ constellation.hanName }}</span>
+          </div>
+          <div class="ca-cs-grid">
+            <div class="ca-cs-cell">
+              <div class="ca-cs-cell-k">赤经 RA</div>
+              <div class="ca-cs-cell-v">{{ constellation.ra }}</div>
+            </div>
+            <div class="ca-cs-cell">
+              <div class="ca-cs-cell-k">赤纬 Dec</div>
+              <div class="ca-cs-cell-v">{{ constellation.dec }}</div>
+            </div>
+            <div class="ca-cs-cell">
+              <div class="ca-cs-cell-k">平均星等</div>
+              <div class="ca-cs-cell-v">{{ constellation.avgMag }}<span class="ca-cs-unit">m</span></div>
+            </div>
+            <div class="ca-cs-cell">
+              <div class="ca-cs-cell-k">距离</div>
+              <div class="ca-cs-cell-v">{{ constellation.distance }}<span class="ca-cs-unit">ly</span></div>
+            </div>
+          </div>
+          <!-- 亮星名录（Top 3 = α/β/γ） -->
+          <div class="ca-cs-brights">
+            <div class="ca-cs-b-title">亮星名录</div>
+            <div class="ca-cs-b-list">
+              <div class="ca-cs-b-item" v-for="b in brightStars" :key="b.rank">
+                <span class="ca-cs-b-rank" :style="{ color: b.color }">{{ b.rank }}</span>
+                <span class="ca-cs-b-name">{{ b.name }}</span>
+                <span class="ca-cs-b-spacer"></span>
+                <span class="ca-cs-b-meta">{{ b.mag }}m · {{ b.emotion }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- 底部注释 -->
+          <div class="ca-cs-foot">
+            <component :is="Info" :size="9" />
+            <span>星图为虚拟自定义星座：按心事时间顺序串联，星等=共鸣数，星色=情绪</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ═══ 1. 合集画像（Persona）参考星星 AIPersonaCard：左笺卷小卡 + 右双段解读 + 维度═══ -->
     <section class="ca-card ca-persona">
       <div class="ca-card-head">
@@ -825,6 +934,81 @@ const bgStars = Array.from({ length: 24 }, (_, i) => {
   }
 })
 
+/* ═══════════════════════════════════════════════════════════
+   【星空绑定】星座迷你星图数据：合集=你的私人自定义星座
+   ═══════════════════════════════════════════════════════════ */
+/** 你的自定义星座（8 则心事 = 8 颗主星，按时间顺序串联成星座图案） */
+type ConstellationStar = {
+  name: string        // 星名（故事名）
+  x: number           // 星图虚拟 X（viewBox 280×220）
+  y: number           // 星图虚拟 Y
+  size: number        // 星半径（= 星等换算：共鸣越多越大）
+  color: string       // 星色（= 情绪色）
+  mag: number         // 视星等（数字越小越亮）
+  emotion: string     // 情绪标签
+  resonance: number   // 共鸣数
+  rank?: 'α' | 'β' | 'γ'  // 亮星编号（Top3 亮星才有）
+}
+const constellation = {
+  name: '夜雨孤灯座',   // 拉丁名风格 = 汉名+「座」
+  hanName: '夜雨孤灯',  // 四字汉名
+  ra: 'RA 22h 14m',     // 赤经（虚拟，对应子时高峰期）
+  dec: 'Dec +37° 21′',  // 赤纬（虚拟，北半球春夜可见）
+  avgMag: 4.2,          // 平均星等（较暗星座，需凝神静视）
+  distance: 412,        // 距离（光年）
+  // 8 颗主星 = 8 则故事，用坐标手动排出一个「提灯 + 弯月」的星座形状
+  stars: [
+    { name: '雨夜寄北',  x: 52,  y: 128, size: 5.0, color: '#ffd98a', mag: 2.8, emotion: '思念', resonance: 42, rank: 'α' as const },
+    { name: '一个人的地铁', x: 82, y: 96,  size: 3.2, color: '#caa7ff', mag: 4.7, emotion: '孤独', resonance: 18 },
+    { name: '旧照片',    x: 112, y: 68,  size: 3.6, color: '#ffd98a', mag: 4.3, emotion: '思念', resonance: 22 },
+    { name: '江边走走',  x: 148, y: 52,  size: 4.4, color: '#95f0c0', mag: 3.4, emotion: '释然', resonance: 31, rank: 'γ' as const },
+    { name: '凌晨四点',  x: 184, y: 72,  size: 4.7, color: '#caa7ff', mag: 3.1, emotion: '孤独', resonance: 35, rank: 'β' as const },
+    { name: '阳台的种子', x: 212, y: 102, size: 3.0, color: '#86a8ff', mag: 4.9, emotion: '希望', resonance: 15 },
+    { name: '故乡的槐花', x: 230, y: 138, size: 3.8, color: '#ffd98a', mag: 4.1, emotion: '思念', resonance: 25 },
+    { name: '合上这一卷', x: 214, y: 174, size: 3.4, color: '#95f0c0', mag: 4.5, emotion: '释然', resonance: 19 },
+  ] as ConstellationStar[],
+}
+
+/** Top3 亮星名录（α/β/γ） */
+const brightStars = computed(() =>
+  [...constellation.stars]
+    .filter(s => s.rank)
+    .sort((a, b) => a.mag - b.mag)
+    .map(s => ({
+      rank: s.rank!,
+      name: s.name,
+      mag: s.mag,
+      emotion: s.emotion,
+      color: s.color,
+    }))
+)
+
+/** 星座连线 SVG path：把 8 颗星按时间顺序用二次贝塞尔平滑连起来（提灯弧线形状） */
+const constellationLinePath = computed(() => {
+  const pts = constellation.stars.map(s => [s.x, s.y] as const)
+  let d = `M ${pts[0][0]} ${pts[0][1]}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x1, y1] = pts[i]
+    const [x2, y2] = pts[i + 1]
+    // 控制点：两点中点 + 垂直微偏（模拟星座自然弯曲）
+    const cx = (x1 + x2) / 2
+    const cy = (y1 + y2) / 2 + (i % 2 === 0 ? -3 : 3)
+    d += ` Q ${cx} ${cy} ${x2} ${y2}`
+  }
+  return d
+})
+
+/** 深空背景星（20 颗随机小点，用于衬托星座） */
+const deepSpaceStars = Array.from({ length: 22 }, (_, i) => {
+  const seed = i * 31 + 7
+  return {
+    x: (seed * 41) % 280,
+    y: (seed * 53) % 220,
+    r: 0.3 + ((seed % 3) * 0.25),
+    opacity: 0.06 + ((seed % 5) * 0.03),
+  }
+})
+
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
 const trajExpanded = ref(false)
 
@@ -1087,6 +1271,190 @@ function tagStyle(tag: string): Record<string, string> {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   flex-shrink: 0;
+}
+
+/* ═══ 0.5 星座迷你星图（合集=你的私人自定义星座：左星图+右参数面板）═══ */
+.ca-constellation-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.ca-cs-map {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(202, 167, 255, 0.06), transparent 70%),
+    radial-gradient(ellipse at 30% 80%, rgba(255, 217, 138, 0.05), transparent 60%),
+    rgba(15, 10, 35, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 10px 14px;
+  position: relative;
+  overflow: hidden;
+}
+.ca-cs-map::before {
+  /* 左上角深紫色渐变晕染（模拟银河带） */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(202,167,255,0.05), transparent 45%),
+    radial-gradient(circle at 20% 90%, rgba(255,217,138,0.04), transparent 40%);
+  pointer-events: none;
+}
+.ca-cs-svg {
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+/* 右：星图参数面板 */
+.ca-cs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ca-cs-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ca-cs-k {
+  flex-shrink: 0;
+  width: 56px;
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.ca-cs-v {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.02em;
+}
+.ca-cs-v-gold {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+/* 四宫格天文参数 */
+.ca-cs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 10px;
+  position: relative;
+}
+.ca-cs-grid::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgba(202,167,255,0.08) 49.5%, rgba(202,167,255,0.08) 50.5%, transparent 50.5%),
+    linear-gradient(0deg,  transparent 49.5%, rgba(202,167,255,0.08) 49.5%, rgba(202,167,255,0.08) 50.5%, transparent 50.5%);
+  pointer-events: none;
+  opacity: 0.55;
+}
+.ca-cs-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 4px;
+  position: relative;
+}
+.ca-cs-cell-k {
+  font-size: 0.56rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.ca-cs-cell-v {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.ca-cs-unit {
+  font-size: 0.58rem;
+  color: var(--muted);
+  margin-left: 2px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+/* 亮星名录 */
+.ca-cs-brights {
+  padding: 8px 10px;
+  background: rgba(255, 217, 138, 0.025);
+  border: 1px solid rgba(255, 217, 138, 0.09);
+  border-radius: 10px;
+}
+.ca-cs-b-title {
+  font-size: 0.6rem;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed rgba(255, 217, 138, 0.1);
+  opacity: 0.9;
+}
+.ca-cs-b-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ca-cs-b-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+}
+.ca-cs-b-rank {
+  width: 14px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  text-align: center;
+  filter: drop-shadow(0 0 2px currentColor);
+}
+.ca-cs-b-name {
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
+}
+.ca-cs-b-spacer { flex: 1; }
+.ca-cs-b-meta {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+/* 底部注释 */
+.ca-cs-foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-size: 0.56rem;
+  line-height: 1.5;
+  color: var(--muted-light);
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.04);
+  letter-spacing: 0.03em;
+  opacity: 0.9;
 }
 
 /* ═══ 1. Persona（合集画像：笺卷小卡 + 双段解读 + 金句 + 引导 + 维度）═══ */
@@ -2227,6 +2595,10 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-duo { grid-template-columns: 1fr; }
   .ca-persona-body { grid-template-columns: 1fr; gap: 14px; }
   .ca-wrap { padding: 14px 16px 20px; }
+  /* 星座迷你星图：移动端改单列 */
+  .ca-constellation-body { grid-template-columns: 1fr; gap: 12px; }
+  .ca-cs-svg { max-height: 220px; }
+  .ca-cs-grid { padding: 8px 10px; }
   /* 心事摘录：单列 */
   .ca-q-item { grid-template-columns: 52px 1fr; gap: 10px; padding: 12px 12px; }
   .ca-q-illus { width: 48px; height: 48px; }
