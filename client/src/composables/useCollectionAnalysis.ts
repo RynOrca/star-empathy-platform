@@ -1,4 +1,5 @@
 import { ref, watch, Ref, onBeforeUnmount } from 'vue'
+import { authFetch, authHeaders } from '../stores/auth'
 import type { PersonaPayload, EmotionPayload } from './useStarAnalysis'
 
 // ───────────────────── Nightscape（合集独有：夜色流转+心事轨迹+五大气象+天窗片段+Hero统计） ──────────────────────
@@ -91,7 +92,7 @@ export function useCollectionAnalysis(collectionId: Ref<number | null>, options?
     }
     error.value = null
     try {
-      const res = await fetch(`/api/collections/${id}/analysis`)
+      const res = await authFetch(`/api/collections/${id}/analysis`, { headers: authHeaders() })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`)
       if (destroyed || mySeq !== inflightSeq) return
