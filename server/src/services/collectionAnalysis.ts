@@ -292,6 +292,20 @@ function calcEmotionWeights(rows: any[], themes: any[]): number[] {
   return base.map((v) => Math.max(0.05, Math.min(0.9, v / sum)))
 }
 
+/** 相对日期工具：created ISO 时间戳 → "3 天前" 等中文文案（本地 copy 相对日期，避免跨模块相对日期工具 */
+function relativeDate(created?: number | string | null): string {
+  if (!created) return '很久以前'
+  const d = typeof created === 'number' ? new Date(created) : new Date(created)
+  if (Number.isNaN(d.getTime())) return '此刻'
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return '刚刚'
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)} 天前`
+  if (diff < 86400 * 365) return `${Math.floor(diff / 86400 / 30)} 个月前`
+  return `${Math.floor(diff / 86400 / 365)} 年前`
+}
+
 /** 构建 persona（合集画像）—— 与 star 的 PersonaPayload 同结构，方便前端复用 */
 function buildPersona(rows: any[], themes: any[]): PersonaPayload {
   const name1 = ['夜雨', '云边', '江风', '星窗', '灯影', '槐序']
@@ -309,7 +323,6 @@ function buildPersona(rows: any[], themes: any[]): PersonaPayload {
     { left: '感性',   right: '理性',   percent: 75 - (seed % 15), side: 'left' },
     { left: '独处',   right: '喧闹',   percent: 82,                 side: 'left' },
     { left: '怀旧',   right: '向前',   percent: 64,                 side: 'left' },
-    { left: '柔软',   right: '坚定',   percent: 58,                 side: 'left' },
   ]
   return {
     constellation: `${hanName} · 合集`,
@@ -325,22 +338,38 @@ function buildPersona(rows: any[], themes: any[]): PersonaPayload {
 
 /** 构建 emotion（合集情感）—— 与 StarDetail 的 EmotionPayload 同结构 */
 function buildEmotion(rows: any[], themes: any[]): EmotionPayload {
-  const names = ['思念', '孤独', '释然', '希望', '共鸣']
+  const names: ['思念', '孤独', '释然', '希望', '共鸣'] = ['思念', '孤独', '释然', '希望', '共鸣']
   const weights = calcEmotionWeights(rows, themes)
-  const emotions = names.map((name, i) => ({
-    name,
-    value: weights[i],
-    color: SPECTRUM_PALETTE[i],
-    desc: ['远方的人与未寄出的话', '末班车与空荡的街', '雨停后的第一缕晨光',
-           '纸船顺流而下的方向', '陌生人留下的温度'][i],
-  }))
-  // insights 放在 nightscape.emotionInsights 里了，这里补 3 条 quotes 给 EmotionPayload.quotes
-  // 不过合集的 quotes 用 nightscape.storyQuotes 渲染；这里给 payload 一份兜底空 quotes 避免前端判空
-  return {
-    emotions,
-    insights: [], // 合集走 nightscape.emotionInsights（带夜刻/月/云/温）
-    quotes: [],   // 合集走 nightscape.storyQuotes（天窗片段）
-  }
+  const emotions: EmotionPayload['emotions'] = [
+    { name: names[0], value: weights[0], color: SPECTRUM_PALETTE[0], desc: '远方的人与未寄出的话' },
+    { name: names[1], value: weights[1], color: SPECTRUM_PALETTE[1], desc: '末班车与空荡的街' },
+    { name: names[2], value: weights[2], color: SPECTRUM_PALETTE[2], desc: '雨停后的第一缕晨光' },
+    { name: names[3], value: weights[3], color: SPECTRUM_PALETTE[3], desc: '纸船顺流而下的方向' },
+    { name: names[4], value: weights[4], color: SPECTRUM_PALETTE[4], desc: '陌生人留下的温度' },
+  ]
+  const topTheme = themes[0]?.name ?? '夜色'
+  const top3Stories = rows.slice(0, 3).concat([null, null, null]).slice(0, 3) as (any | null)[]
+  const insights: EmotionPayload['insights'] = [
+    { title: '夜读时刻', pct: `${Math.round(weights[0] * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`,
+      color: SPECTRUM_PALETTE[0],
+      desc: `最浓的情绪是「${names[0]}」——总在夜深时涌上来。你习惯把最软的部分留给${topTheme}，在别人入睡后才开始写这些心事。` },
+    { title: '温柔底色', pct: `${Math.round(weights[1] * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`,
+      color: SPECTRUM_PALETTE[1],
+      desc: `「${names[1]}」是这卷星笺的底色——它不是悲凉，而是一种慢慢和自己相处的方式，藏着不愿打扰别人的体贴。` },
+    { title: '微光出口', pct: `${Math.round((weights[2] + weights[3] + weights[4]) * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`,
+      color: '#95f0c0',
+      desc: `「${names[2]}」「${names[3]}」「${names[4]}」拼出了另一面——即使夜色再沉，你仍愿意抬头看看月亮，相信风过之后天亮会来。` },
+  ]
+  const quotes: EmotionPayload['quotes'] = top3Stories.map((r, i) => ({
+    text: r?.content?.slice(0, 18) ? r.content.slice(0, 18) + '…'
+         : ['每一盏孤灯都是夜里不肯睡的人', '有些心事只能说给星星听', '天亮之后，把昨夜留给昨夜'][i],
+    color: [SPECTRUM_PALETTE[0], SPECTRUM_PALETTE[4], SPECTRUM_PALETTE[3]][i],
+    tags: (r?.tags ?? [themes[i]?.name ?? '夜', themes[i + 1]?.name ?? '光']).slice(0, 2),
+    author: r?.location ? `@匿名 · ${r.location}` : ['@未署名 · 江风路', '@未署名 · 槐树下', '@未署名 · 末班车上'][i],
+    date: r?.createdAt ? relativeDate(r.createdAt) : ['3 天前', '昨天', '刚刚'][i],
+    illus: (['moon', 'house', 'sakura'] as const)[i],
+  })) as EmotionPayload['quotes']
+  return { emotions, insights, quotes }
 }
 
 /** 读 collection_analyses 表；没存过 → 立即合成一份 Phase 1 完整数据返回 ready=true，并写缓存 */
