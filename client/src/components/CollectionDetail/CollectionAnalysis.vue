@@ -396,7 +396,7 @@
                   background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}33 70%, transparent)`,
                   boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
                 }"
-                :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
+                :title="`${e.name} · ${Math.round(e.value * 100)}%`"
               >
                 <span class="orb-label ca-no-label">{{ e.name }}</span>
                 <span class="orb-val ca-no-val">{{ Math.round(e.value * 100) }}</span>
@@ -1471,9 +1471,9 @@ function storySummary(content: string): string {
   return plain.length > 36 ? plain.slice(0, 36) + '…' : plain
 }
 
-const hourSum = computed(() => Math.max(1, hourly.reduce((a, b) => a + b, 0)))
-const peakPct = computed(() => Math.max(1, Math.round(hourly[peakHour] / hourSum.value * 100)))
-const lowPct = computed(() => Math.max(0.1, Math.round(hourly[lowHour] / hourSum.value * 100 * 10) / 10))
+const hourSum = computed(() => Math.max(1, hourly.value.reduce((a: number, b: number) => a + b, 0)))
+const peakPct = computed(() => Math.max(1, Math.round(hourly.value[peakHour.value] / hourSum.value * 100)))
+const lowPct  = computed(() => Math.max(0.1, Math.round(hourly.value[lowHour.value] / hourSum.value * 100 * 10) / 10))
 
 const DIZHI_PER_2H: Record<number, string> = {
   23: '子', 0: '子', 1: '丑', 2: '丑', 3: '寅', 4: '寅', 5: '卯', 6: '卯',
@@ -4846,4 +4846,144 @@ function tagStyle(tag: string): Record<string, string> {
   padding: 2px 0 0 !important;
   gap: 10px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   三态切换（TooFew / Loading / Real）全局卡片 + 骨架屏动画
+   对齐 StarDetail AIPersonaCard / AIRadarWordcloud 的视觉
+   ═══════════════════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.spin-slow { animation: spin 4.5s linear infinite; }
+
+/* 三态外层容器：和 ca-wrap 内其余 section 的 gap 一致 */
+.ca-state-wrap { width: 100%; display: flex; flex-direction: column; }
+
+/* 通用 panel-wrapper（三态卡片）：对齐 StarDetail 其它卡片的统一观感 */
+.panel-wrapper {
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.panel-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.36), transparent);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-green  { color: #9ae6b4; }
+.pw-blue   { color: #86a8ff; }
+.pw-gold   { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.03em;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* persona-empty：空态/loading 共享容器（居中 flex + 虚线边框微背景） */
+.persona-empty {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 24px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  border: 1px dashed rgba(255,255,255,0.06);
+}
+/* ① 心事不足（不生成）：图标灰调 */
+.empty-scant { min-height: 220px; }
+.pe-icon-wrap {
+  width: 44px; height: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+.pe-icon-wrap.pe-scant {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.35);
+}
+/* ② 生成中（骨架屏）：图标紫色发光 */
+.empty-loading { min-height: 280px; }
+.pe-icon-wrap.pe-loading {
+  background: rgba(202,167,255,0.12);
+  color: #caa7ff;
+  box-shadow: 0 0 16px rgba(202,167,255,0.18);
+}
+/* 文字排版 */
+.pe-text {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pe-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.68);
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.pe-sub {
+  font-size: 0.64rem;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.02em;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  max-width: 360px;
+  line-height: 1.55;
+}
+.pe-sub b { color: rgba(255,255,255,0.45); font-weight: 600; }
+
+/* 骨架屏：4 条 shimmer 横线 */
+.skeleton-lines {
+  width: 100%;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sk-line {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(202,167,255,0.08), rgba(202,167,255,0.18), rgba(202,167,255,0.08));
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.sk-line.sk-1 { width: 92%; }
+.sk-line.sk-2 { width: 76%; }
+.sk-line.sk-3 { width: 58%; }
 </style>

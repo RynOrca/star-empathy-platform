@@ -145,19 +145,69 @@ function buildNightscape(collectionId: number | string, rows: any[], hourly: num
   const moonAges = ['26.4', '12.1', '7.3', '3.8', '15.2', '20.6']
   const illumPct = (seed % 100) + ''
 
+  // 根据 peakHour 计算一个合理的 timeSpan（子初 ~ 卯初 的表达）
+  const startH = (peakHour + 20) % 24
+  const endH   = (peakHour + 5) % 24
+  const toCN = (h: number) => {
+    if (h === 23 || h === 0) return '子'
+    if (h >= 1  && h <= 2)  return '丑'
+    if (h >= 3  && h <= 4)  return '寅'
+    if (h >= 5  && h <= 6)  return '卯'
+    if (h >= 7  && h <= 8)  return '辰'
+    if (h >= 9  && h <= 10) return '巳'
+    if (h >= 11 && h <= 12) return '午'
+    if (h >= 13 && h <= 14) return '未'
+    if (h >= 15 && h <= 16) return '申'
+    if (h >= 17 && h <= 18) return '酉'
+    if (h >= 19 && h <= 20) return '戌'
+    return '亥'
+  }
+  const termDeg = 3 + ((seed * 7) % 27)
+  const hanSeed = rows.length + (parseInt(String(collectionId), 10) % 997)
+  const namePool1 = ['夜雨', '云边', '江风', '星窗', '灯影', '槐序', '清宵', '残月']
+  const namePool2 = ['孤灯', '微语', '剪秋', '晚潮', '青衫', '碎月', '春寒', '听风']
+  const hanName = `${namePool1[hanSeed % namePool1.length]}${namePool2[(hanSeed * 3) % namePool2.length]}`
+
+  // hourDots：按 hourly 非零小时数生成散点
+  const nonZeroHours: number[] = hourly
+    .map((v, h) => ({ v, h }))
+    .filter(x => x.v > 0)
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 8)
+    .map(x => x.h)
+  const hourDots = nonZeroHours.length > 0
+    ? nonZeroHours.map((h, i) => {
+        const pos = Math.round(((h + 2) % 24) / 24 * 100)
+        const size = 6 + Math.min(6, Math.round(hourly[h] / Math.max(1, hourly[peakHour]) * 6))
+        const color = SPECTRUM_PALETTE[i % SPECTRUM_PALETTE.length]
+        return { pos, size, color }
+      })
+    : [
+        { pos: 10,  size: 12, color: SPECTRUM_PALETTE[0] },
+        { pos: 38,  size: 10, color: SPECTRUM_PALETTE[3] },
+        { pos: 66,  size: 7,  color: SPECTRUM_PALETTE[1] },
+        { pos: 88,  size: 4,  color: SPECTRUM_PALETTE[2] },
+      ]
+
   const nightSky = {
+    name: `${hanName} · 那一夜`,
+    season: `${term} · ${toCN(peakHour)}夜第${(seed % 3) + 1}场`,
+    timeSpan: `${toCN(startH)}初 ${String(startH).padStart(2,'0')}:${String((seed * 7) % 60).padStart(2,'0')} ~ ${toCN(endH)}初 ${String(endH).padStart(2,'0')}:${String((seed * 11) % 60).padStart(2,'0')}`,
     phase,
+    moonIllum: `${illumPct}%`,
     moonAge: `${moonAges[seed % moonAges.length]} 日龄`,
-    moonIllum: `${illumPct}% 亮`,
     term,
+    ecliptic: `λ ${termDeg}°${(seed % 60).toString().padStart(2,'0')}′`,
+    termDeg,
     meteo: [
-      { k: '时跨', v: '子~卯 · 4 时', color: SPECTRUM_PALETTE[0] },
+      { k: '时跨', v: `${toCN(startH)}~${toCN(endH)} · ${endH - startH & 12} 时`, color: SPECTRUM_PALETTE[0] },
       { k: '夜温', v: `${(10 + (seed % 5)).toFixed(1)}℃ · 凉润`, color: METEO_COLORS.nightTemp },
       { k: '风向', v: (seed % 2 ? '西北' : '东南') + '风 二级', color: METEO_COLORS.wind },
       { k: '能见度', v: '薄云 · 7.2km', color: METEO_COLORS.cloud },
       { k: '云量', v: '散云 · 4/8 量', color: SPECTRUM_PALETTE[4] },
       { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
     ],
+    hourDots,
   }
   const fiveMeteo = [
     { k: '夜温', en: 'T · NIGHT',    color: METEO_COLORS.nightTemp },

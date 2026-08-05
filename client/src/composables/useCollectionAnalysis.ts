@@ -4,11 +4,17 @@ import type { PersonaPayload, EmotionPayload } from './useStarAnalysis'
 // ───────────────────── Nightscape（合集独有：夜色流转+心事轨迹+五大气象+天窗片段+Hero统计） ──────────────────────
 export type NightscapePayload = {
   nightSky: {
+    name: string
+    season: string
+    timeSpan: string
     phase: string
     moonAge: string
     moonIllum: string
     term: string
+    ecliptic: string
+    termDeg: number
     meteo: Array<{ k: string; v: string; color?: string }>
+    hourDots: Array<{ pos: number; size: number; color: string }>
   }
   fiveMeteo: Array<{ k: string; en: string; color: string }>
   heroStars: Array<{
