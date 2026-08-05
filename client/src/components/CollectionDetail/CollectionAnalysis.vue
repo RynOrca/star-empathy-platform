@@ -80,7 +80,7 @@
         </div>
       </section>
 
-      <!-- 星辰归属（SVG 星图散布：ra/dec 方位 + 大小=故事数 + 星座连线） -->
+      <!-- 星辰归属（真实地平坐标星图：alt/az + 地平线 + hover 高亮） -->
       <section class="ca-card ca-stars">
         <div class="ca-card-head">
           <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
@@ -89,39 +89,84 @@
         </div>
         <div class="ca-starmap-wrap">
           <svg v-if="starMapData.stars.length > 0" :viewBox="`0 0 ${MAP_W} ${MAP_H}`" class="ca-starmap-svg" preserveAspectRatio="xMidYMid meet">
-            <!-- 背景星点 -->
+            <!-- 天空背景渐变 -->
+            <defs>
+              <linearGradient :id="'skyGrad'" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(10,10,30,0.15)" />
+                <stop offset="100%" stop-color="rgba(10,10,30,0)" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" :width="MAP_W" :height="HORIZON_Y" fill="url(#skyGrad)" />
+
+            <!-- 背景星点（仅天空区域） -->
             <circle v-for="(bg, i) in bgStars" :key="'bg'+i" :cx="bg.x" :cy="bg.y" :r="bg.r" fill="#fff" :opacity="bg.opacity" />
-            <!-- 星座连线 -->
+
+            <!-- 地平线 -->
+            <line :x1="0" :y1="HORIZON_Y" :x2="MAP_W" :y2="HORIZON_Y" stroke="rgba(134,168,255,0.25)" stroke-width="0.5" stroke-dasharray="4 3" />
+            <!-- 地平线下方暗色遮罩 -->
+            <rect x="0" :y="HORIZON_Y" :width="MAP_W" :height="MAP_H - HORIZON_Y" fill="rgba(0,0,0,0.25)" />
+
+            <!-- 罗盘方位标 -->
+            <text x="14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
+            <text :x="MAP_W * 0.25 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">E</text>
+            <text :x="MAP_W * 0.5 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">S</text>
+            <text :x="MAP_W * 0.75 - 3" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.2)">W</text>
+            <text :x="MAP_W - 14" :y="HORIZON_Y - 3" class="ca-sm-compass" fill="rgba(255,255,255,0.3)">N</text>
+            <!-- 天顶标 -->
+            <text :x="MAP_W / 2" y="8" text-anchor="middle" class="ca-sm-compass" fill="rgba(255,255,255,0.15)">天顶</text>
+
+            <!-- 星座连线（仅地平线上） -->
             <line
               v-for="(l, i) in starMapData.lines"
               :key="'l'+i"
               :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2"
               :stroke="l.color" stroke-width="0.4" opacity="0.18" stroke-dasharray="2 2"
             />
-            <!-- 主星：外发光 + 主体 + 高光核心 + 标签 -->
-            <g v-for="s in starMapData.stars" :key="s.id" class="ca-sm-star">
+
+            <!-- 主星：hover 高亮 + 防遮挡标签 -->
+            <g
+              v-for="s in starMapData.stars"
+              :key="s.id"
+              class="ca-sm-star"
+              :class="{
+                active: hoveredStarId === s.id,
+                dimmed: hoveredStarId !== null && hoveredStarId !== s.id,
+                below: !s.aboveHorizon,
+              }"
+              @mouseenter="hoveredStarId = s.id"
+              @mouseleave="hoveredStarId = null"
+            >
               <!-- 外发光晕 -->
               <circle :cx="s.x" :cy="s.y" :r="s.radius * 3" :fill="s.color" opacity="0.06" />
               <circle :cx="s.x" :cy="s.y" :r="s.radius * 1.8" :fill="s.color" opacity="0.14" />
               <!-- 主体 -->
               <circle :cx="s.x" :cy="s.y" :r="s.radius" :fill="s.color" opacity="0.9">
-                <animate attributeName="opacity" values="0.7;1;0.7" :dur="3 + (s.id % 3) + 's'" repeatCount="indefinite" />
+                <animate attributeName="opacity" :values="`0.7;1;0.7`" :dur="3 + (s.id % 3) + 's'" repeatCount="indefinite" />
               </circle>
               <!-- 高光核心 -->
               <circle :cx="s.x" :cy="s.y" :r="s.radius * 0.35" fill="#fff" opacity="0.85" />
-              <!-- 星名标签 -->
-              <text :x="s.x" :y="s.y + s.radius + 9" text-anchor="middle" class="ca-sm-label" :fill="s.color">{{ s.name }}</text>
-              <!-- 故事数 -->
-              <text :x="s.x" :y="s.y + s.radius + 18" text-anchor="middle" class="ca-sm-count">{{ s.count }}篇</text>
+
+              <!-- 默认标签：仅 top 3 星显示，交替上下避免遮挡 -->
+              <template v-if="s.showLabel && hoveredStarId === null">
+                <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label" :fill="s.color">{{ s.name }}</text>
+                <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count">{{ s.count }}篇</text>
+              </template>
+
+              <!-- hover 时：显示完整信息浮窗 -->
+              <template v-if="hoveredStarId === s.id">
+                <text :x="s.x" :y="s.labelY" text-anchor="middle" class="ca-sm-label ca-sm-label-hover" :fill="s.color">{{ s.name }}</text>
+                <text :x="s.x" :y="s.labelY + (s.labelAbove ? -4 : 7)" text-anchor="middle" class="ca-sm-count ca-sm-count-hover">{{ s.count }}篇 · {{ s.aboveHorizon ? '地平线上' : '地平线下' }} · alt {{ Math.round(s.alt) }}°</text>
+              </template>
             </g>
           </svg>
           <div v-else class="ca-stars-empty">
             故事尚未挂上星辰
           </div>
-          <!-- 图例 -->
+          <!-- 图例 + 地平线统计 -->
           <div v-if="starBelongings.length > 0" class="ca-sm-legend">
-            <span class="ca-sm-legend-item"><i class="ca-sm-dot"></i>圆点大小 = 故事数</span>
-            <span class="ca-sm-legend-item"><i class="ca-sm-dash"></i>虚线 = 星座连线</span>
+            <span class="ca-sm-legend-item"><i class="ca-sm-dot"></i>大小=故事数</span>
+            <span class="ca-sm-legend-item"><i class="ca-sm-dash"></i>星座连线</span>
+            <span v-if="starMapData.belowHorizon > 0" class="ca-sm-legend-item ca-sm-below">{{ starMapData.aboveHorizon }}↑ / {{ starMapData.belowHorizon }}↓</span>
           </div>
         </div>
         <div class="ca-stars-insight">
@@ -270,6 +315,8 @@ import {
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { getStarNameInfo } from '../../utils/starName'
+import { dateToJD, lstDeg, altAz } from '../../utils/astro'
+import { useLocation } from '../../composables/useLocation'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -357,62 +404,82 @@ const starBelongings = computed<{ id: number; name: string; con: string; color: 
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
 
-/** SVG 星图：用 ra/dec 投影到 2D 平面，圆点大小=故事数 */
+/** SVG 星图：用真实地平坐标(alt/az)排布，地平线 + hover 高亮 + 防遮挡 */
 const MAP_W = 280
-const MAP_H = 150
+const MAP_H = 170
+const HORIZON_Y = 125  // 地平线 y 坐标（alt=0°）
+const ZENITH_Y = 12    // 天顶 y 坐标（alt=90°）
+const BELOW_Y = 158    // 地平线下最大深度（alt≈-30°）
+
+const { lat, lng } = useLocation()
+
+/** hover 高亮的星 ID */
+const hoveredStarId = ref<number | null>(null)
+
 const starMapData = computed(() => {
   const stars = starBelongings.value
-  if (stars.length === 0) return { stars: [], lines: [] }
+  if (stars.length === 0) return { stars: [], lines: [], aboveHorizon: 0, belowHorizon: 0 }
 
-  // 有方位数据的星（ra >= 0）
-  const withPos = stars.filter(s => s.ra >= 0)
-  // 无方位的星（行星等 ra=-1）：均匀散布在外圈
-  const noPos = stars.filter(s => s.ra < 0)
-
-  // 计算质心
-  let cx = 12, cy = 0
-  if (withPos.length > 0) {
-    cx = withPos.reduce((a, s) => a + s.ra, 0) / withPos.length
-    cy = withPos.reduce((a, s) => a + s.dec, 0) / withPos.length
-  }
-
-  // 计算最大距离用于缩放
-  let maxDist = 0
-  for (const s of withPos) {
-    const d = Math.sqrt((s.ra - cx) ** 2 + (s.dec - cy) ** 2)
-    if (d > maxDist) maxDist = d
-  }
-  maxDist = Math.max(maxDist, 2) // 避免除零
-
-  const pad = 28
-  const scale = Math.min((MAP_W - pad * 2) / 2, (MAP_H - pad * 2) / 2) / maxDist
+  // 观测者位置（无定位时默认北京 39.9°N 116.4°E）
+  const obsLat = lat.value ?? 39.9
+  const obsLng = lng.value ?? 116.4
+  const now = new Date()
+  const jd = dateToJD(now)
+  const lst = lstDeg(jd, obsLng)
   const maxCount = Math.max(1, ...stars.map(s => s.count))
 
-  // 映射有方位的星
-  const mapped = withPos.map(s => ({
-    ...s,
-    x: MAP_W / 2 + (s.ra - cx) * scale,
-    y: MAP_H / 2 - (s.dec - cy) * scale,
-    radius: 2.5 + (s.count / maxCount) * 5, // 2.5~7.5px
-  }))
+  // 计算每颗星的地平坐标并投影
+  const all = stars.map((s, idx) => {
+    let alt = 0, az = 0
+    if (s.ra >= 0) {
+      const r = altAz(s.ra, s.dec, obsLat, lst)
+      alt = r.alt
+      az = r.az
+    } else {
+      // 行星（ra=-1）：给一个中天附近默认位置
+      alt = 35
+      az = 180
+    }
 
-  // 无方位的星（行星）：在顶部弧形散布
-  const noMapped = noPos.map((s, i) => {
-    const angle = (i / Math.max(1, noPos.length)) * Math.PI - Math.PI / 2
+    // 方位角 0-360° → x：北在左、东、南、西、北在右（全周展开）
+    const x = 14 + (az / 360) * (MAP_W - 28)
+    // 高度角 → y：90°→ZENITH_Y, 0°→HORIZON_Y, -30°→BELOW_Y
+    let y: number
+    if (alt >= 0) {
+      y = HORIZON_Y - (alt / 90) * (HORIZON_Y - ZENITH_Y)
+    } else {
+      y = HORIZON_Y + Math.min(1, -alt / 30) * (BELOW_Y - HORIZON_Y)
+    }
+    y = Math.max(6, Math.min(MAP_H - 4, y))
+
+    const radius = 2.5 + (s.count / maxCount) * 5 // 2.5~7.5px
+    // 标签位置：交替上下，避免遮挡
+    const labelAbove = idx % 2 === 0
+    const labelY = labelAbove ? y - radius - 4 : y + radius + 10
+
     return {
       ...s,
-      x: MAP_W / 2 + Math.cos(angle) * (MAP_W / 2 - pad),
-      y: MAP_H / 2 + Math.sin(angle) * (MAP_H / 2 - pad) * 0.5,
-      radius: 2.5 + (s.count / maxCount) * 5,
+      alt,
+      az,
+      x,
+      y,
+      radius,
+      labelAbove,
+      labelY,
+      aboveHorizon: alt >= 0,
+      // 仅 top 3 故事数的星默认显示标签
+      showLabel: idx < 3,
     }
   })
 
-  const all = [...mapped, ...noMapped]
+  // 统计地平线上下数量
+  const aboveHorizon = all.filter(s => s.aboveHorizon).length
+  const belowHorizon = all.length - aboveHorizon
 
-  // 星座连线：同星座的星用最近邻连线
+  // 星座连线：同星座的星用最近邻连线（仅地平线上）
   const conGroups = new Map<string, typeof all>()
   for (const s of all) {
-    if (!s.con) continue
+    if (!s.con || !s.aboveHorizon) continue
     if (!conGroups.has(s.con)) conGroups.set(s.con, [])
     conGroups.get(s.con)!.push(s)
   }
@@ -438,15 +505,15 @@ const starMapData = computed(() => {
     }
   }
 
-  return { stars: all, lines }
+  return { stars: all, lines, aboveHorizon, belowHorizon }
 })
 
-/** 背景装饰星点（确定性伪随机） */
-const bgStars = Array.from({ length: 28 }, (_, i) => {
+/** 背景装饰星点（仅天空区域，确定性伪随机） */
+const bgStars = Array.from({ length: 24 }, (_, i) => {
   const seed = i * 7919 + 13
   return {
     x: (seed * 13) % MAP_W,
-    y: (seed * 17) % MAP_H,
+    y: ZENITH_Y + ((seed * 17) % (HORIZON_Y - ZENITH_Y - 4)),
     r: 0.3 + ((seed % 4) * 0.25),
     opacity: 0.1 + ((seed % 6) * 0.04),
   }
@@ -847,11 +914,11 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* ═══ 3. Stars Belonging（SVG 星图散布） ═══ */
+/* ═══ 3. Stars Belonging（真实地平坐标星图） ═══ */
 .ca-starmap-wrap {
   position: relative;
   border-radius: 8px;
-  background: radial-gradient(ellipse at 50% 40%, rgba(134, 168, 255, 0.04), rgba(10, 10, 26, 0.5));
+  background: radial-gradient(ellipse at 50% 30%, rgba(134, 168, 255, 0.04), rgba(10, 10, 26, 0.5));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.03);
 }
@@ -859,16 +926,35 @@ function tagStyle(tag: string): Record<string, string> {
   width: 100%;
   height: auto;
   display: block;
-  min-height: 120px;
+  min-height: 140px;
+}
+.ca-sm-compass {
+  font-size: 4px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  pointer-events: none;
 }
 .ca-sm-star {
   cursor: pointer;
-  transition: transform 0.2s;
-  transform-origin: center;
-  transform-box: fill-box;
+  transition: opacity 0.2s;
 }
-.ca-sm-star:hover {
-  transform: scale(1.15);
+/* hover 高亮：放大 + 完整标签 */
+.ca-sm-star.active {
+  opacity: 1;
+}
+.ca-sm-star.active > circle:nth-child(3) {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+/* 非 hover 星变暗 */
+.ca-sm-star.dimmed {
+  opacity: 0.25;
+}
+/* 地平线下星更暗 */
+.ca-sm-star.below {
+  opacity: 0.35;
+}
+.ca-sm-star.below.dimmed {
+  opacity: 0.15;
 }
 .ca-sm-label {
   font-size: 5px;
@@ -876,25 +962,38 @@ function tagStyle(tag: string): Record<string, string> {
   letter-spacing: 0.02em;
   pointer-events: none;
 }
+.ca-sm-label-hover {
+  font-size: 6.5px;
+  font-weight: 700;
+}
 .ca-sm-count {
   font-size: 4px;
   fill: rgba(255, 255, 255, 0.35);
   pointer-events: none;
 }
+.ca-sm-count-hover {
+  font-size: 5px;
+  fill: rgba(255, 255, 255, 0.6);
+}
 .ca-sm-legend {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   padding: 5px 10px;
   font-size: 0.56rem;
   color: var(--muted-light);
   letter-spacing: 0.02em;
   border-top: 1px solid rgba(255, 255, 255, 0.03);
   background: rgba(0, 0, 0, 0.15);
+  flex-wrap: wrap;
 }
 .ca-sm-legend-item {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.ca-sm-below {
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: auto;
 }
 .ca-sm-dot {
   display: inline-block;
