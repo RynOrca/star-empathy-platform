@@ -563,7 +563,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, nextTick, type Component } from 'vue'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, watch, nextTick, type Component } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   X, Lock, Globe, BookOpen, BookMarked, Heart, Eye, Clock, Pencil, Trash2,
   ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Activity, Tag, Hash,
@@ -583,6 +584,14 @@ marked.setOptions({ breaks: true, gfm: true })
 
 const { isMobile } = useMediaQuery()
 const { fetchDetail } = useCollections()
+const route = useRoute()
+
+/** 点击星星小框跳转 /sky?star=xxx 或任何路由变化 → 自动关闭合集详情弹窗 */
+watch(
+  () => route.fullPath,
+  () => { if (show.value) emit('close') },
+  { flush: 'post' }
+)
 
 // ─── Props ───
 const props = defineProps<{
@@ -605,7 +614,17 @@ const emit = defineEmits<{
 
 // ─── 内部 show 标志（控制 enter/leave 动画，镜像 StarDetail 模式）───
 const show = ref(false)
-onMounted(() => { nextTick(() => { show.value = true }) })
+onMounted(() => {
+  nextTick(() => { show.value = true })
+  // 兜底：点击了当前 URL 对应的星星（Vue Router 不会重复导航），也关闭合集详情弹窗
+  window.addEventListener('star-identity-click', onStarIdentityClick)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('star-identity-click', onStarIdentityClick)
+})
+function onStarIdentityClick() {
+  if (show.value) handleClose()
+}
 function handleClose() { show.value = false }
 
 // ─── 数据状态 ───
