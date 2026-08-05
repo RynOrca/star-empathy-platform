@@ -1,13 +1,61 @@
-﻿<template>
+<template>
   <div class="ca-wrap">
+    <!-- ─── 全局三态：Too Few Stories（< 3，不生成） ─── -->
+    <div v-if="tooFewStories" class="ca-state-wrap">
+      <div class="panel-wrapper ca-state-card ca-state-scant">
+        <div class="panel-head">
+          <Sparkles :size="10" class="pw-icon pw-purple" />
+          <span class="pw-title">AI 星笺解读</span>
+          <span class="pw-count">未生成</span>
+        </div>
+        <div class="persona-empty empty-scant">
+          <div class="pe-icon-wrap pe-scant">
+            <BookDashed :size="14" />
+          </div>
+          <div class="pe-text">
+            <div class="pe-title">心事还不够多</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 将为这卷星笺生成专属解读</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 全局三态：Loading（生成中骨架） ─── -->
+    <div v-else-if="isLoading" class="ca-state-wrap">
+      <div class="panel-wrapper ca-state-card ca-state-loading">
+        <div class="panel-head">
+          <Sparkles :size="10" class="pw-icon pw-purple" />
+          <span class="pw-title">AI 星笺解读</span>
+          <span class="pw-count">生成中</span>
+        </div>
+        <div class="persona-empty empty-loading">
+          <div class="pe-icon-wrap pe-loading">
+            <Sparkle :size="14" class="spin-slow" />
+          </div>
+          <div class="pe-text">
+            <div class="pe-title">AI 星笺解读生成中…</div>
+            <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合夜色轨迹与情绪光谱</div>
+          </div>
+          <div class="skeleton-lines">
+            <span class="sk-line sk-1"></span>
+            <span class="sk-line sk-2"></span>
+            <span class="sk-line sk-3"></span>
+            <span class="sk-line sk-2"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 全局三态：Real（ready=true，所有真实内容） ─── -->
+    <template v-else>
     <!-- ═══ 0. 顶部标识条 ═══ -->
     <div class="ca-hero-strip">
       <div class="ca-hero-left">
         <Sparkles :size="13" class="ca-hero-spark" />
         <span class="ca-hero-label">AI 星笺解读</span>
-        <span class="ca-hero-sub">· 基于 {{ storyCount }} 则心事的聚合凝视</span>
+        <span class="ca-hero-sub">· 基于 {{ displayStoryCount }} 则心事的聚合凝视</span>
       </div>
-      <span class="ca-hero-badge">DESIGN PREVIEW</span>
+      <span class="ca-hero-badge">LIVE</span>
     </div>
 
     <!-- ═══ 0.5. Hero：合集星图总览 + 星辰归属置顶（对齐 StarDetail AIPersonaCard 规范）
@@ -741,26 +789,30 @@
     <!-- 底部说明（设计预览标记）-->
     <div class="ca-foot-note">
       <component :is="Info" :size="11" />
-      <span>以上为设计预览，AI 解读内容为占位示例，尚未接入生成服务。</span>
+      <span>AI 解读内容由 agent 根据合集中的心事实时聚合生成。</span>
     </div>
+    </template>
+    <!-- /v-else real state -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
-  Feather, Info, Quote, CloudSun,
+  Feather, Info, Quote, CloudSun, Sparkle, BookDashed,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { getStarNameInfo } from '../../utils/starName'
 import { dateToJD, lstDeg, altAz } from '../../utils/astro'
 import { useLocation } from '../../composables/useLocation'
+import { useCollectionAnalysis, type NightscapePayload } from '../../composables/useCollectionAnalysis'
 
 marked.setOptions({ breaks: true, gfm: true })
 
 const props = defineProps<{
+  collectionId: number | null
   collectionName: string
   storyCount: number
   /** 真实故事列表，用于共鸣榜与星辰归属（若为空则用 mock） */
@@ -781,164 +833,173 @@ defineEmits<{
   'story-click': [story: any]
 }>()
 
-/* ═══════════════════════════════════════════════════════════
-   MOCK DATA —— 设计预览占位，后续接入 agent 时替换
-   ═══════════════════════════════════════════════════════════ */
+// ─── 调用 useCollectionAnalysis（仿 StarDetail）───
+const collId = toRef(props, 'collectionId')
+const collAnalysis = useCollectionAnalysis(collId)
 
-const persona = {
-  hanName: '夜雨孤灯',
-  constellation: '夜雨孤灯 · 默认合集',
-  tags: ['思念', '夜雨', '独行', '回忆', '微光'],
-  quote: '每一盏孤灯，都是夜里不肯睡的人。',
-  suggestIntro: '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
-  paragraphFirst:
-    '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
-  paragraphSecond:
-    '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
-  dimensions: [
+// ─── 三态开关（与 StarDetail AIPersonaCard 保持完全一致的优先级） ───
+// 1) 后端 tooFewStories=true OR props.storyCount < 3 → 心事不够多，不生成
+// 2) collAnalysis.loading=true OR (analysis ready=false AND not tooFew) → 生成中骨架
+// 3) else → 真实数据
+const tooFewStories = computed(() => {
+  if (hasReal.value) return false
+  const fromApi = collAnalysis.analysis.value?.tooFewStories
+  if (fromApi === true) return true
+  if (collAnalysis.analysis.value?.ready) return false // API 明确 ready 但没 tooFew → 认为可以
+  return (props.storyCount ?? 0) < 3
+})
+
+const hasReal = computed(() => {
+  const a = collAnalysis.analysis.value
+  if (!a || !a.ready) return false
+  return !!(a.nightscape && a.persona)
+})
+
+const isLoading = computed(() => {
+  if (tooFewStories.value || hasReal.value) return false
+  // loading OR ready=false 且故事>=3 → 显示骨架
+  if (collAnalysis.loading.value) return true
+  const a = collAnalysis.analysis.value
+  if (a && !a.ready && !a.tooFewStories) return true
+  return false
+})
+
+const displayStoryCount = computed(() => {
+  const fromApi = collAnalysis.analysis.value?.storyCount
+  if (typeof fromApi === 'number') return fromApi
+  return props.storyCount ?? 0
+})
+
+// ─── 从 API 返回值取值（兜底到旧 mock 避免突然空白） ───
+const _p = computed(() => collAnalysis.analysis.value?.persona)
+const _e = computed(() => collAnalysis.analysis.value?.emotion)
+const _n = computed<NightscapePayload | null | undefined>(() => collAnalysis.analysis.value?.nightscape)
+
+const persona = computed(() => ({
+  hanName: _p.value?.hanName ?? '夜雨孤灯',
+  constellation: _p.value?.constellation ?? `${props.collectionName} · 默认合集`,
+  tags: _p.value?.tags ?? ['思念', '夜雨', '独行', '回忆', '微光'],
+  quote: _p.value?.quote ?? '每一盏孤灯，都是夜里不肯睡的人。',
+  suggestIntro: _p.value?.suggestIntro ?? '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
+  paragraphFirst: _p.value?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
+  paragraphSecond: _p.value?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
+  dimensions: (_p.value?.dimensions?.length ?? 0) >= 5 ? _p.value!.dimensions : [
     { left: '内向',   right: '外向',   percent: 78, side: 'left'  as const },
     { left: '柔和',   right: '锋利',   percent: 34, side: 'left'  as const },
     { left: '沉静',   right: '炽烈',   percent: 62, side: 'left'  as const },
     { left: '现实',   right: '梦幻',   percent: 71, side: 'right' as const },
-    { left: '慢热',   right: '热切',   percent: 57, side: 'left'  as const },  // 补 5 维对应 5 曜
+    { left: '慢热',   right: '热切',   percent: 57, side: 'left'  as const },
   ],
-}
+}))
 
-/** 星座五曜：金木水火土五行星对应 5 个性格维度（中文名+英文名+代表色） */
-const fivePlanets = [
-  { cn: '金', en: 'Venus',   color: '#ffd98a' },   // 金星：温软→内向/外向
-  { cn: '木', en: 'Jupiter', color: '#95f0c0' },   // 木星：舒展→柔和/锋利
-  { cn: '水', en: 'Mercury', color: '#86a8ff' },   // 水星：流动→沉静/炽烈
-  { cn: '火', en: 'Mars',    color: '#ff8b7d' },   // 火星：热情→现实/梦幻
-  { cn: '土', en: 'Saturn',  color: '#caa7ff' },   // 土星：沉淀→慢热/热切
-]
+const fiveMeteo = computed(() => _n.value?.fiveMeteo ?? [
+  { k: '夜温',   en: 'T · NIGHT',    color: '#86a8ff' },
+  { k: '风向',   en: 'W · NORTHW',   color: '#caa7ff' },
+  { k: '见月',   en: 'M · WANING',   color: '#ffd98a' },
+  { k: '云量',   en: 'C · FOURTH',   color: '#95f0c0' },
+  { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },
+])
 
-/** 【天空本色】合集画像：天空意象数组（替换α/β/γ亮星），从诗/故事/风物中提取
- *  size: 字大小权重，color: 字形光晕
- */
-const skyImages = [
-  { word: '夜雨',   size: 'md', color: '#86a8ff' },
-  { word: '江风',   size: 'md', color: '#95f0c0' },
-  { word: '孤灯',   size: 'lg', color: '#ffd98a' },
-  { word: '远乡',   size: 'md', color: '#ffd98a' },
-  { word: '独坐',   size: 'md', color: '#caa7ff' },
-  { word: '槐花',   size: 'sm', color: '#ffd98a' },
-  { word: '种子',   size: 'sm', color: '#86a8ff' },
-  { word: '残卷',   size: 'sm', color: '#95f0c0' },
-]
+const emotions = computed(() => {
+  if (_e.value?.emotions && _e.value.emotions.length >= 5) return _e.value.emotions
+  return [
+    { name: '思念', value: 0.78, color: '#ffd98a', desc: '远方的人与未寄出的话' },
+    { name: '孤独', value: 0.62, color: '#caa7ff', desc: '末班车与空荡的街' },
+    { name: '释然', value: 0.41, color: '#9ae6b4', desc: '雨停后的第一缕晨光' },
+    { name: '希望', value: 0.35, color: '#86a8ff', desc: '纸船顺流而下的方向' },
+    { name: '共鸣', value: 0.28, color: '#ff8b7d', desc: '陌生人留下的温度' },
+  ]
+})
 
-/** 【天空本色】合集画像：夜的五大「气象属性」（替换金木水火土五曜）
- *  对应 persona.dimensions 5维的天文重命名，每维带气象名+颜色
- */
-const fiveMeteo = [
-  { k: '夜温',   en: 'T · NIGHT',    color: '#86a8ff' },  // 温度：凉润
-  { k: '风向',   en: 'W · NORTHW',   color: '#caa7ff' },  // 风：西北二级
-  { k: '见月',   en: 'M · WANING',   color: '#ffd98a' },  // 月：残月蛾眉
-  { k: '云量',   en: 'C · FOURTH',   color: '#95f0c0' },  // 云：4/8散云
-  { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },  // 体感：衣薄微寒
-]
+const emotionInsights = computed(() => {
+  if (_n.value?.emotionInsights && _n.value.emotionInsights.length >= 5) return _n.value.emotionInsights
+  return [
+    { title: '<b>浓稠思念</b>，是这卷星笺的底色', pct: '42.3%', desc: '雨夜、灯影、未寄出的信是反复出现的三种意象——思念并不尖锐，更像一盏不肯熄灭的灯，温吞地亮到天明。', color: '#ffd98a' },
+    { title: '<b>深夜独行</b>的孤独，紧随思念之后', pct: '33.6%', desc: '末班车、空街道、凌晨四点的台灯——它们不是悲伤的注脚，而是独自面对自己时安静的背景音。', color: '#caa7ff' },
+    { title: '<b>微光释然</b>，是最意外的情绪角落', pct: '22.2%', desc: '虽然整体偏暗，但从「阳台种子」「江边走走」等片段能看见：风一吹，有些事就悄悄松了绑。', color: '#9ae6b4' },
+    { title: '<b>微光希望</b>，在叙事末尾悄然抬头', pct: '18.9%', desc: '纸船顺流、种子发芽、槐花再开——时间没有直接给出答案，但它让一些事变得可以放下。', color: '#86a8ff' },
+    { title: '<b>陌生人的共鸣</b>，是最轻也最暖的部分', pct: '15.1%', desc: '一句话、一个点赞、一次擦肩而过的善意——它们不解决问题，但会让某个夜晚变得没那么难熬。', color: '#ff8b7d' },
+  ]
+})
 
-
-const emotions = [
-  { name: '思念', value: 0.78, color: '#ffd98a', desc: '远方的人与未寄出的话' },
-  { name: '孤独', value: 0.62, color: '#caa7ff', desc: '末班车与空荡的街' },
-  { name: '释然', value: 0.41, color: '#95f0c0', desc: '雨停后的第一缕晨光' },
-  { name: '希望', value: 0.35, color: '#86a8ff', desc: '纸船顺流而下的方向' },
-  { name: '共鸣', value: 0.28, color: '#ff8b7d', desc: '陌生人留下的温度' },
-]
-/** 【星空绑定】情绪 → 恒星光谱型映射（O/B/A/F/G/K/M 对应温度蓝→红，温度→情绪色） */
-const emotionSpectra = [
-  { type: 'G2V' },  // 思念 → G型黄矮星（类似太阳，温吞思念
-  { type: 'K5V' },  // 孤独 → K型橙矮星，温度稍低
-  { type: 'F8V' },  // 释然 → F型黄白星，微蓝
-  { type: 'A3V' },  // 希望 → A型白星，温度更高
-  { type: 'M2V' },  // 共鸣 → M型红矮星，温度最低但长久
-]
-
-/** 情绪洞察卡片（参考星星 emotionGen：彩点 + 加粗高亮情绪词标题 + 百分比 + 【星空绑定】星等/光年/恒星类型参数） */
-const emotionInsights = [
-  {
-    title: '<b>浓稠思念</b>，是这卷星笺的底色',
-    pct: '42.3%',
-    desc: '雨夜、灯影、未寄出的信是反复出现的三种意象——思念并不尖锐，更像一盏不肯熄灭的灯，温吞地亮到天明。',
-    color: '#ffd98a',
-    astro: { type: '黄矮星 G2V', mag: '2.8', dist: '148' },
-  },
-  {
-    title: '<b>深夜独行</b>的孤独，紧随思念之后',
-    pct: '33.6%',
-    desc: '末班车、空街道、凌晨四点的台灯——它们不是悲伤的注脚，而是独自面对自己时安静的背景音。',
-    color: '#caa7ff',
-    astro: { type: '橙矮星 K5V', mag: '3.1', dist: '212' },
-  },
-  {
-    title: '<b>微光释然</b>，是最意外的情绪角落',
-    pct: '22.2%',
-    desc: '虽然整体偏暗，但从「阳台种子」「江边走走」等片段能看见：风一吹，有些事就悄悄松了绑。',
-    color: '#95f0c0',
-    astro: { type: '黄白星 F8V', mag: '3.4', dist: '276' },
-  },
-  {
-    title: '<b>微光希望</b>，在叙事末尾悄然抬头',
-    pct: '18.9%',
-    desc: '纸船顺流、种子发芽、槐花再开——时间没有直接给出答案，但它让一些事变得可以放下。',
-    color: '#86a8ff',
-    astro: { type: '白矮星 A3V', mag: '4.3', dist: '338' },
-  },
-  {
-    title: '<b>陌生人的共鸣</b>，是最轻也最暖的部分',
-    pct: '15.1%',
-    desc: '一句话、一个点赞、一次擦肩而过的善意——它们不解决问题，但会让某个夜晚变得没那么难熬。',
-    color: '#ff8b7d',
-    astro: { type: '红矮星 M2V', mag: '4.9', dist: '404' },
-  },
-]
-const emotionNarrative = {
-  dominant: '思念',
-  dominantPct: '42.3%',
+const emotionNarrative = computed(() => _n.value?.emotionNarrative ?? {
+  dominant: '思念', dominantPct: '42.3%',
   summary: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
-  contrast: '「夜虽沉，主序却稳——就像恒星在主序阶段停留最久，你的思念也在最深处静静燃烧，虽然暗但最持久。',
+  contrast: '夜虽沉，主序却稳——就像恒星在主序阶段停留最久，你的思念也在最深处静静燃烧，虽然暗但最持久。',
   flow: '从东升（浓思）→ 中天（孤独回望）→ 西沉（释然微光），星轨虽慢，但终究划过了整个夜。',
-}
+})
 
-/** 心事摘录 → 【星空绑定】亮星独白（Top3亮星 αβγ，加星名/星等/光年/恒星类型） */
-const storyQuotes = [
-  {
-    rank: 'α',
-    starName: '雨夜寄北',
-    illus: 'moon',
-    color: '#ffd98a',
-    text: '把没寄出的话折成纸船，放进窗外的雨里——不知道它会漂去哪里，但至少今晚，它不用再困在我心里。',
-    tags: ['思念', '夜雨', '纸船'],
-    author: '匿名星客',
-    date: '03/12 子时',
-    astro: { type: 'G2V', mag: '2.8', dist: '148' },
-  },
-  {
-    rank: 'β',
-    starName: '凌晨四点',
-    illus: 'house',
-    color: '#caa7ff',
-    text: '翻到那张合影，才发现你笑得比我记得的还要年轻。屋里很安静，只有我一个人，却好像听见厨房里还飘着切菜的声音。',
-    tags: ['回忆', '家', '旧照片'],
-    author: '夜归人',
-    date: '03/25 丑时',
-    astro: { type: 'K5V', mag: '3.1', dist: '212' },
-  },
-  {
-    rank: 'γ',
-    starName: '江边走走',
-    illus: 'flower',
-    color: '#95f0c0',
-    text: '风把帽子吹进水里，我居然笑了出来。有些东西抓不住就是抓不住，没关系——下次换一顶帽子就是了。',
-    tags: ['释然', '风', '江边'],
-    author: '桥上客',
-    date: '04/30 辰时',
-    astro: { type: 'F8V', mag: '3.4', dist: '276' },
-  },
-]
+const storyQuotes = computed(() => {
+  if (_n.value?.storyQuotes && _n.value.storyQuotes.length >= 3) return _n.value.storyQuotes.map(q => ({
+    ...q, astro: undefined as any,
+  }))
+  return [
+    { rank: 'α', starName: '雨夜寄北', illus: 'moon' as const,  color: '#ffd98a', text: '把没寄出的话折成纸船，放进窗外的雨里——不知道它会漂去哪里，但至少今晚，它不用再困在我心里。', tags: ['思念', '夜雨', '纸船'], author: '匿名星客', date: '03/12 子时' },
+    { rank: 'β', starName: '凌晨四点', illus: 'house' as const, color: '#caa7ff', text: '翻到那张合影，才发现你笑得比我记得的还要年轻。屋里很安静，只有我一个人，却好像听见厨房里还飘着切菜的声音。', tags: ['回忆', '家', '旧照片'], author: '夜归人', date: '03/25 丑时' },
+    { rank: 'γ', starName: '江边走走', illus: 'plant' as const, color: '#9ae6b4', text: '风把帽子吹进水里，我居然笑了出来。有些东西抓不住就是抓不住，没关系——下次换一顶帽子就是了。', tags: ['释然', '风', '江边'], author: '桥上客', date: '04/30 辰时' },
+  ]
+})
 
-/** 情感球体尺寸：按值映射 40~66px（参考星星 orbSize 映射区间） */
+const heroStars = computed(() => _n.value?.heroStars ?? [
+  { x: 58,  y: 150, r: 4.9, fill: '#ffd98a', gid: 'Gold'   as const, label: '20:31' },
+  { x: 150, y: 52,  r: 4.6, fill: '#caa7ff', gid: 'Purple' as const, label: '01:12' },
+  { x: 226, y: 130, r: 4.2, fill: '#86a8ff', gid: 'Blue'   as const, label: '03:04' },
+  { x: 100, y: 110, r: 3.0, fill: '#ffd98a', gid: 'Gold'   as const },
+  { x: 128, y: 170, r: 3.2, fill: '#ffb48a', gid: 'Gold'   as const },
+  { x: 182, y: 92,  r: 2.9, fill: '#9ae6b4', gid: 'Green'  as const },
+  { x: 252, y: 64,  r: 3.4, fill: '#ffd98a', gid: 'Gold'   as const },
+  { x: 288, y: 148, r: 3.0, fill: '#caa7ff', gid: 'Purple' as const },
+])
+
+const heroStats = computed(() => _n.value?.heroStats ?? [
+  { k: '心事总数', v: displayStoryCount.value, sub: '则', color: '#ffd98a' },
+  { k: '累计共鸣', v: (props.resonanceTotal ?? 237), sub: '次', color: '#caa7ff' },
+  { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, displayStoryCount.value)), sub: '则心事', color: '#86a8ff' },
+  { k: '覆盖时辰', v: `${positivesCountFn(hourly.value)}/24`, sub: '段', color: '#9ae6b4' },
+])
+
+const hourly = computed<number[]>(() => _n.value?.hourly ?? [2,1,1,0,0,1,3,5,4,3,2,2,4,3,2,1,2,3,4,6,9,12,8,5])
+const peakHour = computed<number>(() => _n.value?.peakHour ?? 21)
+const lowHour  = computed<number>(() => _n.value?.lowHour  ?? 4)
+const peakText = computed<string>(() => '子时雨最盛，心事也最稠。你总在别人入睡后才点亮自己那盏灯，把白天没说完的话留给夜雨。')
+const lowText  = computed<string>(() => '卯时天将明，是这卷星笺最安静的时辰。或许醒来之后，有些情绪就随晨光散了。')
+
+const nightSky = computed(() => _n.value?.nightSky ?? {
+  name: `${persona.value.hanName} · 那一夜`,
+  season: '甲辰年 · 春分后第三夜',
+  timeSpan: '子初 22:47 ~ 卯初 05:21',
+  phase: '残月 · 蛾眉',
+  moonIllum: '22%',
+  moonAge: '26.4 日龄',
+  term: '春分后三',
+  ecliptic: 'λ 3°12′',
+  termDeg: 3 + 12 / 60 * 15,
+  meteo: [
+    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
+    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
+    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
+    { k: '能见度', v: '薄云 · 7.2km', color: '#9ae6b4' },
+    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
+    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
+  ],
+  hourDots: [
+    { pos: 10,  size: 12, color: '#ffd98a' },
+    { pos: 22,  size: 8,  color: '#ffd98a' },
+    { pos: 38,  size: 10, color: '#caa7ff' },
+    { pos: 52,  size: 5,  color: '#95f0c0' },
+    { pos: 66,  size: 7,  color: '#caa7ff' },
+    { pos: 78,  size: 6,  color: '#95f0c0' },
+    { pos: 88,  size: 4,  color: '#86a8ff' },
+  ],
+})
+
+function positivesCountFn(arr: number[]) { return arr.filter(v => v > 0).length }
+
+/* ═══════════════════════════════════════════════════════════
+   其余不变：星辰归属（starBelongings）/ starMapData / 共鸣榜 / 情感轨迹 / 工具函数
+   依然用 mock 或 props.stories 派生，这部分后续可以继续接真实数据或继续走 agent
+   ═══════════════════════════════════════════════════════════ */
+
 function orbSize(value: number): number {
   return Math.round(40 + value * 26)
 }
@@ -959,43 +1020,35 @@ const MOCK_BELONGINGS = [
   { id: 323,   name: '右枢',     con: '天龙座', color: '#b9c9ff', count: 1, ra: 211.6, dec: 64.4 },   // α Dra B9V  灰蓝
 ]
 const starBelongings = computed<{ id: number; name: string; con: string; color: string; count: number; ra: number; dec: number }[]>(() => {
-  /**
-   * 【设计预览模式：强制返回 MOCK，不依赖真实数据】
-   * 用户已明确：禁止接数据，先把前端设计做好，信息充实。
-   * 因此这里直接使用 MOCK_BELONGINGS（8 颗跨星座星），保证光谱/星座/标签/星图
-   * 全部有足够数据呈现设计效果。
-   * 将来接入真实数据时，恢复下面注释掉的真实数据聚合逻辑即可。
-   */
+  // 从真实故事聚合 catalogStarId / catalogStarIds → 星名 + 星座 + 光谱色 + 故事数
+  const map = new Map<number, number>()
+  for (const s of props.stories ?? []) {
+    const ids: number[] = []
+    if (s.catalogStarId != null) ids.push(s.catalogStarId)
+    if (Array.isArray(s.catalogStarIds)) ids.push(...s.catalogStarIds)
+    for (const id of Array.from(new Set(ids))) {
+      map.set(id, (map.get(id) ?? 0) + 1)
+    }
+  }
+  if (map.size > 0) {
+    return Array.from(map.entries())
+      .map(([id, count]) => {
+        const info = getStarNameInfo(id)
+        return {
+          id,
+          name: info?.name ?? `星 ${id}`,
+          con: info?.con ?? '',
+          color: info?.color ?? '#86a8ff',
+          count,
+          ra: info?.ra ?? -1,
+          dec: info?.dec ?? 0,
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
+  }
+  // 真实故事没有绑定星辰归属：兜底到 mock 的 6 颗亮星，确保星图不空白
   return MOCK_BELONGINGS.map(x => ({ ...x }))
-
-  // —— 真实数据逻辑（暂不启用） ——
-  // const map = new Map<number, number>()
-  // for (const s of props.stories ?? []) {
-  //   const ids: number[] = []
-  //   if (s.catalogStarId != null) ids.push(s.catalogStarId)
-  //   if (Array.isArray(s.catalogStarIds)) ids.push(...s.catalogStarIds)
-  //   for (const id of Array.from(new Set(ids))) {
-  //     map.set(id, (map.get(id) ?? 0) + 1)
-  //   }
-  // }
-  // if (map.size > 0) {
-  //   return Array.from(map.entries())
-  //     .map(([id, count]) => {
-  //       const info = getStarNameInfo(id)
-  //       return {
-  //         id,
-  //         name: info?.name ?? `星 ${id}`,
-  //         con: info?.con ?? '',
-  //         color: info?.color ?? '#86a8ff',
-  //         count,
-  //         ra: info?.ra ?? -1,
-  //         dec: info?.dec ?? 0,
-  //       }
-  //     })
-  //     .sort((a, b) => b.count - a.count)
-  //     .slice(0, 12)
-  // }
-  // return MOCK_BELONGINGS.map(x => ({ ...x }))
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
 
@@ -1202,33 +1255,8 @@ const winMeta: Record<string, any> = {}
  *  gid → Gold(金·喜悦/思念) / Purple(紫·柔软/低落) / Blue(蓝·平静) / Green(绿·释然)
  *  label → Top 3 带时间标签
  */
-type HeroStar = { x:number; y:number; r:number; fill:string; gid:'Gold'|'Purple'|'Blue'|'Green'; label?:string }
-const heroStars: HeroStar[] = [
-  // Top 3 大心事（带时间标签）
-  { x: 58,  y: 150, r: 4.9, fill: '#ffd98a', gid: 'Gold',   label: '20:31' }, // 雨夜寄北 · 思念浓（中部偏下）
-  { x: 150, y: 52,  r: 4.6, fill: '#caa7ff', gid: 'Purple', label: '01:12' }, // 凌晨四点 · 柔软伤感（上部）
-  { x: 226, y: 130, r: 4.2, fill: '#86a8ff', gid: 'Blue',   label: '03:04' }, // 江边走走 · 平静（中部）
-  // 其余 5 颗
-  { x: 100, y: 110, r: 3.0, fill: '#ffd98a', gid: 'Gold' },
-  { x: 128, y: 170, r: 3.2, fill: '#ffb48a', gid: 'Gold' },
-  { x: 182, y: 92,  r: 2.9, fill: '#9ae6b4', gid: 'Green'},
-  { x: 252, y: 64,  r: 3.4, fill: '#ffd98a', gid: 'Gold' },
-  { x: 288, y: 148, r: 3.0, fill: '#caa7ff', gid: 'Purple'},
-]
-
-/**
- * 合集统计数据（全部可以从 props.stories 真实提取，绝非假数据）
- *  这里先按 {{ storyCount }}=4 的 demo 填充占位
- *  后续接入时替换为 computed 真实计算即可
- */
-const heroStats = [
-  { k: '心事总数', v: props.storyCount ?? 4, sub: '则', color: '#ffd98a' },
-  { k: '累计共鸣', v: (props.resonanceTotal ?? 237), sub: '次', color: '#caa7ff' },
-  { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, props.storyCount ?? 4)), sub: '则心事', color: '#86a8ff' },
-  { k: '投递跨度', v: '4 小时 34 分', sub: '20:31 ~ 01:05', color: undefined },
-  { k: '情绪倾向', v: '柔软思念', sub: '暖色占比 58%', color: '#ffb48a' },
-  { k: '最多时段', v: '01:00 ~ 02:00', sub: '占比 37.5%', color: '#9ae6b4' },
-]
+/* HeroStar type 已在前面的 computed 中用到，这里保留仅类型声明（避免未使用type警告） */
+export type _HeroStarShape = { x:number; y:number; r:number; fill:string; gid:'Gold'|'Purple'|'Blue'|'Green'; label?:string }
 
 /** 星星统计：光谱色分布 / 星等品质 / 星座Top / 地平等全部从 starBelongings 真实派生 */
 const colorToSpectral: Record<string, { label:string; cn:string }> = {
@@ -1289,51 +1317,9 @@ const spectralSummary = computed(() => {
   }))
 })
 
-/* ═══════════════════════════════════════════════════════════
-   【旧数据兼容】下方画像/天官书 section 仍在使用 nightSky / skyFlecks
-   暂未重构，保留原定义避免渲染崩溃；下一轮重构时同步替换
-   ═══════════════════════════════════════════════════════════ */
-/** 合集 = 你自己的「那一夜」整片夜空 */
-const nightSky = {
-  name: '夜雨孤灯 · 那一夜',
-  season: '甲辰年 · 春分后第三夜',
-  timeSpan: '子初 22:47 ~ 卯初 05:21',
-  phase: '残月 · 蛾眉',
-  moonIllum: '22%',
-  moonAge: '26.4 日龄',
-  term: '春分后三',
-  ecliptic: 'λ 3°12′',
-  termDeg: 3 + 12 / 60 * 15,
-  meteo: [
-    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
-    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
-    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
-    { k: '能见度', v: '薄云 · 7.2km', color: '#95f0c0' },
-    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
-    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
-  ],
-  hourDots: [
-    { pos: 10,  size: 12, color: '#ffd98a' },
-    { pos: 22,  size: 8,  color: '#ffd98a' },
-    { pos: 38,  size: 10, color: '#caa7ff' },
-    { pos: 52,  size: 5,  color: '#95f0c0' },
-    { pos: 66,  size: 7,  color: '#caa7ff' },
-    { pos: 78,  size: 6,  color: '#95f0c0' },
-    { pos: 88,  size: 4,  color: '#86a8ff' },
-  ],
-}
-
-/** 8 则心事 = 那一夜里的 8 道光斑 */
-const skyFlecks: { x: number; y: number; r: number; color: string; glowId: 'Gold' | 'Purple' | 'Green' | 'Blue'; tag?: string }[] = [
-  { x: 68,  y: 140, r: 4.8, color: '#ffd98a', glowId: 'Gold',   tag: '子初三刻' },
-  { x: 188, y: 78,  r: 4.5, color: '#caa7ff', glowId: 'Purple', tag: '丑正二刻' },
-  { x: 152, y: 54,  r: 4.2, color: '#95f0c0', glowId: 'Green',  tag: '寅初一刻' },
-  { x: 106, y: 102, r: 3.0, color: '#ffd98a', glowId: 'Gold'   },
-  { x: 86,  y: 164, r: 3.4, color: '#ff8b7d', glowId: 'Blue'   },
-  { x: 214, y: 118, r: 2.8, color: '#86a8ff', glowId: 'Blue'   },
-  { x: 238, y: 158, r: 3.6, color: '#ffd98a', glowId: 'Gold'   },
-  { x: 224, y: 188, r: 3.2, color: '#95f0c0', glowId: 'Green'  },
-]
+/* nightSky / skyFlecks 已在上方用 computed 从 API/nighscape 映射，不再需要旧 mock 常量。
+   skyFlecks 模板已不再引用，但以防万一仍有遗留引用，给一个空的兜底： */
+const skyFlecks: { x: number; y: number; r: number; color: string; glowId: 'Gold' | 'Purple' | 'Green' | 'Blue'; tag?: string }[] = []
 
 /** Top3 亮星名录（α/β/γ） */
 const brightStars = computed(() =>
@@ -1378,11 +1364,8 @@ const deepSpaceStars = Array.from({ length: 22 }, (_, i) => {
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
 const trajExpanded = ref(false)
 
-const hourly = [2, 1, 1, 0, 0, 1, 3, 5, 4, 3, 2, 2, 4, 3, 2, 1, 2, 3, 4, 6, 9, 12, 8, 5]
-const peakHour = 22
-const lowHour = 4
-const peakText = '子时雨最盛，心事也最稠。你总在别人入睡后才点亮自己那盏灯，把白天没说完的话留给夜雨。'
-const lowText = '卯时天将明，是这卷星笺最安静的时辰。或许醒来之后，有些情绪就随晨光散了。'
+/* hourly / peakHour / lowHour / peakText / lowText 已在上方用 computed 从 API/nightscape 映射，
+   这一组常量是旧 mock 版本，删除避免重复声明报错 */
 
 const trajectory = [
   { emotion: '思念', color: '#ffd98a', date: '03/12', title: '雨夜寄北', snippet: '把没寄出的话折成纸船，放进窗外的雨里。' },

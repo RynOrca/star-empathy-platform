@@ -9,6 +9,7 @@ import {
   deleteCollection,
   listPublicCollections,
 } from '../services/collectionService';
+import { readCollectionAnalysis, triggerAnalysisIfNeeded } from '../services/collectionAnalysis';
 
 const router = Router();
 
@@ -112,9 +113,43 @@ router.delete('/:id', authRequired, (req: Request, res: Response) => {
   }
 });
 
-// 合集级 AI 分析（P3 预留，暂未开放）
-router.get('/:id/analysis', (_req: Request, res: Response) => {
-  notFound(res, '合集分析功能尚未开放');
+// 合集级 AI 分析
+//  - storyCount < 3：返回 ready=false 但带 storyCount 提示（前端显示"心事不够多"空态，不轮询）
+//  - storyCount >= 3：首次触发会合成（Phase 1 立即完成，Phase 2 异步 agent），返回 { persona, emotion, nightscape, ready, generatedAt }
+//  - 前端轮询：ready=false 时每 3s 再拉一次，直到 ready=true 或超过 MAX_POLL 次
+router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return badRequest(res, '无效的合集 id');
+    const currentUserId = (req as Request & { user?: { id: number } }).user?.id;
+
+    // 先通过 getCollectionDetail 检查可见性（private 仅 owner 可见；public 任何人）
+    const detail = getCollectionDetail(id, currentUserId);
+    if (!detail) return notFound(res, '合集不存在');
+
+    const storyCount = detail.storyCount ?? 0;
+
+    // 故事太少：直接返回空态（带 storyCount 供前端判定），不写缓存，不生成
+    if (storyCount < 3) {
+      return ok(res, 'success', {
+        persona: null,
+        emotion: null,
+        nightscape: null,
+        ready: false,
+        tooFewStories: true,
+        storyCount,
+        generatedAt: null,
+      });
+    }
+
+    // storyCount >= 3：触发懒生成 + 读（Phase 1 同步合成完，ready=true；Phase 2 会先返回 ready=false 异步写）
+    triggerAnalysisIfNeeded(id);
+    const analysis = readCollectionAnalysis(id);
+    return ok(res, 'success', { ...analysis, tooFewStories: false, storyCount });
+  } catch (error) {
+    console.error('GET /api/collections/:id/analysis error:', error);
+    serverError(res);
+  }
 });
 
 export default router;

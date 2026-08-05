@@ -154,6 +154,19 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_csa_star ON catalog_star_analyses(catalog_star_id);
 
+  -- AI 预生成的合集级分析结果（合集画像+情感+夜色流转动效+心事轨迹+天空意象）
+  CREATE TABLE IF NOT EXISTS collection_analyses (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id     INTEGER NOT NULL UNIQUE REFERENCES collections(id),
+    persona_json      TEXT,
+    emotion_json      TEXT,
+    nightscape_json   TEXT,   -- 夜色流转+心事轨迹+五大气象+天窗片段+Hero统计 等合集特有
+    story_count       INTEGER NOT NULL DEFAULT 0,
+    story_hash        TEXT,
+    generated_at      INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_cllct_anly_coll ON collection_analyses(collection_id);
+
   -- 故事合集（星笺）：故事的唯一系列标识，决定内含故事可见性
   CREATE TABLE IF NOT EXISTS collections (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,

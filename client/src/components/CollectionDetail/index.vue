@@ -82,9 +82,11 @@
               <!-- ═══ AI 解读 Tab ═══ -->
               <template v-else-if="activeTab === 'analysis'">
                 <CollectionAnalysis
+                  :collection-id="props.collectionId"
                   :collection-name="detail.name"
                   :story-count="detail.storyCount"
                   :stories="detail.stories"
+                  :resonance-total="totalResonance"
                   @story-click="onStoryClick"
                 />
               </template>
@@ -461,9 +463,11 @@
             <!-- ═══ AI 解读 Tab ═══ -->
             <template v-else-if="activeTab === 'analysis'">
               <CollectionAnalysis
+                :collection-id="props.collectionId"
                 :collection-name="detail.name"
                 :story-count="detail.storyCount"
                 :stories="detail.stories"
+                :resonance-total="totalResonance"
                 @story-click="onStoryClick"
               />
             </template>
