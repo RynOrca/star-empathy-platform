@@ -154,26 +154,7 @@
             </div>
           </div>
 
-          <!-- ③ 光谱色分布 -->
-          <div class="ca-h-ss-section">
-            <div class="ca-hs-k ca-h-ss-sec-k">光谱色分布 · SPECTRAL COLOR</div>
-            <div v-if="starStatistics.spectral.length > 0" class="ca-h-ss-bars">
-              <div v-for="s in starStatistics.spectral.slice(0, 4)" :key="s.spec" class="ca-h-ss-bar">
-                <div class="ca-h-ss-bar-labels">
-                  <span class="ca-h-ss-bar-color" :style="{ background: s.color, boxShadow: `0 0 4px ${s.color}` }"></span>
-                  <span class="ca-h-ss-bar-spec">{{ s.spec }}</span>
-                  <span class="ca-h-ss-bar-cn">{{ s.cn }}</span>
-                  <span class="ca-h-ss-bar-pct" :style="{ color: s.color }">{{ s.pct }}%</span>
-                </div>
-                <div class="ca-h-ss-bar-track">
-                  <div class="ca-h-ss-bar-fill" :style="{ width: s.pct + '%', background: s.color }"></div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="ca-h-ss-empty">尚无归属恒星数据</div>
-          </div>
-
-          <!-- ④ 星座 Top3 + 星群品质标签 -->
+          <!-- ③ 星座 Top3 + 星群品质标签 -->
           <div class="ca-h-ss-section ca-h-ss-bottom">
             <div class="ca-hs-k ca-h-ss-sec-k">星座 / 星群气质</div>
             <div class="ca-h-ss-cons">
@@ -4466,9 +4447,14 @@ function tagStyle(tag: string): Record<string, string> {
   min-height: 0;
   height: 100%;   /* 撑满grid高度，等于右内容高度 */
 }
-/* 左里面的唯一元素：【黑色星空板块】 height:100% —— 跟随右内容高度响应式变化！ */
+/* 左里面的唯一元素：【黑色星空板块】 height:100% —— 跟随右内容高度响应式变化！
+   flex列布局：背景(黑底)自然拉伸100%，SVG居中不变形，legend贴底。 */
 .ca-h-left-block .ca-starmap-wrap {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   /* 保留本体深蓝夜空底+细边框（这就是用户说的"黑色板块"，不是嵌套框，是本体） */
   border-color: rgba(134,168,255,0.08);
   background:
@@ -4477,14 +4463,19 @@ function tagStyle(tag: string): Record<string, string> {
   border-radius: 7px;
   padding: 10px 8px 8px;
 }
-/* 左黑块里的星图SVG：aspect-ratio保持星图比例不变形，上下留夜空黑底 */
+/* 左黑块里的星图SVG：aspect-ratio保持星图比例不变形，margin: auto 0 垂直居中，上下留夜空黑底！
+   = 只有黑背景拉伸，SVG文字和点不拉伸！ */
 .ca-h-left-block .ca-starmap-svg {
   aspect-ratio: 420 / 300;
-  /* 不加硬min-height，让SVG根据宽度自适应，黑块上下自然留夜空底 */
   width: 100%;
   height: auto;
-  margin: 0 auto;
+  margin: auto 0;    /* 垂直居中，上下多余高度 = 夜空黑底空白（就是您要的"只有天空黑色背景拉伸，文字点不拉伸"） */
   display: block;
+  flex-shrink: 0;
+}
+/* 图例（底部3个图例说明）：margin-top: auto 贴底，不随SVG居中，固定在黑板块最下方 */
+.ca-h-left-block .ca-sm-legend {
+  margin-top: auto;
   flex-shrink: 0;
 }
 
