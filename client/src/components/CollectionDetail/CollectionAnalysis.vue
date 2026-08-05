@@ -74,26 +74,30 @@
         </div>
       </section>
 
-      <!-- 星辰归属（替换原主题脉络：避免与情感光谱条形图重复） -->
+      <!-- 星辰归属（重新设计：星轨发光列表） -->
       <section class="ca-card ca-stars">
         <div class="ca-card-head">
           <component :is="Orbit" :size="12" class="ca-ch-icon ca-ch-blue" />
           <span class="ca-ch-title">星辰归属</span>
           <span class="ca-ch-count">{{ starBelongings.length }} 星 · {{ starBelongTotal }} 篇</span>
         </div>
-        <div class="ca-stars-body">
+        <div class="ca-stars-list">
           <div
             v-for="s in starBelongings"
             :key="s.id"
-            class="ca-star-bubble"
-            :style="{
-              '--bubble-c': s.color,
-              fontSize: bubbleFontSize(s.count) + 'rem',
-            } as Record<string, string>"
+            class="ca-star-item"
+            :style="{ '--star-c': s.color } as Record<string, string>"
             :title="`${s.name}${s.con ? ' · ' + s.con : ''} · ${s.count} 篇`"
           >
-            <span class="ca-star-bubble-name">{{ s.name }}</span>
-            <span class="ca-star-bubble-count">{{ s.count }}</span>
+            <span class="ca-star-glow" :style="glowStyle(s.count)"></span>
+            <div class="ca-star-info">
+              <span class="ca-star-name">{{ s.name }}</span>
+              <span v-if="s.con" class="ca-star-con">{{ s.con }}</span>
+            </div>
+            <div class="ca-star-bar-wrap">
+              <div class="ca-star-bar" :style="{ width: starBarWidth(s.count) + '%' }"></div>
+            </div>
+            <span class="ca-star-count">{{ s.count }}</span>
           </div>
           <div v-if="starBelongings.length === 0" class="ca-stars-empty">
             故事尚未挂上星辰
@@ -153,42 +157,7 @@
       </div>
     </section>
 
-    <!-- ═══ 5. 情感轨迹（故事序列，限高滚动+渐隐）═══ -->
-    <section class="ca-card ca-trajectory">
-      <div class="ca-card-head">
-        <component :is="Route" :size="12" class="ca-ch-icon ca-ch-green" />
-        <span class="ca-ch-title">情感轨迹</span>
-        <span class="ca-ch-count">逐则心事 · 情绪流转 · {{ trajectory.length }} 则</span>
-        <button
-          v-if="trajectory.length > 3"
-          class="ca-traj-toggle"
-          @click="trajExpanded = !trajExpanded"
-        >{{ trajExpanded ? '收起' : '展开' }}</button>
-      </div>
-      <div class="ca-traj-scroll" :class="{ expanded: trajExpanded }">
-        <div class="ca-traj-body">
-          <div class="ca-traj-line"></div>
-          <div
-            v-for="(p, i) in trajectory"
-            :key="i"
-            class="ca-traj-node"
-            :style="{ '--node-color': p.color } as Record<string, string>"
-          >
-            <div class="ca-traj-dot" :style="{ background: p.color, boxShadow: `0 0 8px ${p.color}aa` }"></div>
-            <div class="ca-traj-card">
-              <div class="ca-traj-head">
-                <span class="ca-traj-emo" :style="{ color: p.color }">{{ p.emotion }}</span>
-                <span class="ca-traj-date">{{ p.date }}</span>
-              </div>
-              <div class="ca-traj-title">{{ p.title }}</div>
-              <div class="ca-traj-snippet">{{ p.snippet }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══ 6. 共鸣榜 + 7. 关键词云（双栏）═══ -->
+    <!-- ═══ 5. 共鸣榜 + 情感轨迹（双栏，情感轨迹替换原关键词云）═══ -->
     <div class="ca-duo">
       <!-- 共鸣榜 -->
       <section class="ca-card ca-rank">
@@ -217,24 +186,38 @@
         </div>
       </section>
 
-      <!-- 关键词云 -->
-      <section class="ca-card ca-cloud">
+      <!-- 情感轨迹（从原独立全宽位移入双栏，限高滚动+渐隐+展开） -->
+      <section class="ca-card ca-trajectory">
         <div class="ca-card-head">
-          <component :is="CloudFog" :size="12" class="ca-ch-icon ca-ch-cyan" />
-          <span class="ca-ch-title">关键词星云</span>
-          <span class="ca-ch-count">{{ keywords.length }} 词</span>
+          <component :is="Route" :size="12" class="ca-ch-icon ca-ch-green" />
+          <span class="ca-ch-title">情感轨迹</span>
+          <span class="ca-ch-count">{{ trajectory.length }} 则</span>
+          <button
+            v-if="trajectory.length > 3"
+            class="ca-traj-toggle"
+            @click="trajExpanded = !trajExpanded"
+          >{{ trajExpanded ? '收起' : '展开' }}</button>
         </div>
-        <div class="ca-cloud-body">
-          <span
-            v-for="k in keywords"
-            :key="k.word"
-            class="ca-kw"
-            :style="{
-              fontSize: kwSize(k.weight) + 'rem',
-              color: kwColor(k.weight),
-              opacity: 0.55 + k.weight * 0.45,
-            }"
-          >{{ k.word }}</span>
+        <div class="ca-traj-scroll" :class="{ expanded: trajExpanded }">
+          <div class="ca-traj-body">
+            <div class="ca-traj-line"></div>
+            <div
+              v-for="(p, i) in trajectory"
+              :key="i"
+              class="ca-traj-node"
+              :style="{ '--node-color': p.color } as Record<string, string>"
+            >
+              <div class="ca-traj-dot" :style="{ background: p.color, boxShadow: `0 0 8px ${p.color}aa` }"></div>
+              <div class="ca-traj-card">
+                <div class="ca-traj-head">
+                  <span class="ca-traj-emo" :style="{ color: p.color }">{{ p.emotion }}</span>
+                  <span class="ca-traj-date">{{ p.date }}</span>
+                </div>
+                <div class="ca-traj-title">{{ p.title }}</div>
+                <div class="ca-traj-snippet">{{ p.snippet }}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -261,7 +244,7 @@
 import { computed, ref } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
-  CloudFog, Feather, Info,
+  Feather, Info,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -345,11 +328,17 @@ const starBelongings = computed<{ id: number; name: string; con: string; color: 
     .slice(0, 12)
 })
 const starBelongTotal = computed(() => starBelongings.value.reduce((a, b) => a + b.count, 0))
-/** 气泡字号：按故事数映射 0.62rem ~ 1.05rem */
-function bubbleFontSize(count: number): number {
+/** 发光圆点尺寸：按故事数映射 6px ~ 14px */
+function glowStyle(count: number): Record<string, string> {
   const max = Math.max(1, ...starBelongings.value.map(s => s.count))
   const ratio = max > 0 ? count / max : 0
-  return +(0.62 + ratio * 0.43).toFixed(2)
+  const size = Math.round(6 + ratio * 8)
+  return { width: size + 'px', height: size + 'px' }
+}
+/** 进度条宽度：按故事数占比 */
+function starBarWidth(count: number): number {
+  const max = Math.max(1, ...starBelongings.value.map(s => s.count))
+  return max > 0 ? Math.round((count / max) * 100) : 0
 }
 
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
@@ -370,24 +359,6 @@ const trajectory = [
   { emotion: '希望', color: '#86a8ff', date: '04/15', title: '阳台的种子', snippet: '埋下去第十天，今天早上冒了一点绿。' },
   { emotion: '思念', color: '#ffd98a', date: '04/22', title: '故乡的槐花', snippet: '又到开花的季节，只是树下的人不在了。' },
   { emotion: '释然', color: '#95f0c0', date: '04/30', title: '合上这一卷', snippet: '把散落的纸页收好，灯灭了，雨也停了。' },
-]
-
-const keywords = [
-  { word: '夜雨', weight: 1.0 },
-  { word: '孤灯', weight: 0.92 },
-  { word: '思念', weight: 0.88 },
-  { word: '故乡', weight: 0.76 },
-  { word: '独行', weight: 0.68 },
-  { word: '回忆', weight: 0.62 },
-  { word: '末班车', weight: 0.5 },
-  { word: '槐花', weight: 0.46 },
-  { word: '纸船', weight: 0.42 },
-  { word: '晨光', weight: 0.38 },
-  { word: '台灯', weight: 0.34 },
-  { word: '影子', weight: 0.32 },
-  { word: '远方', weight: 0.3 },
-  { word: '江风', weight: 0.26 },
-  { word: '合影', weight: 0.22 },
 ]
 
 const narrativeMd = `### 夜半的低语
@@ -479,17 +450,6 @@ function tagStyle(tag: string): Record<string, string> {
     background: `hsla(${h}, 62%, 74%, 0.08)`,
     borderColor: `hsla(${h}, 62%, 74%, 0.18)`,
   }
-}
-
-function kwSize(w: number) {
-  // 0.7rem ~ 1.5rem
-  return (0.7 + w * 0.8).toFixed(2)
-}
-function kwColor(w: number) {
-  if (w > 0.7) return '#ffd98a'
-  if (w > 0.45) return '#caa7ff'
-  if (w > 0.3) return '#86a8ff'
-  return 'rgba(255,255,255,0.5)'
 }
 </script>
 
@@ -768,46 +728,98 @@ function kwColor(w: number) {
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* ═══ 3. Stars Belonging（替换原 Theme，气泡云避免与情感光谱条形图重复）═══ */
-.ca-stars-body {
+/* ═══ 3. Stars Belonging（星轨发光列表） ═══ */
+.ca-stars-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px 8px;
-  align-items: center;
-  min-height: 60px;
-  padding: 4px 2px;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 40px;
 }
-.ca-star-bubble {
-  display: inline-flex;
+.ca-star-item {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 100px;
-  background: color-mix(in srgb, var(--bubble-c, #86a8ff) 10%, transparent);
-  border: 0.5px solid color-mix(in srgb, var(--bubble-c, #86a8ff) 28%, transparent);
-  color: var(--bubble-c, var(--ink-secondary));
-  line-height: 1.4;
-  transition: transform 0.15s, filter 0.15s;
+  gap: 9px;
+  padding: 3px 2px;
+  border-radius: 6px;
+  transition: background 0.15s;
   cursor: default;
 }
-.ca-star-bubble:hover {
-  transform: translateY(-1px) scale(1.06);
-  filter: brightness(1.15);
+.ca-star-item:hover {
+  background: color-mix(in srgb, var(--star-c, #86a8ff) 6%, transparent);
 }
-.ca-star-bubble-name {
+/* 发光圆点：径向渐变 + 多层 box-shadow 模拟星光 */
+.ca-star-glow {
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--star-c, #86a8ff) 95%, white) 0%,
+    var(--star-c, #86a8ff) 45%,
+    transparent 75%
+  );
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--star-c, #86a8ff) 70%, transparent),
+    0 0 12px color-mix(in srgb, var(--star-c, #86a8ff) 35%, transparent);
+  animation: starPulse 3s ease-in-out infinite;
+}
+@keyframes starPulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; box-shadow: 0 0 8px var(--star-c, #86a8ff), 0 0 16px color-mix(in srgb, var(--star-c, #86a8ff) 40%, transparent); }
+}
+.ca-star-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-shrink: 0;
+  width: 56px;
+}
+.ca-star-name {
+  font-size: 0.74rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
-.ca-star-bubble-count {
-  font-size: 0.6rem;
-  opacity: 0.7;
+.ca-star-con {
+  font-size: 0.58rem;
+  color: var(--muted-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+.ca-star-bar-wrap {
+  flex: 1;
+  height: 2px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  min-width: 20px;
+}
+.ca-star-bar {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--star-c, #86a8ff), color-mix(in srgb, var(--star-c, #86a8ff) 40%, transparent));
+  box-shadow: 0 0 4px color-mix(in srgb, var(--star-c, #86a8ff) 50%, transparent);
+  transition: width 0.5s ease;
+}
+.ca-star-count {
+  font-size: 0.66rem;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: right;
 }
 .ca-stars-empty {
   font-size: 0.7rem;
   color: var(--muted-light);
   font-style: italic;
   padding: 8px 0;
+  text-align: center;
 }
 .ca-stars-insight {
   display: flex;
@@ -1071,25 +1083,7 @@ function kwColor(w: number) {
   flex-shrink: 0;
 }
 
-/* ═══ 7. Cloud ═══ */
-.ca-cloud-body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 4px;
-  min-height: 120px;
-}
-.ca-kw {
-  font-weight: 500;
-  line-height: 1;
-  transition: transform 0.15s, opacity 0.15s;
-  cursor: default;
-}
-.ca-kw:hover { transform: scale(1.15); }
-
-/* ═══ 8. Narrative ═══ */
+/* ═══ 7. Narrative ═══ */
 .ca-narr-body :deep(h3) {
   margin: 14px 0 8px;
   font-size: 0.78rem;
