@@ -303,6 +303,10 @@ export interface SkyAPI {
   releaseSnap: () => void
   /** issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示） */
   snapToPlanet: (bodyName: string) => void
+  /** issue #136：PC 端行星特写观察模式开关（true=禁止 hover/点击，只允许拖动/缩放） */
+  setObserveMode: (v: boolean) => void
+  /** 切换行星视运动轨迹显示（不含太阳/月球；黄道线始终显示作为太阳轨迹） */
+  setPlanetTrailsVisible: (v: boolean) => void
 }
 
 export function useSky(
@@ -363,6 +367,10 @@ export function useSky(
   // closeup 跟随复用 Vector3（避免每帧 new，animate 循环高频调用）
   const _closeupWorld = new Vector3()
   const _closeupDir = new Vector3()
+  // 观察模式拖拽复用 Vector3（pointermove 闭包内，避免每帧 new）
+  const _dragV = new Vector3()
+  // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
+  const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
   let lastMagUpdate = 0
   // 伽利略卫星（木卫 1-4）Sprite 引用，每帧更新位置
@@ -1688,7 +1696,7 @@ for (const s of stars) starById.set(s.id, s)
       if (observeMode && closeupState === 'CLOSEUP') {
         const deltaYaw = (e.clientX - px) * 0.004
         const deltaPitch = (e.clientY - py) * 0.004
-        camera.rotateOnWorldAxis(_v.set(0, 1, 0), -deltaYaw)
+        camera.rotateOnWorldAxis(_dragV.set(0, 1, 0), -deltaYaw)
         camera.rotateX(-deltaPitch)
         px = e.clientX; py = e.clientY
         return
@@ -1734,16 +1742,18 @@ for (const s of stars) starById.set(s.id, s)
           const maxDist = closeupTarget.size * CLOSEUP_MAX_RATIO
           const newDist = closeupTarget.dist * factor
           if (newDist >= maxDist) {
-            // 拉远到极限 → 退出特写到 IDLE（相机停留，继续 pinch 调 FOV）
-            camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
-            if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
-            // 非观察模式下恢复 glows；观察模式下 glows 统一由 exitCloseup 恢复
-            if (!observeMode) {
+            // 观察模式：clamp 到 maxDist 保持 CLOSEUP 跟随，不退出（issue #144）
+            // 非观察模式：拉远到极限 → 退出特写到 IDLE（相机停留，继续 pinch 调 FOV）
+            if (observeMode) {
+              closeupTarget.dist = maxDist
+            } else {
+              camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
+              if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
               if (closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
               for (const g of hiddenGlows) g.visible = true
               hiddenGlows = []
+              closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
             }
-            closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
           } else {
             closeupTarget.dist = Math.max(minDist, newDist)
           }
@@ -1781,16 +1791,18 @@ for (const s of stars) starById.set(s.id, s)
       const maxDist = closeupTarget.size * CLOSEUP_MAX_RATIO
       const newDist = closeupTarget.dist * factor
       if (newDist >= maxDist) {
-        // 拉远到极限 → 退出特写到 IDLE（相机停留，继续滚轮调 FOV）
-        camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
-        if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
-        // 非观察模式下恢复 glows；观察模式下 glows 统一由 exitCloseup 恢复
-        if (!observeMode) {
+        // 观察模式：clamp 到 maxDist 保持 CLOSEUP 跟随，不退出（issue #144）
+        // 非观察模式：拉远到极限 → 退出特写到 IDLE（相机停留，继续滚轮调 FOV）
+        if (observeMode) {
+          closeupTarget.dist = maxDist
+        } else {
+          camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
+          if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
           if (closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
           for (const g of hiddenGlows) g.visible = true
           hiddenGlows = []
+          closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
         }
-        closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
       } else {
         closeupTarget.dist = Math.max(minDist, newDist)
       }
@@ -2582,6 +2594,7 @@ for (const s of stars) starById.set(s.id, s)
         })
         const line = new Line(g, mat)
         skyGroup.add(line)
+        planetTrailLines.push(line)
       }).catch(err => console.error('[useSky] 轨道线计算失败', planet.name, err))
     }
   }).catch(err => {
@@ -3732,6 +3745,10 @@ for (const s of stars) starById.set(s.id, s)
         planetHoverGlow.visible = false
         hoveredStarId = -1
       }
+    },
+    // 切换行星视运动轨迹显示（不含太阳/月球；黄道线始终显示作为太阳轨迹）
+    setPlanetTrailsVisible(v: boolean) {
+      for (const line of planetTrailLines) line.visible = v
     },
     // 设置时间加速倍率（1=真实时间，100=加速 100 倍观察行星运动）
     setTimeScale(scale: number) { timeScale = Math.max(1, Math.min(10000, Math.round(scale))); },
