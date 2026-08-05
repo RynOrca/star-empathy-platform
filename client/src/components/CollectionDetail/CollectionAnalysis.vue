@@ -1395,9 +1395,9 @@ const heroStars: HeroStar[] = [
  *  后续接入时替换为 computed 真实计算即可
  */
 const heroStats = [
-  { k: '心事总数', v: storyCount ?? 4, sub: '则', color: '#ffd98a' },
+  { k: '心事总数', v: props.storyCount ?? 4, sub: '则', color: '#ffd98a' },
   { k: '累计共鸣', v: (props.resonanceTotal ?? 237), sub: '次', color: '#caa7ff' },
-  { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, storyCount ?? 4)), sub: '则心事', color: '#86a8ff' },
+  { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, props.storyCount ?? 4)), sub: '则心事', color: '#86a8ff' },
   { k: '投递跨度', v: '4 小时 34 分', sub: '20:31 ~ 01:05', color: undefined },
   { k: '情绪倾向', v: '柔软思念', sub: '暖色占比 58%', color: '#ffb48a' },
   { k: '最多时段', v: '01:00 ~ 02:00', sub: '占比 37.5%', color: '#9ae6b4' },
