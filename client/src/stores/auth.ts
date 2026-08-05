@@ -21,6 +21,19 @@ let routerInstance: Router | null = null
 export function setAuthRouter(r: Router) { routerInstance = r }
 
 /**
+ * 统一生成带 token 的请求头，没有 token 时返回空对象（兼容未登录/公开接口）。
+ * 与 authFetch 搭配使用：authFetch(url, { headers: authHeaders() })
+ * - json=true：额外附加 Content-Type: application/json（用于 POST/PATCH/PUT JSON body）
+ */
+export function authHeaders(json = false): Record<string, string> {
+  const token = localStorage.getItem('token')
+  const h: Record<string, string> = {}
+  if (json) h['Content-Type'] = 'application/json'
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
+
+/**
  * 统一鉴权 fetch：遇到 401 自动清 token + 跳登录页
  * 用于需要登录的 API 调用，避免 token 失效时页面卡在空数据
  */

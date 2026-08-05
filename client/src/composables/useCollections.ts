@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { authFetch } from '../stores/auth'
+import { authFetch, authHeaders } from '../stores/auth'
 
 export interface Collection {
   id: number
@@ -28,15 +28,6 @@ export interface CreateCollectionInput {
 }
 
 export type UpdateCollectionInput = Partial<CreateCollectionInput> & { sortOrder?: number }
-
-// 统一鉴权请求头：带 token；json=true 时附加 Content-Type
-function authHeaders(json = false): Record<string, string> {
-  const token = localStorage.getItem('token')
-  const h: Record<string, string> = {}
-  if (json) h['Content-Type'] = 'application/json'
-  if (token) h['Authorization'] = `Bearer ${token}`
-  return h
-}
 
 export function useCollections() {
   const list = ref<Collection[]>([])

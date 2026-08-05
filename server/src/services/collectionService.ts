@@ -168,23 +168,7 @@ export function verifyCollectionOwnership(collectionId: number, userId: number):
  * 返回值始终非 null（已确保至少有一个合集）。
  */
 export function ensureDefaultCollection(userId: number): any {
-  // 1) 尝试 is_default=1（旧库列，try-catch 兼容新库无此列）
-  try {
-    const def = db.prepare('SELECT * FROM collections WHERE user_id = ? AND is_default = 1 LIMIT 1').get(userId);
-    if (def) return attachStoryCount([def as any])[0];
-  } catch {}
-
-  // 2) 第一个公开合集
-  const firstPub = db.prepare('SELECT * FROM collections WHERE user_id = ? AND visibility = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1').get(userId, 'public') as Collection | undefined;
-  if (firstPub) return attachStoryCount([firstPub])[0];
-
-  // 3) 任意一个合集
-  const any = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1').get(userId) as Collection | undefined;
-  if (any) return attachStoryCount([any])[0];
-
-  // 4) 创建默认合集
-  const created = createCollection(userId, { name: '我的默认合集', description: '默认收纳所有未分类的故事', coverColor: '#E8B86D', visibility: 'public' });
-  return created.collection;
+  return getOrCreateDefaultCollections(userId).publicCollection;
 }
 
 /**
@@ -192,12 +176,71 @@ export function ensureDefaultCollection(userId: number): any {
  * 用于投递故事时自动归属。
  */
 export function getDefaultCollection(userId: number): any | null {
-  try {
-    const def = db.prepare('SELECT * FROM collections WHERE user_id = ? AND is_default = 1 LIMIT 1').get(userId);
-    if (def) return def;
-  } catch {}
-  const firstPub = db.prepare('SELECT * FROM collections WHERE user_id = ? AND visibility = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1').get(userId, 'public');
-  if (firstPub) return firstPub;
-  const any = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1').get(userId);
-  return any ?? null;
+  return getOrCreateDefaultCollections(userId).publicCollection;
+}
+
+/**
+ * 🌟 新默认机制：每个用户必有「公开星笺」+「私密星笺」两个系统级默认合集
+ *   - 公开星笺（name='公开星笺', visibility='public', sort_order=0）→ 所有投稿默认进这里
+ *   - 私密星笺（name='私密星笺', visibility='private', sort_order=1）→ 用户手动切到私密
+ * 幂等：存在就复用，不存在才创建；返回值始终非 null。
+ */
+export interface DefaultCollections {
+  publicCollection: any;   // 公开星笺（所有新故事/历史故事默认放这）
+  privateCollection: any;  // 私密星笺（用户手动放）
+}
+const PUBLIC_DEFAULT_NAME = '公开星笺';
+const PRIVATE_DEFAULT_NAME = '私密星笺';
+const PUBLIC_DEFAULT_DESC = '默认收纳所有未指定合集的公开故事，公开可见';
+const PRIVATE_DEFAULT_DESC = '收纳仅自己可见的私密心事，不对外展示';
+const PUBLIC_DEFAULT_COLOR = '#E8B86D';   // 暖金（原默认色，星空感）
+const PRIVATE_DEFAULT_COLOR = '#6A7ACB';  // 星靛蓝（私密夜色感）
+
+export function getOrCreateDefaultCollections(userId: number): DefaultCollections {
+  // 1) 先找该用户所有合集
+  const all = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC').all(userId) as unknown as Collection[];
+
+  // 2) 精准匹配（名字+可见性同时命中），存在就复用
+  let publicColl = all.find((c) => c.name === PUBLIC_DEFAULT_NAME && c.visibility === 'public');
+  let privateColl = all.find((c) => c.name === PRIVATE_DEFAULT_NAME && c.visibility === 'private');
+
+  // 3) 找不到精准名：fallback 用任意一个同 visibility 的（兼容老用户已有"我的默认合集"等公开合集）
+  if (!publicColl) publicColl = all.find((c) => c.visibility === 'public') || null as any;
+  if (!privateColl) privateColl = all.find((c) => c.visibility === 'private') || null as any;
+
+  // 4) 还没找到 → 创建公开星笺（sort_order=0 第一个）
+  if (!publicColl) {
+    const created = createCollection(userId, {
+      name: PUBLIC_DEFAULT_NAME,
+      description: PUBLIC_DEFAULT_DESC,
+      coverColor: PUBLIC_DEFAULT_COLOR,
+      visibility: 'public',
+    });
+    // createCollection 返回 { error?, collection? }，尽量把 sort_order 改成 0 排在最前
+    if (created.collection) {
+      db.prepare('UPDATE collections SET sort_order = 0 WHERE id = ?').run(created.collection.id);
+      created.collection.sort_order = 0;
+    }
+    publicColl = created.collection as any;
+  }
+
+  // 5) 还没找到 → 创建私密星笺（sort_order=1 第二个）
+  if (!privateColl) {
+    const created = createCollection(userId, {
+      name: PRIVATE_DEFAULT_NAME,
+      description: PRIVATE_DEFAULT_DESC,
+      coverColor: PRIVATE_DEFAULT_COLOR,
+      visibility: 'private',
+    });
+    if (created.collection) {
+      db.prepare('UPDATE collections SET sort_order = 1 WHERE id = ?').run(created.collection.id);
+      created.collection.sort_order = 1;
+    }
+    privateColl = created.collection as any;
+  }
+
+  return {
+    publicCollection: attachStoryCount([publicColl as any])[0],
+    privateCollection: attachStoryCount([privateColl as any])[0],
+  };
 }

@@ -3,7 +3,7 @@ import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId,
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
-import { verifyCollectionOwnership, createCollection, ensureDefaultCollection } from '../services/collectionService';
+import { verifyCollectionOwnership, createCollection, ensureDefaultCollection, getOrCreateDefaultCollections } from '../services/collectionService';
 
 const router = Router();
 
@@ -112,8 +112,9 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
       if (created.error) return badRequest(res, created.error);
       finalCollectionId = created.collection?.id;
     } else {
-      const def = ensureDefaultCollection(user.id);
-      finalCollectionId = def?.id;
+      // 用户没选合集、也没指定新建合集名 → 默认进「公开星笺」（系统默认公开合集）
+      const defs = getOrCreateDefaultCollections(user.id);
+      finalCollectionId = defs?.publicCollection?.id;
     }
 
     const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds, safeTags, finalCollectionId);

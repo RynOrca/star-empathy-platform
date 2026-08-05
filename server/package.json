@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/src/index.js",
     "seed": "ts-node scripts/seed.ts",
+    "migrate:default-collections": "ts-node scripts/migrate-default-collections.ts",
     "agent:kernels": "ts-node scripts/generateKernels.ts",
     "agent:analyze": "ts-node scripts/generateAllAnalyses.ts"
   },

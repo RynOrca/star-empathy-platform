@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -63,20 +63,20 @@
         <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
-        <!-- 记录：AI 匹配星辰写故事 -->
-        <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
+        <!-- 记录：AI 匹配星辰写故事（不依赖定位，首帧就显示） -->
+        <button class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
         </button>
         <!-- 星笺：打开我的合集 -->
         <button v-if="username && !isGuest" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
           <Library :size="18" />
         </button>
-        <!-- 设置 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
+        <!-- 设置（不依赖定位，首帧就显示） -->
+        <button class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
-        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线） -->
-        <button v-if="locationReady" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
+        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（不依赖定位，首帧就显示） -->
+        <button class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
         <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
@@ -568,9 +568,24 @@ const router = useRouter()
 const route = useRoute()
 const { startRefreshTimer, stopRefreshTimer } = useAuth()
 const username = ref('')
+// 先声明 userId，避免下方同步兜底时出现 TDZ（引用后声明的变量 → ReferenceError）
+const currentUserId = ref<number | null>(null)
+// ── 同步兜底：首帧就从 localStorage 读 token/username，消灭「登录按钮 → User 按钮」的慢一步闪烁 ──
+//   有 token 时立即把 username 置为非空（优先用缓存的真实 username，没有就用占位），
+//   让 User 按钮/星笺按钮首帧就显示；等 /api/auth/me 异步回来会覆盖成真实值，全程不闪
+try {
+  if (typeof localStorage !== 'undefined') {
+    const token = localStorage.getItem('token')
+    if (token) {
+      const cachedUname = localStorage.getItem('username')
+      const cachedUid = localStorage.getItem('userId')
+      username.value = cachedUname || 'placeholder-user'
+      if (cachedUid) currentUserId.value = Number(cachedUid) || null
+    }
+  }
+} catch {}
 // 访客账号（体验账号）无个人主页，点用户按钮应跳登录页
 const isGuest = computed(() => username.value === '星穹访客')
-const currentUserId = ref<number | null>(null)
 
 // ─── 合集详情 overlay 状态 ───
 const { list: userCollections, fetchList: fetchUserCollections, update: updateCollection, remove: removeCollection } = useCollections()
