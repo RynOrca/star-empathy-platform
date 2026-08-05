@@ -266,36 +266,55 @@
       </div>
     </section>
 
-    <!-- ═══ 2. 情感光谱 + 3. 星辰归属（双栏，原主题脉络被心事摘录全宽卡片替代）═══ -->
+    <!-- ═══ 2. 星座星色（=原情感光谱，升级星空绑定：球阵加光谱型+赫罗图轴、洞察卡加星等/距离） + 3. 星辰归属 双栏═══ -->
     <div class="ca-duo">
-      <!-- 情感光谱（参考星星 AIRadarWordcloud：发光球体 + 情绪洞察卡 + 主调叙事） -->
+      <!-- 星座星色（赫罗图风格：发光球体+光谱标签+洞察卡加天文参数+主调叙事→星座主序） -->
       <section class="ca-card ca-emotion">
         <div class="ca-card-head">
           <component :is="HeartPulse" :size="12" class="ca-ch-icon ca-ch-red" />
-          <span class="ca-ch-title">情感光谱</span>
-          <span class="ca-ch-count">5 维模型 · {{ storyCount }} 则心事采样</span>
+          <span class="ca-ch-title">星座星色</span>
+          <span class="ca-ch-count">HR 图 · {{ emotions.length }} 光谱型 · {{ storyCount }} 主星</span>
         </div>
         <div class="ca-emotion-body">
-          <!-- 球体展示（加大尺寸 + 底部对齐） -->
-          <div class="ca-emo-orbs">
+          <!-- 球体展示：容器改成赫罗图(HR Diagram)风格，加X/Y轴 -->
+          <div class="ca-emo-orbs ca-hr-diagram">
+            <!-- Y 轴：光度 Lum (暗→亮，从下到上) -->
+            <div class="ca-hr-y">
+              <span class="ca-hr-y-top">Lum ↑</span>
+              <span class="ca-hr-y-bot">暗</span>
+            </div>
+            <!-- X 轴：温度 Temp (蓝→红，从左到右) -->
+            <div class="ca-hr-x">
+              <span class="ca-hr-x-l">O B A F G K M →</span>
+              <span class="ca-hr-x-r">Temp ↓</span>
+            </div>
+            <!-- 球体：加光谱型小标签 badge -->
             <span
-              v-for="e in emotions"
+              v-for="(e, i) in emotions"
               :key="e.name"
-              class="ca-emo-orb"
+              class="ca-emo-orb ca-hr-orb"
               :style="{
                 width: orbSize(e.value) + 'px',
                 height: orbSize(e.value) + 'px',
                 background: `radial-gradient(circle at 35% 30%, ${e.color}dd, ${e.color}33 70%, transparent)`,
                 boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
+                // HR 图 X 偏移：按光谱顺序从左到右排布
+                left: `calc(8% + ${i * 17}%)`,
+                // HR 图 Y 偏移：值越大光度越高（越靠上）
+                bottom: `calc(22% + ${e.value * 45}%)`,
               }"
-              :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc}`"
+              :title="`${e.name} · ${Math.round(e.value * 100)}% · ${e.desc} · 光谱 ${emotionSpectra[i].type}`"
             >
+              <!-- 光谱型标签徽章（右下） -->
+              <span class="ca-hr-spec-tag" :style="{ color: e.color, borderColor: e.color + '66' }">
+                {{ emotionSpectra[i].type }}
+              </span>
               <span class="ca-emo-orb-label">{{ e.name }}</span>
               <span class="ca-emo-orb-val">{{ Math.round(e.value * 100) }}</span>
             </span>
           </div>
 
-          <!-- 情绪洞察卡片（替代原先明细列表，参考星星 e-para 结构：彩点+高亮标题%+描述） -->
+          <!-- 情绪洞察卡片：加星等/光年/恒星类型参数行 -->
           <div class="ca-emo-insights">
             <div class="ca-ei-card" v-for="(ins, i) in emotionInsights" :key="i">
               <span class="ca-ei-dot" :style="{ background: ins.color, boxShadow: `0 0 5px ${ins.color}` }"></span>
@@ -304,21 +323,39 @@
                   <span class="ca-ei-title-name" v-html="ins.title"></span>
                   <span class="ca-ei-pct" :style="{ color: ins.color }">{{ ins.pct }}</span>
                 </div>
+                <!-- 新增：天文参数行（恒星类型 / 视星等 / 光年距离） -->
+                <div class="ca-ei-astro">
+                  <span class="ca-ei-astro-item">
+                    <i class="ca-ei-astro-k">TYPE</i>
+                    <i class="ca-ei-astro-v" :style="{ color: ins.color }">{{ ins.astro.type }}</i>
+                  </span>
+                  <span class="ca-ei-astro-item">
+                    <i class="ca-ei-astro-k">MAG</i>
+                    <i class="ca-ei-astro-v">{{ ins.astro.mag }}m</i>
+                  </span>
+                  <span class="ca-ei-astro-item">
+                    <i class="ca-ei-astro-k">DIST</i>
+                    <i class="ca-ei-astro-v">{{ ins.astro.dist }}ly</i>
+                  </span>
+                </div>
                 <div class="ca-ei-desc">{{ ins.desc }}</div>
               </div>
             </div>
           </div>
 
-          <!-- 主调叙事（保留 + 加左紫条） -->
-          <div class="ca-emo-narrative">
+          <!-- 主调叙事：改成星座主序口吻（恒星演化类比） -->
+          <div class="ca-emo-narrative ca-emo-mainseq">
             <p class="ca-emo-para">
               <span class="ca-emo-lead">{{ emotionNarrative.dominant }}</span>
               <span class="ca-emo-lead-pct">{{ emotionNarrative.dominantPct }}</span>
               {{ emotionNarrative.summary }}
             </p>
-            <p class="ca-emo-para ca-emo-para-sub">{{ emotionNarrative.contrast }}</p>
+            <p class="ca-emo-para ca-emo-para-sub">
+              <i class="ca-emo-ms-label">主序阶段</i>
+              {{ emotionNarrative.contrast }}
+            </p>
             <p class="ca-emo-para ca-emo-para-flow">
-              <component :is="HeartPulse" :size="10" class="ca-emo-flow-icon" />
+              <component :is="Orbit" :size="10" class="ca-emo-flow-icon" />
               {{ emotionNarrative.flow }}
             </p>
           </div>
@@ -424,16 +461,19 @@
       </section>
     </div>
 
-    <!-- ═══ 心事摘录（全宽，参考 AIRadarWordcloud 故事摘录：左SVG插画 + 右引号 + 作者日期）═══ -->
+    <!-- ═══ 心事摘录 → 【星空绑定】亮星独白（全宽：左插画+αβγ亮星编号徽章+星等/光年+正文+标签）═══ -->
     <section class="ca-card ca-quote">
       <div class="ca-card-head">
         <component :is="Quote" :size="12" class="ca-ch-icon ca-ch-gold" />
-        <span class="ca-ch-title">心事摘录</span>
-        <span class="ca-ch-count">AI 精选 {{ storyQuotes.length }} 段独白</span>
+        <span class="ca-ch-title">亮星独白</span>
+        <span class="ca-ch-count">α β γ · {{ storyQuotes.length }} 颗亮星 · 精选心事</span>
       </div>
       <div class="ca-q-body">
         <div class="ca-q-list">
           <div class="ca-q-item" v-for="(q, i) in storyQuotes" :key="i">
+            <!-- 【新增】左上 α/β/γ 亮星编号徽章（彩色发光） -->
+            <span class="ca-q-rank" :style="{ '--c': q.color }"><i>{{ q.rank }}</i></span>
+
             <!-- 左 SVG 插画：根据 illus 渲染月亮 / 家屋 / 花枝 -->
             <svg v-if="q.illus === 'moon'" viewBox="0 0 60 60" class="ca-q-illus">
               <circle cx="14" cy="18" r="1" fill="#fff" opacity="0.5" />
@@ -467,9 +507,22 @@
               <circle cx="20" cy="44" r="0.9" fill="rgba(251,182,206,0.55)" />
               <circle cx="40" cy="46" r="0.8" fill="rgba(251,182,206,0.48)" />
             </svg>
-            <!-- 右：正文 -->
+
+            <!-- 右：正文（顶部新增亮星星名+天文参数行） -->
             <div class="ca-q-body-inner">
               <div class="ca-q-mark" :style="{ color: q.color }">"</div>
+              <!-- 【新增】亮星星名+天文参数行（α 雨夜寄北 / 视星等 / 光年） -->
+              <div class="ca-q-star-head">
+                <span class="ca-q-star-name" :style="{ color: q.color }">
+                  <i class="ca-q-star-greek" :style="{ color: q.color }">{{ q.rank }}</i>
+                  {{ q.starName }}
+                </span>
+                <span class="ca-q-star-astro">
+                  <span><i>MAG</i>{{ q.astro.mag }}m</span>
+                  <span><i>DIST</i>{{ q.astro.dist }}ly</span>
+                  <span><i>TYPE</i>{{ q.astro.type }}</span>
+                </span>
+              </div>
               <div class="ca-q-text">{{ q.text }}</div>
               <div class="ca-q-meta">
                 <span class="ca-q-tag" v-for="t in q.tags" :key="t">#{{ t }}</span>
@@ -776,72 +829,95 @@ const emotions = [
   { name: '希望', value: 0.35, color: '#86a8ff', desc: '纸船顺流而下的方向' },
   { name: '共鸣', value: 0.28, color: '#ff8b7d', desc: '陌生人留下的温度' },
 ]
-/** 情绪洞察卡片（参考星星 emotionGen：彩点 + 加粗高亮情绪词标题 + 百分比 + 叙事描述） */
+/** 【星空绑定】情绪 → 恒星光谱型映射（O/B/A/F/G/K/M 对应温度蓝→红，温度→情绪色） */
+const emotionSpectra = [
+  { type: 'G2V' },  // 思念 → G型黄矮星（类似太阳，温吞思念
+  { type: 'K5V' },  // 孤独 → K型橙矮星，温度稍低
+  { type: 'F8V' },  // 释然 → F型黄白星，微蓝
+  { type: 'A3V' },  // 希望 → A型白星，温度更高
+  { type: 'M2V' },  // 共鸣 → M型红矮星，温度最低但长久
+]
+
+/** 情绪洞察卡片（参考星星 emotionGen：彩点 + 加粗高亮情绪词标题 + 百分比 + 【星空绑定】星等/光年/恒星类型参数） */
 const emotionInsights = [
   {
     title: '<b>浓稠思念</b>，是这卷星笺的底色',
     pct: '42.3%',
     desc: '雨夜、灯影、未寄出的信是反复出现的三种意象——思念并不尖锐，更像一盏不肯熄灭的灯，温吞地亮到天明。',
     color: '#ffd98a',
+    astro: { type: '黄矮星 G2V', mag: '2.8', dist: '148' },
   },
   {
     title: '<b>深夜独行</b>的孤独，紧随思念之后',
     pct: '33.6%',
     desc: '末班车、空街道、凌晨四点的台灯——它们不是悲伤的注脚，而是独自面对自己时安静的背景音。',
     color: '#caa7ff',
+    astro: { type: '橙矮星 K5V', mag: '3.1', dist: '212' },
   },
   {
     title: '<b>微光释然</b>，是最意外的情绪角落',
     pct: '22.2%',
     desc: '虽然整体偏暗，但从「阳台种子」「江边走走」等片段能看见：风一吹，有些事就悄悄松了绑。',
     color: '#95f0c0',
+    astro: { type: '黄白星 F8V', mag: '3.4', dist: '276' },
   },
   {
     title: '<b>微光希望</b>，在叙事末尾悄然抬头',
     pct: '18.9%',
     desc: '纸船顺流、种子发芽、槐花再开——时间没有直接给出答案，但它让一些事变得可以放下。',
     color: '#86a8ff',
+    astro: { type: '白矮星 A3V', mag: '4.3', dist: '338' },
   },
   {
     title: '<b>陌生人的共鸣</b>，是最轻也最暖的部分',
     pct: '15.1%',
     desc: '一句话、一个点赞、一次擦肩而过的善意——它们不解决问题，但会让某个夜晚变得没那么难熬。',
     color: '#ff8b7d',
+    astro: { type: '红矮星 M2V', mag: '4.9', dist: '404' },
   },
 ]
 const emotionNarrative = {
   dominant: '思念',
   dominantPct: '42.3%',
   summary: '雨夜与灯影反复出现，思念是这卷星笺的主调，多指向远方的人与未寄出的话。',
-  contrast: '孤独紧随其后，但释然与希望的微光已在地平线上浮现——心事虽重，并未沉没。',
-  flow: '从夜雨到晨光，情绪由浓转淡；思念与孤独交织，却在共鸣中找到出口。',
+  contrast: '「夜虽沉，主序却稳——就像恒星在主序阶段停留最久，你的思念也在最深处静静燃烧，虽然暗但最持久。',
+  flow: '从东升（浓思）→ 中天（孤独回望）→ 西沉（释然微光），星轨虽慢，但终究划过了整个夜。',
 }
 
-/** 心事摘录（参考星星 emotionGen.quotes：左插画 + 引号 + 正文 + 标签 + 作者日期） */
+/** 心事摘录 → 【星空绑定】亮星独白（Top3亮星 αβγ，加星名/星等/光年/恒星类型） */
 const storyQuotes = [
   {
+    rank: 'α',
+    starName: '雨夜寄北',
     illus: 'moon',
     color: '#ffd98a',
     text: '把没寄出的话折成纸船，放进窗外的雨里——不知道它会漂去哪里，但至少今晚，它不用再困在我心里。',
     tags: ['思念', '夜雨', '纸船'],
     author: '匿名星客',
     date: '03/12 子时',
+    astro: { type: 'G2V', mag: '2.8', dist: '148' },
   },
   {
+    rank: 'β',
+    starName: '凌晨四点',
     illus: 'house',
     color: '#caa7ff',
     text: '翻到那张合影，才发现你笑得比我记得的还要年轻。屋里很安静，只有我一个人，却好像听见厨房里还飘着切菜的声音。',
     tags: ['回忆', '家', '旧照片'],
     author: '夜归人',
     date: '03/25 丑时',
+    astro: { type: 'K5V', mag: '3.1', dist: '212' },
   },
   {
+    rank: 'γ',
+    starName: '江边走走',
     illus: 'flower',
     color: '#95f0c0',
     text: '风把帽子吹进水里，我居然笑了出来。有些东西抓不住就是抓不住，没关系——下次换一顶帽子就是了。',
     tags: ['释然', '风', '江边'],
     author: '桥上客',
     date: '04/30 辰时',
+    astro: { type: 'F8V', mag: '3.4', dist: '276' },
   },
 ]
 
@@ -1981,6 +2057,93 @@ function tagStyle(tag: string): Record<string, string> {
   min-height: 82px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
 }
+/* 【星空绑定】赫罗图(HR Diagram)容器：绝对定位球、XY轴标签 */
+.ca-hr-diagram {
+  position: relative;
+  min-height: 136px;
+  padding: 18px 34px 26px 40px;
+  background:
+    linear-gradient(180deg, rgba(134,168,255,0.05) 0%, rgba(255,139,125,0.05) 100%),
+    rgba(255,255,255,0.008);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 10px;
+  overflow: hidden;
+}
+/* Y 轴：光度 Lum（顶部→底部 暗→亮 */
+.ca-hr-y {
+  position: absolute;
+  left: 6px;
+  top: 12px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+.ca-hr-y-top {
+  writing-mode: vertical-rl;
+  font-size: 0.5rem;
+  color: rgba(134,168,255,0.7);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 600;
+  transform: rotate(180deg);
+  opacity: 0.8;
+}
+.ca-hr-y-bot {
+  font-size: 0.5rem;
+  color: rgba(255,139,125,0.75);
+  letter-spacing: 0.15em;
+  opacity: 0.7;
+}
+/* X 轴：光谱型 OBAFGKM + 温度 Temp */
+.ca-hr-x {
+  position: absolute;
+  left: 40px;
+  right: 10px;
+  bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.ca-hr-x-l {
+  font-size: 0.5rem;
+  color: rgba(134,168,255,0.7);
+  letter-spacing: 0.25em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.ca-hr-x-r {
+  font-size: 0.5rem;
+  color: rgba(255,139,125,0.8);
+  letter-spacing: 0.15em;
+  opacity: 0.75;
+}
+/* HR 图内球体：绝对定位（相对容器，用left/bottom，用 calc() 值 */
+.ca-hr-orb {
+  position: absolute;
+  margin: 0 !important;
+  transform-origin: center bottom;
+}
+/* 光谱型标签徽章（HR图球体右下角浮层 */
+.ca-hr-spec-tag {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  font-size: 0.48rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  padding: 1px 3px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  backdrop-filter: blur(1.5px);
+  z-index: 2;
+  opacity: 0.92;
+}
 .ca-emo-orb {
   display: flex;
   flex-direction: column;
@@ -2062,6 +2225,38 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255,255,255,0.42);
   text-align: justify;
 }
+/* 【星空绑定】洞察卡天文参数行（恒星类型 / 星等 / 距离光年） */
+.ca-ei-astro {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 7px;
+  background: rgba(255,255,255,0.018);
+  border-left: 1.5px solid currentColor;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.52);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+.ca-ei-astro-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ca-ei-astro-k {
+  font-size: 0.54rem;
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.06em;
+}
+.ca-ei-astro-v {
+  color: currentColor;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 /* 叙事段落（主调叙事 + 左紫条包裹） */
 .ca-emo-narrative {
@@ -2113,6 +2308,25 @@ function tagStyle(tag: string): Record<string, string> {
   color: #ff8b7d;
   opacity: 0.75;
 }
+/* 【星空绑定】主序阶段标签（情绪球体右下角浮层） */
+.ca-emo-ms-label {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  font-size: 0.48rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  background: rgba(0,0,0,0.45);
+  padding: 1px 3.5px;
+  border-radius: 3px;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255,217,138,0.38);
+  backdrop-filter: blur(2px);
+  z-index: 2;
+  white-space: nowrap;
+  opacity: 0.92;
+}
 
 /* 删除旧的未用 class */
 .ca-emo-list, .ca-emo-item, .ca-emo-dot, .ca-emo-item-name, .ca-emo-item-desc, .ca-emo-item-val { display: none; }
@@ -2131,8 +2345,8 @@ function tagStyle(tag: string): Record<string, string> {
 }
 .ca-q-item {
   display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 11px;
+  grid-template-columns: 26px 48px 1fr;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 7px;
   background: rgba(255,255,255,0.016);
@@ -2144,14 +2358,78 @@ function tagStyle(tag: string): Record<string, string> {
   border-color: rgba(255,217,138,0.12);
   transform: translateY(-1px);
 }
+/* 【星空绑定】αβγ 亮星徽章（第一列） */
+.ca-q-rank {
+  align-self: flex-start;
+  justify-self: center;
+  margin-top: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--rk, #ffd98a) 0%, rgba(0,0,0,0.35) 100%);
+  border: 1px solid var(--rk, #ffd98a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0a0a18;
+  text-shadow: 0 0 3px rgba(255,255,255,0.35);
+  box-shadow:
+    0 0 6px var(--rk, #ffd98a)66,
+    inset 0 0 4px rgba(255,255,255,0.25);
+  z-index: 1;
+}
 .ca-q-illus {
   width: 48px;
   height: 48px;
   align-self: center;
   opacity: 0.95;
   flex-shrink: 0;
+  position: relative;
 }
 .ca-q-body-inner { position: relative; padding: 0; }
+/* 【星空绑定】亮星星名 + 天文参数行（头部） */
+.ca-q-star-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed rgba(255,255,255,0.06);
+}
+.ca-q-star-name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.86);
+  letter-spacing: 0.05em;
+}
+.ca-q-star-astro {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.54rem;
+  font-family: 'Courier New', monospace;
+  color: rgba(255,255,255,0.42);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ca-q-star-astro-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.ca-q-star-astro-k {
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.04em;
+  font-size: 0.5rem;
+}
 .ca-q-mark {
   font-size: 1.6rem;
   font-weight: 700;
