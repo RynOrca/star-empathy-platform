@@ -1388,7 +1388,7 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-wrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;  /* 分隔符改用星座连线 ::before 代替 */
   padding: 18px 22px 24px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1399,6 +1399,57 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-wrap::-webkit-scrollbar { width: 5px; }
 .ca-wrap::-webkit-scrollbar-track { background: transparent; }
 .ca-wrap::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+/* 【星空绑定】板块间分隔符：星座连线 SVG（5颗星+虚连线，只显示在非首元素） */
+.ca-wrap > * + * {
+  position: relative;
+  margin-top: 22px;
+}
+.ca-wrap > * + *::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: -16px;
+  height: 12px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 12' preserveAspectRatio='none'>\
+    <!-- 5颗星沿水平曲线分布 -->\
+    <defs>\
+      <radialGradient id='star1' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23ffd98a' stop-opacity='1'/><stop offset='100%25' stop-color='%23ffd98a' stop-opacity='0'/></radialGradient>\
+      <radialGradient id='star2' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23caa7ff' stop-opacity='1'/><stop offset='100%25' stop-color='%23caa7ff' stop-opacity='0'/></radialGradient>\
+      <radialGradient id='star3' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%2395f0c0' stop-opacity='1'/><stop offset='100%25' stop-color='%2395f0c0' stop-opacity='0'/></radialGradient>\
+      <radialGradient id='star4' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%2386a8ff' stop-opacity='1'/><stop offset='100%25' stop-color='%2386a8ff' stop-opacity='0'/></radialGradient>\
+      <radialGradient id='star5' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23ff8b7d' stop-opacity='1'/><stop offset='100%25' stop-color='%23ff8b7d' stop-opacity='0'/></radialGradient>\
+    </defs>\
+    <!-- 星座连线（贝塞尔曲线，起伏穿过5星 -->\
+    <path d='M 20 8 C 80 3, 160 10, 200 5 S 320 9, 380 6' fill='none' stroke='rgba(255,217,138,0.38)' stroke-width='0.8' stroke-dasharray='2.5 2' stroke-linecap='round'/>\
+    <!-- 星 1（金星色 -->\
+    <circle cx='20' cy='8' r='2.2' fill='%23ffd98a'/>\
+    <circle cx='20' cy='8' r='4.5' fill='url(%23star1)' opacity='0.8'/>\
+    <!-- 星 2（木紫色 -->\
+    <circle cx='110' cy='4' r='1.7' fill='%23caa7ff'/>\
+    <circle cx='110' cy='4' r='3.6' fill='url(%23star2)' opacity='0.7'/>\
+    <!-- 星 3（中间绿主星 -->\
+    <circle cx='200' cy='5' r='2.8' fill='%2395f0c0'/>\
+    <circle cx='200' cy='5' r='5.6' fill='url(%23star3)' opacity='0.85'/>\
+    <!-- 星 4（蓝色 -->\
+    <circle cx='290' cy='9' r='1.5' fill='%2386a8ff'/>\
+    <circle cx='290' cy='9' r='3.2' fill='url(%23star4)' opacity='0.7'/>\
+    <!-- 星 5（珊瑚色末星 -->\
+    <circle cx='380' cy='6' r='2' fill='%23ff8b7d'/>\
+    <circle cx='380' cy='6' r='4.2' fill='url(%23star5)' opacity='0.75'/>\
+  </svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  opacity: 0.92;
+  z-index: 0;
+}
+/* 双栏 ca-duo 内部的两个小 section 不要额外显示分隔符 */
+.ca-duo > section::before { display: none; }
+.ca-duo > section { margin-top: 0; }
+.ca-duo { margin-top: 22px; }
 
 /* ═══ Hero Strip ═══ */
 .ca-hero-strip {
