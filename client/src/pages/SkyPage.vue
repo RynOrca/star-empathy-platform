@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -873,14 +873,24 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
-
+  // 兜底：当前 URL 与目标 URL 完全一致时（重复点击同星），仍要移动到星星位置
+  window.addEventListener('star-identity-click', onStarIdentityClick as EventListener)
   // 从个人主页收藏点击跳转过来：定位到指定星星
   focusOnQueryStar()
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('star-identity-click', onStarIdentityClick as EventListener)
+})
+function onStarIdentityClick(e: CustomEvent<{ starId: number }>) {
+  const id = e.detail?.starId
+  if (id == null || Number.isNaN(id)) return
+  focusOnQueryStar(id)
+}
 
 // 提取定位逻辑为独立函数，供 onMounted 和 watch 共用
-function focusOnQueryStar() {
-  const targetStarId = route.query.star
+// 新增 starIdOverride：当外部事件（非路由 query）需要触发相同定位时直接传 id，不走 route.query
+function focusOnQueryStar(starIdOverride?: number) {
+  const targetStarId = starIdOverride != null ? String(starIdOverride) : route.query.star
   if (!targetStarId) return
   const starId = parseInt(targetStarId as string, 10)
   if (isNaN(starId)) return
