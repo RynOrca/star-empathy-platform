@@ -27,9 +27,8 @@ import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR } from '../utils/constants'
 import { STAR_DISPLAY_CONFIG, type StarDisplayConfig } from '../utils/starDisplayConfig'
 import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync } from '../utils/astro'
-// 阶段 3 P2：小行星 + 流星雨 + GPU 检测
+// 阶段 3 P2：小行星 + GPU 检测
 import { ASTEROIDS } from '../data/asteroids'
-import { getActiveShowers, type MeteorShower } from '../data/meteorShowers'
 import { detectGPU, getRenderParams } from '../utils/gpuDetect'
 // [DISABLED 2026-07-28] 彗星系统已禁用（用户反馈不需要），保留文件以备未来恢复
 // import { COMETS, getCometPositionSync, cometTailDirection, type CometElement } from '../data/comets'
@@ -367,8 +366,6 @@ export function useSky(
   // closeup 跟随复用 Vector3（避免每帧 new，animate 循环高频调用）
   const _closeupWorld = new Vector3()
   const _closeupDir = new Vector3()
-  // 观察模式拖拽复用 Vector3（pointermove 闭包内，避免每帧 new）
-  const _dragV = new Vector3()
   // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
   const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
@@ -1692,12 +1689,8 @@ for (const s of stars) starById.set(s.id, s)
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.size === 1 && dragging) {
-      // 观察模式 + CLOSEUP：拖动绕行星旋转，不退出特写，行星保持在视野中心
+      // 观察模式 + CLOSEUP：禁止拖动旋转，只允许滚轮/pinch 缩放，行星保持在视野中心
       if (observeMode && closeupState === 'CLOSEUP') {
-        const deltaYaw = (e.clientX - px) * 0.004
-        const deltaPitch = (e.clientY - py) * 0.004
-        camera.rotateOnWorldAxis(_dragV.set(0, 1, 0), -deltaYaw)
-        camera.rotateX(-deltaPitch)
         px = e.clientX; py = e.clientY
         return
       }
@@ -2736,207 +2729,6 @@ for (const s of stars) starById.set(s.id, s)
   //     .catch(err => console.error('[useSky] 小行星降级渲染失败', err))
   // }
 
-  // ═══ 阶段 3 P2-2：流星雨粒子系统（季节性触发） ═══
-  // 活跃期内从辐射点向外发散的拖尾粒子
-  // 粒子数按 GPU 等级：high=60, medium=40, low=20, fallback=0
-  interface MeteorParticle {
-    active: boolean       // 是否激活
-    pos: Vector3          // 当前位置
-    vel: Vector3          // 速度向量
-    life: number          // 剩余寿命 (0~1)
-    maxLife: number       // 总寿命
-    color: Color          // 拖尾颜色
-    trail: Float32Array   // 拖尾历史位置（用于线段渲染）
-    trailLen: number      // 当前拖尾长度
-  }
-  const maxParticles = renderParams.meteorParticles
-  const meteorParticles: MeteorParticle[] = []
-  // OPT-25：流星拖尾改用 ShaderMaterial，加入程序化湍流抖动
-  // 改进点：
-  //   1. uTime uniform 驱动 sin 噪声，让 alpha 沿位置相位抖动（等离子体湍流感）
-  //   2. 保留 vertexColors 通道，但片元 shader 中乘以 vAlpha 实现亮度调制
-  //   3. 替代 LineBasicMaterial 的固定 opacity，获得"程序化形状"的视觉
-  let meteorTrailMat: ShaderMaterial | null = null
-  const meteorTrailLines: LineSegments | null = maxParticles > 0 ? (() => {
-    // 拖尾用 LineSegments：每个粒子 8 段 = 16 个顶点
-    const TRAIL_SEGMENTS = 8
-    const totalVerts = maxParticles * TRAIL_SEGMENTS * 2
-    const positions = new Float32Array(totalVerts * 3)
-    const colors = new Float32Array(totalVerts * 3)
-    const g = new BufferGeometry()
-    g.setAttribute('position', new BufferAttribute(positions, 3))
-    g.setAttribute('color', new BufferAttribute(colors, 3))
-    meteorTrailMat = new ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uOpacity: { value: 0.85 },
-      },
-      vertexShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uTime;
-        void main() {
-          vColor = color;
-          // 程序化湍流：基于位置相位 + 时间的 sin 噪声，让 alpha 抖动
-          // 相邻顶点位置接近，相位接近，alpha 过渡连续；远处顶点相位差大，形成湍流
-          float phase = position.x * 0.15 + position.y * 0.15 + position.z * 0.15;
-          vAlpha = 0.75 + 0.25 * sin(uTime * 4.0 + phase);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uOpacity;
-        void main() {
-          // vColor 已包含寿命衰减（CPU 端预乘），vAlpha 是湍流抖动，uOpacity 是全局透明度
-          gl_FragColor = vec4(vColor, vAlpha * uOpacity);
-        }
-      `,
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      vertexColors: true,
-    })
-    const lines = new LineSegments(g, meteorTrailMat)
-    lines.frustumCulled = false
-    skyGroup.add(lines)
-    // 初始化粒子池
-    for (let i = 0; i < maxParticles; i++) {
-      meteorParticles.push({
-        active: false,
-        pos: new Vector3(),
-        vel: new Vector3(),
-        life: 0,
-        maxLife: 0,
-        color: new Color(),
-        trail: new Float32Array(TRAIL_SEGMENTS * 3),
-        trailLen: 0,
-      })
-    }
-    return lines
-  })() : null
-
-  // OPT-25：流星头部光晕 Points（参考 OPT-24 透视缩放模板 + fake-glow-material 思路）
-  // 改进点：
-  //   1. 每颗激活流星在当前位置渲染一个发光点，复用 OPT-24 透视缩放公式
-  //   2. aSize 按寿命衰减（出现时大，消失时小）
-  //   3. sin(uTime * 频率 + 粒子索引) 呼吸抖动，模拟等离子体"闪烁"
-  //   4. 圆形软边缘 + AdditiveBlending，比 LineSegments 起点更亮
-  let meteorHeadPoints: Points | null = null
-  let meteorHeadPosAttr: BufferAttribute | null = null
-  let meteorHeadSizeAttr: BufferAttribute | null = null
-  let meteorHeadColorAttr: BufferAttribute | null = null
-  let meteorHeadMat: ShaderMaterial | null = null
-  if (maxParticles > 0) {
-    const headPositions = new Float32Array(maxParticles * 3)
-    const headSizes = new Float32Array(maxParticles)
-    const headColors = new Float32Array(maxParticles * 3)
-    const headGeo = new BufferGeometry()
-    meteorHeadPosAttr = new BufferAttribute(headPositions, 3)
-    meteorHeadSizeAttr = new BufferAttribute(headSizes, 1)
-    meteorHeadColorAttr = new BufferAttribute(headColors, 3)
-    headGeo.setAttribute('position', meteorHeadPosAttr)
-    headGeo.setAttribute('aSize', meteorHeadSizeAttr)
-    headGeo.setAttribute('aColor', meteorHeadColorAttr)
-    // 初始 drawRange = 0（无激活流星时不渲染）
-    headGeo.setDrawRange(0, 0)
-    meteorHeadMat = new ShaderMaterial({
-      uniforms: {
-        uMap: { value: texCache.get(8) ?? glowTex('white', 32) },
-        uDpr: { value: dpr },  // OPT-29：使用共享 dpr 变量，与 renderer.setPixelRatio 一致
-        uTime: { value: 0 },
-      },
-      vertexShader: `
-        attribute float aSize;
-        attribute vec3 aColor;
-        varying vec3 vColor;
-        varying float vBreath;
-        uniform float uDpr;
-        uniform float uTime;
-        void main() {
-          vColor = aColor;
-          // 呼吸抖动：sin(uTime * 6 + 粒子相位)，模拟等离子体闪烁
-          // gl_VertexID 在 WebGL1 不可用，用 position 推导相位
-          float phase = position.x * 0.3 + position.y * 0.3;
-          vBreath = 0.85 + 0.15 * sin(uTime * 6.0 + phase);
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          // 复用 OPT-24 透视缩放公式
-          gl_PointSize = aSize * (300.0 * uDpr / max(1.0, -mvPosition.z));
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D uMap;
-        varying vec3 vColor;
-        varying float vBreath;
-        void main() {
-          // 圆形粒子 + 软边缘 discard
-          vec2 c = gl_PointCoord - 0.5;
-          float d = length(c);
-          if (d > 0.5) discard;
-          vec4 tex = texture2D(uMap, gl_PointCoord);
-          // vBreath 调制亮度，让光晕"呼吸"
-          gl_FragColor = vec4(vColor * vBreath, tex.a);
-        }
-      `,
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-    })
-    meteorHeadPoints = new Points(headGeo, meteorHeadMat)
-    meteorHeadPoints.frustumCulled = false
-    skyGroup.add(meteorHeadPoints)
-  }
-
-  // 当前活跃的流星雨（每小时刷新一次，基于模拟时间）
-  let activeShowers: Array<MeteorShower & { intensity: number }> = []
-  let lastShowerRefresh = 0
-  function refreshShowers(date: Date = new Date()) {
-    activeShowers = getActiveShowers(date)
-    lastShowerRefresh = performance.now()
-  }
-  refreshShowers()
-
-  // 发射一颗流星
-  function spawnMeteor(particle: MeteorParticle) {
-    if (activeShowers.length === 0) return
-    // 按强度加权选流星雨
-    const totalWeight = activeShowers.reduce((s, sh) => s + sh.intensity * sh.zhr, 0)
-    let r = Math.random() * totalWeight
-    let shower = activeShowers[0]
-    for (const sh of activeShowers) {
-      r -= sh.intensity * sh.zhr
-      if (r <= 0) { shower = sh; break }
-    }
-    // 辐射点位置
-    const radiant = raDecXYZ(shower.radiantRA, shower.radiantDec, SPHERE_RADIUS)
-    // 在辐射点附近随机偏移（±5°）
-    const offsetAngle = (Math.random() - 0.5) * 10 * D2R
-    const offsetDir = new Vector3(radiant.x, radiant.y, radiant.z).normalize()
-    // 随机切线方向
-    const tangent = new Vector3(-offsetDir.y, offsetDir.x, 0).normalize()
-    const finalPos = offsetDir.applyAxisAngle(tangent, offsetAngle).multiplyScalar(SPHERE_RADIUS)
-    particle.pos.copy(finalPos)
-    // 速度方向：从辐射点向外（沿天球切平面）
-    // 切平面法向量 = finalPos.normalize()，取随机向量投影到切平面
-    const normal = finalPos.clone().normalize()
-    const randVec = new Vector3(
-      Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5,
-    )
-    // 减去法向量分量，得到切平面内向量
-    randVec.addScaledVector(normal, -randVec.dot(normal)).normalize()
-    particle.vel.copy(randVec.multiplyScalar(shower.speed * 0.5))
-    // 寿命：0.8~2.0 秒
-    particle.maxLife = 0.8 + Math.random() * 1.2
-    particle.life = particle.maxLife
-    particle.color.set(shower.color)
-    particle.trailLen = 0
-    particle.active = true
-  }
-
   /* [DISABLED 2026-07-28] 彗星渲染已禁用（用户反馈不需要），保留代码以备未来恢复
   // ═══ OPT-10：彗星渲染（哈雷 + 恩克，2 颗著名短/长周期彗星） ═══
   // 渲染策略（参考 axisrow/open-solar-system + N3rson/Solar-System-3D）：
@@ -3509,101 +3301,6 @@ for (const s of stars) starById.set(s.id, s)
     // 使用 simTimeMs 而非 _now，确保 timeScale=1000 时颗粒演化可见
     if (sunSurfaceMat) {
       (sunSurfaceMat.uniforms.uTime.value as number) = simTimeMs / 1000
-    }
-    // ─── 阶段 3 P2-2：流星雨粒子更新 ───
-    // 每小时刷新一次活跃流星雨列表（基于模拟时间，加速时也能正确切换季节）
-    if (_now - lastShowerRefresh > 3600 * 1000) refreshShowers(new Date(simTimeMs))
-    // OPT-25：更新流星拖尾和头部光晕的 uTime uniform
-    const meteorTime = simTimeMs / 1000
-    if (meteorTrailMat) (meteorTrailMat.uniforms.uTime.value as number) = meteorTime
-    if (meteorHeadMat) (meteorHeadMat.uniforms.uTime.value as number) = meteorTime
-    if (meteorTrailLines && maxParticles > 0) {
-      const TRAIL_SEGMENTS = 8
-      const posAttr = meteorTrailLines.geometry.attributes.position as BufferAttribute
-      const colAttr = meteorTrailLines.geometry.attributes.color as BufferAttribute
-      const posArr = posAttr.array as Float32Array
-      const colArr = colAttr.array as Float32Array
-      // 清空顶点（避免残留）
-      posArr.fill(0)
-      colArr.fill(0)
-      let writeIdx = 0  // 顶点写入位置
-      // OPT-25：head points 写入索引（独立于拖尾 writeIdx）
-      let headIdx = 0
-      const headPosArr = meteorHeadPosAttr ? meteorHeadPosAttr.array as Float32Array : null
-      const headSizeArr = meteorHeadSizeAttr ? meteorHeadSizeAttr.array as Float32Array : null
-      const headColorArr = meteorHeadColorAttr ? meteorHeadColorAttr.array as Float32Array : null
-      for (let i = 0; i < maxParticles; i++) {
-        const p = meteorParticles[i]
-        // 激活粒子：更新位置 + 寿命
-        if (p.active) {
-          p.life -= deltaMs / 1000
-          if (p.life <= 0) {
-            p.active = false
-            continue
-          }
-          // 位置更新（速度 × deltaMs，缩放以适应天球尺度）
-          p.pos.x += p.vel.x * deltaMs * 0.01
-          p.pos.y += p.vel.y * deltaMs * 0.01
-          p.pos.z += p.vel.z * deltaMs * 0.01
-          // 拖尾：先 shift 历史点（k=N→1），再写入新位置到 trail[0]
-          // 顺序不能反：若先写 trail[0] 再 shift，shift 会把新点复制到 trail[1]
-          for (let k = TRAIL_SEGMENTS - 1; k > 0; k--) {
-            p.trail[k * 3]     = p.trail[(k - 1) * 3]
-            p.trail[k * 3 + 1] = p.trail[(k - 1) * 3 + 1]
-            p.trail[k * 3 + 2] = p.trail[(k - 1) * 3 + 2]
-          }
-          p.trail[0] = p.pos.x; p.trail[1] = p.pos.y; p.trail[2] = p.pos.z
-          if (p.trailLen < TRAIL_SEGMENTS) p.trailLen++
-          // 写入拖尾线段（每段 2 个顶点）
-          const alpha = p.life / p.maxLife  // 寿命衰减
-          for (let k = 0; k < p.trailLen - 1 && writeIdx + 1 < posArr.length / 3; k++) {
-            posArr[writeIdx * 3]     = p.trail[k * 3]
-            posArr[writeIdx * 3 + 1] = p.trail[k * 3 + 1]
-            posArr[writeIdx * 3 + 2] = p.trail[k * 3 + 2]
-            colArr[writeIdx * 3]     = p.color.r * alpha
-            colArr[writeIdx * 3 + 1] = p.color.g * alpha
-            colArr[writeIdx * 3 + 2] = p.color.b * alpha
-            writeIdx++
-            posArr[writeIdx * 3]     = p.trail[(k + 1) * 3]
-            posArr[writeIdx * 3 + 1] = p.trail[(k + 1) * 3 + 1]
-            posArr[writeIdx * 3 + 2] = p.trail[(k + 1) * 3 + 2]
-            colArr[writeIdx * 3]     = p.color.r * alpha * 0.3
-            colArr[writeIdx * 3 + 1] = p.color.g * alpha * 0.3
-            colArr[writeIdx * 3 + 2] = p.color.b * alpha * 0.3
-            writeIdx++
-          }
-          // OPT-25：写入头部光晕点（每颗激活流星一个点）
-          if (headPosArr && headSizeArr && headColorArr && headIdx < maxParticles) {
-            headPosArr[headIdx * 3]     = p.pos.x
-            headPosArr[headIdx * 3 + 1] = p.pos.y
-            headPosArr[headIdx * 3 + 2] = p.pos.z
-            // aSize 按寿命衰减：出现时大（alpha≈1），消失时小（alpha≈0）
-            // 基准 12.0 让光晕比小行星（基准 6.0）更醒目，符合流星头部亮度
-            headSizeArr[headIdx] = 12.0 * alpha
-            headColorArr[headIdx * 3]     = p.color.r
-            headColorArr[headIdx * 3 + 1] = p.color.g
-            headColorArr[headIdx * 3 + 2] = p.color.b
-            headIdx++
-          }
-        } else if (activeShowers.length > 0) {
-          // 真实 ZHR 速率：spawn 概率 = 总有效 ZHR / 2000，封顶 0.15
-          // 英仙座 ZHR=100 → 0.05/帧 ≈ 3 颗/秒；双子座 ZHR=120 → 0.06/帧
-          // 视觉增强倍数让流星雨肉眼可见（真实 ZHR=100 实际每秒仅 0.028 颗）
-          const totalZHR = activeShowers.reduce((s, sh) => s + sh.zhr * sh.intensity, 0)
-          const spawnProb = Math.min(0.15, totalZHR / 2000)
-          if (Math.random() < spawnProb) spawnMeteor(p)
-        }
-      }
-      posAttr.needsUpdate = true
-      colAttr.needsUpdate = true
-      meteorTrailLines.geometry.setDrawRange(0, writeIdx)
-      // OPT-25：更新 head points 的 drawRange 和 needsUpdate
-      if (meteorHeadPoints && meteorHeadPosAttr && meteorHeadSizeAttr && meteorHeadColorAttr) {
-        meteorHeadPoints.geometry.setDrawRange(0, headIdx)
-        meteorHeadPosAttr.needsUpdate = true
-        meteorHeadSizeAttr.needsUpdate = true
-        meteorHeadColorAttr.needsUpdate = true
-      }
     }
     // 内核连线呼吸动画
     if (kernelLinesGroup.visible) {
@@ -4321,7 +4018,6 @@ for (const s of stars) starById.set(s.id, s)
           })
           // [P1-1 修复 2026-07-27] ShaderMaterial uniforms 中的纹理不会被 Object.values(mat) 遍历到
           // 需显式进入 uniforms.{name}.value 释放，否则太阳/土星环等纹理每次卸载都泄漏
-          // 原代码只补充了流星头纹理（texCache.get(8)），遗漏了 sunMat.uMap 和 ringMat.uMap
           const uniforms = mm.uniforms
           if (uniforms && typeof uniforms === 'object') {
             Object.values(uniforms).forEach(u => {
