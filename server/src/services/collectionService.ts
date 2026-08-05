@@ -198,7 +198,7 @@ const PRIVATE_DEFAULT_COLOR = '#6A7ACB';  // 星靛蓝（私密夜色感）
 
 export function getOrCreateDefaultCollections(userId: number): DefaultCollections {
   // 1) 先找该用户所有合集
-  const all = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC').all(userId) as Collection[];
+  const all = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC').all(userId) as unknown as Collection[];
 
   // 2) 精准匹配（名字+可见性同时命中），存在就复用
   let publicColl = all.find((c) => c.name === PUBLIC_DEFAULT_NAME && c.visibility === 'public');
