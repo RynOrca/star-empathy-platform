@@ -306,6 +306,10 @@ export interface SkyAPI {
   flyToStar3D: (star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) => void
   /** 天镜览星：打断当前飞行动画 */
   cancelFly: () => void
+  /** 天镜览星：订阅相机每帧位姿（订阅者内部自行节流），返回取消订阅函数 */
+  onCameraFrame: (cb: (pose: CameraPose) => void) => () => void
+  /** 天镜览星：取相机视线中心的赤经赤纬（用于 HUD 显示） */
+  getCenterCelestial: () => { ra: string; dec: string }
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
   /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
@@ -420,6 +424,30 @@ export function useSky(
     if (fov > 39) return 3
     return 4
   }
+
+  /** 相机视线中心的赤经（格式 '18h 36m'） */
+  function getCenterRa(): string {
+    const dir = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+    const ra = Math.atan2(dir.y, dir.x)
+    let raDeg = ra * 180 / Math.PI
+    if (raDeg < 0) raDeg += 360
+    const hours = raDeg / 15
+    const h = Math.floor(hours)
+    const m = Math.floor((hours - h) * 60)
+    return `${h}h ${m}m`
+  }
+
+  /** 相机视线中心的赤纬（格式 '+38° 47′'） */
+  function getCenterDec(): string {
+    const dir = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+    const dec = Math.asin(dir.z) * 180 / Math.PI
+    const sign = dec >= 0 ? '+' : '-'
+    const absDec = Math.abs(dec)
+    const d = Math.floor(absDec)
+    const m = Math.floor((absDec - d) * 60)
+    return `${sign}${d}° ${m}′`
+  }
+
   // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
   const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
@@ -2997,6 +3025,18 @@ for (const s of stars) starById.set(s.id, s)
     camera.updateProjectionMatrix()
     frameCount++  // OPT-14：帧计数器递增（用于太阳坐标缓存节流）
 
+    // 天镜览星：通知相机帧订阅者（每帧执行，订阅者内部自行节流）
+    if (cameraFrameSubscribers.length > 0) {
+      const pose: CameraPose = {
+        position: camera.position.clone(),
+        lookAt: new Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position),
+        fov: camera.fov,
+        centerRa: getCenterRa(),
+        centerDec: getCenterDec(),
+      }
+      for (const cb of cameraFrameSubscribers) cb(pose)
+    }
+
     // 实时恒星漂移：按真实恒星时与基础 LST 的差修正 rotY
     // 已禁用：天球回归默认不旋转
     // if (observer) {
@@ -3483,6 +3523,17 @@ for (const s of stars) starById.set(s.id, s)
 
   return {
     camera,
+    // ═══ 天镜览星 API ═══
+    onCameraFrame(cb: (pose: CameraPose) => void): () => void {
+      cameraFrameSubscribers.push(cb)
+      return () => {
+        const i = cameraFrameSubscribers.indexOf(cb)
+        if (i >= 0) cameraFrameSubscribers.splice(i, 1)
+      }
+    },
+    getCenterCelestial(): { ra: string; dec: string } {
+      return { ra: getCenterRa(), dec: getCenterDec() }
+    },
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
     // issue #136：PC 端行星特写观察模式开关
