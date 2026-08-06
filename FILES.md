@@ -158,7 +158,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `CameraOverlay.vue` | **容器组件**。按 `isMobile` 分叉渲染 PC/移动端子组件，管理故事卡片状态。PC 端组合 Viewfinder+CameraHud+ViewportInfo+ZoomFilterControl+FrameStoriesPanel；移动端组合 MobileCameraHud+BubbleLayer+ZoomStageIndicator；两端共用 StoryDetailCard。通过 `defineExpose` 暴露 panelRef 供父组件调用滚动居中 |
+| `CameraOverlay.vue` | **容器组件**。按 `isMobile` 分叉渲染 PC/移动端子组件，管理故事卡片状态。PC 端组合 Viewfinder+CameraHud+ViewportInfo+ZoomFilterControl+FrameStoriesPanel；移动端（方案D 单卡片轮播）组合 MobileCameraHud+MobileGalleryPanel；两端共用 StoryDetailCard。移动端事件流：`activeChange`（卡片切换同步 activeStarId，不飞镜头）+ 复用 `storyClick`（点击卡片飞镜头+开详情）。通过 `defineExpose` 暴露 panelRef 供父组件调用滚动居中 |
 | `Viewfinder.vue` | **PC 端取景框 overlay**。边框（inset:0 贴近视口边缘，包含顶部 HUD 与底部参数栏）+四角标记+九宫格网格+暗角+**贯穿中心的相机十字准星**（横竖两条贯穿屏幕的细线 + 中心 16px 十字标记，模拟相机取景器）。级联进入动画（纯 opacity，避免 transform 残留导致拖动时抖动） |
 | `CameraHud.vue` | **PC 端顶部/底部 HUD**。EXIT 按钮+PHOTO MODE 录制指示+RA/DEC/FOV 坐标 chip+底部 ISO/快门/光圈参数+日期时间 FPS。requestAnimationFrame 实时更新。HUD 容器 `will-change: opacity` + `backface-visibility: hidden` 提升为独立合成层，避免 canvas 重绘时文字抖动；进入动画纯 opacity 无 transform |
 | `ViewportInfo.vue` | **PC 端左上角天区信息**。显示取景框内亮星数量与故事总数，按数量推断天区名称 |

@@ -28,7 +28,7 @@
       />
     </template>
 
-    <!-- 移动端 -->
+    <!-- 移动端（方案D 单卡片横滑） -->
     <template v-else>
       <MobileCameraHud
         :region="region"
@@ -36,14 +36,12 @@
         @exit="$emit('exit')"
         @set-mode="onSetMode"
       />
-      <BubbleLayer
+      <MobileGalleryPanel
         :stories="frameStories"
         :active-star-id="activeStarId"
-        @click="onBubbleClick"
-      />
-      <ZoomStageIndicator
-        :zoom-level="zoomLevel"
-        @set-zoom="onSetZoom"
+        :mode="filters.mode"
+        @click-story="onStoryClick"
+        @active-change="onActiveChange"
       />
     </template>
 
@@ -65,8 +63,7 @@ import ViewportInfo from './ViewportInfo.vue'
 import ZoomFilterControl from './ZoomFilterControl.vue'
 import FrameStoriesPanel from './FrameStoriesPanel.vue'
 import MobileCameraHud from './MobileCameraHud.vue'
-import BubbleLayer from './BubbleLayer.vue'
-import ZoomStageIndicator from './ZoomStageIndicator.vue'
+import MobileGalleryPanel from './MobileGalleryPanel.vue'
 import StoryDetailCard from './StoryDetailCard.vue'
 import type { StarData } from '../../composables/useStars'
 import type { StarInFrame } from '../../composables/useSky'
@@ -89,7 +86,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   exit: []
   storyClick: [star: StarData]
-  bubbleClick: [star: StarData]
+  activeChange: [starId: number]
   closeCard: []
   setZoom: [level: number]
   setMode: [mode: CameraFilterMode]
@@ -105,8 +102,10 @@ function onStoryClick(star: StarData) {
   emit('storyClick', star)
 }
 
-function onBubbleClick(star: StarData) {
-  emit('bubbleClick', star)
+function onActiveChange(starId: number) {
+  // 移动端单卡片切换时同步 activeStarId（不触发飞镜头，仅高亮）
+  // 由父组件 SkyPage 处理 activeStarId 更新
+  emit('activeChange', starId)
 }
 
 function onCloseCard() {
