@@ -130,7 +130,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、导航栏**行星轨迹开关**（Orbit 图标，调 `setPlanetTrailsVisible`，黄道线作为太阳轨迹始终显示）、移动端底部「凝听星语」按钮（吸附星体后滑入，issue #124；issue #134 扩展支持行星：按钮区分恒星/行星，行星入口只打开故事面板不进入特写）；**PC 端行星特写观察模式**（issue #136）：`planetObserveMode` ref + document click 监听实现点击空白进入观察模式（隐藏故事面板露出行星）、任意点击切回故事模式；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail |
+| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、导航栏**行星轨迹开关**（Orbit 图标，调 `setPlanetTrailsVisible`，黄道线作为太阳轨迹始终显示）、移动端底部「凝听星语」按钮（吸附星体后滑入，issue #124；issue #134 扩展支持行星：按钮区分恒星/行星，行星入口只打开故事面板不进入特写）；**PC 端行星特写观察模式**（issue #136）：`planetObserveMode` ref + document click 监听实现点击空白进入观察模式（隐藏故事面板露出行星）、任意点击切回故事模式；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail；**天镜览星模式**：导航栏 ApertureIcon 按钮 → `useCameraMode(sky, stars)` → `CameraOverlay` v-if 分叉渲染 PC（取景框+HUD+故事列表）/移动端（方案D 单卡片轮播）→ ESC 退出/路由离开自动清理；sky Proxy 代理转发（SkyCanvas 挂载前同步调用 useCameraMode） |
 | `HomePage.vue` | 首页/登录页。粒子星空背景 + 左右分栏（品牌意境/登录注册表单），含找回密码、匿名访客体验；移动端可竖向滚动（issue #124） |
 | `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
 
@@ -159,12 +159,28 @@
 | `LoadingScreen.vue` | 加载动画 |
 | `LegendToggle.vue` | 图例开关 |
 
+### 组件 `src/components/CameraMode/` — 天镜览星（Camera Mode）
+
+| 文件 | 用途 |
+|---|---|
+| `CameraOverlay.vue` | **容器组件**。按 `isMobile` 分叉渲染 PC/移动端子组件，管理故事卡片状态。PC 端组合 Viewfinder+CameraHud+ViewportInfo+ZoomFilterControl+FrameStoriesPanel；移动端（方案D 单卡片轮播）组合 MobileCameraHud+MobileGalleryPanel；两端共用 StoryDetailCard。移动端事件流：`activeChange`（卡片切换同步 activeStarId，不飞镜头）+ 复用 `storyClick`（点击卡片飞镜头+开详情）。通过 `defineExpose` 暴露 panelRef 供父组件调用滚动居中 |
+| `Viewfinder.vue` | **PC 端取景框 overlay**。边框（inset:0 贴近视口边缘，包含顶部 HUD 与底部参数栏）+四角标记+九宫格网格+暗角+**贯穿中心的相机十字准星**（横竖两条贯穿屏幕的细线 + 中心 16px 十字标记，模拟相机取景器）。级联进入动画（纯 opacity，避免 transform 残留导致拖动时抖动） |
+| `CameraHud.vue` | **PC 端顶部/底部 HUD**。EXIT 按钮+PHOTO MODE 录制指示+RA/DEC/FOV 坐标 chip+底部 ISO/快门/光圈参数+日期时间 FPS。requestAnimationFrame 实时更新。HUD 容器 `will-change: opacity` + `backface-visibility: hidden` 提升为独立合成层，避免 canvas 重绘时文字抖动；进入动画纯 opacity 无 transform |
+| `ViewportInfo.vue` | **PC 端左上角天区信息**。显示取景框内亮星数量与故事总数，按数量推断天区名称 |
+| `ZoomFilterControl.vue` | **PC 端左下角缩放+模式切换**。ZOOM 滑块（Ⅰ~Ⅳ 罗马数字档位）+ MODE 二选一互斥按钮（观星 gazing / 听语 listening），emit setZoom/setMode |
+| `FrameStoriesPanel.vue` | **PC 端右下角故事列表**。接收 `mode` prop，按星去重（catalogStarId 优先）：观星模式展示星星介绍（STARS IN FRAME），听语模式展示情感故事（VOICES IN FRAME，未看过+共鸣高优先）。点击触发居中滚动+飞镜头+打开详情。`defineExpose({ scrollToCardCenter, isCardCentered })` 供父组件协调交互时序 |
+| `MobileCameraHud.vue` | **移动端顶部 HUD**。双行布局：第一行 EXIT 按钮+天区名，第二行观星/听语模式切换按钮。slide-down 进入动画 |
+| `MobileGalleryPanel.vue` | **移动端底部单卡片横滑轮播**（方案D 化核心组件）。替代 BubbleLayer+ZoomStageIndicator：底部固定画廊，header 标题+翻页按钮，单卡片轨道横向滑动切换（touchend 水平位移 > 40px 判定），小圆点分页器。滑动=浏览摘要不飞镜头；点击卡片 emit clickStory 飞镜头+开详情。activeIdx 变化 emit activeChange 同步 activeStarId。stories 变化时保持当前星或回到首位。按 mode 切换观星/听语文案与 meta（听语多 viewCount/时间）。复用 CameraIcons 图标 |
+| `StoryDetailCard.vue` | **两端共用故事卡片**。Teleport+Transition 实现，PC 端居中弹出（scale+translate），移动端底部滑入（translateY）。含星名（catalogStarId 优先取 `getStarDisplayName` 真实星名，避免与故事标题重复）/标题（与星名不同时才显示）/正文/meta/标签/共鸣按钮（含访客拦截）。使用 useResonate 实现共鸣操作 |
+| `icons/CameraIcons.ts` | **相机模式 SVG icon 集合**。17 个函数式组件（ApertureIcon/ChevronLeftIcon/ChevronRightIcon 翻页右箭头/CloseIcon/BookOpenIcon/SparklesIcon/FlameIcon/MapPinIcon/ScrollIcon/HeartIcon/EyeIcon/CompassIcon/ClockIcon/CrosshairIcon/TelescopeIcon 观星/MessageCircleIcon 听语/GalleryIcon 画廊四宫格），统一 `viewBox 0 0 24 24` + `stroke=currentColor` + `stroke-width=1.8`，供 Phase 4-6 相机模式组件使用。禁用 emoji 字符（AGENTS.md 规范） |
+
 ### 核心逻辑 `src/composables/`
 
 | 文件 | 用途 |
 |---|---|
-| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING，含 `preCloseupCamera` 快照实现望远镜效果——退出特写回到进入前的相机视角而非固定原点；进入特写隐藏 planetHoverGlow+halo 避免闪光弹；观察模式下滚轮/pinch 拉远到 maxDist 时 clamp 而非退出 CLOSEUP，issue #144）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint）、移动端准星吸附（`onSnapChange` 回调 + `releaseSnap` 主动释放，issue #124；issue #134 扩展支持行星吸附，导出 `SnapTarget` 类型区分恒星/行星，吸附行星时 tooltip 显示行星名）；**行星视运动轨迹**存储于 `planetTrailLines` 数组，`setPlanetTrailsVisible(v)` 切换显示（黄道线作为太阳轨迹始终显示） |
-| `useStars.ts` | 星星数据获取、过滤、本地更新 |
+| `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING，含 `preCloseupCamera` 快照实现望远镜效果——退出特写回到进入前的相机视角而非固定原点；进入特写隐藏 planetHoverGlow+halo 避免闪光弹；观察模式下滚轮/pinch 拉远到 maxDist 时 clamp 而非退出 CLOSEUP，issue #144）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint）、移动端准星吸附（`onSnapChange` 回调 + `releaseSnap` 主动释放，issue #124；issue #134 扩展支持行星吸附，导出 `SnapTarget` 类型区分恒星/行星，吸附行星时 tooltip 显示行星名）；**行星视运动轨迹**存储于 `planetTrailLines` 数组，`setPlanetTrailsVisible(v)` 切换显示（黄道线作为太阳轨迹始终显示）；**天镜览星 API**：`flyToStar3D`（670ms 两段式飞行动画——前 35% 缩小 FOV 到 75°+朝向 slerp 到目标星，后 65% 移动并放大到目标 FOV，全程相机 lookAt 目标星保持居中）、`cancelFly`、`getStarsInFrame`（Frustum 视锥过滤+屏幕坐标投影+RA/Dec 计算）、`onCameraFrame`（帧回调订阅）、`getCenterCelestial`、`setCameraModeOverlay`（进入时保存相机快照 pos/quat/fov 到 `cameraModeEnterPos/Quat/Fov`，接受 storyStars 创建呼吸 glow Sprite）、`exitCameraModeWithTween`（退出时 800ms tween 回到进入时的相机快照）、`cameraZoomLevel` ref |
+| `useStars.ts` | 星星数据获取、过滤、本地更新。**天镜览星派生字段**：`isNew`（24h 内）、`isHot`（resonanceCount ≥ HOT_THRESHOLD）、`isAncient`（type='history'）、`isNear`（地平线可见，由 useCameraMode 更新） |
+| `useCameraMode.ts` | **天镜览星模式总控**。模式状态机（IDLE/SCROLLING/FLYING/DETAIL_OPEN）、取景框星过滤（节流 400ms）、故事列表派生（`CameraFilters.mode` 互斥：gazing 观星 / listening 听语；按 catalogStarId 去重每星一卡：观星优先 history 故事，听语优先 user 故事+未看过+共鸣高）、点击协调（PC 居中滚动+飞镜头+卡片；移动端飞镜头+卡片）。导出 `markStarSeen(starId)` 用 localStorage 记录已看故事星，影响听语模式排序 |
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
 | `useKernel.ts` | 故事内核（情感标签）提取 |

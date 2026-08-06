@@ -51,3 +51,21 @@ export const CLOSEUP_WHEEL_FACTOR = 0.88   // 滚轮每步拉近系数（向上 
 // 邻星连线
 export const NEARBY_LINE_COUNT = 4
 export const NEARBY_LINE_THRESHOLD = 80 // 距离阈值
+
+// ═══ 天镜览星模式 ═══
+/** 热门故事阈值：resonanceCount >= HOT_THRESHOLD 判为 isHot */
+export const HOT_THRESHOLD = 100
+/** 相机模式缩放层级对应的 FOV 值（度） */
+export const CAMERA_FOV_BY_STAGE: Record<number, number> = {
+  1: 75,
+  2: 60,
+  3: 45,
+  4: 35,
+}
+/** 相机模式飞行动画时长（ms） */
+export const CAMERA_FLY_DURATION_MS = 670
+/** 取景框星过滤节流间隔（ms） */
+export const CAMERA_FRAME_THROTTLE_MS = 400
+/** 取景框列表最大显示项数 */
+export const CAMERA_LIST_MAX_ITEMS = 50
+

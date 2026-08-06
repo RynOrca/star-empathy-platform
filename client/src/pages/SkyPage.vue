@@ -1,15 +1,15 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
       <div class="nav-left">
-        <!-- 节气（桌面端） -->
-        <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
+        <!-- 节气（桌面端，相机模式隐藏） -->
+        <span v-if="solarTerm && cameraMode.cameraMode.value !== 'observe'" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
         </span>
         <button
-          v-if="moonPhase"
+          v-if="moonPhase && cameraMode.cameraMode.value !== 'observe'"
           class="moon-phase"
           :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）点击查看详情`"
           @click="openMoonPanel"
@@ -18,8 +18,8 @@
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </button>
       </div>
-      <!-- PC 端搜索框 -->
-      <div v-if="!isMobile" class="nav-center">
+      <!-- PC 端搜索框（相机模式隐藏） -->
+      <div v-if="!isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-center">
         <div class="search-box">
           <Search :size="14" class="search-box-icon" />
           <input
@@ -56,15 +56,15 @@
       </div>
       <div class="nav-right">
         <!-- 搜索按钮（移动端） -->
-        <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+        <button v-if="isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
           <Search :size="18" />
         </button>
-        <!-- 定位 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
+        <!-- 定位（相机模式隐藏） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
-        <!-- 记录：AI 匹配星辰写故事（不依赖定位，首帧就显示） -->
-        <button class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
+        <!-- 记录：AI 匹配星辰写故事（相机模式隐藏，不依赖定位，首帧就显示） -->
+        <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
         </button>
         <!-- 星笺：打开我的合集 -->
@@ -75,15 +75,19 @@
         <button class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
-        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（不依赖定位，首帧就显示） -->
-        <button class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
+        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，首帧就显示） -->
+        <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
-        <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
-        <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+        <!-- 天镜览星：进入/退出相机模式 -->
+        <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" :aria-label="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" aria-haspopup="dialog" :aria-expanded="cameraMode.cameraMode.value === 'observe'">
+          <ApertureIcon />
+        </button>
+        <!-- 用户/登录（相机模式隐藏） -->
+        <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
           <User :size="18" />
         </button>
-        <button v-if="!username || isGuest" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+        <button v-if="(!username || isGuest) && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
           <User :size="18" />
         </button>
       </div>
@@ -141,6 +145,31 @@
     </Transition>
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" @snap-change="onSnapChange" />
+
+    <!-- 天镜览星 · 相机模式 overlay（PC 端取景框+HUD+列表 / 移动端气泡+拖拽） -->
+    <Transition name="camera-fade">
+      <CameraOverlay
+        v-if="cameraMode.cameraMode.value === 'observe'"
+        ref="cameraOverlayRef"
+        :is-mobile="isMobile"
+        :is-guest="isGuest"
+        :stars-in-frame="cameraMode.starsInFrame.value"
+        :frame-stories="cameraMode.frameStories.value"
+        :active-star-id="cameraMode.activeStarId.value"
+        :active-card-star="cameraMode.activeCardStar.value"
+        :filters="cameraMode.filters"
+        :zoom-level="cameraMode.cameraZoomLevel.value"
+        :center-celestial="cameraCenterCelestial"
+        :current-fov="cameraCurrentFov"
+        :region="cameraRegion"
+        @exit="cameraMode.exit()"
+        @story-click="onCameraStoryClick"
+        @active-change="onCameraActiveChange"
+        @close-card="cameraMode.closeStoryCard()"
+        @set-zoom="onCameraSetZoom"
+        @set-mode="onCameraSetMode"
+      />
+    </Transition>
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -231,8 +260,8 @@
       </div>
     </Transition>
 
-    <!-- 三张叙事引导牌 -->
-    <div v-if="locationReady" class="guide-cards">
+    <!-- 三张叙事引导牌（相机模式隐藏） -->
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-cards">
       <div class="guide-card">
         <div class="guide-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -263,18 +292,19 @@
       </div>
     </div>
 
-    <div v-if="locationReady" class="zoom-controls">
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div v-if="locationReady" class="hint">
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
     <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
     <!-- issue #135 动画修复：完全复刻 .search-sheet 结构 → wrapper套 Transition + inner 用 @keyframes animation -->
+    <!-- 天镜览星模式下隐藏（仅允许拖动+放大，吸附与按钮均不触发） -->
     <Transition name="sheet-fade">
-      <div v-if="isMobile && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
+      <div v-if="isMobile && cameraMode.cameraMode.value !== 'observe' && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
         <button
           class="story-enter-btn"
           type="button"
@@ -542,7 +572,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
@@ -561,8 +591,16 @@ import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
 import { useCollections, type Collection, type CollectionDetail as CollectionDetailType, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
+import { useCameraMode, type CameraFilterMode } from '../composables/useCameraMode'
+import { useStars } from '../composables/useStars'
+import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
+import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
+import { CAMERA_FOV_BY_STAGE } from '../utils/constants'
 
 const { isMobile } = useMediaQuery()
+
+// 天镜览星模式所需的故事星数据源（独立于 storiesByStarId，供 useCameraMode 使用）
+const stars = useStars()
 
 const router = useRouter()
 const route = useRoute()
@@ -865,6 +903,9 @@ onMounted(async () => {
   }) as EventListener)
   // 兜底：当前 URL 与目标 URL 完全一致时（重复点击同星），仍要移动到星星位置
   window.addEventListener('star-identity-click', onStarIdentityClick as EventListener)
+
+  // 天镜览星：ESC 键退出相机模式
+  window.addEventListener('keydown', onCameraKeyDown)
   // 从个人主页收藏点击跳转过来：定位到指定星星
   focusOnQueryStar()
 })
@@ -1247,6 +1288,110 @@ function formatStarName(s: CatalogStar): string {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
 
+// ═══════════════════════════════════════════
+// 天镜览星 · 相机模式
+// ═══════════════════════════════════════════
+// SkyPage 不直接调用 useSky()：sky 实例由 SkyCanvas 内部创建并通过 ref 暴露。
+// useCameraMode 需在 setup 同步调用（内部注册 onBeforeUnmount），但此时 SkyCanvas
+// 尚未挂载、skyRef.value.sky 为 null。故用 Proxy 转发所有属性/方法到最新 skyRef.value.sky；
+// cameraZoomLevel / isFlying 用本地 ref 同步，sky 未就绪时方法 fallback 为 noop。
+const _cameraZoomLevelSync = ref(1)
+const _cameraIsFlyingSync = ref(false)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.cameraZoomLevel?.value,
+  (v) => { if (typeof v === 'number') _cameraZoomLevelSync.value = v },
+  { immediate: true },
+)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.isFlying?.value,
+  (v) => { if (typeof v === 'boolean') _cameraIsFlyingSync.value = v },
+  { immediate: true },
+)
+const sky = new Proxy({} as SkyAPI, {
+  get(_t, prop: string | symbol) {
+    if (prop === 'cameraZoomLevel') return _cameraZoomLevelSync
+    if (prop === 'isFlying') return _cameraIsFlyingSync
+    const real = skyRef.value?.sky
+    if (real) return (real as Record<symbol | string, unknown>)[prop]
+    return () => {}
+  },
+}) as SkyAPI
+
+const cameraMode = useCameraMode(sky, stars)
+
+const cameraCenterCelestial = ref({ ra: '', dec: '' })
+const cameraCurrentFov = ref(75)
+const cameraRegion = ref('夏季银河大三角区域')
+const cameraOverlayRef = ref<InstanceType<typeof CameraOverlay> | null>(null)
+let cameraFrameUnsub: (() => void) | null = null
+
+// 订阅相机帧更新 HUD 数据
+watch(() => cameraMode.cameraMode.value, (mode) => {
+  if (mode === 'observe') {
+    cameraFrameUnsub = sky.onCameraFrame((pose) => {
+      cameraCenterCelestial.value = { ra: pose.centerRa, dec: pose.centerDec }
+      cameraCurrentFov.value = pose.fov
+    })
+  } else if (cameraFrameUnsub) {
+    cameraFrameUnsub()
+    cameraFrameUnsub = null
+  }
+})
+
+function toggleCameraMode() {
+  if (cameraMode.cameraMode.value === 'observe') {
+    cameraMode.exit()
+  } else {
+    cameraMode.enter()
+  }
+}
+
+async function onCameraStoryClick(star: any) {
+  const overlay = cameraOverlayRef.value
+  const panel = (overlay as any)?.panelRef
+  await cameraMode.handleStoryClick(
+    star,
+    panel?.scrollToCardCenter,
+    panel?.isCardCentered,
+  )
+}
+
+function onCameraActiveChange(starId: number) {
+  // 移动端单卡片切换时同步 activeStarId（不触发飞镜头，仅高亮）
+  cameraMode.setActiveStar(starId)
+}
+
+function onCameraSetZoom(level: number) {
+  const targetFov = CAMERA_FOV_BY_STAGE[level]
+  if (targetFov) {
+    // 调用 useSky 的 setCameraFov：300ms 平滑过渡 fov + 立即更新 zoomLevel 触发 UI 动画
+    sky.setCameraFov(targetFov)
+  }
+}
+
+function onCameraSetMode(mode: CameraFilterMode) {
+  cameraMode.setMode(mode)
+}
+
+// ═══ 天镜览星 · 边界处理 ═══
+// ESC 键退出相机模式：卡片打开时先关卡片，否则退出相机模式
+function onCameraKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && cameraMode.cameraMode.value === 'observe') {
+    if (cameraMode.isCardOpen.value) {
+      cameraMode.closeStoryCard()
+    } else {
+      cameraMode.exit()
+    }
+  }
+}
+
+// 路由离开时清理相机模式状态
+onBeforeRouteLeave(() => {
+  if (cameraMode.cameraMode.value === 'observe') {
+    cameraMode.exit()
+  }
+})
+
 // issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
 const snappedTarget = ref<SnapTarget | null>(null)
 const snappedLabel = ref<string>('')
@@ -1353,6 +1498,8 @@ onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
   clearHoverTimer()
+  // 天镜览星：移除键盘事件监听
+  window.removeEventListener('keydown', onCameraKeyDown)
 })
 const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
@@ -3375,5 +3522,13 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     gap: 13px;
   }
   .cb-card { padding: 15px 15px 17px; gap: 12px }
+}
+
+/* ═══ 天镜览星 · 相机模式过渡 ═══ */
+.camera-fade-enter-active, .camera-fade-leave-active {
+  transition: opacity 0.45s var(--ease-in-out);
+}
+.camera-fade-enter-from, .camera-fade-leave-to {
+  opacity: 0;
 }
 </style>
