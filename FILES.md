@@ -127,7 +127,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、导航栏**行星轨迹开关**（Orbit 图标，调 `setPlanetTrailsVisible`，黄道线作为太阳轨迹始终显示）、移动端底部「凝听星语」按钮（吸附星体后滑入，issue #124；issue #134 扩展支持行星：按钮区分恒星/行星，行星入口只打开故事面板不进入特写）；**PC 端行星特写观察模式**（issue #136）：`planetObserveMode` ref + document click 监听实现点击空白进入观察模式（隐藏故事面板露出行星）、任意点击切回故事模式；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail；**天镜览星模式**：导航栏 ApertureIcon 按钮 → `useCameraMode(sky, stars)` → `CameraOverlay` v-if 分叉渲染 PC（取景框+HUD+故事列表）/移动端（气泡+拖拽）→ ESC 退出/路由离开自动清理；sky Proxy 代理转发（SkyCanvas 挂载前同步调用 useCameraMode） |
+| `SkyPage.vue` | **星空主页**。定位、城市选择面板、3D 画布、星体点击处理（`onStarClick`/`onPlanetClick`，进入行星特写模式）、关闭详情退出特写（`onCloseDetail` 调 `exitCloseup`）、故事表单、导航栏**行星轨迹开关**（Orbit 图标，调 `setPlanetTrailsVisible`，黄道线作为太阳轨迹始终显示）、移动端底部「凝听星语」按钮（吸附星体后滑入，issue #124；issue #134 扩展支持行星：按钮区分恒星/行星，行星入口只打开故事面板不进入特写）；**PC 端行星特写观察模式**（issue #136）：`planetObserveMode` ref + document click 监听实现点击空白进入观察模式（隐藏故事面板露出行星）、任意点击切回故事模式；**「记录」功能入口**：导航栏 PenLine 按钮打开 `StoryForm` auto-match 模式 → `useStarMatching` 调 `/api/stories/match-star` → 展示 Top3 候选星面板 → 用户选星 → 相机飞行 + 高亮 + 打开 StarDetail；**天镜览星模式**：导航栏 ApertureIcon 按钮 → `useCameraMode(sky, stars)` → `CameraOverlay` v-if 分叉渲染 PC（取景框+HUD+故事列表）/移动端（方案D 单卡片轮播）→ ESC 退出/路由离开自动清理；sky Proxy 代理转发（SkyCanvas 挂载前同步调用 useCameraMode） |
 | `HomePage.vue` | 首页/登录页。粒子星空背景 + 左右分栏（品牌意境/登录注册表单），含找回密码、匿名访客体验；移动端可竖向滚动（issue #124） |
 | `ProfilePage.vue` | **个人空间页** (Style D 叙事沉浸式)。固定 Topbar（罗马数字按钮 Ⅰ返航/Ⅱ题刻/Ⅲ密钥/Ⅳ离开）+ 480px 月亮 Hero（含邮箱展示）+ 金线 banner/签名；时间轴默认 5 条+点击展开+5、左右交替卡片；私人星座 SVG 椭圆节点最多 12 + 内核虚线连线；典藏星展 Favorites 错叠 4 卡 shift 拼贴取消收藏；5 Modal 统一换肤（签名/星穹之钥密码+找回链接/退出登录确认/故事详情/摘取确认）+ Gold Flash 成功反馈。authFetch 401 兜底自动跳登录。响应式 768/380 双断点（移动端顶部设置弹窗）；Prefers-reduced-motion 全停动画 |
 
@@ -164,10 +164,7 @@
 | `ViewportInfo.vue` | **PC 端左上角天区信息**。显示取景框内亮星数量与故事总数，按数量推断天区名称 |
 | `ZoomFilterControl.vue` | **PC 端左下角缩放+模式切换**。ZOOM 滑块（Ⅰ~Ⅳ 罗马数字档位）+ MODE 二选一互斥按钮（观星 gazing / 听语 listening），emit setZoom/setMode |
 | `FrameStoriesPanel.vue` | **PC 端右下角故事列表**。接收 `mode` prop，按星去重（catalogStarId 优先）：观星模式展示星星介绍（STARS IN FRAME），听语模式展示情感故事（VOICES IN FRAME，未看过+共鸣高优先）。点击触发居中滚动+飞镜头+打开详情。`defineExpose({ scrollToCardCenter, isCardCentered })` 供父组件协调交互时序 |
-| `StarBubble.vue` | **移动端单个气泡**。按 zoomStage（1~4）切换 s/m/l 三档尺寸（星名+关键词/短句/完整摘要+meta）。点击 emit click，active 状态金色描边+光晕 |
-| `BubbleLayer.vue` | **移动端气泡层**。视口剔除（±10% margin）后渲染 StarBubble 列表，emit click 转发 |
 | `MobileCameraHud.vue` | **移动端顶部 HUD**。双行布局：第一行 EXIT 按钮+天区名，第二行观星/听语模式切换按钮。slide-down 进入动画 |
-| `ZoomStageIndicator.vue` | **移动端右侧缩放指示器**。竖排 Ⅰ~Ⅳ 罗马数字按钮，active 档位高亮放大 |
 | `MobileGalleryPanel.vue` | **移动端底部单卡片横滑轮播**（方案D 化核心组件）。替代 BubbleLayer+ZoomStageIndicator：底部固定画廊，header 标题+翻页按钮，单卡片轨道横向滑动切换（touchend 水平位移 > 40px 判定），小圆点分页器。滑动=浏览摘要不飞镜头；点击卡片 emit clickStory 飞镜头+开详情。activeIdx 变化 emit activeChange 同步 activeStarId。stories 变化时保持当前星或回到首位。按 mode 切换观星/听语文案与 meta（听语多 viewCount/时间）。复用 CameraIcons 图标 |
 | `StoryDetailCard.vue` | **两端共用故事卡片**。Teleport+Transition 实现，PC 端居中弹出（scale+translate），移动端底部滑入（translateY）。含星名（catalogStarId 优先取 `getStarDisplayName` 真实星名，避免与故事标题重复）/标题（与星名不同时才显示）/正文/meta/标签/共鸣按钮（含访客拦截）。使用 useResonate 实现共鸣操作 |
 | `icons/CameraIcons.ts` | **相机模式 SVG icon 集合**。17 个函数式组件（ApertureIcon/ChevronLeftIcon/ChevronRightIcon 翻页右箭头/CloseIcon/BookOpenIcon/SparklesIcon/FlameIcon/MapPinIcon/ScrollIcon/HeartIcon/EyeIcon/CompassIcon/ClockIcon/CrosshairIcon/TelescopeIcon 观星/MessageCircleIcon 听语/GalleryIcon 画廊四宫格），统一 `viewBox 0 0 24 24` + `stroke=currentColor` + `stroke-width=1.8`，供 Phase 4-6 相机模式组件使用。禁用 emoji 字符（AGENTS.md 规范） |
