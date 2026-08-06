@@ -32,7 +32,9 @@
     <template v-else>
       <MobileCameraHud
         :region="region"
+        :filters="filters"
         @exit="$emit('exit')"
+        @set-mode="onSetMode"
       />
       <BubbleLayer
         :stories="frameStories"
