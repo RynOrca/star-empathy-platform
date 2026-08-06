@@ -27,6 +27,7 @@
               <span>{{ resonating ? '共鸣中…' : '共鸣' }}</span>
             </button>
           </div>
+          <p v-if="guestHint" class="sc-guest-hint">{{ guestHint }}</p>
         </div>
       </div>
     </Transition>
@@ -35,6 +36,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { CloseIcon, SparklesIcon, FlameIcon, ScrollIcon, HeartIcon, EyeIcon, ClockIcon } from './icons/CameraIcons'
 import { useResonate } from '../../composables/useResonate'
 import type { StarData } from '../../composables/useStars'
@@ -42,7 +44,11 @@ import type { StarData } from '../../composables/useStars'
 const props = defineProps<{
   star: StarData | null
   isMobile: boolean
+  isGuest: boolean
 }>()
+
+const router = useRouter()
+const guestHint = ref('')
 
 defineEmits<{ close: [] }>()
 
@@ -69,6 +75,13 @@ const formatTime = computed(() => {
 
 async function onResonate() {
   if (!props.star || localResonanceAdded.value) return
+  // 访客拦截：清 token 跳登录页（与 StarDetail guestGuard 一致）
+  if (props.isGuest) {
+    guestHint.value = '请先登录后再共鸣'
+    localStorage.removeItem('token')
+    router.push('/')
+    return
+  }
   const ok = await resonate(props.star.id)
   if (ok) {
     localResonanceAdded.value = true
@@ -197,6 +210,12 @@ async function onResonate() {
   transform: scale(1.03);
 }
 .sc-resonate:disabled { opacity: 0.5; cursor: not-allowed; }
+.sc-guest-hint {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--rec-color, #ff5b5b);
+  text-align: center;
+}
 
 /* PC 端过渡 */
 .story-card-pc-enter-from, .story-card-pc-leave-to {

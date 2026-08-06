@@ -48,6 +48,7 @@
     <StoryDetailCard
       :star="activeCardStar"
       :is-mobile="isMobile"
+      :is-guest="isGuest"
       @close="onCloseCard"
     />
   </div>
@@ -70,6 +71,7 @@ import type { CameraFilters, StoryListItem } from '../../composables/useCameraMo
 
 const props = defineProps<{
   isMobile: boolean
+  isGuest: boolean
   starsInFrame: StarInFrame[]
   frameStories: StoryListItem[]
   activeStarId: number | null

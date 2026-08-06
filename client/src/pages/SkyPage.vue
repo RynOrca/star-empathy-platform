@@ -72,7 +72,7 @@
           <Orbit :size="18" />
         </button>
         <!-- 天镜览星：进入/退出相机模式 -->
-        <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'">
+        <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" :aria-label="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" aria-haspopup="dialog" :aria-expanded="cameraMode.cameraMode.value === 'observe'">
           <ApertureIcon />
         </button>
         <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
@@ -144,6 +144,7 @@
         v-if="cameraMode.cameraMode.value === 'observe'"
         ref="cameraOverlayRef"
         :is-mobile="isMobile"
+        :is-guest="isGuest"
         :stars-in-frame="cameraMode.starsInFrame.value"
         :frame-stories="cameraMode.frameStories.value"
         :active-star-id="cameraMode.activeStarId.value"

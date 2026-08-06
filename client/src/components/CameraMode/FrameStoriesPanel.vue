@@ -9,30 +9,32 @@
       无符合条件的故事，请调整过滤器
     </div>
     <div v-else ref="listRef" class="fsp-list">
-      <div
-        v-for="item in stories"
-        :key="item.star.id"
-        class="fsp-item"
-        :class="{ 'is-active': item.star.id === activeStarId }"
-        :data-star-id="item.star.id"
-        :style="{ '--item-color': getStarColor(item.star) }"
-        @click="$emit('clickStory', item.star)"
-      >
-        <div class="fsp-item-header">
-          <span class="fsp-star-dot" />
-          <span class="fsp-star-name">{{ getStarName(item.star) }}</span>
-          <SparklesIcon v-if="item.star.isNew" class="fsp-tag-new" />
-          <FlameIcon v-if="item.star.isHot" class="fsp-tag-hot" />
-          <span class="fsp-time">{{ formatTime(item.star.createdAt) }}</span>
+      <TransitionGroup name="fsp-item-anim" tag="div" class="fsp-list-inner">
+        <div
+          v-for="item in stories"
+          :key="item.star.id"
+          class="fsp-item"
+          :class="{ 'is-active': item.star.id === activeStarId }"
+          :data-star-id="item.star.id"
+          :style="{ '--item-color': getStarColor(item.star) }"
+          @click="$emit('clickStory', item.star)"
+        >
+          <div class="fsp-item-header">
+            <span class="fsp-star-dot" />
+            <span class="fsp-star-name">{{ getStarName(item.star) }}</span>
+            <SparklesIcon v-if="item.star.isNew" class="fsp-tag-new" />
+            <FlameIcon v-if="item.star.isHot" class="fsp-tag-hot" />
+            <span class="fsp-time">{{ formatTime(item.star.createdAt) }}</span>
+          </div>
+          <div v-if="item.star.title" class="fsp-title-text">{{ item.star.title }}</div>
+          <div class="fsp-excerpt">{{ item.star.content }}</div>
+          <div class="fsp-meta">
+            <span class="fsp-meta-item"><HeartIcon />{{ item.star.resonanceCount }}</span>
+            <span class="fsp-meta-item"><EyeIcon />{{ item.star.viewCount }}</span>
+            <span class="fsp-meta-item"><CompassIcon />{{ item.inFrame.ra }}</span>
+          </div>
         </div>
-        <div v-if="item.star.title" class="fsp-title-text">{{ item.star.title }}</div>
-        <div class="fsp-excerpt">{{ item.star.content }}</div>
-        <div class="fsp-meta">
-          <span class="fsp-meta-item"><HeartIcon />{{ item.star.resonanceCount }}</span>
-          <span class="fsp-meta-item"><EyeIcon />{{ item.star.viewCount }}</span>
-          <span class="fsp-meta-item"><CompassIcon />{{ item.inFrame.ra }}</span>
-        </div>
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
@@ -139,11 +141,31 @@ defineExpose({ scrollToCardCenter, isCardCentered })
 .fsp-list {
   overflow-y: auto;
   padding: 8px;
+  position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(202, 167, 255, 0.25) transparent;
 }
 .fsp-list::-webkit-scrollbar { width: 6px; }
 .fsp-list::-webkit-scrollbar-thumb { background: rgba(202, 167, 255, 0.25); border-radius: 3px; }
+
+/* TransitionGroup 进出动画 */
+.fsp-item-anim-enter-active,
+.fsp-item-anim-leave-active {
+  transition: opacity 0.3s var(--ease-in-out), transform 0.3s var(--ease-in-out);
+}
+.fsp-item-anim-enter-from {
+  opacity: 0;
+  transform: translateX(12px);
+}
+.fsp-item-anim-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
+}
+.fsp-item-anim-leave-active {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+}
 .fsp-item {
   position: relative;
   padding: 10px 14px;
