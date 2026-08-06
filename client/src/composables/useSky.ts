@@ -25,6 +25,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR } from '../utils/constants'
+import { CAMERA_FOV_BY_STAGE, CAMERA_FLY_DURATION_MS, CAMERA_FRAME_THROTTLE_MS, CAMERA_LIST_MAX_ITEMS } from '../utils/constants'
+import { ref } from 'vue'
 import { STAR_DISPLAY_CONFIG, type StarDisplayConfig } from '../utils/starDisplayConfig'
 import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync } from '../utils/astro'
 // 阶段 3 P2：小行星 + GPU 检测
@@ -225,6 +227,26 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 }
 
 // ═══════════════════════════════════════════
+export interface CameraPose {
+  position: Vector3
+  lookAt: Vector3
+  fov: number
+  centerRa: string
+  centerDec: string
+}
+
+export interface StarInFrame {
+  starId: number
+  catalogStarId: number | null
+  screenX: number
+  screenY: number
+  inFrame: boolean
+  ra: string
+  dec: string
+  zoomStage: 1 | 2 | 3 | 4
+  starData: { id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }
+}
+
 export interface ObserverLoc { lat: number; lon: number }
 
 // issue #134：准星吸附目标（区分恒星/行星）
@@ -366,6 +388,27 @@ export function useSky(
   // closeup 跟随复用 Vector3（避免每帧 new，animate 循环高频调用）
   const _closeupWorld = new Vector3()
   const _closeupDir = new Vector3()
+  // ═══ 天镜览星模式（Camera Mode） ═══
+  // 相机模式飞行状态（独立于特写状态机，不进入 CLOSEUP）
+  let cameraFlyState: 'idle' | 'flying' = 'idle'
+  let cameraFlyId: number | null = null
+  const flyFromPos = new Vector3()
+  const flyToPos = new Vector3()
+  const flyFromQuat = new Quaternion()
+  const flyToQuat = new Quaternion()
+  let flyFromFov = 0
+  let flyToFov = 0
+  let flyStartTime = 0
+  // 相机模式 overlay 开关
+  let cameraOverlayEnabled = false
+  // onCameraFrame 订阅者列表
+  const cameraFrameSubscribers: Array<(pose: CameraPose) => void> = []
+  // 取景框星过滤节流时间戳
+  let lastFrameCheckTime = 0
+  // isFlying ref（供外部响应式读取）
+  const isFlying = ref(false)
+  // cameraZoomLevel ref（1~4，基于 fov 反推）
+  const cameraZoomLevel = ref(1)
   // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
   const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
