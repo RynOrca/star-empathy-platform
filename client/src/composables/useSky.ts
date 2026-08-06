@@ -314,6 +314,8 @@ export interface SkyAPI {
   getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
   /** 天镜览星：进入/退出相机模式 overlay（隐藏 hover 光晕/星名标签等） */
   setCameraModeOverlay: (enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => void
+  /** 天镜览星：退出相机模式时 tween 回到进入时的相机快照 */
+  exitCameraModeWithTween: () => void
   /** 天镜览星：当前是否正在执行飞行动画 */
   isFlying: Ref<boolean>
   /** 天镜览星：当前缩放层级 1~4（基于 FOV 反推） */
@@ -417,6 +419,10 @@ export function useSky(
   let flyStartTime = 0
   // 相机模式 overlay 开关
   let cameraOverlayEnabled = false
+  // 进入相机模式时的相机快照（退出时 tween 回去）
+  const cameraModeEnterPos = new Vector3()
+  const cameraModeEnterQuat = new Quaternion()
+  let cameraModeEnterFov = 0
   // 天镜览星故事星 glow 元数据
   const cameraModeStoryStars = new Map<number, { glowSprite: Sprite | null; phase: number }>()
   // onCameraFrame 订阅者列表
@@ -3622,6 +3628,10 @@ for (const s of stars) starById.set(s.id, s)
     setCameraModeOverlay(this: SkyAPI, enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) {
       cameraOverlayEnabled = enabled
       if (enabled) {
+        // 进入相机模式：保存进入时的相机快照，退出时 tween 回来
+        cameraModeEnterPos.copy(camera.position)
+        cameraModeEnterQuat.copy(camera.quaternion)
+        cameraModeEnterFov = camera.fov
         // 进入相机模式
         if (closeupState !== 'IDLE') {
           // 同步清理 closeup 状态（不启动飞回 tween，相机模式由 flyToStar3D 处理定位）
@@ -3686,7 +3696,54 @@ for (const s of stars) starById.set(s.id, s)
           }
         })
         cameraModeStoryStars.clear()
+
+        // 用动画过渡回到进入相机模式时的视角
+        this.exitCameraModeWithTween()
       }
+    },
+    // ═══ 天镜览星：退出相机模式时 tween 回到进入时的相机快照 ═══
+    exitCameraModeWithTween(this: SkyAPI) {
+      // 打断进行中的飞行/特写 tween
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      cameraFlyState = 'idle'
+      isFlying.value = false
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+
+      const startPos = camera.position.clone()
+      const startQuat = camera.quaternion.clone()
+      const startFov = camera.fov
+      const duration = 800
+      const startTime = performance.now()
+
+      function tweenStep(this: SkyAPI, now: number) {
+        if (disposed) { activeTweenId = null; return }
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const e = easeInOutCubic(t)
+
+        camera.position.lerpVectors(startPos, cameraModeEnterPos, e)
+        camera.quaternion.slerpQuaternions(startQuat, cameraModeEnterQuat, e)
+        camera.fov = startFov + (cameraModeEnterFov - startFov) * e
+        camera.updateProjectionMatrix()
+
+        if (t < 1) {
+          activeTweenId = requestAnimationFrame(tweenStep)
+        } else {
+          activeTweenId = null
+          // 同步拖拽基准与 zoom level，避免退出后视角漂移
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+          userFov = camera.fov
+          cameraZoomLevel.value = fovToZoomLevel(camera.fov)
+        }
+      }
+      activeTweenId = requestAnimationFrame(tweenStep)
     },
     isFlying,
     cameraZoomLevel,
@@ -4050,6 +4107,11 @@ for (const s of stars) starById.set(s.id, s)
       flyFromFov = camera.fov
       const stage = options?.zoomLevel ?? 3
       flyToFov = CAMERA_FOV_BY_STAGE[stage] ?? 45
+      // 两段式动画：第一段缩小到 FOV 75（zoom level 1），第二段移动并放大到目标 FOV
+      // 关键约束：整个飞行过程中相机始终 lookAt 目标星（flyToQuat），目标星保持在画面中央
+      const shrinkFov = CAMERA_FOV_BY_STAGE[1] // 75
+      // 拐点比例：前 35% 用于缩小（相机位置/朝向同时过渡到 lookAt 目标），后 65% 用于移动+放大
+      const SPLIT = 0.35
 
       flyStartTime = performance.now()
       cameraFlyState = 'flying'
@@ -4059,11 +4121,25 @@ for (const s of stars) starById.set(s.id, s)
         if (disposed) { cameraFlyId = null; cameraFlyState = 'idle'; isFlying.value = false; return }
         const elapsed = now - flyStartTime
         const t = Math.min(elapsed / CAMERA_FLY_DURATION_MS, 1)
-        const e = easeInOutCubic(t)
 
-        camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
-        camera.position.lerpVectors(flyFromPos, flyToPos, e)
-        camera.fov = flyFromFov + (flyToFov - flyFromFov) * e
+        if (t < SPLIT) {
+          // 第一段：FOV 从 flyFromFov → shrinkFov（缩小，避免大放大倍率下平移产生的视野撕裂）
+          // 同时朝向从 flyFromQuat slerp 到 flyToQuat（让目标星尽早进入画面中心）
+          // 相机位置保持 flyFromPos 不变
+          const tt = t / SPLIT
+          const e = easeInOutCubic(tt)
+          camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
+          camera.position.copy(flyFromPos)
+          camera.fov = flyFromFov + (shrinkFov - flyFromFov) * e
+        } else {
+          // 第二段：FOV 从 shrinkFov → flyToFov（放大），相机位置从 flyFromPos lerp 到 flyToPos
+          // 朝向固定为 flyToQuat（lookAt 目标星），目标星始终在画面中央
+          const tt = (t - SPLIT) / (1 - SPLIT)
+          const e = easeInOutCubic(tt)
+          camera.quaternion.copy(flyToQuat)
+          camera.position.lerpVectors(flyFromPos, flyToPos, e)
+          camera.fov = shrinkFov + (flyToFov - shrinkFov) * e
+        }
         camera.updateProjectionMatrix()
 
         if (t < 1) {

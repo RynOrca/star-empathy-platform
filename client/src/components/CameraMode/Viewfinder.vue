@@ -12,14 +12,16 @@
     <div class="vf-corner vf-corner-tr" />
     <div class="vf-corner vf-corner-bl" />
     <div class="vf-corner vf-corner-br" />
+    <!-- 相机十字准星：贯穿中心的细十字线 -->
     <div class="vf-crosshair">
-      <CrosshairIcon />
+      <div class="vf-crosshair-h" />
+      <div class="vf-crosshair-v" />
+      <div class="vf-crosshair-center" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { CrosshairIcon } from './icons/CameraIcons'
 </script>
 
 <style scoped>
@@ -29,15 +31,16 @@ import { CrosshairIcon } from './icons/CameraIcons'
   pointer-events: none;
   z-index: 10;
 }
+/* 暗角：贴近视口边缘，包含 HUD 区域 */
 .vf-vignette {
   position: absolute;
-  inset: 24px;
-  border-radius: 4px;
+  inset: 0;
   box-shadow: inset 0 0 200px 60px var(--vf-vignette);
 }
+/* 九宫格网格 */
 .vf-grid {
   position: absolute;
-  inset: 24px;
+  inset: 0;
 }
 .vf-grid-line {
   position: absolute;
@@ -53,31 +56,83 @@ import { CrosshairIcon } from './icons/CameraIcons'
 }
 .vf-grid-v1 { left: 33.33%; }
 .vf-grid-v2 { left: 66.66%; }
+/* 紫色边框：贴近视口边缘，包含顶部 HUD 和底部参数栏 */
 .vf-border {
   position: absolute;
-  inset: 24px;
+  inset: 0;
   border: 2px solid var(--vf-border);
-  border-radius: 4px;
+  box-sizing: border-box;
 }
+/* 四角标记 */
 .vf-corner {
   position: absolute;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-color: var(--vf-border);
   border-style: solid;
   border-width: 0;
 }
-.vf-corner-tl { top: 20px; left: 20px; border-top-width: 3px; border-left-width: 3px; }
-.vf-corner-tr { top: 20px; right: 20px; border-top-width: 3px; border-right-width: 3px; }
-.vf-corner-bl { bottom: 20px; left: 20px; border-bottom-width: 3px; border-left-width: 3px; }
-.vf-corner-br { bottom: 20px; right: 20px; border-bottom-width: 3px; border-right-width: 3px; }
+.vf-corner-tl { top: 4px; left: 4px; border-top-width: 3px; border-left-width: 3px; }
+.vf-corner-tr { top: 4px; right: 4px; border-top-width: 3px; border-right-width: 3px; }
+.vf-corner-bl { bottom: 4px; left: 4px; border-bottom-width: 3px; border-left-width: 3px; }
+.vf-corner-br { bottom: 4px; right: 4px; border-bottom-width: 3px; border-right-width: 3px; }
+
+/* ═══ 相机十字准星：贯穿中心的两条细线 + 中心点 ═══ */
 .vf-crosshair {
   position: absolute;
   top: 50%;
   left: 50%;
+  width: 0;
+  height: 0;
+}
+.vf-crosshair-h {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
+  height: 1px;
+  background: var(--vf-crosshair);
+  opacity: 0.35;
   transform: translate(-50%, -50%);
-  color: var(--vf-crosshair);
-  opacity: 0.7;
+}
+.vf-crosshair-v {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 100vh;
+  background: var(--vf-crosshair);
+  opacity: 0.35;
+  transform: translate(-50%, -50%);
+}
+.vf-crosshair-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+}
+.vf-crosshair-center::before,
+.vf-crosshair-center::after {
+  content: '';
+  position: absolute;
+  background: var(--vf-crosshair);
+  opacity: 0.9;
+}
+.vf-crosshair-center::before {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-50%);
+}
+.vf-crosshair-center::after {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
 }
 
 /* ═══ 级联进入动画 ═══ */
@@ -92,8 +147,8 @@ import { CrosshairIcon } from './icons/CameraIcons'
 .vf-corner-br { animation-delay: 200ms; }
 .vf-crosshair { animation: vf-crosshair-enter 0.4s var(--ease-in-out) both; animation-delay: 240ms; }
 
-@keyframes vf-border-enter { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
+@keyframes vf-border-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vf-vignette-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vf-corner-enter { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
-@keyframes vf-crosshair-enter { from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } to { opacity: 0.7; transform: translate(-50%, -50%) scale(1); } }
+@keyframes vf-corner-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 1; } }
 </style>

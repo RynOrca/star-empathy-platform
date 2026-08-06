@@ -13,7 +13,7 @@
             <FlameIcon v-if="star.isHot" class="sc-tag" />
             <ScrollIcon v-if="star.isAncient" class="sc-tag" />
           </div>
-          <div v-if="star.title" class="sc-title">{{ star.title }}</div>
+          <div v-if="storyTitle" class="sc-title">{{ storyTitle }}</div>
           <div class="sc-content">{{ star.content }}</div>
           <div class="sc-meta">
             <span class="sc-meta-item"><HeartIcon />{{ star.resonanceCount }}</span>
@@ -39,6 +39,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { CloseIcon, SparklesIcon, FlameIcon, ScrollIcon, HeartIcon, EyeIcon, ClockIcon } from './icons/CameraIcons'
 import { useResonate } from '../../composables/useResonate'
+import { getStarDisplayName } from '../../utils/starName'
 import type { StarData } from '../../composables/useStars'
 
 const props = defineProps<{
@@ -58,7 +59,18 @@ const localResonanceAdded = ref(false)
 const resonating = computed(() => props.star ? resonatingId.value === props.star.id : false)
 
 const starColor = computed(() => props.star?.catalogStarId ? '#ffd98a' : '#caa7ff')
-const starName = computed(() => props.star?.title || (props.star ? `星 #${props.star.id}` : ''))
+const starName = computed(() => {
+  if (!props.star) return ''
+  // 优先用星表真实星名，避免与故事标题重复
+  if (props.star.catalogStarId) return getStarDisplayName(props.star.catalogStarId)
+  return props.star.title || `星 #${props.star.id}`
+})
+/** 故事标题：仅当与星名不同时才显示，避免重复 */
+const storyTitle = computed(() => {
+  if (!props.star || !props.star.title) return ''
+  if (props.star.catalogStarId && props.star.title === starName.value) return ''
+  return props.star.title
+})
 const displayTags = computed(() => {
   if (!props.star) return []
   const tags = props.star.tags || (props.star.tag ? [props.star.tag] : [])

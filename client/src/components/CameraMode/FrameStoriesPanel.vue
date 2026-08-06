@@ -2,11 +2,11 @@
   <div class="frame-stories-panel">
     <div class="fsp-header">
       <BookOpenIcon />
-      <span class="fsp-title">STORIES IN FRAME</span>
+      <span class="fsp-title">{{ mode === 'gazing' ? 'STARS IN FRAME' : 'VOICES IN FRAME' }}</span>
       <span class="fsp-count">{{ stories.length }}</span>
     </div>
     <div v-if="stories.length === 0" class="fsp-empty">
-      无符合条件的故事，请调整过滤器
+      {{ mode === 'gazing' ? '取景框内暂无故事星' : '取景框内暂无情感故事' }}
     </div>
     <div v-else ref="listRef" class="fsp-list">
       <TransitionGroup name="fsp-item-anim" tag="div" class="fsp-list-inner">
@@ -14,7 +14,7 @@
           v-for="item in stories"
           :key="item.star.id"
           class="fsp-item"
-          :class="{ 'is-active': item.star.id === activeStarId }"
+          :class="{ 'is-active': item.star.id === activeStarId, 'is-gazing': mode === 'gazing' }"
           :data-star-id="item.star.id"
           :style="{ '--item-color': getStarColor(item.star) }"
           @click="$emit('clickStory', item.star)"
@@ -22,15 +22,17 @@
           <div class="fsp-item-header">
             <span class="fsp-star-dot" />
             <span class="fsp-star-name">{{ getStarName(item.star) }}</span>
-            <SparklesIcon v-if="item.star.isNew" class="fsp-tag-new" />
-            <FlameIcon v-if="item.star.isHot" class="fsp-tag-hot" />
-            <span class="fsp-time">{{ formatTime(item.star.createdAt) }}</span>
+            <SparklesIcon v-if="mode === 'listening' && item.star.isNew" class="fsp-tag-new" />
+            <FlameIcon v-if="mode === 'listening' && item.star.isHot" class="fsp-tag-hot" />
+            <span v-if="mode === 'listening'" class="fsp-time">{{ formatTime(item.star.createdAt) }}</span>
           </div>
-          <div v-if="item.star.title" class="fsp-title-text">{{ item.star.title }}</div>
+          <!-- 听语模式：故事标题（与星名不同时才显示，避免重复） -->
+          <div v-if="mode === 'listening' && storyTitleToShow(item.star)" class="fsp-title-text">{{ storyTitleToShow(item.star) }}</div>
+          <!-- 卡片正文：观星=星星介绍；听语=情感故事 -->
           <div class="fsp-excerpt">{{ item.star.content }}</div>
           <div class="fsp-meta">
             <span class="fsp-meta-item"><HeartIcon />{{ item.star.resonanceCount }}</span>
-            <span class="fsp-meta-item"><EyeIcon />{{ item.star.viewCount }}</span>
+            <span v-if="mode === 'listening'" class="fsp-meta-item"><EyeIcon />{{ item.star.viewCount }}</span>
             <span class="fsp-meta-item"><CompassIcon />{{ item.inFrame.ra }}</span>
           </div>
         </div>
@@ -42,12 +44,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { BookOpenIcon, SparklesIcon, FlameIcon, HeartIcon, EyeIcon, CompassIcon } from './icons/CameraIcons'
-import type { StoryListItem } from '../../composables/useCameraMode'
+import { getStarDisplayName } from '../../utils/starName'
+import type { StoryListItem, CameraFilterMode } from '../../composables/useCameraMode'
 import type { StarData } from '../../composables/useStars'
 
 defineProps<{
   stories: StoryListItem[]
   activeStarId: number | null
+  mode: CameraFilterMode
 }>()
 
 defineEmits<{
@@ -80,8 +84,27 @@ function getStarColor(star: StarData): string {
   return '#caa7ff'
 }
 
+/**
+ * 卡片星名：
+ * - 有 catalogStarId → 取真实星名（避免与故事标题重复）
+ * - 否则 fallback 到故事标题或 `星 #${id}`
+ */
 function getStarName(star: StarData): string {
+  if (star.catalogStarId !== null && star.catalogStarId !== undefined) {
+    return getStarDisplayName(star.catalogStarId)
+  }
   return star.title || `星 #${star.id}`
+}
+
+/**
+ * 听语模式下，故事标题仅当与星名不同时才显示，避免重复。
+ */
+function storyTitleToShow(star: StarData): string {
+  if (!star.title) return ''
+  if (star.catalogStarId !== null && star.catalogStarId !== undefined) {
+    if (star.title === getStarDisplayName(star.catalogStarId)) return ''
+  }
+  return star.title
 }
 
 function formatTime(iso: string): string {

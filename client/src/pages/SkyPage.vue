@@ -56,30 +56,30 @@
       </div>
       <div class="nav-right">
         <!-- 搜索按钮（移动端） -->
-        <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+        <button v-if="isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
           <Search :size="18" />
         </button>
-        <!-- 定位 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
+        <!-- 定位（相机模式隐藏） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
-        <!-- 记录：AI 匹配星辰写故事 -->
-        <button v-if="locationReady" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
+        <!-- 记录：AI 匹配星辰写故事（相机模式隐藏） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
         </button>
-        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线） -->
-        <button v-if="locationReady" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
+        <!-- 行星轨迹开关（相机模式隐藏） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
         <!-- 天镜览星：进入/退出相机模式 -->
         <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" :aria-label="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" aria-haspopup="dialog" :aria-expanded="cameraMode.cameraMode.value === 'observe'">
           <ApertureIcon />
         </button>
-        <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
-        <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+        <!-- 用户/登录（相机模式隐藏） -->
+        <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
           <User :size="18" />
         </button>
-        <button v-if="!username || isGuest" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+        <button v-if="(!username || isGuest) && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
           <User :size="18" />
         </button>
       </div>
@@ -159,7 +159,7 @@
         @bubble-click="onCameraBubbleClick"
         @close-card="cameraMode.closeStoryCard()"
         @set-zoom="onCameraSetZoom"
-        @toggle-filter="onCameraToggleFilter"
+        @set-mode="onCameraSetMode"
       />
     </Transition>
 
@@ -554,7 +554,7 @@ import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
-import { useCameraMode, type CameraFilters } from '../composables/useCameraMode'
+import { useCameraMode, type CameraFilterMode } from '../composables/useCameraMode'
 import { useStars } from '../composables/useStars'
 import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
 import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
@@ -1284,8 +1284,8 @@ function onCameraSetZoom(level: number) {
   }
 }
 
-function onCameraToggleFilter(key: keyof CameraFilters) {
-  cameraMode.setFilter(key, !cameraMode.filters[key])
+function onCameraSetMode(mode: CameraFilterMode) {
+  cameraMode.setMode(mode)
 }
 
 // ═══ 天镜览星 · 边界处理 ═══

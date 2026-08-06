@@ -105,6 +105,9 @@ onBeforeUnmount(() => {
   padding: 0 32px;
   background: linear-gradient(to bottom, var(--hud-bg), transparent);
   pointer-events: none;
+  /* 提升为独立合成层，避免 canvas 重绘时 HUD 文字抖动 */
+  will-change: opacity;
+  backface-visibility: hidden;
 }
 .hud-top { top: 0; }
 .hud-bottom {
@@ -176,12 +179,12 @@ onBeforeUnmount(() => {
   gap: 24px;
 }
 
-/* ═══ 级联进入动画 ═══ */
+/* ═══ 级联进入动画（纯 opacity，避免 transform 残留导致拖动时抖动） ═══ */
 .hud-top { animation: hud-top-enter 0.4s var(--ease-in-out) both; animation-delay: 80ms; }
 .hud-bottom { animation: hud-bottom-enter 0.4s var(--ease-in-out) both; animation-delay: 160ms; }
 .hud-coords { animation: hud-coords-enter 0.4s var(--ease-in-out) both; animation-delay: 240ms; }
 
-@keyframes hud-top-enter { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes hud-bottom-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hud-top-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hud-bottom-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hud-coords-enter { from { opacity: 0; } to { opacity: 1; } }
 </style>

@@ -14,19 +14,25 @@
       </div>
     </div>
     <div class="zfc-filter">
-      <div class="zfc-label">FILTER</div>
-      <div class="zfc-toggles">
-        <button class="zfc-toggle" :class="{ active: filters.new }" @click="$emit('toggleFilter', 'new')">
-          <SparklesIcon /><span>新发</span>
+      <div class="zfc-label">MODE</div>
+      <div class="zfc-mode-toggles">
+        <button
+          class="zfc-mode-btn"
+          :class="{ active: filters.mode === 'gazing' }"
+          @click="$emit('setMode', 'gazing')"
+          :aria-pressed="filters.mode === 'gazing'"
+          title="观星：仅展示星星本身的介绍"
+        >
+          <TelescopeIcon /><span>观星</span>
         </button>
-        <button class="zfc-toggle" :class="{ active: filters.hot }" @click="$emit('toggleFilter', 'hot')">
-          <FlameIcon /><span>热门</span>
-        </button>
-        <button class="zfc-toggle" :class="{ active: filters.near }" @click="$emit('toggleFilter', 'near')">
-          <MapPinIcon /><span>附近</span>
-        </button>
-        <button class="zfc-toggle" :class="{ active: filters.ancient }" @click="$emit('toggleFilter', 'ancient')">
-          <ScrollIcon /><span>古人</span>
+        <button
+          class="zfc-mode-btn"
+          :class="{ active: filters.mode === 'listening' }"
+          @click="$emit('setMode', 'listening')"
+          :aria-pressed="filters.mode === 'listening'"
+          title="听语：展示星星的情感故事（共鸣高且未看过优先）"
+        >
+          <MessageCircleIcon /><span>听语</span>
         </button>
       </div>
     </div>
@@ -34,8 +40,8 @@
 </template>
 
 <script setup lang="ts">
-import { SparklesIcon, FlameIcon, MapPinIcon, ScrollIcon } from './icons/CameraIcons'
-import type { CameraFilters } from '../../composables/useCameraMode'
+import { TelescopeIcon, MessageCircleIcon } from './icons/CameraIcons'
+import type { CameraFilters, CameraFilterMode } from '../../composables/useCameraMode'
 
 defineProps<{
   zoomLevel: number
@@ -44,7 +50,7 @@ defineProps<{
 
 defineEmits<{
   setZoom: [level: number]
-  toggleFilter: [key: keyof CameraFilters]
+  setMode: [mode: CameraFilterMode]
 }>()
 </script>
 
@@ -119,30 +125,32 @@ defineEmits<{
   color: var(--hud-accent);
   transform: scale(1.1);
 }
-.zfc-toggles {
+.zfc-mode-toggles {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
-.zfc-toggle {
+.zfc-mode-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: transparent;
   border: 1px solid rgba(202, 167, 255, 0.2);
   color: var(--hud-text);
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-family: var(--font-display);
   transition: all 0.25s var(--ease-in-out);
 }
-.zfc-toggle.active {
+.zfc-mode-btn.active {
   background: rgba(202, 167, 255, 0.15);
   border-color: var(--accent-purple);
   color: var(--hud-accent);
 }
-.zfc-toggle:hover {
+.zfc-mode-btn:hover {
   border-color: var(--accent-purple);
 }
 

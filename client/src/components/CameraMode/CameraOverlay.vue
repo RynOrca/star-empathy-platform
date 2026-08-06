@@ -17,12 +17,13 @@
         :zoom-level="zoomLevel"
         :filters="filters"
         @set-zoom="onSetZoom"
-        @toggle-filter="onToggleFilter"
+        @set-mode="onSetMode"
       />
       <FrameStoriesPanel
         ref="panelRef"
         :stories="frameStories"
         :active-star-id="activeStarId"
+        :mode="filters.mode"
         @click-story="onStoryClick"
       />
     </template>
@@ -67,7 +68,7 @@ import ZoomStageIndicator from './ZoomStageIndicator.vue'
 import StoryDetailCard from './StoryDetailCard.vue'
 import type { StarData } from '../../composables/useStars'
 import type { StarInFrame } from '../../composables/useSky'
-import type { CameraFilters, StoryListItem } from '../../composables/useCameraMode'
+import type { CameraFilters, CameraFilterMode, StoryListItem } from '../../composables/useCameraMode'
 
 const props = defineProps<{
   isMobile: boolean
@@ -89,7 +90,7 @@ const emit = defineEmits<{
   bubbleClick: [star: StarData]
   closeCard: []
   setZoom: [level: number]
-  toggleFilter: [key: keyof CameraFilters]
+  setMode: [mode: CameraFilterMode]
 }>()
 
 const panelRef = ref<InstanceType<typeof FrameStoriesPanel> | null>(null)
@@ -114,8 +115,8 @@ function onSetZoom(level: number) {
   emit('setZoom', level)
 }
 
-function onToggleFilter(key: keyof CameraFilters) {
-  emit('toggleFilter', key)
+function onSetMode(mode: CameraFilterMode) {
+  emit('setMode', mode)
 }
 
 defineExpose({ panelRef })
