@@ -1,20 +1,23 @@
 <template>
   <div class="zoom-filter-control">
-    <div class="zfc-zoom">
-      <div class="zfc-label">ZOOM</div>
+    <div class="zfc-zoom" title="视场角：Ⅰ广角(75°) ~ Ⅳ长焦(35°)，点击罗马数字切换">
+      <div class="zfc-label">
+        <span>视场</span>
+        <span class="zfc-fov-value">{{ currentFovDeg }}°</span>
+      </div>
       <div class="zfc-slider-wrap">
         <div class="zfc-track" />
         <div class="zfc-fill" :style="{ width: `${(zoomLevel - 1) / 3 * 100}%` }" />
         <div class="zfc-thumb" :style="{ left: `${(zoomLevel - 1) / 3 * 100}%` }" />
       </div>
       <div class="zfc-ticks">
-        <button v-for="n in 4" :key="n" class="zfc-tick" :class="{ active: zoomLevel === n }" @click="$emit('setZoom', n)">
+        <button v-for="n in 4" :key="n" class="zfc-tick" :class="{ active: zoomLevel === n }" :title="`视场 ${CAMERA_FOV_BY_STAGE[n]}°（${['广角', '标准', '中焦', '长焦'][n - 1]}）`" @click="$emit('setZoom', n)">
           {{ ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ'][n - 1] }}
         </button>
       </div>
     </div>
     <div class="zfc-filter">
-      <div class="zfc-label">MODE</div>
+      <div class="zfc-label">模式</div>
       <div class="zfc-mode-toggles">
         <button
           class="zfc-mode-btn"
@@ -40,10 +43,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { TelescopeIcon, MessageCircleIcon } from './icons/CameraIcons'
+import { CAMERA_FOV_BY_STAGE } from '../../utils/constants'
 import type { CameraFilters, CameraFilterMode } from '../../composables/useCameraMode'
 
-defineProps<{
+const props = defineProps<{
   zoomLevel: number
   filters: CameraFilters
 }>()
@@ -52,6 +57,9 @@ defineEmits<{
   setZoom: [level: number]
   setMode: [mode: CameraFilterMode]
 }>()
+
+const CAMERA_FOV_BY_STAGE_REF = CAMERA_FOV_BY_STAGE
+const currentFovDeg = computed(() => CAMERA_FOV_BY_STAGE_REF[props.zoomLevel] ?? 75)
 </script>
 
 <style scoped>
@@ -74,6 +82,14 @@ defineEmits<{
   letter-spacing: 0.15em;
   opacity: 0.6;
   margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.zfc-fov-value {
+  color: var(--hud-accent);
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
 }
 .zfc-zoom { margin-bottom: 16px; }
 .zfc-slider-wrap {

@@ -67,16 +67,21 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
 
   /**
    * 过滤后的取景框故事列表（按星去重：每颗星只显示一个卡片）
-   * - gazing 观星：优先取该星 history 故事（星星介绍）
-   * - listening 听语：优先取该星 user 故事，未看过 + 共鸣高优先
+   * - gazing 观星：只取 history 类型故事（星星本身的介绍/神话传说）
+   * - listening 听语：取 user + history 两类故事（用户情感故事优先，其次历史故事），
+   *   未看过 + 共鸣高优先。同一颗星若同时有 user 和 history 故事，优先展示 user 故事。
    */
   const frameStories = computed<StoryListItem[]>(() => {
     const starMap = new Map(stars.filteredStars.value.map(s => [s.id, s]))
-    // 收取景框内所有故事星
+    // 收取景框内故事星，并按模式过滤类型
     const inFrameItems: StoryListItem[] = []
     for (const sif of starsInFrame.value) {
       const star = starMap.get(sif.starId)
-      if (star) inFrameItems.push({ star, inFrame: sif })
+      if (!star) continue
+      // 观星模式只保留 history（星星介绍）；听语模式保留 user + history（情感故事优先）
+      if (filters.mode === 'gazing' && star.type !== 'history') continue
+      // listening 不过滤类型（user 和 history 都保留）
+      inFrameItems.push({ star, inFrame: sif })
     }
     if (inFrameItems.length === 0) return []
 
@@ -91,32 +96,39 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
         byStar.set(key, item)
         continue
       }
-      // 已存在同星卡片，根据模式择优
-      if (filters.mode === 'gazing') {
-        // 观星：优先 history 类型
-        if (item.star.type === 'history' && existing.star.type !== 'history') {
-          byStar.set(key, item)
-        }
-      } else {
-        // 听语：优先 user 类型；同类型时未看过 + 共鸣高优先
+      // 同星多故事择优
+      if (filters.mode === 'listening') {
+        // user 故事优先于 history 故事
         if (item.star.type === 'user' && existing.star.type !== 'user') {
           byStar.set(key, item)
-        } else if (item.star.type === existing.star.type) {
-          const itemUnseen = isStarUnseen(item.star.id)
-          const existUnseen = isStarUnseen(existing.star.id)
-          if (itemUnseen && !existUnseen) byStar.set(key, item)
-          else if (itemUnseen === existUnseen && item.star.resonanceCount > existing.star.resonanceCount) byStar.set(key, item)
+          continue
         }
+        if (item.star.type !== 'user' && existing.star.type === 'user') continue
+        // 同类型内：未看过优先，其次共鸣高
+        const itemUnseen = isStarUnseen(item.star.id)
+        const existUnseen = isStarUnseen(existing.star.id)
+        if (itemUnseen && !existUnseen) byStar.set(key, item)
+        else if (itemUnseen === existUnseen && item.star.resonanceCount > existing.star.resonanceCount) byStar.set(key, item)
+      } else {
+        // 观星：共鸣数高优先
+        if (item.star.resonanceCount > existing.star.resonanceCount) byStar.set(key, item)
       }
     }
 
     const result = Array.from(byStar.values())
     if (filters.mode === 'listening') {
-      // 听语模式：未看过优先排前，其次共鸣数降序
+      // 听语模式排序：user 故事在前（未看过优先 + 共鸣降序），history 故事在后（共鸣降序）
       result.sort((a, b) => {
-        const aUnseen = isStarUnseen(a.star.id)
-        const bUnseen = isStarUnseen(b.star.id)
-        if (aUnseen !== bUnseen) return aUnseen ? -1 : 1
+        const aIsUser = a.star.type === 'user'
+        const bIsUser = b.star.type === 'user'
+        if (aIsUser !== bIsUser) return aIsUser ? -1 : 1
+        // 同类型内排序
+        if (aIsUser) {
+          // user 故事：未看过优先，共鸣降序
+          const aUnseen = isStarUnseen(a.star.id)
+          const bUnseen = isStarUnseen(b.star.id)
+          if (aUnseen !== bUnseen) return aUnseen ? -1 : 1
+        }
         return b.star.resonanceCount - a.star.resonanceCount
       })
     } else {
@@ -132,15 +144,8 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     cameraMode.value = 'observe'
     state.value = 'IDLE'
 
-    // 构造故事星列表传给 useSky 创建呼吸 glow
-    const storyStars = stars.filteredStars.value.map(s => ({
-      id: s.id,
-      catalogStarId: s.catalogStarId,
-      posX: s.posX,
-      posY: s.posY,
-      posZ: s.posZ,
-    }))
-    sky.setCameraModeOverlay(true, storyStars)
+    // 直接传 filteredStars 引用，避免创建 200+ 对象的数组（StarData 具备所需字段）
+    sky.setCameraModeOverlay(true, stars.filteredStars.value as unknown as Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>)
 
     let throttling = false
     unsubscribeFrame = sky.onCameraFrame(() => {
@@ -182,14 +187,9 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
   /** 刷新取景框内故事星列表 */
   function refreshStarsInFrame(): void {
     if (cameraMode.value !== 'observe') return
-    const storyStars = stars.filteredStars.value.map(s => ({
-      id: s.id,
-      catalogStarId: s.catalogStarId,
-      posX: s.posX,
-      posY: s.posY,
-      posZ: s.posZ,
-    }))
-    starsInFrame.value = sky.getStarsInFrame(storyStars)
+    // 直接传 filteredStars 引用，避免每 400ms 创建 200+ 对象的数组导致 GC 卡顿
+    // getStarsInFrame 只读取 id/catalogStarId/posX/posY/posZ，StarData 具备这些字段
+    starsInFrame.value = sky.getStarsInFrame(stars.filteredStars.value as unknown as Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>)
   }
 
   /** 等待 ms */

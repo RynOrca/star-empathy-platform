@@ -12,12 +12,18 @@
     <div class="vf-corner vf-corner-tr" />
     <div class="vf-corner vf-corner-bl" />
     <div class="vf-corner vf-corner-br" />
-    <!-- 相机十字准星：贯穿中心的细十字线 -->
-    <div class="vf-crosshair">
-      <div class="vf-crosshair-h" />
-      <div class="vf-crosshair-v" />
-      <div class="vf-crosshair-center" />
-    </div>
+    <!-- 相机十字准星：用 SVG 绘制贯穿屏幕的十字线（单一合成层，避免大 div 卡顿） -->
+    <svg class="vf-crosshair-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <line class="vf-ch-h" x1="0" y1="50%" x2="100%" y2="50%" />
+      <line class="vf-ch-v" x1="50%" y1="0" x2="50%" y2="100%" />
+      <!-- 中心 16x16 方框：用 4 条短线段绘制，通过 CSS transform 居中 -->
+      <g class="vf-ch-center-group">
+        <line class="vf-ch-center-line" x1="0" y1="0" x2="16" y2="0" />
+        <line class="vf-ch-center-line" x1="0" y1="16" x2="16" y2="16" />
+        <line class="vf-ch-center-line" x1="0" y1="0" x2="0" y2="16" />
+        <line class="vf-ch-center-line" x1="16" y1="0" x2="16" y2="16" />
+      </g>
+    </svg>
   </div>
 </template>
 
@@ -77,62 +83,27 @@
 .vf-corner-bl { bottom: 4px; left: 4px; border-bottom-width: 3px; border-left-width: 3px; }
 .vf-corner-br { bottom: 4px; right: 4px; border-bottom-width: 3px; border-right-width: 3px; }
 
-/* ═══ 相机十字准星：贯穿中心的两条细线 + 中心点 ═══ */
-.vf-crosshair {
+/* ═══ 相机十字准星：SVG 单一合成层，避免大 div 每帧重绘卡顿 ═══ */
+.vf-crosshair-svg {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-}
-.vf-crosshair-h {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100vw;
-  height: 1px;
-  background: var(--vf-crosshair);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0.35;
-  transform: translate(-50%, -50%);
+  animation: vf-crosshair-enter 0.4s var(--ease-in-out) both;
+  animation-delay: 240ms;
 }
-.vf-crosshair-v {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1px;
-  height: 100vh;
-  background: var(--vf-crosshair);
-  opacity: 0.35;
-  transform: translate(-50%, -50%);
+.vf-ch-h, .vf-ch-v {
+  stroke: var(--vf-crosshair);
+  stroke-width: 1;
 }
-.vf-crosshair-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translate(-50%, -50%);
+.vf-ch-center-group {
+  transform: translate(calc(50vw - 8px), calc(50vh - 8px));
 }
-.vf-crosshair-center::before,
-.vf-crosshair-center::after {
-  content: '';
-  position: absolute;
-  background: var(--vf-crosshair);
-  opacity: 0.9;
-}
-.vf-crosshair-center::before {
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  transform: translateY(-50%);
-}
-.vf-crosshair-center::after {
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  transform: translateX(-50%);
+.vf-ch-center-line {
+  stroke: var(--vf-crosshair);
+  stroke-width: 1;
+  opacity: 2.57; /* 0.35 容器 × 2.57 ≈ 0.9，中心十字更醒目 */
 }
 
 /* ═══ 级联进入动画 ═══ */
@@ -145,10 +116,9 @@
 .vf-corner-tr { animation-delay: 120ms; }
 .vf-corner-bl { animation-delay: 160ms; }
 .vf-corner-br { animation-delay: 200ms; }
-.vf-crosshair { animation: vf-crosshair-enter 0.4s var(--ease-in-out) both; animation-delay: 240ms; }
 
 @keyframes vf-border-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vf-vignette-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vf-corner-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 0.35; } }
 </style>

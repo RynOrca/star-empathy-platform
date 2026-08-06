@@ -22,6 +22,7 @@
           <div class="fsp-item-header">
             <span class="fsp-star-dot" />
             <span class="fsp-star-name">{{ getStarName(item.star) }}</span>
+            <span v-if="mode === 'listening' && item.star.type === 'user'" class="fsp-badge-user">心声</span>
             <SparklesIcon v-if="mode === 'listening' && item.star.isNew" class="fsp-tag-new" />
             <FlameIcon v-if="mode === 'listening' && item.star.isHot" class="fsp-tag-hot" />
             <span v-if="mode === 'listening'" class="fsp-time">{{ formatTime(item.star.createdAt) }}</span>
@@ -231,6 +232,15 @@ defineExpose({ scrollToCardCenter, isCardCentered })
 .fsp-star-name {
   font-size: 0.8rem;
   color: var(--hud-accent);
+}
+.fsp-badge-user {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(202, 167, 255, 0.2);
+  color: #caa7ff;
+  border: 1px solid rgba(202, 167, 255, 0.3);
 }
 .fsp-tag-new, .fsp-tag-hot {
   width: 12px; height: 12px;

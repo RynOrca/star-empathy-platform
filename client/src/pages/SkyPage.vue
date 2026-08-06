@@ -3,13 +3,13 @@
     <!-- 导航栏 -->
     <nav class="sky-nav">
       <div class="nav-left">
-        <!-- 节气（桌面端） -->
-        <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
+        <!-- 节气（桌面端，相机模式隐藏） -->
+        <span v-if="solarTerm && cameraMode.cameraMode.value !== 'observe'" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
         </span>
         <button
-          v-if="moonPhase"
+          v-if="moonPhase && cameraMode.cameraMode.value !== 'observe'"
           class="moon-phase"
           :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）点击查看详情`"
           @click="openMoonPanel"
@@ -18,8 +18,8 @@
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </button>
       </div>
-      <!-- PC 端搜索框 -->
-      <div v-if="!isMobile" class="nav-center">
+      <!-- PC 端搜索框（相机模式隐藏） -->
+      <div v-if="!isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-center">
         <div class="search-box">
           <Search :size="14" class="search-box-icon" />
           <input
@@ -252,8 +252,8 @@
       </div>
     </Transition>
 
-    <!-- 三张叙事引导牌 -->
-    <div v-if="locationReady" class="guide-cards">
+    <!-- 三张叙事引导牌（相机模式隐藏） -->
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-cards">
       <div class="guide-card">
         <div class="guide-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -284,11 +284,11 @@
       </div>
     </div>
 
-    <div v-if="locationReady" class="zoom-controls">
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div v-if="locationReady" class="hint">
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="hint">
       <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 

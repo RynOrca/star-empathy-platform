@@ -425,6 +425,19 @@ export function useSky(
   let cameraModeEnterFov = 0
   // 天镜览星故事星 glow 元数据
   const cameraModeStoryStars = new Map<number, { glowSprite: Sprite | null; phase: number }>()
+  // 复用的 frustum / 投影矩阵（避免每帧 new，防止 GC 抖动）
+  const _frustum = new Frustum()
+  const _projScreenMatrix = new Matrix4()
+  // getStarsInFrame 复用的 scratch Vector3（避免每星 new 5 个 Vector3，200+ 星 = 1000+ 对象/次，导致 GC 卡顿）
+  const _sifLocal = new Vector3()
+  const _sifWorld = new Vector3()
+  const _sifStarDir = new Vector3()
+  const _sifNdc = new Vector3()
+  const _sifDir = new Vector3()
+  const _sifCamForward = new Vector3()
+  // onCameraFrame 复用的 scratch Vector3（避免每帧 new 2 个 Vector3）
+  const _ocfLookAt = new Vector3()
+  const _ocfDir = new Vector3()
   // onCameraFrame 订阅者列表
   const cameraFrameSubscribers: Array<(pose: CameraPose) => void> = []
   // 取景框星过滤节流时间戳
@@ -443,8 +456,8 @@ export function useSky(
 
   /** 相机视线中心的赤经（格式 '18h 36m'） */
   function getCenterRa(): string {
-    const dir = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-    const ra = Math.atan2(dir.y, dir.x)
+    _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    const ra = Math.atan2(_ocfDir.y, _ocfDir.x)
     let raDeg = ra * 180 / Math.PI
     if (raDeg < 0) raDeg += 360
     const hours = raDeg / 15
@@ -455,8 +468,8 @@ export function useSky(
 
   /** 相机视线中心的赤纬（格式 '+38° 47′'） */
   function getCenterDec(): string {
-    const dir = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-    const dec = Math.asin(dir.z) * 180 / Math.PI
+    _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    const dec = Math.asin(_ocfDir.z) * 180 / Math.PI
     const sign = dec >= 0 ? '+' : '-'
     const absDec = Math.abs(dec)
     const d = Math.floor(absDec)
@@ -464,19 +477,29 @@ export function useSky(
     return `${sign}${d}° ${m}′`
   }
 
-  /** 取景框（视锥）内的故事星列表，供相机模式列表/气泡使用 */
+  /**
+   * 取景框（视锥）内的故事星列表，供相机模式列表/气泡使用。
+   *
+   * 关键设计：用「固定宽角度」（45° 半角 = 90° 锥）筛选，而非实际相机 frustum。
+   * 原因：缩放后实际 FOV 变窄（如 stage 4 = 35°），frustum 内只剩目标星附近的几颗星，
+   * 用户无法在列表中看到/切换到其他星。改用固定宽角度后，无论 zoom 多深，
+   * 列表始终展示当前朝向周围一片区域的星，用户可点击切换。
+   * 气泡层（BubbleLayer）会自行做视口剔除，只渲染实际在屏幕内的气泡。
+   */
   function getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
     const result: StarInFrame[] = []
     skyGroup.updateMatrixWorld()
     camera.updateMatrixWorld()
     camera.updateProjectionMatrix()
-    const frustum = new Frustum()
-    const projScreenMatrix = new Matrix4()
-    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
-    frustum.setFromProjectionMatrix(projScreenMatrix)
 
     const halfW = canvas.clientWidth / 2
     const halfH = canvas.clientHeight / 2
+
+    // 固定 45° 半角筛选：星星方向与相机朝向夹角 < 45° 即纳入列表
+    const WIDE_HALF_ANGLE_RAD = 45 * Math.PI / 180
+    const cosThreshold = Math.cos(WIDE_HALF_ANGLE_RAD)
+    // 复用 scratch Vector3，避免每星 new 5 个对象（200+ 星 = 1000+ 对象/次 → GC 卡顿）
+    _sifCamForward.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
 
     for (const s of storyStars) {
       let x: number, y: number, z: number
@@ -487,23 +510,25 @@ export function useSky(
       } else {
         x = s.posX; y = s.posY; z = s.posZ
       }
-      const local = new Vector3(x, y, z)
-      const world = local.clone().applyMatrix4(skyGroup.matrixWorld)
-      const inFrame = frustum.containsPoint(world)
-      if (!inFrame) continue
+      _sifLocal.set(x, y, z)
+      _sifWorld.copy(_sifLocal).applyMatrix4(skyGroup.matrixWorld)
 
-      const ndc = world.clone().project(camera)
-      const screenX = ndc.x * halfW + halfW
-      const screenY = -ndc.y * halfH + halfH
+      // 角度筛选：星星方向与相机朝向的夹角 < 45°
+      _sifStarDir.copy(_sifWorld).normalize()
+      if (_sifStarDir.dot(_sifCamForward) < cosThreshold) continue
+
+      _sifNdc.copy(_sifWorld).project(camera)
+      const screenX = _sifNdc.x * halfW + halfW
+      const screenY = -_sifNdc.y * halfH + halfH
 
       // RA/Dec 基于星星固有局部坐标（raDecXYZ 逆变换），不受 skyGroup 旋转影响
-      const dir = local.clone().normalize()
-      const ra = Math.atan2(-dir.z, dir.x)
+      _sifDir.copy(_sifLocal).normalize()
+      const ra = Math.atan2(-_sifDir.z, _sifDir.x)
       let raDeg = ra * 180 / Math.PI
       if (raDeg < 0) raDeg += 360
       const raH = Math.floor(raDeg / 15)
       const raM = Math.floor((raDeg / 15 - raH) * 60)
-      const dec = Math.asin(dir.y) * 180 / Math.PI
+      const dec = Math.asin(_sifDir.y) * 180 / Math.PI
       const decSign = dec >= 0 ? '+' : '-'
       const decD = Math.floor(Math.abs(dec))
       const decM = Math.floor((Math.abs(dec) - decD) * 60)
@@ -1907,7 +1932,8 @@ for (const s of stars) starById.set(s.id, s)
           } else {
             closeupTarget.dist = Math.max(minDist, newDist)
           }
-        } else {
+        } else if (!isFlying.value) {
+          // 飞行动画期间禁止滚轮调整 FOV，避免覆盖 flyToStar3D 的目标 FOV
           userFov = Math.max(FOV_MIN, Math.min(FOV_MAX, userFov + delta * 0.1))
           camera.fov = userFov
           camera.updateProjectionMatrix()
@@ -1956,7 +1982,8 @@ for (const s of stars) starById.set(s.id, s)
       } else {
         closeupTarget.dist = Math.max(minDist, newDist)
       }
-    } else {
+    } else if (!isFlying.value) {
+      // 飞行动画期间禁止滚轮调整 FOV，避免覆盖 flyToStar3D 的目标 FOV
       userFov = Math.max(FOV_MIN, Math.min(FOV_MAX, userFov + e.deltaY * 0.05))
       camera.fov = userFov
       camera.updateProjectionMatrix()
@@ -3101,10 +3128,12 @@ for (const s of stars) starById.set(s.id, s)
     frameCount++  // OPT-14：帧计数器递增（用于太阳坐标缓存节流）
 
     // 天镜览星：通知相机帧订阅者（每帧执行，订阅者内部自行节流）
+    // 复用 scratch Vector3 避免每帧 new 2 个对象（60fps = 120 对象/秒 → GC 卡顿）
     if (cameraFrameSubscribers.length > 0) {
+      _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position)
       const pose: CameraPose = {
-        position: camera.position.clone(),
-        lookAt: new Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position),
+        position: camera.position,  // 直接引用，订阅者不应修改
+        lookAt: _ocfLookAt.copy(_ocfDir),
         fov: camera.fov,
         centerRa: getCenterRa(),
         centerDec: getCenterDec(),
@@ -3208,17 +3237,27 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画
-    for (const sg of storyGlows) {
-      const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
-      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-      ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+    // 有故事的星：呼吸辉光动画（相机模式下跳过，storyGlows 已隐藏，避免 200+ sprite 无效更新）
+    if (!cameraOverlayEnabled) {
+      for (const sg of storyGlows) {
+        const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
+        const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+        ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+      }
     }
-    // 天镜览星：故事星呼吸 glow
+    // 天镜览星：故事星呼吸 glow（性能优化：只更新取景框内可见的星，避免 200+ sprite 每帧更新导致卡顿）
     if (cameraOverlayEnabled && cameraModeStoryStars.size > 0) {
       const secs = _now / 1000
+      // 用当前 frustum 判断可见性，只更新可见星的 glow
+      _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
       cameraModeStoryStars.forEach((meta) => {
         if (!meta.glowSprite) return
+        // 不可见的星 glow 设为 0，跳过呼吸计算
+        if (!_frustum.containsPoint(meta.glowSprite.position)) {
+          meta.glowSprite.visible = false
+          return
+        }
+        meta.glowSprite.visible = true
         const pulse = Math.sin(secs * 1.5 + meta.phase) * 0.3
         const mat = meta.glowSprite.material as SpriteMaterial
         mat.opacity = 0.5 + pulse
@@ -3657,6 +3696,9 @@ for (const s of stars) starById.set(s.id, s)
         // 隐藏普通模式星名标签
         starNameLabels.forEach((label) => { label.element.style.display = 'none' })
 
+        // 隐藏普通模式 storyGlows（相机模式有独立的 cameraModeStoryStars glow，避免 400+ sprite 重复渲染）
+        for (const sg of storyGlows) sg.sprite.visible = false
+
         // 为故事星创建呼吸 glow（覆盖星表星 + 用户星）
         cameraModeStoryStars.clear()
         if (storyStars) {
@@ -3686,6 +3728,9 @@ for (const s of stars) starById.set(s.id, s)
       } else {
         // 退出相机模式，恢复
         starNameLabels.forEach((label) => { label.element.style.display = '' })
+
+        // 恢复普通模式 storyGlows 可见性
+        for (const sg of storyGlows) sg.sprite.visible = true
 
         // 清理故事星 glow
         cameraModeStoryStars.forEach((meta) => {
@@ -4094,8 +4139,10 @@ for (const s of stars) starById.set(s.id, s)
       const starLocal = new Vector3(x, y, z)
       const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
 
-      flyFromPos.copy(camera.position)
-      flyToPos.copy(starWorld).sub(starWorld.clone().sub(camera.position).normalize().multiplyScalar(80))
+      // ═══ 相机模式核心设计：相机始终在原点（星图球心），不移动位置 ═══
+      // 通过改变朝向（lookAt 目标星）+ 缩小 FOV（放大）来"聚焦"星星
+      // 这样拖动始终围绕球心旋转，视角一致；zoom 控制 FOV 与飞行一致
+      flyFromPos.copy(camera.position) // 应为 (0,0,0)，保留以兼容退出 tween
 
       flyFromQuat.copy(camera.quaternion)
       const worldUp = new Vector3(0, 1, 0).applyQuaternion(flyFromQuat)
@@ -4107,10 +4154,10 @@ for (const s of stars) starById.set(s.id, s)
       flyFromFov = camera.fov
       const stage = options?.zoomLevel ?? 3
       flyToFov = CAMERA_FOV_BY_STAGE[stage] ?? 45
-      // 两段式动画：第一段缩小到 FOV 75（zoom level 1），第二段移动并放大到目标 FOV
-      // 关键约束：整个飞行过程中相机始终 lookAt 目标星（flyToQuat），目标星保持在画面中央
+      // 两段式动画：第一段缩小到 FOV 75（zoom level 1，广角全局视角），
+      // 第二段朝向 slerp 到目标星 + 放大到目标 FOV
+      // 关键约束：相机位置始终在原点不动，只改朝向和 FOV
       const shrinkFov = CAMERA_FOV_BY_STAGE[1] // 75
-      // 拐点比例：前 35% 用于缩小（相机位置/朝向同时过渡到 lookAt 目标），后 65% 用于移动+放大
       const SPLIT = 0.35
 
       flyStartTime = performance.now()
@@ -4123,21 +4170,21 @@ for (const s of stars) starById.set(s.id, s)
         const t = Math.min(elapsed / CAMERA_FLY_DURATION_MS, 1)
 
         if (t < SPLIT) {
-          // 第一段：FOV 从 flyFromFov → shrinkFov（缩小，避免大放大倍率下平移产生的视野撕裂）
-          // 同时朝向从 flyFromQuat slerp 到 flyToQuat（让目标星尽早进入画面中心）
-          // 相机位置保持 flyFromPos 不变
+          // 第一段：FOV 从 flyFromFov → shrinkFov（缩小到广角，展开全局视野）
+          // 朝向保持不变（用户还在"寻找"阶段）
           const tt = t / SPLIT
           const e = easeInOutCubic(tt)
-          camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
-          camera.position.copy(flyFromPos)
+          camera.quaternion.copy(flyFromQuat)
+          camera.position.set(0, 0, 0) // 始终在原点
           camera.fov = flyFromFov + (shrinkFov - flyFromFov) * e
         } else {
-          // 第二段：FOV 从 shrinkFov → flyToFov（放大），相机位置从 flyFromPos lerp 到 flyToPos
-          // 朝向固定为 flyToQuat（lookAt 目标星），目标星始终在画面中央
+          // 第二段：朝向从 flyFromQuat slerp 到 flyToQuat（转向目标星），
+          // FOV 从 shrinkFov → flyToFov（放大聚焦）
+          // 相机位置始终在原点
           const tt = (t - SPLIT) / (1 - SPLIT)
           const e = easeInOutCubic(tt)
-          camera.quaternion.copy(flyToQuat)
-          camera.position.lerpVectors(flyFromPos, flyToPos, e)
+          camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
+          camera.position.set(0, 0, 0) // 始终在原点
           camera.fov = shrinkFov + (flyToFov - shrinkFov) * e
         }
         camera.updateProjectionMatrix()

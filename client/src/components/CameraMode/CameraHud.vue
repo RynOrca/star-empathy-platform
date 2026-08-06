@@ -105,9 +105,6 @@ onBeforeUnmount(() => {
   padding: 0 32px;
   background: linear-gradient(to bottom, var(--hud-bg), transparent);
   pointer-events: none;
-  /* 提升为独立合成层，避免 canvas 重绘时 HUD 文字抖动 */
-  will-change: opacity;
-  backface-visibility: hidden;
 }
 .hud-top { top: 0; }
 .hud-bottom {
