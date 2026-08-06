@@ -486,7 +486,6 @@ export function useSky(
    * 原因：缩放后实际 FOV 变窄（如 stage 4 = 35°），frustum 内只剩目标星附近的几颗星，
    * 用户无法在列表中看到/切换到其他星。改用固定宽角度后，无论 zoom 多深，
    * 列表始终展示当前朝向周围一片区域的星，用户可点击切换。
-   * 气泡层（BubbleLayer）会自行做视口剔除，只渲染实际在屏幕内的气泡。
    */
   function getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
     const result: StarInFrame[] = []
