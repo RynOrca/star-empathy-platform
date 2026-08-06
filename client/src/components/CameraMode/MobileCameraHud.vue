@@ -49,4 +49,9 @@ defineEmits<{ exit: [] }>()
   opacity: 0.7;
   letter-spacing: 0.05em;
 }
+
+/* ═══ 级联进入动画 ═══ */
+.mobile-camera-hud { animation: mch-enter 0.4s var(--ease-in-out) both; }
+
+@keyframes mch-enter { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
 </style>

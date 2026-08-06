@@ -226,4 +226,9 @@ defineExpose({ scrollToCardCenter, isCardCentered })
   align-items: center;
   gap: 4px;
 }
+
+/* ═══ 级联进入动画 ═══ */
+.frame-stories-panel { animation: fsp-enter 0.5s var(--ease-in-out) both; animation-delay: 320ms; }
+
+@keyframes fsp-enter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

@@ -145,4 +145,9 @@ defineEmits<{
 .zfc-toggle:hover {
   border-color: var(--accent-purple);
 }
+
+/* ═══ 级联进入动画 ═══ */
+.zoom-filter-control { animation: zfc-enter 0.5s var(--ease-in-out) both; animation-delay: 240ms; }
+
+@keyframes zfc-enter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

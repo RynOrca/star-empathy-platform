@@ -50,4 +50,9 @@ const title = computed(() => {
   opacity: 0.7;
   letter-spacing: 0.05em;
 }
+
+/* ═══ 级联进入动画 ═══ */
+.viewport-info { animation: vp-enter 0.5s var(--ease-in-out) both; animation-delay: 160ms; }
+
+@keyframes vp-enter { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 </style>

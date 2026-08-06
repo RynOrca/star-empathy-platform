@@ -48,4 +48,9 @@ defineEmits<{
   opacity: 1;
   transform: scale(1.1);
 }
+
+/* ═══ 级联进入动画 ═══ */
+.zoom-stage-indicator { animation: zsi-enter 0.4s var(--ease-in-out) both; animation-delay: 120ms; }
+
+@keyframes zsi-enter { from { opacity: 0; transform: translateY(-50%) translateX(20px); } to { opacity: 1; transform: translateY(-50%) translateX(0); } }
 </style>

@@ -537,7 +537,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { Orbit, Crosshair, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Star } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
@@ -831,6 +831,9 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
+
+  // 天镜览星：ESC 键退出相机模式
+  window.addEventListener('keydown', onCameraKeyDown)
 
   // 从个人主页收藏点击跳转过来：定位到指定星星
   focusOnQueryStar()
@@ -1284,6 +1287,25 @@ function onCameraToggleFilter(key: keyof CameraFilters) {
   cameraMode.setFilter(key, !cameraMode.filters[key])
 }
 
+// ═══ 天镜览星 · 边界处理 ═══
+// ESC 键退出相机模式：卡片打开时先关卡片，否则退出相机模式
+function onCameraKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && cameraMode.cameraMode.value === 'observe') {
+    if (cameraMode.isCardOpen.value) {
+      cameraMode.closeStoryCard()
+    } else {
+      cameraMode.exit()
+    }
+  }
+}
+
+// 路由离开时清理相机模式状态
+onBeforeRouteLeave(() => {
+  if (cameraMode.cameraMode.value === 'observe') {
+    cameraMode.exit()
+  }
+})
+
 // issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
 const snappedTarget = ref<SnapTarget | null>(null)
 const snappedLabel = ref<string>('')
@@ -1390,6 +1412,8 @@ onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
   clearHoverTimer()
+  // 天镜览星：移除键盘事件监听
+  window.removeEventListener('keydown', onCameraKeyDown)
 })
 const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)

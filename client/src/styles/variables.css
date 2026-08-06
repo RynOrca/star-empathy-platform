@@ -155,3 +155,14 @@
   --story-item-hover: rgba(202, 167, 255, 0.06);
   --story-item-active: rgba(202, 167, 255, 0.08);
 }
+
+/* ═══ 天镜览星：prefers-reduced-motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+  .camera-overlay *,
+  .camera-overlay *::before,
+  .camera-overlay *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

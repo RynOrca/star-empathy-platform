@@ -79,4 +79,21 @@ import { CrosshairIcon } from './icons/CameraIcons'
   color: var(--vf-crosshair);
   opacity: 0.7;
 }
+
+/* ═══ 级联进入动画 ═══ */
+.vf-border { animation: vf-border-enter 0.5s var(--ease-in-out) both; }
+.vf-vignette { animation: vf-vignette-enter 0.6s var(--ease-in-out) both; animation-delay: 40ms; }
+.vf-corner-tl, .vf-corner-tr, .vf-corner-bl, .vf-corner-br {
+  animation: vf-corner-enter 0.4s var(--ease-in-out) both;
+}
+.vf-corner-tl { animation-delay: 80ms; }
+.vf-corner-tr { animation-delay: 120ms; }
+.vf-corner-bl { animation-delay: 160ms; }
+.vf-corner-br { animation-delay: 200ms; }
+.vf-crosshair { animation: vf-crosshair-enter 0.4s var(--ease-in-out) both; animation-delay: 240ms; }
+
+@keyframes vf-border-enter { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
+@keyframes vf-vignette-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vf-corner-enter { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes vf-crosshair-enter { from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } to { opacity: 0.7; transform: translate(-50%, -50%) scale(1); } }
 </style>
