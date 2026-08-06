@@ -144,6 +144,9 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     cameraMode.value = 'observe'
     state.value = 'IDLE'
 
+    // 禁用移动端准星吸附与「凝听星语」按钮触发（天镜模式只允许拖动+放大）
+    sky.setSnapEnabled(false)
+
     // 直接传 filteredStars 引用，避免创建 200+ 对象的数组（StarData 具备所需字段）
     sky.setCameraModeOverlay(true, stars.filteredStars.value as unknown as Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>)
 
@@ -170,6 +173,8 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     if (isCardOpen.value) closeStoryCard()
     sky.cancelFly()
     sky.setCameraModeOverlay(false)
+    // 恢复移动端准星吸附与「凝听星语」按钮触发
+    sky.setSnapEnabled(true)
     if (unsubscribeFrame) {
       unsubscribeFrame()
       unsubscribeFrame = null

@@ -342,6 +342,8 @@ export interface SkyAPI {
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
   /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
   releaseSnap: () => void
+  /** 天镜览星模式开关：禁用/启用准星吸附与准星 DOM 显示（进入天镜 false，退出 true） */
+  setSnapEnabled: (enabled: boolean) => void
   /** issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示） */
   snapToPlanet: (bodyName: string) => void
   /** issue #136：PC 端行星特写观察模式开关（true=禁止 hover/点击，只允许拖动/缩放） */
@@ -1296,6 +1298,8 @@ for (const s of stars) starById.set(s.id, s)
   // ═══ 移动端准星吸附状态（issue #116） ═══
   // 仅在 (max-width: 768px) 启用；PC 完全不进入逻辑分支
   let isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  // 天镜览星模式下禁用准星吸附（进入时 false，退出时 true）
+  let snapEnabled = true
   let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
   let crosshairStyle: HTMLStyleElement | null = null
   let snappedStarId = -1                            // 当前吸附的恒星 ID，-1 = 未吸附恒星
@@ -1351,6 +1355,24 @@ for (const s of stars) starById.set(s.id, s)
     }
     // issue #124：通知外部已脱吸附
     options?.onSnapChange?.(null)
+  }
+
+  /**
+   * 天镜览星模式开关：禁用/启用准星吸附与准星 DOM 显示。
+   * 进入天镜时调用 setSnapEnabled(false)：释放当前吸附 + 隐藏准星 + 禁用 pointermove 中的吸附逻辑
+   * 退出天镜时调用 setSnapEnabled(true)：恢复准星显示 + 恢复吸附逻辑
+   */
+  function setSnapEnabled(enabled: boolean): void {
+    if (snapEnabled === enabled) return
+    snapEnabled = enabled
+    if (!enabled) {
+      // 进入天镜：释放当前吸附，隐藏准星
+      releaseSnap()
+      if (crosshairEl) crosshairEl.classList.remove('visible')
+    } else {
+      // 退出天镜：恢复准星显示（仅移动端）
+      if (crosshairEl) crosshairEl.classList.toggle('visible', isMobile)
+    }
   }
 
   /**
@@ -1676,8 +1698,8 @@ for (const s of stars) starById.set(s.id, s)
       }
 
       // ─── issue #116 移动端准星吸附（issue #134 扩展：支持行星吸附） ───
-      // 仅移动端 + 非行星特写模式启用；拖拽时也运行（拖拽瞄准是核心交互）
-      if (isMobile && closeupState === 'IDLE') {
+      // 仅移动端 + 非行星特写模式 + 非天镜览星模式启用；拖拽时也运行（拖拽瞄准是核心交互）
+      if (isMobile && closeupState === 'IDLE' && snapEnabled) {
         // issue #134：投影法检测屏幕中心最近的行星（Raycaster 精确命中在中心太难对准，改用投影距离+容差）
         // 优先级：行星 > 恒星（与 PC 端点击一致）
         const centerPlanet = detectPlanetByProjection(0, 0)
@@ -4610,5 +4632,7 @@ for (const s of stars) starById.set(s.id, s)
     releaseSnap,
     // issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示）
     snapToPlanet,
+    // 天镜览星模式开关：禁用/启用准星吸附与准星显示
+    setSnapEnabled,
   }
 }

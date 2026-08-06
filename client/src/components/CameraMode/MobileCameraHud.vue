@@ -60,6 +60,7 @@ defineEmits<{
   font-family: var(--font-display);
   color: var(--hud-text);
   animation: mch-enter 0.4s var(--ease-in-out) both;
+  pointer-events: auto;
 }
 
 @keyframes mch-enter {

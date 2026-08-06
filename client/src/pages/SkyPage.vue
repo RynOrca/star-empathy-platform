@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -294,8 +294,9 @@
 
     <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
     <!-- issue #135 动画修复：完全复刻 .search-sheet 结构 → wrapper套 Transition + inner 用 @keyframes animation -->
+    <!-- 天镜览星模式下隐藏（仅允许拖动+放大，吸附与按钮均不触发） -->
     <Transition name="sheet-fade">
-      <div v-if="isMobile && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
+      <div v-if="isMobile && cameraMode.cameraMode.value !== 'observe' && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
         <button
           class="story-enter-btn"
           type="button"
