@@ -106,3 +106,17 @@ export const STAR_DISPLAY_CONFIG: StarDisplayConfig = {
   nameLabelOffsetPx: -12,
   tooltipOffsetPx: -8,
 }
+
+/**
+ * 根据相机缩放层级（1~4）返回气泡显示档位
+ * Ⅰ (1): zoom < 1.8 → 仅星名 + 关键词（size-s）
+ * Ⅱ (2): 1.8 ≤ zoom < 2.6 → 短句摘要（size-m）
+ * Ⅲ (3): 2.6 ≤ zoom < 3.4 → 完整摘要 + meta（size-l）
+ * Ⅳ (4): zoom ≥ 3.4 → 完整摘要 + meta + 高亮（size-l + active）
+ */
+export function getZoomStage(zoomLevel: number): 1 | 2 | 3 | 4 {
+  if (zoomLevel < 1.8) return 1
+  if (zoomLevel < 2.6) return 2
+  if (zoomLevel < 3.4) return 3
+  return 4
+}
