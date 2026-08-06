@@ -180,3 +180,26 @@ export const MessageCircleIcon = defineComponent({
     ])
   },
 })
+
+/** ChevronRight — 翻页右箭头 */
+export const ChevronRightIcon = defineComponent({
+  name: 'ChevronRightIcon',
+  setup(_, { attrs }) {
+    return () => h('svg', { ...svgProps, width: 14, height: 14, ...attrs }, [
+      h('polyline', { points: '9 18 15 12 9 6' }),
+    ])
+  },
+})
+
+/** Gallery — 画廊标题图标（四宫格） */
+export const GalleryIcon = defineComponent({
+  name: 'GalleryIcon',
+  setup(_, { attrs }) {
+    return () => h('svg', { ...svgProps, width: 14, height: 14, ...attrs }, [
+      h('rect', { x: 3, y: 3, width: 7, height: 7, rx: 1 }),
+      h('rect', { x: 14, y: 3, width: 7, height: 7, rx: 1 }),
+      h('rect', { x: 3, y: 14, width: 7, height: 7, rx: 1 }),
+      h('rect', { x: 14, y: 14, width: 7, height: 7, rx: 1 }),
+    ])
+  },
+})

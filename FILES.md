@@ -169,7 +169,7 @@
 | `MobileCameraHud.vue` | **移动端顶部 HUD**。EXIT 按钮+天区名。slide-down 进入动画 |
 | `ZoomStageIndicator.vue` | **移动端右侧缩放指示器**。竖排 Ⅰ~Ⅳ 罗马数字按钮，active 档位高亮放大 |
 | `StoryDetailCard.vue` | **两端共用故事卡片**。Teleport+Transition 实现，PC 端居中弹出（scale+translate），移动端底部滑入（translateY）。含星名（catalogStarId 优先取 `getStarDisplayName` 真实星名，避免与故事标题重复）/标题（与星名不同时才显示）/正文/meta/标签/共鸣按钮（含访客拦截）。使用 useResonate 实现共鸣操作 |
-| `icons/CameraIcons.ts` | **相机模式 SVG icon 集合**。15 个函数式组件（ApertureIcon/ChevronLeftIcon/CloseIcon/BookOpenIcon/SparklesIcon/FlameIcon/MapPinIcon/ScrollIcon/HeartIcon/EyeIcon/CompassIcon/ClockIcon/CrosshairIcon/TelescopeIcon 观星/MessageCircleIcon 听语），统一 `viewBox 0 0 24 24` + `stroke=currentColor` + `stroke-width=1.8`，供 Phase 4-6 相机模式组件使用。禁用 emoji 字符（AGENTS.md 规范） |
+| `icons/CameraIcons.ts` | **相机模式 SVG icon 集合**。17 个函数式组件（ApertureIcon/ChevronLeftIcon/ChevronRightIcon 翻页右箭头/CloseIcon/BookOpenIcon/SparklesIcon/FlameIcon/MapPinIcon/ScrollIcon/HeartIcon/EyeIcon/CompassIcon/ClockIcon/CrosshairIcon/TelescopeIcon 观星/MessageCircleIcon 听语/GalleryIcon 画廊四宫格），统一 `viewBox 0 0 24 24` + `stroke=currentColor` + `stroke-width=1.8`，供 Phase 4-6 相机模式组件使用。禁用 emoji 字符（AGENTS.md 规范） |
 
 ### 核心逻辑 `src/composables/`
 
