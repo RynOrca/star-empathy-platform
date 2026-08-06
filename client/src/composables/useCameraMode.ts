@@ -237,20 +237,6 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     }
   }
 
-  /** 移动端点击气泡：直接飞镜头 → 打开卡片 */
-  async function handleBubbleClick(star: StarData): Promise<void> {
-    if (isAnimating.value) return
-    activeStarId.value = star.id
-    isAnimating.value = true
-    state.value = 'FLYING'
-    sky.flyToStar3D(star, { zoomLevel: 3 })
-    await wait(700)
-    if (cameraMode.value !== 'observe') return
-    openStoryCard(star)
-    state.value = 'DETAIL_OPEN'
-    isAnimating.value = false
-  }
-
   /** 打开故事卡片 */
   function openStoryCard(star: StarData): void {
     activeCardStar.value = star
@@ -268,6 +254,11 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
   /** 设置过滤模式（互斥：gazing / listening） */
   function setMode(mode: CameraFilterMode): void {
     filters.mode = mode
+  }
+
+  /** 设置当前活动星 ID（不触发飞镜头，仅高亮）— 供移动端单卡片切换使用 */
+  function setActiveStar(starId: number): void {
+    activeStarId.value = starId
   }
 
   onBeforeUnmount(() => {
@@ -288,10 +279,10 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     enter,
     exit,
     handleStoryClick,
-    handleBubbleClick,
     openStoryCard,
     closeStoryCard,
     setMode,
+    setActiveStar,
     refreshStarsInFrame,
   }
 }
