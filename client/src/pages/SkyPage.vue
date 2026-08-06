@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1277,10 +1277,9 @@ async function onCameraBubbleClick(star: any) {
 
 function onCameraSetZoom(level: number) {
   const targetFov = CAMERA_FOV_BY_STAGE[level]
-  const camera = skyRef.value?.sky?.camera
-  if (targetFov && camera) {
-    camera.fov = targetFov
-    camera.updateProjectionMatrix()
+  if (targetFov) {
+    // 调用 useSky 的 setCameraFov：300ms 平滑过渡 fov + 立即更新 zoomLevel 触发 UI 动画
+    sky.setCameraFov(targetFov)
   }
 }
 

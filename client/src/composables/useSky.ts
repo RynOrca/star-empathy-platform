@@ -306,6 +306,8 @@ export interface SkyAPI {
   flyToStar3D: (star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) => void
   /** 天镜览星：打断当前飞行动画 */
   cancelFly: () => void
+  /** 天镜览星：平滑切换相机 FOV（点击罗马数字时调用，300ms 过渡，立即更新 zoomLevel 让 UI 即时响应） */
+  setCameraFov: (targetFov: number) => void
   /** 天镜览星：订阅相机每帧位姿（订阅者内部自行节流），返回取消订阅函数 */
   onCameraFrame: (cb: (pose: CameraPose) => void) => () => void
   /** 天镜览星：取相机视线中心的赤经赤纬（用于 HUD 显示） */
@@ -1303,6 +1305,8 @@ for (const s of stars) starById.set(s.id, s)
   let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
   let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
   let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // 天镜览星：点击罗马数字切换视场时的 FOV 过渡动画 RAF id（与 fly/tween/snapFov 互斥）
+  let cameraFovTweenId: number | null = null
   // issue #135：程序化 snap 标志（snapToPlanet 设置），防止 pointermove 自动 release
   // 仅在用户主动 pointerdown 拖动时才清除此标志，允许正常的拖动释放逻辑生效
   let programmaticSnap = false
@@ -4135,6 +4139,11 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(snapFovRafId)
         snapFovRafId = 0
       }
+      // 打断视场切换 tween（互斥）
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
 
       const starLocal = new Vector3(x, y, z)
       const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
@@ -4212,6 +4221,64 @@ for (const s of stars) starById.set(s.id, s)
       }
       cameraFlyState = 'idle'
       isFlying.value = false
+    },
+    // ═══ 天镜览星：点击罗马数字切换视场 ═══
+    // 300ms RAF tween 平滑过渡 camera.fov，立即更新 cameraZoomLevel 让 UI（罗马数字高亮、
+    // 进度条、视场度数）即时响应并触发 CSS transition；与 fly/tween/snapFov 互斥打断。
+    setCameraFov(targetFov: number) {
+      // 打断飞行
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+        cameraFlyState = 'idle'
+        isFlying.value = false
+      }
+      // 打断特写 tween
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+      // 打断 snap FOV 动画
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
+      // 打断已有视场切换 tween
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
+
+      // 立即更新 zoomLevel，让 UI 即时响应（罗马数字高亮、进度条 width、视场度数）
+      // CSS transition 会让进度条/罗马数字在 0.3s 内平滑过渡
+      cameraZoomLevel.value = fovToZoomLevel(targetFov)
+
+      const fromFov = camera.fov
+      const toFov = targetFov
+      if (Math.abs(toFov - fromFov) < 0.1) {
+        userFov = toFov
+        camera.fov = toFov
+        camera.updateProjectionMatrix()
+        return
+      }
+      const duration = 300
+      const startTime = performance.now()
+
+      function fovStep(now: number) {
+        if (disposed) { cameraFovTweenId = null; return }
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const e = easeInOutCubic(t)
+        camera.fov = fromFov + (toFov - fromFov) * e
+        camera.updateProjectionMatrix()
+        if (t < 1) {
+          cameraFovTweenId = requestAnimationFrame(fovStep)
+        } else {
+          cameraFovTweenId = null
+          userFov = camera.fov
+        }
+      }
+      cameraFovTweenId = requestAnimationFrame(fovStep)
     },
     // ═══ 行星特写：focusOnPlanet → TWEENING → CLOSEUP（状态机入口） ═══
     // 飞到 CLOSEUP_INIT_RATIO × size 距离，FOV 缩到 CLOSEUP_FOV，末态进入 CLOSEUP 模式
@@ -4467,6 +4534,11 @@ for (const s of stars) starById.set(s.id, s)
       if (tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl)
       // issue #116：清理移动端准星 DOM + 样式 + FOV 动画
       cancelAnimationFrame(snapFovRafId)
+      // 天镜览星：清理视场切换 tween
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
       if (crosshairEl && crosshairEl.parentNode) crosshairEl.parentNode.removeChild(crosshairEl)
       if (crosshairStyle) crosshairStyle.remove()
       // 释放 GPU 资源（geometry/material/texture）
