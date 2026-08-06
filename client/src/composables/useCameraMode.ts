@@ -36,21 +36,16 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
   const cameraZoomLevel = sky.cameraZoomLevel
 
   let unsubscribeFrame: (() => void) | null = null
+  let throttleTimer: ReturnType<typeof setTimeout> | null = null
 
   /** 过滤后的取景框故事列表（或关系，按共鸣降序） */
   const frameStories = computed<StoryListItem[]>(() => {
-    const enabledCategories = [
-      filters.new && 'new',
-      filters.hot && 'hot',
-      filters.near && 'near',
-      filters.ancient && 'ancient',
-    ].filter(Boolean) as string[]
+    if (!filters.new && !filters.hot && !filters.near && !filters.ancient) return []
 
-    if (enabledCategories.length === 0) return []
-
+    const starMap = new Map(stars.filteredStars.value.map(s => [s.id, s]))
     const result: StoryListItem[] = []
     for (const sif of starsInFrame.value) {
-      const star = stars.filteredStars.value.find(s => s.id === sif.starId)
+      const star = starMap.get(sif.starId)
       if (!star) continue
       if (filters.new && star.isNew) result.push({ star, inFrame: sif })
       else if (filters.hot && star.isHot) result.push({ star, inFrame: sif })
@@ -72,11 +67,15 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     unsubscribeFrame = sky.onCameraFrame(() => {
       if (throttling) return
       throttling = true
-      setTimeout(() => {
+      if (throttleTimer) clearTimeout(throttleTimer)
+      throttleTimer = setTimeout(() => {
         throttling = false
         refreshStarsInFrame()
       }, 400)
     })
+
+    // 立即刷新一次，避免首帧 400ms 延迟
+    refreshStarsInFrame()
   }
 
   /** 退出相机模式 */
@@ -91,8 +90,13 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
       unsubscribeFrame()
       unsubscribeFrame = null
     }
+    if (throttleTimer) {
+      clearTimeout(throttleTimer)
+      throttleTimer = null
+    }
     starsInFrame.value = []
     activeStarId.value = null
+    activeCardStar.value = null
     isAnimating.value = false
   }
 
@@ -129,6 +133,7 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
       sky.flyToStar3D(star, { zoomLevel: 3 })
       state.value = 'FLYING'
       await wait(700)
+      if (cameraMode.value !== 'observe') return
       openStoryCard(star)
       state.value = 'DETAIL_OPEN'
       isAnimating.value = false
@@ -138,10 +143,14 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
       sky.flyToStar3D(star, { zoomLevel: 3 })
       const wasOpen = isCardOpen.value
       if (wasOpen && wasActive) {
+        await wait(700)
+        if (cameraMode.value !== 'observe') return
+        state.value = 'DETAIL_OPEN'
         isAnimating.value = false
       } else {
         if (wasOpen) closeStoryCard()
         await wait(700)
+        if (cameraMode.value !== 'observe') return
         openStoryCard(star)
         state.value = 'DETAIL_OPEN'
         isAnimating.value = false
@@ -157,6 +166,7 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     state.value = 'FLYING'
     sky.flyToStar3D(star, { zoomLevel: 3 })
     await wait(700)
+    if (cameraMode.value !== 'observe') return
     openStoryCard(star)
     state.value = 'DETAIL_OPEN'
     isAnimating.value = false
@@ -180,7 +190,7 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
   }
 
   onBeforeUnmount(() => {
-    if (unsubscribeFrame) unsubscribeFrame()
+    exit()
   })
 
   return {
