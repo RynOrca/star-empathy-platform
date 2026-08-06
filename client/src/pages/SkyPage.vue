@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -156,7 +156,7 @@
         :region="cameraRegion"
         @exit="cameraMode.exit()"
         @story-click="onCameraStoryClick"
-        @bubble-click="onCameraBubbleClick"
+        @active-change="onCameraActiveChange"
         @close-card="cameraMode.closeStoryCard()"
         @set-zoom="onCameraSetZoom"
         @set-mode="onCameraSetMode"
@@ -1271,8 +1271,9 @@ async function onCameraStoryClick(star: any) {
   )
 }
 
-async function onCameraBubbleClick(star: any) {
-  await cameraMode.handleBubbleClick(star)
+function onCameraActiveChange(starId: number) {
+  // 移动端单卡片切换时同步 activeStarId（不触发飞镜头，仅高亮）
+  cameraMode.setActiveStar(starId)
 }
 
 function onCameraSetZoom(level: number) {
