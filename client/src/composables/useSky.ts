@@ -453,6 +453,9 @@ export function useSky(
   /** 取景框（视锥）内的故事星列表，供相机模式列表/气泡使用 */
   function getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
     const result: StarInFrame[] = []
+    skyGroup.updateMatrixWorld()
+    camera.updateMatrixWorld()
+    camera.updateProjectionMatrix()
     const frustum = new Frustum()
     const projScreenMatrix = new Matrix4()
     projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
@@ -471,7 +474,7 @@ export function useSky(
         x = s.posX; y = s.posY; z = s.posZ
       }
       const local = new Vector3(x, y, z)
-      const world = local.applyMatrix4(skyGroup.matrixWorld)
+      const world = local.clone().applyMatrix4(skyGroup.matrixWorld)
       const inFrame = frustum.containsPoint(world)
       if (!inFrame) continue
 
@@ -479,13 +482,14 @@ export function useSky(
       const screenX = ndc.x * halfW + halfW
       const screenY = -ndc.y * halfH + halfH
 
+      // RA/Dec 基于星星固有局部坐标（raDecXYZ 逆变换），不受 skyGroup 旋转影响
       const dir = local.clone().normalize()
-      const ra = Math.atan2(dir.y, dir.x)
+      const ra = Math.atan2(-dir.z, dir.x)
       let raDeg = ra * 180 / Math.PI
       if (raDeg < 0) raDeg += 360
       const raH = Math.floor(raDeg / 15)
       const raM = Math.floor((raDeg / 15 - raH) * 60)
-      const dec = Math.asin(dir.z) * 180 / Math.PI
+      const dec = Math.asin(dir.y) * 180 / Math.PI
       const decSign = dec >= 0 ? '+' : '-'
       const decD = Math.floor(Math.abs(dec))
       const decM = Math.floor((Math.abs(dec) - decD) * 60)
