@@ -4,7 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshPhongMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide, RepeatWrapping,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Frustum,
   TextureLoader, PointLight, ShaderMaterial, LoadingManager,
   Quaternion, Euler,
   ACESFilmicToneMapping,
@@ -310,6 +310,8 @@ export interface SkyAPI {
   onCameraFrame: (cb: (pose: CameraPose) => void) => () => void
   /** 天镜览星：取相机视线中心的赤经赤纬（用于 HUD 显示） */
   getCenterCelestial: () => { ra: string; dec: string }
+  /** 天镜览星：取景框（视锥）内的故事星列表 */
+  getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
   /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
@@ -446,6 +448,61 @@ export function useSky(
     const d = Math.floor(absDec)
     const m = Math.floor((absDec - d) * 60)
     return `${sign}${d}° ${m}′`
+  }
+
+  /** 取景框（视锥）内的故事星列表，供相机模式列表/气泡使用 */
+  function getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
+    const result: StarInFrame[] = []
+    const frustum = new Frustum()
+    const projScreenMatrix = new Matrix4()
+    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    frustum.setFromProjectionMatrix(projScreenMatrix)
+
+    const halfW = canvas.clientWidth / 2
+    const halfH = canvas.clientHeight / 2
+
+    for (const s of storyStars) {
+      let x: number, y: number, z: number
+      if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
+        const cat = starById.get(s.catalogStarId)
+        if (!cat) continue
+        x = cat.x; y = cat.y; z = cat.z
+      } else {
+        x = s.posX; y = s.posY; z = s.posZ
+      }
+      const local = new Vector3(x, y, z)
+      const world = local.applyMatrix4(skyGroup.matrixWorld)
+      const inFrame = frustum.containsPoint(world)
+      if (!inFrame) continue
+
+      const ndc = world.clone().project(camera)
+      const screenX = ndc.x * halfW + halfW
+      const screenY = -ndc.y * halfH + halfH
+
+      const dir = local.clone().normalize()
+      const ra = Math.atan2(dir.y, dir.x)
+      let raDeg = ra * 180 / Math.PI
+      if (raDeg < 0) raDeg += 360
+      const raH = Math.floor(raDeg / 15)
+      const raM = Math.floor((raDeg / 15 - raH) * 60)
+      const dec = Math.asin(dir.z) * 180 / Math.PI
+      const decSign = dec >= 0 ? '+' : '-'
+      const decD = Math.floor(Math.abs(dec))
+      const decM = Math.floor((Math.abs(dec) - decD) * 60)
+
+      result.push({
+        starId: s.id,
+        catalogStarId: s.catalogStarId,
+        screenX,
+        screenY,
+        inFrame: true,
+        ra: `${raH}h ${raM}m`,
+        dec: `${decSign}${decD}° ${decM}′`,
+        zoomStage: fovToZoomLevel(camera.fov),
+        starData: s,
+      })
+    }
+    return result
   }
 
   // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
@@ -3533,6 +3590,9 @@ for (const s of stars) starById.set(s.id, s)
     },
     getCenterCelestial(): { ra: string; dec: string } {
       return { ra: getCenterRa(), dec: getCenterDec() }
+    },
+    getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
+      return getStarsInFrame(storyStars)
     },
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
