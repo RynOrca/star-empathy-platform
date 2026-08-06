@@ -90,6 +90,7 @@
   --radius-full: 9999px;        /* 胶囊按钮、头像 */
 
   /* ═══ 字体层级 ═══ */
+  --text-xxs: 0.6rem;
   --text-xs: 0.625rem;          /* 10px — caption */
   --text-sm: 0.75rem;           /* 12px — secondary */
   --text-base: 0.875rem;        /* 14px — body */
@@ -99,6 +100,7 @@
 
   --font: "Inter", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-display: 'Cinzel', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
   /* ═══ 阴影 ═══ */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -133,4 +135,23 @@
   --touch-target: 44px;                             /* 最小触控区域 */
   --mobile-safe-bottom: env(safe-area-inset-bottom, 16px);
   --mobile-safe-top: env(safe-area-inset-top, 0px);
+
+  /* ═══ 天镜览星模式（Camera Mode）token ═══ */
+  --accent-purple: #caa7ff;
+  --vf-vignette: rgba(7, 8, 22, 0.55);
+  --vf-border: rgba(202, 167, 255, 0.8);
+  --vf-grid: rgba(202, 167, 255, 0.07);
+  --vf-crosshair: rgba(202, 167, 255, 0.6);
+  --hud-bg: rgba(7, 8, 22, 0.75);
+  --hud-text: rgba(240, 236, 246, 0.85);
+  --hud-accent: #ffd98a;
+  --rec-color: #ff5b5b;
+  --bubble-bg: rgba(20, 22, 40, 0.88);
+  --bubble-border: rgba(202, 167, 255, 0.3);
+  --bubble-active-border: #ffd98a;
+  --bubble-active-glow: 0 0 24px rgba(255, 217, 138, 0.4);
+  --story-card-bg: rgba(18, 20, 36, 0.96);
+  --story-list-bg: rgba(15, 17, 32, 0.85);
+  --story-item-hover: rgba(202, 167, 255, 0.06);
+  --story-item-active: rgba(202, 167, 255, 0.08);
 }
