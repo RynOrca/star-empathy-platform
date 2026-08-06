@@ -302,6 +302,10 @@ export interface SkyAPI {
   setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
   /** 平滑将相机焦点移动到指定恒星（带动画） */
   focusOnStar: (x: number, y: number, z: number) => void
+  /** 天镜览星：飞向故事星（独立 670ms 动画，不进入 CLOSEUP） */
+  flyToStar3D: (star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) => void
+  /** 天镜览星：打断当前飞行动画 */
+  cancelFly: () => void
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
   /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
@@ -409,6 +413,13 @@ export function useSky(
   const isFlying = ref(false)
   // cameraZoomLevel ref（1~4，基于 fov 反推）
   const cameraZoomLevel = ref(1)
+  /** 根据 camera.fov 反推缩放层级 1~4 */
+  function fovToZoomLevel(fov: number): 1 | 2 | 3 | 4 {
+    if (fov > 67) return 1
+    if (fov > 52) return 2
+    if (fov > 39) return 3
+    return 4
+  }
   // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
   const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
@@ -3787,6 +3798,90 @@ for (const s of stars) starById.set(s.id, s)
         }
       }
       activeTweenId = requestAnimationFrame(animStep)
+    },
+    // ═══ 天镜览星：飞向故事星（独立 670ms 动画，不进入 CLOSEUP） ═══
+    flyToStar3D(star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) {
+      // 解析坐标：优先用 catalogStarId 查星表，否则用数据库 3D 坐标
+      let x: number, y: number, z: number
+      if (star.catalogStarId !== null && star.catalogStarId !== undefined) {
+        const target = starById.get(star.catalogStarId)
+        if (!target) return
+        x = target.x; y = target.y; z = target.z
+      } else {
+        x = star.posX; y = star.posY; z = star.posZ
+      }
+
+      // 打断旧飞行
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      // 打断特写 tween（互斥）
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+      // 打断 snap FOV 动画
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
+
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+
+      flyFromPos.copy(camera.position)
+      flyToPos.copy(starWorld).sub(starWorld.clone().sub(camera.position).normalize().multiplyScalar(80))
+
+      flyFromQuat.copy(camera.quaternion)
+      const worldUp = new Vector3(0, 1, 0).applyQuaternion(flyFromQuat)
+      const dummyCam = camera.clone()
+      dummyCam.up.copy(worldUp)
+      dummyCam.lookAt(starWorld)
+      flyToQuat.copy(dummyCam.quaternion)
+
+      flyFromFov = camera.fov
+      const stage = options?.zoomLevel ?? 3
+      flyToFov = CAMERA_FOV_BY_STAGE[stage] ?? 45
+
+      flyStartTime = performance.now()
+      cameraFlyState = 'flying'
+      isFlying.value = true
+
+      function flyStep(now: number) {
+        if (disposed) { cameraFlyId = null; cameraFlyState = 'idle'; isFlying.value = false; return }
+        const elapsed = now - flyStartTime
+        const t = Math.min(elapsed / CAMERA_FLY_DURATION_MS, 1)
+        const e = easeInOutCubic(t)
+
+        camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
+        camera.position.lerpVectors(flyFromPos, flyToPos, e)
+        camera.fov = flyFromFov + (flyToFov - flyFromFov) * e
+        camera.updateProjectionMatrix()
+
+        if (t < 1) {
+          cameraFlyId = requestAnimationFrame(flyStep)
+        } else {
+          cameraFlyId = null
+          cameraFlyState = 'idle'
+          isFlying.value = false
+          // 同步拖拽基准
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+          userFov = camera.fov
+          // 更新 zoomLevel
+          cameraZoomLevel.value = fovToZoomLevel(camera.fov)
+        }
+      }
+      cameraFlyId = requestAnimationFrame(flyStep)
+    },
+    cancelFly() {
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      cameraFlyState = 'idle'
+      isFlying.value = false
     },
     // ═══ 行星特写：focusOnPlanet → TWEENING → CLOSEUP（状态机入口） ═══
     // 飞到 CLOSEUP_INIT_RATIO × size 距离，FOV 缩到 CLOSEUP_FOV，末态进入 CLOSEUP 模式
