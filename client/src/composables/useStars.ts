@@ -1,4 +1,5 @@
 import { ref, reactive, computed, onMounted } from 'vue'
+import { HOT_THRESHOLD } from '../utils/constants'
 
 interface StarData {
   id: number
@@ -19,6 +20,16 @@ interface StarData {
   tags?: string[]
   locationLat: number | null
   locationLng: number | null
+
+  // ═══ 天镜览星派生字段（运行时计算，不入库） ═══
+  /** 24h 内发布 */
+  isNew?: boolean
+  /** resonanceCount >= HOT_THRESHOLD */
+  isHot?: boolean
+  /** type === 'history'，古人故事 */
+  isAncient?: boolean
+  /** 距用户位置近（地平线可见，需用户已定位） */
+  isNear?: boolean
 }
 
 export interface StarFilters {
@@ -53,7 +64,13 @@ export function useStars() {
       const res = await fetch('/api/stories')
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || '请求失败')
-      stars.value = json.data as StarData[]
+      stars.value = (json.data as StarData[]).map((s) => ({
+        ...s,
+        isNew: Date.now() - new Date(s.createdAt).getTime() < 24 * 60 * 60 * 1000,
+        isHot: s.resonanceCount >= HOT_THRESHOLD,
+        isAncient: s.type === 'history',
+        isNear: false, // 默认 false，由 useCameraMode 根据用户位置更新
+      }))
     } catch (e: any) {
       error.value = e.message || '加载星空数据失败'
       console.error('useStars: fetch failed', e)
