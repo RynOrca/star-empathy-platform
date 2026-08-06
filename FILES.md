@@ -154,6 +154,12 @@
 | `LoadingScreen.vue` | 加载动画 |
 | `LegendToggle.vue` | 图例开关 |
 
+### 组件 `src/components/CameraMode/` — 天镜览星（Camera Mode）
+
+| 文件 | 用途 |
+|---|---|
+| `icons/CameraIcons.ts` | **相机模式 SVG icon 集合**。13 个函数式组件（ApertureIcon/ChevronLeftIcon/CloseIcon/BookOpenIcon/SparklesIcon/FlameIcon/MapPinIcon/ScrollIcon/HeartIcon/EyeIcon/CompassIcon/ClockIcon/CrosshairIcon），统一 `viewBox 0 0 24 24` + `stroke=currentColor` + `stroke-width=1.8`，供 Phase 4-6 相机模式组件使用。禁用 emoji 字符（AGENTS.md 规范） |
+
 ### 核心逻辑 `src/composables/`
 
 | 文件 | 用途 |
