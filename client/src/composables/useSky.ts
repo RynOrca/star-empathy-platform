@@ -3608,7 +3608,22 @@ for (const s of stars) starById.set(s.id, s)
       cameraOverlayEnabled = enabled
       if (enabled) {
         // 进入相机模式
-        if (closeupState !== 'IDLE') this.exitCloseup()
+        if (closeupState !== 'IDLE') {
+          // 同步清理 closeup 状态（不启动飞回 tween，相机模式由 flyToStar3D 处理定位）
+          if (activeTweenId !== null) {
+            cancelAnimationFrame(activeTweenId)
+            activeTweenId = null
+          }
+          camera.near = DEFAULT_NEAR
+          camera.updateProjectionMatrix()
+          if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+          if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          for (const g of hiddenGlows) g.visible = true
+          hiddenGlows = []
+          closeupState = 'IDLE'
+          closeupTarget = null
+          preCloseupCamera = null
+        }
         releaseSnap()
         planetHoverTargetOpacity = 0
         planetHoverGlow.visible = false
