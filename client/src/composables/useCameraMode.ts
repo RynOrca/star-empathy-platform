@@ -61,7 +61,16 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     if (cameraMode.value === 'observe') return
     cameraMode.value = 'observe'
     state.value = 'IDLE'
-    sky.setCameraModeOverlay(true)
+
+    // 构造故事星列表传给 useSky 创建呼吸 glow
+    const storyStars = stars.filteredStars.value.map(s => ({
+      id: s.id,
+      catalogStarId: s.catalogStarId,
+      posX: s.posX,
+      posY: s.posY,
+      posZ: s.posZ,
+    }))
+    sky.setCameraModeOverlay(true, storyStars)
 
     let throttling = false
     unsubscribeFrame = sky.onCameraFrame(() => {

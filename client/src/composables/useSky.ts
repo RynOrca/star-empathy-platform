@@ -313,7 +313,7 @@ export interface SkyAPI {
   /** 天镜览星：取景框（视锥）内的故事星列表 */
   getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
   /** 天镜览星：进入/退出相机模式 overlay（隐藏 hover 光晕/星名标签等） */
-  setCameraModeOverlay: (enabled: boolean) => void
+  setCameraModeOverlay: (enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => void
   /** 天镜览星：当前是否正在执行飞行动画 */
   isFlying: Ref<boolean>
   /** 天镜览星：当前缩放层级 1~4（基于 FOV 反推） */
@@ -417,6 +417,8 @@ export function useSky(
   let flyStartTime = 0
   // 相机模式 overlay 开关
   let cameraOverlayEnabled = false
+  // 天镜览星故事星 glow 元数据
+  const cameraModeStoryStars = new Map<number, { glowSprite: Sprite | null; phase: number }>()
   // onCameraFrame 订阅者列表
   const cameraFrameSubscribers: Array<(pose: CameraPose) => void> = []
   // 取景框星过滤节流时间戳
@@ -3206,6 +3208,19 @@ for (const s of stars) starById.set(s.id, s)
       const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
       ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
     }
+    // 天镜览星：故事星呼吸 glow
+    if (cameraOverlayEnabled && cameraModeStoryStars.size > 0) {
+      const secs = _now / 1000
+      cameraModeStoryStars.forEach((meta) => {
+        if (!meta.glowSprite) return
+        const pulse = Math.sin(secs * 1.5 + meta.phase) * 0.3
+        const mat = meta.glowSprite.material as SpriteMaterial
+        mat.opacity = 0.5 + pulse
+        // 轻微缩放呼吸
+        const scalePulse = 1 + Math.sin(secs * 1.5 + meta.phase) * 0.1
+        meta.glowSprite.scale.set(8 * scalePulse, 8 * scalePulse, 1)
+      })
+    }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
     // clamp deltaMs 到 250ms：visibilitychange 已重置 lastFrameTime，但极端情况下（卡顿/调试断点）仍需兜底
     const deltaMs = Math.min(_now - lastFrameTime, 250)
@@ -3604,7 +3619,7 @@ for (const s of stars) starById.set(s.id, s)
     getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
       return getStarsInFrame(storyStars)
     },
-    setCameraModeOverlay(this: SkyAPI, enabled: boolean) {
+    setCameraModeOverlay(this: SkyAPI, enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) {
       cameraOverlayEnabled = enabled
       if (enabled) {
         // 进入相机模式
@@ -3631,9 +3646,46 @@ for (const s of stars) starById.set(s.id, s)
         hoverGlow.visible = false
         // 隐藏普通模式星名标签
         starNameLabels.forEach((label) => { label.element.style.display = 'none' })
+
+        // 为故事星创建呼吸 glow（覆盖星表星 + 用户星）
+        cameraModeStoryStars.clear()
+        if (storyStars) {
+          for (const s of storyStars) {
+            let x: number, y: number, z: number
+            if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
+              const cat = starById.get(s.catalogStarId)
+              if (!cat) continue
+              x = cat.x; y = cat.y; z = cat.z
+            } else {
+              x = s.posX; y = s.posY; z = s.posZ
+            }
+            const sprite = new Sprite(new SpriteMaterial({
+              map: bloomTex('#ffe5a0', 128),
+              blending: AdditiveBlending,
+              depthWrite: false,
+              depthTest: false,
+              transparent: true,
+              opacity: 0.5,
+            }))
+            sprite.scale.set(8, 8, 1)
+            sprite.position.set(x, y, z)
+            skyGroup.add(sprite)
+            cameraModeStoryStars.set(s.id, { glowSprite: sprite, phase: Math.random() * Math.PI * 2 })
+          }
+        }
       } else {
         // 退出相机模式，恢复
         starNameLabels.forEach((label) => { label.element.style.display = '' })
+
+        // 清理故事星 glow
+        cameraModeStoryStars.forEach((meta) => {
+          if (meta.glowSprite) {
+            skyGroup.remove(meta.glowSprite)
+            ;(meta.glowSprite.material as SpriteMaterial).dispose()
+            meta.glowSprite = null
+          }
+        })
+        cameraModeStoryStars.clear()
       }
     },
     isFlying,
