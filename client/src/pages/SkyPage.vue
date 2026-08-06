@@ -67,20 +67,20 @@
         <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
         </button>
-        <!-- 星笺：打开我的合集 -->
-        <button v-if="username && !isGuest" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
+        <!-- 星笺：打开我的合集（相机模式隐藏） -->
+        <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
           <Library :size="18" />
         </button>
-        <!-- 设置（不依赖定位，首帧就显示） -->
-        <button class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
+        <!-- 设置（相机模式隐藏） -->
+        <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="isGuest ? goLogin() : (showSettings = true)" title="设置">
           <Settings :size="18" />
         </button>
         <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，首帧就显示） -->
         <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
-        <!-- 天镜览星：进入/退出相机模式 -->
-        <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" :aria-label="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'" aria-haspopup="dialog" :aria-expanded="cameraMode.cameraMode.value === 'observe'">
+        <!-- 天镜览星：进入相机模式（相机模式期间通过 CameraOverlay 的返回按钮或 ESC 退出） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-camera-btn" @click="toggleCameraMode" title="进入天镜览星" aria-label="进入天镜览星" aria-haspopup="dialog" :aria-expanded="false">
           <ApertureIcon />
         </button>
         <!-- 用户/登录（相机模式隐藏） -->
@@ -1097,6 +1097,8 @@ function locateStar(starId: number) {
 let hoverLinesAbort: AbortController | null = null
 let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
 async function onStarHoverLong(starId: number | null) {
+  // 天镜览星模式下禁止 hover 触发连线/详情
+  if (cameraMode.cameraMode.value === 'observe') return
   // 取消上一次请求和清除计时器
   if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
   if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
@@ -1690,6 +1692,8 @@ function onRecordStorySubmitted(story: any) {
 }
 
 function onStarClick(starId: number) {
+  // 天镜览星模式下禁止点击星星弹出故事界面（相机模式有独立交互逻辑）
+  if (cameraMode.cameraMode.value === 'observe') return
   // 负 id = 行星，转走 onPlanetClick 路径（防御性，从 fly-to-star CustomEvent 触发时也能正确处理）
   if (isPlanetId(starId)) {
     const bodyName = getPlanetBodyName(starId)
@@ -1743,6 +1747,8 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
 }
 
 async function onPlanetClick(name: string, nameCN: string, planetId: number, enterCloseup = true) {
+  // 天镜览星模式下禁止点击行星弹出特写/故事界面
+  if (cameraMode.cameraMode.value === 'observe') return
   const info = PLANET_INFO[name]
   const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
