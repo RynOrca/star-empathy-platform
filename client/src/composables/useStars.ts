@@ -1,7 +1,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { HOT_THRESHOLD } from '../utils/constants'
 
-interface StarData {
+export interface StarData {
   id: number
   type: 'history' | 'user'
   title: string | null

@@ -166,6 +166,7 @@
 |---|---|
 | `useSky.ts` | **Three.js 渲染核心**。天球体、银河、星座连线、行星渲染（物理直径比例+halo辅助光点）、Raycaster 点击检测、相机控制、行星特写状态机（IDLE/TWEENING/CLOSEUP/EXITING，含 `preCloseupCamera` 快照实现望远镜效果——退出特写回到进入前的相机视角而非固定原点；进入特写隐藏 planetHoverGlow+halo 避免闪光弹；观察模式下滚轮/pinch 拉远到 maxDist 时 clamp 而非退出 CLOSEUP，issue #144）、行星 hover 淡光晕（与恒星 hover 互斥，按行星色 tint）、移动端准星吸附（`onSnapChange` 回调 + `releaseSnap` 主动释放，issue #124；issue #134 扩展支持行星吸附，导出 `SnapTarget` 类型区分恒星/行星，吸附行星时 tooltip 显示行星名）；**行星视运动轨迹**存储于 `planetTrailLines` 数组，`setPlanetTrailsVisible(v)` 切换显示（黄道线作为太阳轨迹始终显示） |
 | `useStars.ts` | 星星数据获取、过滤、本地更新 |
+| `useCameraMode.ts` | **天镜览星模式总控**。模式状态机（IDLE/SCROLLING/FLYING/DETAIL_OPEN）、取景框星过滤（节流 400ms）、故事列表派生（或关系过滤器+共鸣降序）、点击协调（PC 居中滚动+飞镜头+卡片；移动端飞镜头+卡片） |
 | `useNarrative.ts` | 叙事 API 调用封装。`fetchNarrative()` 含 `lat`/`lng`/`ra`/`dec` 参数 |
 | `useResonate.ts` | 共鸣操作（乐观更新） |
 | `useKernel.ts` | 故事内核（情感标签）提取 |
