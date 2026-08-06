@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -71,6 +71,10 @@
         <button v-if="locationReady" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
+        <!-- 天镜览星：进入/退出相机模式 -->
+        <button v-if="locationReady" class="nav-icon-btn nav-camera-btn" :class="{ active: cameraMode.cameraMode.value === 'observe' }" @click="toggleCameraMode" :title="cameraMode.cameraMode.value === 'observe' ? '退出天镜览星' : '进入天镜览星'">
+          <ApertureIcon />
+        </button>
         <!-- 用户：普通用户进个人主页，访客（体验账号）跳登录页 -->
         <button v-if="username && !isGuest" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
           <User :size="18" />
@@ -133,6 +137,30 @@
     </Transition>
 
     <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" @snap-change="onSnapChange" />
+
+    <!-- 天镜览星 · 相机模式 overlay（PC 端取景框+HUD+列表 / 移动端气泡+拖拽） -->
+    <Transition name="camera-fade">
+      <CameraOverlay
+        v-if="cameraMode.cameraMode.value === 'observe'"
+        ref="cameraOverlayRef"
+        :is-mobile="isMobile"
+        :stars-in-frame="cameraMode.starsInFrame.value"
+        :frame-stories="cameraMode.frameStories.value"
+        :active-star-id="cameraMode.activeStarId.value"
+        :active-card-star="cameraMode.activeCardStar.value"
+        :filters="cameraMode.filters"
+        :zoom-level="cameraMode.cameraZoomLevel.value"
+        :center-celestial="cameraCenterCelestial"
+        :current-fov="cameraCurrentFov"
+        :region="cameraRegion"
+        @exit="cameraMode.exit()"
+        @story-click="onCameraStoryClick"
+        @bubble-click="onCameraBubbleClick"
+        @close-card="cameraMode.closeStoryCard()"
+        @set-zoom="onCameraSetZoom"
+        @toggle-filter="onCameraToggleFilter"
+      />
+    </Transition>
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -525,8 +553,16 @@ import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
+import { useCameraMode, type CameraFilters } from '../composables/useCameraMode'
+import { useStars } from '../composables/useStars'
+import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
+import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
+import { CAMERA_FOV_BY_STAGE } from '../utils/constants'
 
 const { isMobile } = useMediaQuery()
+
+// 天镜览星模式所需的故事星数据源（独立于 storiesByStarId，供 useCameraMode 使用）
+const stars = useStars()
 
 const router = useRouter()
 const route = useRoute()
@@ -1162,6 +1198,91 @@ function formatStarName(s: CatalogStar): string {
 
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
+
+// ═══════════════════════════════════════════
+// 天镜览星 · 相机模式
+// ═══════════════════════════════════════════
+// SkyPage 不直接调用 useSky()：sky 实例由 SkyCanvas 内部创建并通过 ref 暴露。
+// useCameraMode 需在 setup 同步调用（内部注册 onBeforeUnmount），但此时 SkyCanvas
+// 尚未挂载、skyRef.value.sky 为 null。故用 Proxy 转发所有属性/方法到最新 skyRef.value.sky；
+// cameraZoomLevel / isFlying 用本地 ref 同步，sky 未就绪时方法 fallback 为 noop。
+const _cameraZoomLevelSync = ref(1)
+const _cameraIsFlyingSync = ref(false)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.cameraZoomLevel?.value,
+  (v) => { if (typeof v === 'number') _cameraZoomLevelSync.value = v },
+  { immediate: true },
+)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.isFlying?.value,
+  (v) => { if (typeof v === 'boolean') _cameraIsFlyingSync.value = v },
+  { immediate: true },
+)
+const sky = new Proxy({} as SkyAPI, {
+  get(_t, prop: string | symbol) {
+    if (prop === 'cameraZoomLevel') return _cameraZoomLevelSync
+    if (prop === 'isFlying') return _cameraIsFlyingSync
+    const real = skyRef.value?.sky
+    if (real) return (real as Record<symbol | string, unknown>)[prop]
+    return () => {}
+  },
+}) as SkyAPI
+
+const cameraMode = useCameraMode(sky, stars)
+
+const cameraCenterCelestial = ref({ ra: '', dec: '' })
+const cameraCurrentFov = ref(75)
+const cameraRegion = ref('夏季银河大三角区域')
+const cameraOverlayRef = ref<InstanceType<typeof CameraOverlay> | null>(null)
+let cameraFrameUnsub: (() => void) | null = null
+
+// 订阅相机帧更新 HUD 数据
+watch(() => cameraMode.cameraMode.value, (mode) => {
+  if (mode === 'observe') {
+    cameraFrameUnsub = sky.onCameraFrame((pose) => {
+      cameraCenterCelestial.value = { ra: pose.centerRa, dec: pose.centerDec }
+      cameraCurrentFov.value = pose.fov
+    })
+  } else if (cameraFrameUnsub) {
+    cameraFrameUnsub()
+    cameraFrameUnsub = null
+  }
+})
+
+function toggleCameraMode() {
+  if (cameraMode.cameraMode.value === 'observe') {
+    cameraMode.exit()
+  } else {
+    cameraMode.enter()
+  }
+}
+
+async function onCameraStoryClick(star: any) {
+  const overlay = cameraOverlayRef.value
+  const panel = (overlay as any)?.panelRef
+  await cameraMode.handleStoryClick(
+    star,
+    panel?.scrollToCardCenter,
+    panel?.isCardCentered,
+  )
+}
+
+async function onCameraBubbleClick(star: any) {
+  await cameraMode.handleBubbleClick(star)
+}
+
+function onCameraSetZoom(level: number) {
+  const targetFov = CAMERA_FOV_BY_STAGE[level]
+  const camera = skyRef.value?.sky?.camera
+  if (targetFov && camera) {
+    camera.fov = targetFov
+    camera.updateProjectionMatrix()
+  }
+}
+
+function onCameraToggleFilter(key: keyof CameraFilters) {
+  cameraMode.setFilter(key, !cameraMode.filters[key])
+}
 
 // issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
 const snappedTarget = ref<SnapTarget | null>(null)
@@ -3197,5 +3318,13 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     gap: 13px;
   }
   .cb-card { padding: 15px 15px 17px; gap: 12px }
+}
+
+/* ═══ 天镜览星 · 相机模式过渡 ═══ */
+.camera-fade-enter-active, .camera-fade-leave-active {
+  transition: opacity 0.45s var(--ease-in-out);
+}
+.camera-fade-enter-from, .camera-fade-leave-to {
+  opacity: 0;
 }
 </style>
