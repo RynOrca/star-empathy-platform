@@ -26,7 +26,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR } from '../utils/constants'
 import { CAMERA_FOV_BY_STAGE, CAMERA_FLY_DURATION_MS, CAMERA_FRAME_THROTTLE_MS, CAMERA_LIST_MAX_ITEMS } from '../utils/constants'
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { STAR_DISPLAY_CONFIG, type StarDisplayConfig } from '../utils/starDisplayConfig'
 import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync } from '../utils/astro'
 // 阶段 3 P2：小行星 + GPU 检测
@@ -312,6 +312,12 @@ export interface SkyAPI {
   getCenterCelestial: () => { ra: string; dec: string }
   /** 天镜览星：取景框（视锥）内的故事星列表 */
   getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
+  /** 天镜览星：进入/退出相机模式 overlay（隐藏 hover 光晕/星名标签等） */
+  setCameraModeOverlay: (enabled: boolean) => void
+  /** 天镜览星：当前是否正在执行飞行动画 */
+  isFlying: Ref<boolean>
+  /** 天镜览星：当前缩放层级 1~4（基于 FOV 反推） */
+  cameraZoomLevel: Ref<number>
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
   /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
@@ -3598,6 +3604,25 @@ for (const s of stars) starById.set(s.id, s)
     getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
       return getStarsInFrame(storyStars)
     },
+    setCameraModeOverlay(this: SkyAPI, enabled: boolean) {
+      cameraOverlayEnabled = enabled
+      if (enabled) {
+        // 进入相机模式
+        if (closeupState !== 'IDLE') this.exitCloseup()
+        releaseSnap()
+        planetHoverTargetOpacity = 0
+        planetHoverGlow.visible = false
+        hoverGlowTargetOpacity = 0
+        hoverGlow.visible = false
+        // 隐藏普通模式星名标签
+        starNameLabels.forEach((label) => { label.element.style.display = 'none' })
+      } else {
+        // 退出相机模式，恢复
+        starNameLabels.forEach((label) => { label.element.style.display = '' })
+      }
+    },
+    isFlying,
+    cameraZoomLevel,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
     // issue #136：PC 端行星特写观察模式开关
