@@ -13,7 +13,7 @@
       </header>
 
       <div class="mode-hint">
-        把心事挂上星空，或走入银河聆听前人低语。
+        把心事挂上星空，或走入银河聆听低语。
       </div>
 
       <div class="zfc-mode-toggles">
@@ -34,9 +34,7 @@
               <span class="mode-tag">星友心声</span>
             </div>
             <p class="mode-desc">
-              收录此刻共鸣的星友心事。<br />
-              未看过的故事优先，按共鸣热度排序，<br />
-              让银河替你接住每一份情绪。
+              收录此刻共鸣的星友心事，未看过的故事优先，按共鸣热度排序。
             </p>
           </div>
         </button>
@@ -58,9 +56,7 @@
               <span class="mode-tag mode-tag-blue">神话典籍</span>
             </div>
             <p class="mode-desc">
-              品读星辰的神话与千年传说。<br />
-              只展示每颗星本身的历史故事与星座溯源，<br />
-              适合安静地仰望银河、独自漫游。
+              品读星辰的神话与千年传说，只展示每颗星本身的历史故事与星座溯源。
             </p>
           </div>
         </button>
@@ -88,13 +84,13 @@ defineEmits<{
   bottom: 80px;
   left: 36px;
   z-index: 15;
-  width: 288px;
+  width: 280px;
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px) saturate(1.2);
-  padding: 16px 16px 14px;
+  padding: 14px 14px 12px;
   font-family: var(--font);
   pointer-events: auto;
   color: var(--ink);
@@ -145,8 +141,8 @@ defineEmits<{
   font-size: 11px;
   color: var(--muted);
   opacity: 0.9;
-  line-height: 1.55;
-  margin: 0 2px 12px;
+  line-height: 1.5;
+  margin: 0 2px 10px;
   padding-left: 1px;
   letter-spacing: 0.01em;
 }
@@ -156,13 +152,13 @@ defineEmits<{
   display: grid;
   grid-template-rows: 1fr 1fr;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 .zfc-mode-btn {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 12px 12px 12px;
+  gap: 10px;
+  padding: 10px 10px 10px 10px;
   background: var(--overlay-02);
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
@@ -206,8 +202,8 @@ defineEmits<{
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  line-height: 1.25;
+  gap: 3px;
+  line-height: 1.2;
   min-width: 0;
 }
 .mode-title-row {
@@ -216,7 +212,7 @@ defineEmits<{
   gap: 8px;
 }
 .mode-label {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -240,11 +236,12 @@ defineEmits<{
 .mode-desc {
   margin: 0;
   font-size: 10.5px;
-  line-height: 1.62;
+  line-height: 1.5;
   color: inherit;
   opacity: 0.82;
   letter-spacing: 0.005em;
-  white-space: pre-line;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .zfc-mode-btn.active .mode-desc {
   opacity: 0.92;
