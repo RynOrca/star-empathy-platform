@@ -83,6 +83,7 @@ import {
 } from 'lucide-vue-next'
 import CollectionDetail from '../components/CollectionDetail/index.vue'
 import type { Collection } from '../composables/useCollections'
+import { normalizeCollection } from '../composables/useCollections'
 import { authFetch, authHeaders, useAuth } from '../stores/auth'
 
 const props = defineProps<{
@@ -124,7 +125,8 @@ async function loadDetailMeta() {
     const json = await res.json()
     if (res.status === 404) { notFound.value = true; return }
     if (!res.ok) throw new Error(json.message || '加载失败')
-    const d = json.data
+    const raw = json.data
+    const d = normalizeCollection(raw, { withStories: true })
     detail.value = d
     isOwner.value = !!userId.value && !!d && Number(d.userId) === Number(userId.value)
     // 更新浏览器 title

@@ -284,6 +284,7 @@ import {
 import FolioGrid, { type FolioLike } from '../components/FolioGrid.vue'
 import { authFetch, authHeaders, useAuth } from '../stores/auth'
 import type { Collection } from '../composables/useCollections'
+import { normalizeCollection } from '../composables/useCollections'
 
 const route = useRoute()
 const router = useRouter()
@@ -376,7 +377,8 @@ async function fetchGalaxyReels() {
     const res = await authFetch('/api/collections/public?visibility=galaxy&page=1&limit=12&sort=stories_desc')
     const json = await res.json()
     if (res.ok) {
-      const list = (json.data?.items ?? []) as Collection[]
+      const rawItems = (json.data?.items ?? []) as any[]
+      const list = rawItems.map((r) => normalizeCollection(r, { withStories: false })) as Collection[]
       galaxyReels.value = list
       galaxyCount.value = json.data?.total ?? list.length
       totalStories.value += list.reduce((s, x) => s + (x.storyCount ?? 0), 0)
@@ -400,7 +402,10 @@ async function fetchPicks() {
   try {
     const res = await authFetch('/api/collections/picks?wanted=6&galaxyN=3')
     const json = await res.json()
-    if (res.ok) picks.value = (json.data ?? []) as Collection[]
+    if (res.ok) {
+      const raw = Array.isArray(json.data) ? json.data : []
+      picks.value = raw.map((r: any) => normalizeCollection(r, { withStories: false })) as Collection[]
+    }
   } finally {
     picksLoading.value = false
   }
@@ -445,7 +450,8 @@ async function fetchShelfPage(page: number) {
     if (!res.ok) throw new Error(json.message || '加载失败')
     const d = json.data || {}
     shelfTotalPages.value = d.totalPages ?? Math.ceil((d.total ?? 0) / shelfPageSize)
-    const items: Collection[] = d.items ?? []
+    const rawItems: any[] = d.items ?? []
+    const items: Collection[] = rawItems.map((r) => normalizeCollection(r, { withStories: false })) as Collection[]
     if (page === 1) {
       shelfList.value = items
       totalFolios.value = d.total ?? items.length
