@@ -1832,16 +1832,20 @@ function infoTagStyle(tag: string): Record<string, string> {
 }
 .footer-delete:hover { background: rgba(255, 107, 138, 0.12); }
 
-/* 穹庭书局 · 更多星笺 胶囊：紫金调纯块扁平（无渐变、无光辉阴影） */
+/* 穹庭书局 · 更多星笺 胶囊：纯扁平（无渐变、无边框、无阴影/光辉） */
 .footer-square {
   background: rgba(202, 167, 255, 0.12);
   color: var(--star-purple);
   margin-left: auto;
   font-weight: 600;
+  border: none;
+  border-radius: var(--radius-full);
+  box-shadow: none;
 }
 .footer-square:hover {
-  background: rgba(202, 167, 255, 0.22);
+  background: color-mix(in srgb, var(--star-purple) 22%, transparent);
   color: #ead6ff;
+  box-shadow: none;
 }
 .mobile-footer-square {
   margin-left: 0;
