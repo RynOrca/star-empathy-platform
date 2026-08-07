@@ -31,14 +31,22 @@
       <div :key="story.id" class="detail-view">
         <h2 class="detail-title">{{ story.title || '匿名心事' }}</h2>
         <div class="detail-info-bar">
-          <span v-if="formattedTime" :title="preciseTime">{{ formattedTime }}</span>
-          <span v-if="formattedTime && (formattedDistance?.text || origin)">·</span>
-          <span v-if="formattedDistance?.text" class="detail-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
-          <span v-if="origin" class="detail-origin">
+          <!-- 历史故事：不显示无意义的入库时间和随机地点 -->
+          <template v-if="story.type !== 'history'">
+            <span v-if="formattedTime" :title="preciseTime">{{ formattedTime }}</span>
+            <span v-if="formattedTime && (formattedDistance?.text || origin)">·</span>
+            <span v-if="formattedDistance?.text" class="detail-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
+          </template>
+          <span v-if="(story.type === 'history' ? !!origin : (formattedTime || formattedDistance?.text)) && origin" class="detail-origin">
             <BookOpenIcon :size="11" />
             <span>{{ origin }}</span>
           </span>
-          <template v-if="story.username">
+          <template v-if="story.type === 'history'">
+            <!-- 历史故事统一作者：古人 -->
+            <span v-if="origin" class="meta-sep">·</span>
+            <span class="detail-sender is-ancient">古人</span>
+          </template>
+          <template v-else-if="story.username">
             <span class="meta-sep">·</span>
             <span class="detail-sender">by {{ story.username }}</span>
           </template>
@@ -179,6 +187,7 @@ export interface SiblingStoryPreview {
 const props = defineProps<{
   story: {
     id: number
+    type?: 'history' | 'user' | string | null
     title: string | null
     imageUrl: string | null
     userId: number | null
@@ -469,6 +478,7 @@ function tagStyle(tag: string): Record<string, string> {
 .detail-info-bar span:nth-child(1n+3) { color: var(--star-blue); }
 .detail-sender { color: #7a8cc0; opacity: 0.8; }
 .detail-sender.is-anon { color: #5a5580; }
+.detail-sender.is-ancient { color: var(--star-purple); font-weight: 500; opacity: 0.95; }
 .detail-dist { color: var(--star-blue); }
 .meta-near { color: var(--accent); font-weight: 500; }
 .meta-sep { opacity: 0.4; }

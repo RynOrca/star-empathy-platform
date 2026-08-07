@@ -52,7 +52,8 @@
                 <span v-if="item.star.isHot" class="badge badge-hot" title="高共鸣">
                   <FlameIcon />
                 </span>
-                <span class="card-time"><ClockIcon />{{ formatTime(item.star.createdAt) }}</span>
+                <!-- 历史故事：不显示无意义的入库时间 -->
+                <span v-if="item.star.type !== 'history'" class="card-time"><ClockIcon />{{ formatTime(item.star.createdAt) }}</span>
               </template>
               <!-- 观星模式徽章：星座/距离 -->
               <template v-else>

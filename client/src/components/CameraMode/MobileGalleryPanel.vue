@@ -47,7 +47,7 @@
               <SparklesIcon v-if="mode === 'listening' && item.star.isNew" class="mgp-tag-new" />
               <FlameIcon v-if="mode === 'listening' && item.star.isHot" class="mgp-tag-hot" />
             </div>
-            <span v-if="mode === 'listening'" class="mgp-time">{{ formatTime(item.star.createdAt) }}</span>
+            <span v-if="mode === 'listening' && item.star.type !== 'history'" class="mgp-time">{{ formatTime(item.star.createdAt) }}</span>
           </div>
           <!-- 听语模式：故事标题（与星名不同时才显示，避免重复） -->
           <div v-if="mode === 'listening' && storyTitleToShow(item.star)" class="mgp-title-text">{{ storyTitleToShow(item.star) }}</div>

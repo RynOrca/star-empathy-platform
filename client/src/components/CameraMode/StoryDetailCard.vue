@@ -51,15 +51,18 @@
           <div class="sc-author-row">
             <span class="sc-author">
               <UserMiniIcon />
-              <span>{{ star.username ? ('by ' + star.username) : '匿名星语' }}</span>
+              <!-- 历史故事统一作者"古人"；否则按 username / 匿名星语 -->
+              <template v-if="star.type === 'history'">古人</template>
+              <template v-else>{{ star.username ? ('by ' + star.username) : '匿名星语' }}</template>
             </span>
-            <span class="sc-author-sep" v-if="star.origin || (star.locationLat != null && userLat != null)">·</span>
+            <!-- 历史故事：不显示无意义的地点距离 -->
+            <span class="sc-author-sep" v-if="star.origin || (star.type !== 'history' && star.locationLat != null && userLat != null)">·</span>
             <span v-if="star.origin" class="sc-origin">
               <BookOpenMiniIcon />
               <span>{{ star.origin }}</span>
             </span>
             <span v-if="star.origin && distanceText" class="sc-author-sep">·</span>
-            <span v-if="distanceText" class="sc-distance" :class="{ 'is-near': distanceNear }">
+            <span v-if="star.type !== 'history' && distanceText" class="sc-distance" :class="{ 'is-near': distanceNear }">
               <PinMiniIcon />
               <span>{{ distanceText }}</span>
             </span>
@@ -97,7 +100,8 @@
               <span class="meta-label">共鸣率</span>
             </span>
             <span class="sc-meta-flex" />
-            <span class="sc-meta-item" :title="preciseTime">
+            <!-- 历史故事：不显示无意义的入库时间 -->
+            <span v-if="star.type !== 'history'" class="sc-meta-item" :title="preciseTime">
               <ClockIcon />
               <span class="meta-time">{{ formatTime }}</span>
             </span>

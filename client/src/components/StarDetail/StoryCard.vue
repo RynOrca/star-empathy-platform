@@ -12,7 +12,8 @@
 
       <!-- 所有故事：发送者 + 共鸣按钮 -->
       <template v-if="variant === 'all'">
-        <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+        <span v-if="story.type === 'history'" class="story-sender">古人</span>
+        <span v-else-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
         <button
           class="resonate-btn"
@@ -92,13 +93,23 @@
 
       <!-- 所有故事 / 我的故事元信息 -->
       <template v-else>
-        <span v-if="formattedTime" class="meta-time">{{ formattedTime }}</span>
-        <span v-if="formattedTime && formattedDistance?.text" class="meta-sep">·</span>
-        <span v-if="formattedDistance?.text" class="meta-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
-        <span class="meta-sep">·</span>
-        <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
-        <span class="meta-sep">·</span>
-        <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        <!-- 历史故事：在其他上下文（合集等）也不显示无意义的发表时间+地点 -->
+        <template v-if="story.type === 'history'">
+          <span class="meta-history">来自星河</span>
+          <span class="meta-sep">·</span>
+          <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
+          <span class="meta-sep">·</span>
+          <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        </template>
+        <template v-else>
+          <span v-if="formattedTime" class="meta-time">{{ formattedTime }}</span>
+          <span v-if="formattedTime && formattedDistance?.text" class="meta-sep">·</span>
+          <span v-if="formattedDistance?.text" class="meta-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
+          <span class="meta-sep">·</span>
+          <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
+          <span class="meta-sep">·</span>
+          <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        </template>
       </template>
     </div>
   </div>
