@@ -188,11 +188,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="true"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -225,11 +231,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="true"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -273,11 +285,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="true"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -894,11 +912,17 @@
                 :currentUserId="currentUserId"
                 :formattedTime="formatTime(detailStory.createdAt)"
                 :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+                :viewCount="getStoryViewCount(detailStory.id)"
+                :origin="detailStory.origin ?? null"
+                :createdAtIso="detailStory.createdAt"
+                :siblingStories="siblingStoriesFor(detailStory)"
+                :showStarBelonging="true"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
                 :collection-clickable="true"
                 @collection-click="onCollectionClick"
+                @open-story="openStoryDetail"
               />
             </div>
           </div>
@@ -1243,6 +1267,38 @@ function getStoryViewCount(storyId: number): number {
   return s?.viewCount ?? 0
 }
 
+/** 同星其他故事推荐：按 catalogStarId 匹配（共享任一归属星视为同星），最多返回 4 条预览 */
+import type { SiblingStoryPreview } from './StoryDetail.vue'
+function siblingStoriesFor(story: any): SiblingStoryPreview[] {
+  if (!story?.id) return []
+  const ownIds = new Set<number>()
+  if (typeof story.catalogStarId === 'number' && story.catalogStarId !== 0) ownIds.add(story.catalogStarId)
+  if (Array.isArray(story.catalogStarIds)) {
+    for (const n of story.catalogStarIds) if (typeof n === 'number' && n !== 0) ownIds.add(n)
+  }
+  const sharesStar = (s: any): boolean => {
+    if (s.id === story.id) return false
+    if (ownIds.size === 0) return false
+    if (typeof s.catalogStarId === 'number' && ownIds.has(s.catalogStarId)) return true
+    if (Array.isArray(s.catalogStarIds)) {
+      for (const n of s.catalogStarIds) if (typeof n === 'number' && ownIds.has(n)) return true
+    }
+    return false
+  }
+  const pool = realStories.value.filter(sharesStar)
+    .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
+    .slice(0, 4)
+  return pool.map<SiblingStoryPreview>((s: any) => ({
+    id: s.id,
+    title: s.title ?? null,
+    type: s.type === 'history' ? 'history' : 'user',
+    isNew: !!s.isNew,
+    resonanceCount: s.resonanceCount ?? 0,
+    viewCount: s.viewCount ?? 0,
+    contentPreview: ((s.content ?? '').replace(/\s+/g, ' ').slice(0, 60)),
+  }))
+}
+
 const detailStoryId = ref<number | null>(null)
 const detailStory = computed(() => {
   if (detailStoryId.value === null) return null
@@ -1548,15 +1604,16 @@ function onWriteStory() { if (guestGuard()) return; emit('writeStory') }
 const showChat = ref(false)
 function openChat() { if (guestGuard()) return; showChat.value = true }
 
-function openStoryDetail(story: { id: number }) {
-  detailStoryId.value = story.id
-  const current = getStoryViewCount(story.id)
-  viewCountOverrides.set(story.id, current + 1)
+function openStoryDetail(input: { id: number } | number) {
+  const id: number = typeof input === 'number' ? input : input.id
+  detailStoryId.value = id
+  const current = getStoryViewCount(id)
+  viewCountOverrides.set(id, current + 1)
   emit('incrementViews')
-  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
+  fetch(`/api/stories/${id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
-      viewCountOverrides.set(story.id, current)
+      viewCountOverrides.set(id, current)
     })
 }
 
