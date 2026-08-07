@@ -50,6 +50,78 @@ import constellationsDataRaw from '../data/constellations.json'
 const CAT = rawCatalog as unknown as CatData
 const constellationsData = constellationsDataRaw as unknown as Record<string, ConstellationData>
 
+// ════════════════════════════════════════════════════════════
+// 视星等 → 辉光参数映射（所有可交互星都有辉光，强弱按星等分层）
+// 越亮(mag 越小)：越大、越亮、越暖色温、呼吸越慢（沉稳）
+// 越暗(mag 越大)：越小、越淡、越冷色温、呼吸稍快（细碎闪烁）
+// ════════════════════════════════════════════════════════════
+interface GlowTier {
+  /** bloomTex 画布尺寸：越大边缘渐变更柔和 */
+  texSize: number
+  /** SpriteMaterial.opacity 峰值（上限 clamp） */
+  peakOpacity: number
+  /** Sprite.scale (x=y) 世界尺寸 */
+  scale: number
+  /** 呼吸周期 ms（mag 越大周期越短，闪烁更细碎） */
+  periodMin: number
+  periodMax: number
+  /** 主色调（亮星暖金，中星银白，暗星冷蓝灰） */
+  tint: string
+  /** 有故事时额外叠加 0~1 的 opacity boost */
+  storyBoostOpacity: number
+  /** 有故事时额外乘以的 scale boost */
+  storyBoostScale: number
+}
+function glowTierForMag(mag: number): GlowTier {
+  if (mag <= -0.5) return {  // T0: 亮星（天狼/老人/南门二 级）
+    texSize: 128, peakOpacity: 0.72, scale: 7.0,
+    periodMin: 5000, periodMax: 8000,
+    tint: '#ffe5a0',
+    storyBoostOpacity: 0.22, storyBoostScale: 1.32,
+  }
+  if (mag <= 0.5) return {   // T1: 0 等星
+    texSize: 118, peakOpacity: 0.62, scale: 6.3,
+    periodMin: 4300, periodMax: 6800,
+    tint: '#ffd98a',
+    storyBoostOpacity: 0.20, storyBoostScale: 1.26,
+  }
+  if (mag <= 1.8) return {   // T2: 1 等星
+    texSize: 108, peakOpacity: 0.54, scale: 5.4,
+    periodMin: 3700, periodMax: 6000,
+    tint: '#f4ecd2',
+    storyBoostOpacity: 0.18, storyBoostScale: 1.22,
+  }
+  if (mag <= 3.0) return {   // T3: 2 等星
+    texSize: 98, peakOpacity: 0.46, scale: 4.6,
+    periodMin: 3100, periodMax: 5200,
+    tint: '#eaeaf2',
+    storyBoostOpacity: 0.16, storyBoostScale: 1.18,
+  }
+  if (mag <= 4.5) return {   // T4: 3~4 等星（用户星默认档）
+    texSize: 90, peakOpacity: 0.40, scale: 3.8,
+    periodMin: 2600, periodMax: 4400,
+    tint: '#c7d2e9',
+    storyBoostOpacity: 0.14, storyBoostScale: 1.14,
+  }
+  // T5: 5 等以下（暗星，最小档 → 基础 scale = 3.0，符合用户 3~7 区间）
+  return {
+    texSize: 80, peakOpacity: 0.32, scale: 3.0,
+    periodMin: 2200, periodMax: 3600,
+    tint: '#a8b8d4',
+    storyBoostOpacity: 0.12, storyBoostScale: 1.10,
+  }
+}
+const bloomTexCache = new Map<string, CanvasTexture>()
+/** 按颜色+尺寸缓存辉光纹理，避免每个星都 new 一张 canvas（防止几百星后显存爆） */
+function getBloomTexCached(color: string, size: number): CanvasTexture {
+  const key = `${color}|${size}`
+  const existing = bloomTexCache.get(key)
+  if (existing) return existing
+  const t = bloomTex(color, size)
+  bloomTexCache.set(key, t)
+  return t
+}
+
 const hexRGB = (h: string): [number, number, number] =>
   [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]
 
@@ -260,7 +332,10 @@ export interface SkyAPI {
   zoomOut: () => void
   dispose: () => void
   setObserver: (obs: ObserverLoc | null) => void
-  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
+  setStarStatsCache: (
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+    userStarPos?: Map<number, { x: number; y: number; z: number }>
+  ) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
   /** 绕世界 X 轴旋转天球（弧度），正角 = 右手定则 */
   rotateX: (rad: number) => void
@@ -427,8 +502,17 @@ export function useSky(
   const cameraModeEnterPos = new Vector3()
   const cameraModeEnterQuat = new Quaternion()
   let cameraModeEnterFov = 0
-  // 天镜览星故事星 glow 元数据
-  const cameraModeStoryStars = new Map<number, { glowSprite: Sprite | null; phase: number }>()
+  // 天镜览星：所有交互星 glow 元数据（含星等 tier 信息 + 是否有故事 boost）
+  type CameraModeGlowMeta = {
+    glowSprite: Sprite | null
+    phase: number
+    baseScale: number
+    peakOpacity: number
+    storyBoostOpacity: number
+    storyBoostScale: number
+    hasStory: boolean
+  }
+  const cameraModeStoryStars = new Map<number, CameraModeGlowMeta>()
   // 复用的 frustum / 投影矩阵（避免每帧 new，防止 GC 抖动）
   const _frustum = new Frustum()
   const _projScreenMatrix = new Matrix4()
@@ -856,34 +940,179 @@ for (const s of stars) starById.set(s.id, s)
   let locateHighlightUntil = 0
   let locateHighlightPulsePhase = 0
 
-  // ═══ 有故事的星星：呼吸辉光（同款 bloomTex，复用 hoverGlow 的方式） ═══
-  const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
-  function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
-    const existing = new Set<number>()
-    for (const sg of storyGlows) existing.add(sg.sprite.userData.starId as number)
-    for (const [starId, stats] of cache) {
-      if (stats.stories === 0) continue
-      if (existing.has(starId)) continue
-      const star = starById.get(starId)
-      if (!star) continue
+  // ═══ 所有可交互星：呼吸辉光（按星等分强弱；有故事时额外增亮） ═══
+  //   - 覆盖范围：星表所有星表恒星（从 CAT.stars 自动注入） + 用户星（SkyPage 通过 statsCache 传入 posX/Y/Z）
+  //   - mag 来源：星表恒星读 CatStar.mag；用户星（无 catalogStarId）默认按 3.2 等（T3/T4 交界，中亮度低调不抢镜）
+  interface InteractiveGlow {
+    sprite: Sprite
+    phase: number
+    period: number
+    baseScale: number         // 根据 mag 计算的原始 scale（不含故事增亮）
+    peakOpacity: number       // 根据 mag 计算的峰值 opacity（不含故事增亮）
+    storyBoostOpacity: number // stories>0 时的 opacity 叠加量
+    storyBoostScale: number   // stories>0 时的 scale 倍率
+    storiesCount: number      // 缓存当前 stories 数量，避免每帧去 statsCache 读
+  }
+  const interactiveGlows: InteractiveGlow[] = []
+
+  /** 把 CAT.stars 全量星表恒星以 stories=0 预填进 statsCache，保证每颗都有辉光 */
+  function seedAllCatalogStarsToStatsCache() {
+    for (let i = 0; i < n; i++) {
+      const s = stars[i]
+      if (!statsCache.has(s.id)) {
+        statsCache.set(s.id, { stories: 0, resonance: 0, views: 0, favorites: 0 })
+      }
+    }
+  }
+
+  /** 用户星（无 catalogStarId）的 fallback 星等 */
+  const USER_STAR_DEFAULT_MAG = 3.2
+
+  /**
+   * 根据 starId → (CatStar.mag 或 用户星默认) 取辉光分层参数，
+   * 若无法定位 3D 坐标（即不在星表里也没传 pos）返回 null，跳过创建
+   */
+  function resolveGlowContext(
+    starId: number,
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>
+  ): { star: CatStar | null; pos: { x: number; y: number; z: number }; mag: number; stories: number } | null {
+    const stats = cache.get(starId)
+    if (!stats) return null
+    const cat = starById.get(starId)
+    // ① 星表恒星：直接拿 CatStar 坐标 + mag
+    if (cat) {
+      return {
+        star: cat,
+        pos: { x: cat.x, y: cat.y, z: cat.z },
+        mag: cat.mag,
+        stories: stats.stories,
+      }
+    }
+    // ② 用户星：从 stats 的 userData 找不到位置；这里只接受 starId 时只能靠 starById，
+    //    用户星 glow 走 SkyPage 传入的用户星 Map（下一个函数：updateInteractiveGlowsForUserStars）
+    return null
+  }
+
+  /**
+   * 重建/补齐全部交互星的辉光：
+   *  ✅ 无论有没有故事都显示（stories=0 也有辉光）。
+   *  1. 先把外部传入的 cache（stories 数据）合并进 statsCache；
+   *  2. 再 seed CAT.stars 全量到 statsCache（保证 stories=0 的星也存在 entry）；
+   *  3. 最终遍历 statsCache（而不是传入 cache）建 sprite → 全量星都有辉光。
+   *  - 对星表恒星 + 用户星（通过第二个参数 userStarPos 传入）分别建 sprite
+   */
+  function updateInteractiveGlows(
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+    userStarPos?: Map<number, { x: number; y: number; z: number }>
+  ) {
+    // ① 把外部传入的数据合并进 statsCache（避免后面传参 cache 空导致 for 0 次）
+    cache.forEach((v, k) => statsCache.set(k, v))
+    // ② 把 CAT.stars 全量星表恒星（stories=0）也填进 statsCache — 确保每颗都有 entry
+    seedAllCatalogStarsToStatsCache()
+
+    const existingById = new Map<number, InteractiveGlow>()
+    for (const ig of interactiveGlows) existingById.set(ig.sprite.userData.starId as number, ig)
+
+    // ═══ 处理：星表恒星（含 stories=0）← 遍历 statsCache！
+    for (const [starId, stats] of statsCache) {
+      if (existingById.has(starId)) continue
+      const cat = starById.get(starId)
+      if (!cat) continue  // 用户星在下面独立处理（不在 starById 里）
+      const tier = glowTierForMag(cat.mag)
+      const hasStory = stats.stories > 0
+      const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
       const sp = new Sprite(new SpriteMaterial({
-        map: bloomTex('#ffe5a0', 128),
+        map: getBloomTexCached(tier.tint, tier.texSize),
         blending: AdditiveBlending,
         depthWrite: false,
         depthTest: false,
         transparent: true,
         opacity: 0,
       }))
-      sp.scale.set(10, 10, 1) // 同 hoverGlow 一样大
-      sp.renderOrder = 50
+      sp.scale.set(scale, scale, 1)
+      sp.renderOrder = 48
       sp.userData.starId = starId
-      sp.position.set(star.x, star.y, star.z)
+      sp.position.set(cat.x, cat.y, cat.z)
       skyGroup.add(sp)
-      storyGlows.push({
+      interactiveGlows.push({
         sprite: sp,
         phase: Math.random() * Math.PI * 2,
-        period: 3000 + Math.random() * 2000,
+        period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
+        baseScale: tier.scale,
+        peakOpacity: tier.peakOpacity,
+        storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+        storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+        storiesCount: stats.stories,
       })
+    }
+
+    // ═══ 处理：用户星（无 catalogStarId，pos 由 SkyPage 显式传递）
+    if (userStarPos && userStarPos.size > 0) {
+      for (const [starId, pos] of userStarPos) {
+        if (existingById.has(starId)) continue
+        const tier = glowTierForMag(USER_STAR_DEFAULT_MAG)
+        const stats = statsCache.get(starId)
+        const stories = stats?.stories ?? 1  // 用户星通常是投递心事产生，默认至少有 1 条
+        const hasStory = stories > 0
+        const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
+        const sp = new Sprite(new SpriteMaterial({
+          map: getBloomTexCached(tier.tint, tier.texSize),
+          blending: AdditiveBlending,
+          depthWrite: false,
+          depthTest: false,
+          transparent: true,
+          opacity: 0,
+        }))
+        sp.scale.set(scale, scale, 1)
+        sp.renderOrder = 49
+        sp.userData.starId = starId
+        sp.position.set(pos.x, pos.y, pos.z)
+        skyGroup.add(sp)
+        interactiveGlows.push({
+          sprite: sp,
+          phase: Math.random() * Math.PI * 2,
+          period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
+          baseScale: tier.scale,
+          peakOpacity: tier.peakOpacity,
+          storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+          storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+          storiesCount: stories,
+        })
+      }
+    }
+  }
+
+  /** 事后 stories 变化 → 只更新 existing glow 的 boost 字段（避免重建 sprite，防止闪烁）
+   *  ✅ 从 statsCache 读 stories，避免传入 cache 只有部分条目导致非故事星 boost 没更新
+   */
+  function updateInteractiveGlowsBoost(
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>
+  ) {
+    // 先把外部数据合并进 statsCache（cache 可能只是部分，但 statsCache 是全量）
+    cache.forEach((v, k) => statsCache.set(k, v))
+    for (const ig of interactiveGlows) {
+      const starId = ig.sprite.userData.starId as number
+      let mag: number
+      const cat = starById.get(starId)
+      mag = cat ? cat.mag : USER_STAR_DEFAULT_MAG
+      const tier = glowTierForMag(mag)
+      // ✅ 从 statsCache 取，而不是传入 cache（statsCache 含全量星 = 没故事的也能读到 stories=0）
+      const stats = statsCache.get(starId)
+      const stories = stats?.stories ?? ig.storiesCount
+      const hadStory = ig.storiesCount > 0
+      const hasStory = stories > 0
+      // 故事状态变化 → 更新 boost 与 scale
+      if (hadStory !== hasStory) {
+        ig.storyBoostOpacity = hasStory ? tier.storyBoostOpacity : 0
+        ig.storyBoostScale = hasStory ? tier.storyBoostScale : 1
+      }
+      ig.storiesCount = stories
+      // 同步基础参数（避免前面 tier 定义调整后未立即生效）
+      ig.peakOpacity = tier.peakOpacity
+      ig.baseScale = tier.scale
+      const scale = hasStory ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+      // scale 在 animate 每帧按呼吸 * scalePulse 重算，这里只设基准
+      ig.sprite.scale.set(scale, scale, 1)
     }
   }
 
@@ -3262,33 +3491,44 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画（相机模式下跳过，storyGlows 已隐藏，避免 200+ sprite 无效更新）
+    // 有故事的星：呼吸辉光动画（相机模式下跳过，interactiveGlows 统一隐藏，避免 400+ sprite 无效更新）
     if (!cameraOverlayEnabled) {
-      for (const sg of storyGlows) {
-        const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
+      for (const ig of interactiveGlows) {
+        const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
         const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-        ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+        // ✅ 恒定下限：保证"没故事"的星辉光永远存在（不会呼吸到 opacity=0 隐没）
+        //    基础呼吸：opacity ∈ [0.55 * peak, 1.0 * peak]，再额外加故事 boost
+        const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
+        ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + ig.storyBoostOpacity)
+        // scale 呼吸：暗星幅度稍大，亮星幅度沉稳（下限 1 - pulseAmt，也不会缩到看不见）
+        const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
+        const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
+        const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+        ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
       }
     }
-    // 天镜览星：故事星呼吸 glow（性能优化：只更新取景框内可见的星，避免 200+ sprite 每帧更新导致卡顿）
+    // 天镜览星：所有交互星呼吸 glow（只更新取景框内可见），按 mag tier 强弱
     if (cameraOverlayEnabled && cameraModeStoryStars.size > 0) {
       const secs = _now / 1000
-      // 用当前 frustum 判断可见性，只更新可见星的 glow
       _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
       cameraModeStoryStars.forEach((meta) => {
         if (!meta.glowSprite) return
-        // 不可见的星 glow 设为 0，跳过呼吸计算
         if (!_frustum.containsPoint(meta.glowSprite.position)) {
           meta.glowSprite.visible = false
           return
         }
         meta.glowSprite.visible = true
-        const pulse = Math.sin(secs * 1.5 + meta.phase) * 0.3
+        // 脉动幅度按 tier.peakOpacity：亮星（peak 高）脉动沉稳，暗星脉动稍细碎
+        const pulseAmp = meta.peakOpacity < 0.4 ? 0.10 : 0.06
+        const pulse = Math.sin(secs * 1.6 + meta.phase) * pulseAmp
         const mat = meta.glowSprite.material as SpriteMaterial
-        mat.opacity = 0.5 + pulse
-        // 轻微缩放呼吸
-        const scalePulse = 1 + Math.sin(secs * 1.5 + meta.phase) * 0.1
-        meta.glowSprite.scale.set(8 * scalePulse, 8 * scalePulse, 1)
+        // ✅ 恒定下限：基础 opacity 0.6~1.0 倍 peak，再叠故事 boost + 脉动（不会到 0）
+        const baseOpacity = meta.peakOpacity * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(secs * 1.6 + meta.phase + Math.PI)))
+        mat.opacity = Math.min(1.0, baseOpacity + pulse * 0.5 + meta.storyBoostOpacity)
+        const scalePulseAmt = meta.peakOpacity < 0.4 ? 0.06 : 0.035
+        const scalePulse = 1 + Math.sin(secs * 1.6 + meta.phase) * scalePulseAmt
+        const base = meta.hasStory ? meta.baseScale * meta.storyBoostScale : meta.baseScale
+        meta.glowSprite.scale.set(base * scalePulse, base * scalePulse, 1)
       })
     }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
@@ -3673,6 +3913,11 @@ for (const s of stars) starById.set(s.id, s)
   animate()
   if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
 
+  // ✅ 关键：不等外部 SkyPage 传 setStarStatsCache（那一步要等 fetchStories 异步完）
+  //   立刻以空 cache 走一次 updateInteractiveGlows → seedAllCatalog 把 CAT.stars 全量（stories=0 也）
+  //   都建辉光 sprite → 用户打开页面第一秒就能看到所有可交互星的辉光，而不是等 stories 加载
+  updateInteractiveGlows(new Map())
+
   return {
     camera,
     // ═══ 天镜览星 API ═══
@@ -3721,41 +3966,88 @@ for (const s of stars) starById.set(s.id, s)
         // 隐藏普通模式星名标签
         starNameLabels.forEach((label) => { label.element.style.display = 'none' })
 
-        // 隐藏普通模式 storyGlows（相机模式有独立的 cameraModeStoryStars glow，避免 400+ sprite 重复渲染）
-        for (const sg of storyGlows) sg.sprite.visible = false
+        // 隐藏普通模式 interactiveGlows（相机模式有独立的 cameraModeStoryStars glow，避免重复渲染）
+        for (const ig of interactiveGlows) ig.sprite.visible = false
 
-        // 为故事星创建呼吸 glow（覆盖星表星 + 用户星）
+        // 为所有交互星创建呼吸 glow（全部星表星 + 传进来的 storyStars 用户星），按 mag tier
         cameraModeStoryStars.clear()
+
+        // ① 先处理传进来的 storyStars（用户星 + 已确认的故事星，带 id 和 pos）
+        const storyUserPos = new Map<number, { x: number; y: number; z: number; hasStory: boolean }>()
         if (storyStars) {
           for (const s of storyStars) {
             let x: number, y: number, z: number
+            let mag: number
             if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
               const cat = starById.get(s.catalogStarId)
               if (!cat) continue
               x = cat.x; y = cat.y; z = cat.z
+              mag = cat.mag
             } else {
               x = s.posX; y = s.posY; z = s.posZ
+              mag = USER_STAR_DEFAULT_MAG
             }
+            storyUserPos.set(s.id, { x, y, z, hasStory: true })
+            const tier = glowTierForMag(mag)
+            const hasStory = true
             const sprite = new Sprite(new SpriteMaterial({
-              map: bloomTex('#ffe5a0', 128),
+              map: getBloomTexCached(tier.tint, tier.texSize),
               blending: AdditiveBlending,
               depthWrite: false,
               depthTest: false,
               transparent: true,
-              opacity: 0.5,
+              opacity: tier.peakOpacity,
             }))
-            sprite.scale.set(8, 8, 1)
+            sprite.scale.set(hasStory ? tier.scale * tier.storyBoostScale : tier.scale, hasStory ? tier.scale * tier.storyBoostScale : tier.scale, 1)
             sprite.position.set(x, y, z)
             skyGroup.add(sprite)
-            cameraModeStoryStars.set(s.id, { glowSprite: sprite, phase: Math.random() * Math.PI * 2 })
+            cameraModeStoryStars.set(s.id, {
+              glowSprite: sprite,
+              phase: Math.random() * Math.PI * 2,
+              baseScale: tier.scale,
+              peakOpacity: tier.peakOpacity,
+              storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+              storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+              hasStory,
+            })
           }
+        }
+
+        // ② 再把星表所有恒星（不在 storyStars 已处理里的）一次性补齐（stories=0 也有辉光）
+        for (let i = 0; i < n; i++) {
+          const s = stars[i]
+          if (cameraModeStoryStars.has(s.id)) continue
+          const tier = glowTierForMag(s.mag)
+          const stats = statsCache.get(s.id)
+          const hasStory = !!(stats && stats.stories > 0)
+          const sprite = new Sprite(new SpriteMaterial({
+            map: getBloomTexCached(tier.tint, tier.texSize),
+            blending: AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            transparent: true,
+            opacity: tier.peakOpacity,
+          }))
+          const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
+          sprite.scale.set(scale, scale, 1)
+          sprite.position.set(s.x, s.y, s.z)
+          skyGroup.add(sprite)
+          cameraModeStoryStars.set(s.id, {
+            glowSprite: sprite,
+            phase: Math.random() * Math.PI * 2,
+            baseScale: tier.scale,
+            peakOpacity: tier.peakOpacity,
+            storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+            storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+            hasStory,
+          })
         }
       } else {
         // 退出相机模式，恢复
         starNameLabels.forEach((label) => { label.element.style.display = '' })
 
-        // 恢复普通模式 storyGlows 可见性
-        for (const sg of storyGlows) sg.sprite.visible = true
+        // 恢复普通模式 interactiveGlows 可见性
+        for (const ig of interactiveGlows) ig.sprite.visible = true
 
         // 清理故事星 glow
         cameraModeStoryStars.forEach((meta) => {
@@ -3943,9 +4235,13 @@ for (const s of stars) starById.set(s.id, s)
       }
     },
     setObserver,
-    setStarStatsCache(cache) {
-      cache.forEach((v, k) => statsCache.set(k, v))
-      updateStoryGlows(cache)
+    setStarStatsCache(
+      cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+      userStarPos?: Map<number, { x: number; y: number; z: number }>
+    ) {
+      // merge / seed / 建 sprite 全部统一在 updateInteractiveGlows 内部做
+      updateInteractiveGlows(cache, userStarPos)
+      updateInteractiveGlowsBoost(cache)
     },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
       // 已禁用：天球回归默认不旋转

@@ -167,9 +167,15 @@
 
       <!-- 星笺 Section · 合集管理 -->
       <section id="pd-collections" class="pd-collections-section" aria-label="我的星笺合集">
-        <div class="pd-section-head">
-          <h2>我的星笺 · FOLIO</h2>
-          <p>—— 把散落的故事收进合集，让它们彼此呼应 ——</p>
+        <div class="pd-section-head pd-section-head-with-action">
+          <div class="pd-section-head-main">
+            <h2>我的星笺 · FOLIO</h2>
+            <p>—— 把散落的故事收进合集，让它们彼此呼应 ——</p>
+          </div>
+          <button type="button" class="pd-goto-square" @click="$router.push('/folios')" title="穹庭书局 · 星笺广场">
+            <BookMarked :size="11" />
+            <span>去穹庭书局逛逛 →</span>
+          </button>
         </div>
         <CollectionGrid
           :collections="collections"
@@ -511,7 +517,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star } from 'lucide-vue-next'
+import { Star, BookMarked } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
@@ -1648,6 +1654,40 @@ onBeforeUnmount(() => {
   letter-spacing: 0.1em;
   font-size: 0.85rem;
   margin: 0;
+}
+
+/* 星笺 section 头：右边的书局跳转胶囊 */
+.pd-section-head-with-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 20px;
+  text-align: left;
+  flex-wrap: wrap;
+}
+.pd-section-head-with-action .pd-section-head-main { text-align: center; flex: 1; min-width: 0; }
+.pd-goto-square {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  background: rgba(202, 167, 255, 0.12);
+  color: var(--star-purple);
+  font-family: var(--font);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  font-weight: 600;
+  align-self: center;
+  flex-shrink: 0;
+}
+.pd-goto-square:hover {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12));
+}
+@media (max-width: 640px) {
+  .pd-section-head-with-action { flex-direction: column; align-items: center; gap: 12px; }
 }
 
 /* Stats — 严格对齐 style-a.html 的 .stats/.stat-num/.stat-label */

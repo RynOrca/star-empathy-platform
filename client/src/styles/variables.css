@@ -136,24 +136,31 @@
   --mobile-safe-bottom: env(safe-area-inset-bottom, 16px);
   --mobile-safe-top: env(safe-area-inset-top, 0px);
 
-  /* ═══ 天镜览星模式（Camera Mode）token ═══ */
+  /* ═══ 天镜览星模式（Camera Mode）token — 与主设计系统对齐 ═══ */
   --accent-purple: #caa7ff;
-  --vf-vignette: rgba(7, 8, 22, 0.55);
-  --vf-border: rgba(202, 167, 255, 0.8);
-  --vf-grid: rgba(202, 167, 255, 0.07);
-  --vf-crosshair: rgba(202, 167, 255, 0.6);
-  --hud-bg: rgba(7, 8, 22, 0.75);
-  --hud-text: rgba(240, 236, 246, 0.85);
-  --hud-accent: #ffd98a;
-  --rec-color: #ff5b5b;
-  --bubble-bg: rgba(20, 22, 40, 0.88);
-  --bubble-border: rgba(202, 167, 255, 0.3);
-  --bubble-active-border: #ffd98a;
-  --bubble-active-glow: 0 0 24px rgba(255, 217, 138, 0.4);
-  --story-card-bg: rgba(18, 20, 36, 0.96);
-  --story-list-bg: rgba(15, 17, 32, 0.85);
-  --story-item-hover: rgba(202, 167, 255, 0.06);
-  --story-item-active: rgba(202, 167, 255, 0.08);
+  /* 取景框：更柔和的暗角 + 半透明边框，避免"黑框感"过重 */
+  --vf-vignette: rgba(7, 8, 22, 0.42);
+  --vf-border: rgba(255, 255, 255, 0.08);
+  --vf-grid: rgba(202, 167, 255, 0.05);
+  --vf-crosshair: rgba(202, 167, 255, 0.35);
+  /* HUD：复用主 panel 的表面色与边框，避免独立一套视觉语言 */
+  --hud-bg: var(--surface);
+  --hud-bg-soft: rgba(26, 30, 53, 0.72);  /* HUD 顶部/底部渐变条：稍透明 */
+  --hud-border: var(--rule);
+  --hud-text: var(--ink-secondary);
+  --hud-text-strong: var(--ink);
+  --hud-accent: var(--accent);
+  --rec-color: var(--error);
+  /* 气泡（移动端）：复用 panel 变量 */
+  --bubble-bg: var(--surface);
+  --bubble-border: var(--rule);
+  --bubble-active-border: var(--accent);
+  --bubble-active-glow: 0 0 20px var(--accent-glow);
+  /* 故事卡片 & 列表：使用主 surface 系 */
+  --story-card-bg: var(--surface);
+  --story-list-bg: var(--bg-elevated);
+  --story-item-hover: var(--overlay-04);
+  --story-item-active: var(--accent-subtle);
 }
 
 /* ═══ 天镜览星：prefers-reduced-motion ═══ */

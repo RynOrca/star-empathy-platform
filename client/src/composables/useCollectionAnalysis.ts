@@ -27,6 +27,7 @@ export type NightscapePayload = {
   storyQuotes: Array<{
     rank: string; text: string; tags: string[]; author: string; date: string
     illus: 'moon' | 'house' | 'plant'; starName: string; color: string
+    reason?: string
   }>
   hourly: number[]
   peakHour: number
@@ -38,6 +39,7 @@ export type NightscapePayload = {
   emotionInsights: Array<{
     title: string; pct: string; color: string; desc: string
   }>
+  tone: 'modern' | 'ancient'
 }
 
 export type CollectionAnalysis = {
@@ -50,6 +52,10 @@ export type CollectionAnalysis = {
   tooFewStories?: boolean
   /** 后端返回：实际故事数，前端可用来提示用户还差几条才生成 */
   storyCount?: number
+  /** 合集语气：modern 现代陪伴 / ancient 古籍诗话（根据历史故事占比自动） */
+  tone?: 'modern' | 'ancient'
+  /** 前端内部：已达最大轮询次数仍未 ready → 强制显示已有内容（避免永久骨架） */
+  _stale?: boolean
 }
 
 /**
@@ -64,8 +70,9 @@ export function useCollectionAnalysis(collectionId: Ref<number | null>, options?
   pollIntervalMs?: number
   maxPolls?: number
 }) {
-  const POLL_INTERVAL = options?.pollIntervalMs ?? 3000
-  const MAX_POLLS = options?.maxPolls ?? 20
+  // 默认 800ms 轮询（之前 3s 太慢），最多 12 次 → 9.6s 超时（Phase 1 通常首次就 ready=true，不轮询）
+  const POLL_INTERVAL = options?.pollIntervalMs ?? 800
+  const MAX_POLLS = options?.maxPolls ?? 12
 
   const analysis = ref<CollectionAnalysis | null>(null)
   const loading = ref(false)
@@ -105,9 +112,15 @@ export function useCollectionAnalysis(collectionId: Ref<number | null>, options?
         clearPollTimer()
         return
       }
-      // ready=true 或已达上限：停止轮询
-      if (next?.ready || pollCount >= MAX_POLLS) {
+      // ready=true：停止轮询
+      if (next?.ready) {
         clearPollTimer()
+        return
+      }
+      // 已达上限：给 analysis 打 _stale 标记让 hasReal 降级显示，避免永久骨架
+      if (pollCount >= MAX_POLLS) {
+        clearPollTimer()
+        if (analysis.value) analysis.value = { ...analysis.value, _stale: true }
         return
       }
       // 仍未 ready → 调度下一轮
@@ -122,10 +135,11 @@ export function useCollectionAnalysis(collectionId: Ref<number | null>, options?
       error.value = e.message || '加载分析失败'
       if (pollCount === 0) {
         analysis.value = null
-        loading.value = false
       }
+      loading.value = false
       if (pollCount >= MAX_POLLS) {
         clearPollTimer()
+        if (analysis.value) analysis.value = { ...analysis.value, _stale: true }
         return
       }
       pollCount += 1

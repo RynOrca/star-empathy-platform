@@ -3,7 +3,7 @@
     v-if="collectionName"
     class="cb-badge"
     :class="[sizeClass, { clickable }]"
-    :title="`合集：${collectionName}${isPrivate ? '（私有）' : ''}${storyCount != null ? ` · ${storyCount} 篇` : ''}`"
+    :title="`合集：${collectionName}${visibilityLabel ? '（' + visibilityLabel + '）' : ''}${storyCount != null ? ` · ${storyCount} 篇` : ''}`"
     @click.stop="clickable && emit('click')"
   >
     <span class="cb-dot" :style="{ background: dotColor }"></span>
@@ -12,14 +12,16 @@
       <span class="cb-name">{{ collectionName }}</span>
       <span v-if="storyCount != null && storyCount >= 0" class="cb-count">{{ storyCount }} 篇</span>
     </span>
-    <Lock v-if="isPrivate" :size="lockSize" class="cb-lock" />
+    <Lock v-if="isPrivate" :size="lockSize" class="cb-lock cb-visi-icon" />
+    <Ghost v-else-if="isAnonymous" :size="lockSize" class="cb-lock cb-visi-icon cb-visi-anon" />
+    <Galaxy v-else-if="isGalaxy" :size="lockSize" class="cb-lock cb-visi-icon cb-visi-galaxy" />
     <ChevronRight v-if="clickable" :size="chevronSize" class="cb-chevron" />
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BookMarked, Lock, ChevronRight } from 'lucide-vue-next'
+import { BookMarked, Lock, ChevronRight, Ghost, Sparkles as Galaxy } from 'lucide-vue-next'
 
 const props = withDefaults(defineProps<{
   collectionName: string | null
@@ -39,6 +41,11 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ click: [] }>()
 
 const isPrivate = computed(() => props.collectionVisibility === 'private')
+const isAnonymous = computed(() => props.collectionVisibility === 'anonymous')
+const isGalaxy = computed(() => props.collectionVisibility === 'galaxy')
+const visibilityLabel = computed(() =>
+  isPrivate.value ? '私有' : isAnonymous.value ? '匿名' : isGalaxy.value ? '星河' : ''
+)
 const dotColor = computed(() => props.coverColor || '#E8B86D')
 const iconComp = BookMarked
 const storyCount = computed(() => props.collectionStoryCount)
@@ -108,6 +115,9 @@ const chevronSize = computed(() => props.size === 'md' ? 16 : 12)
   color: rgba(255, 255, 255, 0.34);
   flex-shrink: 0;
 }
+/* visibility icon 颜色区分 */
+.cb-visi-icon.cb-visi-anon   { color: rgba(169, 189, 255, 0.78); }   /* 匿名：灰蓝面具 */
+.cb-visi-icon.cb-visi-galaxy { color: rgba(232, 184, 109, 0.9); }     /* 星河：星穹金（暖金+紫渐变也可，就暖金即可） */
 .cb-chevron {
   color: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;

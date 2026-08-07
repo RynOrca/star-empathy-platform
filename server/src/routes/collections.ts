@@ -8,18 +8,21 @@ import {
   updateCollection,
   deleteCollection,
   listPublicCollections,
+  getPublicCollectionPicks,
+  CollectionVisibility,
+  PublicCollectionsSort,
 } from '../services/collectionService';
-import { readCollectionAnalysis, triggerAnalysisIfNeeded } from '../services/collectionAnalysis';
+import { readCollectionAnalysis, triggerAnalysisIfNeeded, invalidateCollectionAnalysisCache } from '../services/collectionAnalysis';
 
 const router = Router();
 
 type AuthedReq = Request & { user: { id: number } };
 
-// 我的合集列表（?visibility=public|private 可选过滤）
+// 我的合集列表（?visibility=public|private|anonymous|galaxy 可选过滤）
 router.get('/', authRequired, (req: Request, res: Response) => {
   try {
     const user = (req as AuthedReq).user;
-    const visibility = req.query.visibility as 'public' | 'private' | undefined;
+    const visibility = req.query.visibility as CollectionVisibility | undefined;
     const list = listCollections(user.id, visibility);
     ok(res, 'success', list);
   } catch (error) {
@@ -50,7 +53,19 @@ router.get('/public', authOptional, (req: Request, res: Response) => {
     const userIdParsed = userIdRaw ? parseInt(userIdRaw, 10) : NaN;
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 20;
-    const result = listPublicCollections(!isNaN(userIdParsed) ? userIdParsed : undefined, page, limit);
+    const sort = (req.query.sort as PublicCollectionsSort | undefined) ?? 'new';
+    const visibility = req.query.visibility as ('public' | 'anonymous' | 'galaxy') | undefined;
+    // 搜索关键字：search / keyword 两个 query 名都兼容
+    const keywordRaw = (req.query.search ?? req.query.keyword) as string | undefined;
+    const keyword = typeof keywordRaw === 'string' ? keywordRaw : '';
+    const validSorts: PublicCollectionsSort[] = ['hot', 'new', 'resonance', 'name_asc', 'stories_desc'];
+    const validSort = validSorts.includes(sort) ? sort : 'new';
+    const validVis = visibility === 'public' || visibility === 'anonymous' || visibility === 'galaxy' ? visibility : undefined;
+    const result = listPublicCollections({
+      userId: !isNaN(userIdParsed) ? userIdParsed : undefined,
+      page, limit, sort: validSort, visibility: validVis,
+      keyword: keyword || undefined,
+    });
     ok(res, 'success', result);
   } catch (error) {
     console.error('GET /api/collections/public error:', error);
@@ -58,7 +73,23 @@ router.get('/public', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 合集详情（含故事列表）。authOptional：未登录或非 owner 时仅 public 可见，private 返回 404
+// 星笺广场推荐 Picks（官方星河 N 本 + 热度 Top 补齐，默认 6 本）
+router.get('/picks', authOptional, (_req: Request, res: Response) => {
+  try {
+    const wanted = parseInt(_req.query.wanted as string, 10) || 6;
+    const galaxyN = parseInt(_req.query.galaxyN as string, 10) || 3;
+    const picks = getPublicCollectionPicks(
+      Math.max(1, Math.min(20, wanted)),
+      Math.max(0, Math.min(8, galaxyN))
+    );
+    ok(res, 'success', picks);
+  } catch (error) {
+    console.error('GET /api/collections/picks error:', error);
+    serverError(res);
+  }
+});
+
+// 合集详情（含故事列表）。authOptional：未登录或非 owner 时 public/anonymous/galaxy 可见，private 返回 404
 router.get('/:id', authOptional, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -73,14 +104,17 @@ router.get('/:id', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 编辑合集（仅 owner）
+// 编辑合集（仅 owner / 管理员；星河合集仅管理员）
 router.patch('/:id', authRequired, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return badRequest(res, '无效的合集 id');
     const user = (req as AuthedReq).user;
     const { name, description, coverColor, visibility, sortOrder } = req.body || {};
-    const patch: { name?: string; description?: string | null; coverColor?: string | null; visibility?: 'public' | 'private'; sortOrder?: number } = {};
+    const patch: {
+      name?: string; description?: string | null; coverColor?: string | null;
+      visibility?: CollectionVisibility; sortOrder?: number;
+    } = {};
     if (name !== undefined) patch.name = name;
     if (description !== undefined) patch.description = description;
     if (coverColor !== undefined) patch.coverColor = coverColor;
@@ -88,7 +122,7 @@ router.patch('/:id', authRequired, (req: Request, res: Response) => {
     if (sortOrder !== undefined) patch.sortOrder = sortOrder;
     const result = updateCollection(id, user.id, patch);
     if (result.notFound) return notFound(res, '合集不存在');
-    if (result.forbidden) return forbidden(res, '只能编辑自己的合集');
+    if (result.forbidden) return forbidden(res, '无权限编辑该合集');
     if (result.error) return badRequest(res, result.error);
     ok(res, '合集已更新', result.collection);
   } catch (error) {
@@ -97,7 +131,7 @@ router.patch('/:id', authRequired, (req: Request, res: Response) => {
   }
 });
 
-// 删除合集（仅 owner；故事 collection_id 置 NULL，故事保留）
+// 删除合集（仅 owner / 管理员；星河合集仅管理员；故事 collection_id 置 NULL，故事保留）
 router.delete('/:id', authRequired, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -105,7 +139,7 @@ router.delete('/:id', authRequired, (req: Request, res: Response) => {
     const user = (req as AuthedReq).user;
     const result = deleteCollection(id, user.id);
     if (result.notFound) return notFound(res, '合集不存在');
-    if (result.forbidden) return forbidden(res, '只能删除自己的合集');
+    if (result.forbidden) return forbidden(res, '无权限删除该合集');
     ok(res, '合集已删除');
   } catch (error) {
     console.error('DELETE /api/collections/:id error:', error);
@@ -116,7 +150,8 @@ router.delete('/:id', authRequired, (req: Request, res: Response) => {
 // 合集级 AI 分析
 //  - storyCount < 3：返回 ready=false 但带 storyCount 提示（前端显示"心事不够多"空态，不轮询）
 //  - storyCount >= 3：首次触发会合成（Phase 1 立即完成，Phase 2 异步 agent），返回 { persona, emotion, nightscape, ready, generatedAt }
-//  - 前端轮询：ready=false 时每 3s 再拉一次，直到 ready=true 或超过 MAX_POLL 次
+//  - 前端轮询：ready=false 时每 800ms 再拉一次，直到 ready=true 或超过 MAX_POLL 次
+//  - Defensive 兜底：若已 DB 缓存但三大模块全 null（老数据/坏数据）→ invalid 缓存 + 立即重算一次，避免前端永久骨架
 router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -145,7 +180,17 @@ router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
 
     // storyCount >= 3：触发懒生成 + 读（Phase 1 同步合成完，ready=true；Phase 2 会先返回 ready=false 异步写）
     triggerAnalysisIfNeeded(id);
-    const analysis = readCollectionAnalysis(id);
+    let analysis = readCollectionAnalysis(id);
+
+    // Defensive：如果 ready=true 但三大模块全 null（DB 缓存里存了坏数据 / 老缓存字段缺失）
+    // → 主动 invalid 缓存 + 立即重算一次，保证前端拿到可展示的内容（hasReal=ready=true）
+    if (analysis.ready && !analysis.persona && !analysis.emotion && !analysis.nightscape) {
+      console.warn(`[analysis] 合集#${id} ready=true 但 3 大模块全空，invalid 缓存并重算…`);
+      invalidateCollectionAnalysisCache(id);
+      try { triggerAnalysisIfNeeded(id); } catch { /* ignore */ }
+      analysis = readCollectionAnalysis(id);
+    }
+
     return ok(res, 'success', { ...analysis, tooFewStories: false, storyCount });
   } catch (error) {
     console.error('GET /api/collections/:id/analysis error:', error);

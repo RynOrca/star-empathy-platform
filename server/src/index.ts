@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import fs from 'node:fs';
+import { exec } from 'node:child_process';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import starsRouter from './routes/stars';
@@ -260,24 +261,77 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   serverError(res);
 });
 
-// 启动服务
-app.listen(PORT, () => {
-  console.log(`🌟 星语穹庭后端运行中: http://localhost:${PORT}`);
-  console.log(`   GET  /api/stories               - 获取所有故事`);
-  console.log(`   POST /api/stories               - 投递心事`);
-  console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
-  console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
-
-  // 定时清理过期 token 黑名单（每 10 分钟）
-  setInterval(() => {
-    try { cleanExpiredTokens(); } catch { /* 静默 */ }
-  }, 10 * 60 * 1000);
-
-  // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
-  setImmediate(() => {
-    try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+/**
+ * 解析 Windows/Linux 下占用某 TCP 端口的 PID（仅用于打印提示，绝不自动换端口）
+ */
+function resolvePid(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32'
+      ? `netstat -ano | findstr ":${port}" | findstr LISTENING`
+      : `lsof -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null`;
+    exec(cmd, { timeout: 2000 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      const line = stdout.trim().split(/\r?\n/)[0];
+      if (!line) return resolve(null);
+      // Windows: 最后一列 = PID；Linux lsof -t = PID
+      const parts = line.split(/\s+/).filter(Boolean);
+      if (process.platform === 'win32') {
+        resolve(parts[parts.length - 1] || null);
+      } else {
+        resolve(parts[0] || null);
+      }
+    });
   });
-});
+}
+
+// 启动服务（端口被占 → 直接报错退出，绝不 fallback 到其他端口）
+// 为什么不允许自动换端口？
+//   · 前端 vite.config.ts /api 代理硬编码到 3000，换端口 = 前端全 502
+//   · 生产部署 nginx 反代 /api → 后端 3000，换端口 = 线上静默挂掉
+//   · 任何 PORT 变更都必须由运维通过环境变量明确指定（process.env.API_PORT），后端绝不替用户做决定
+function startServer(port: number) {
+  const server = app.listen(port);
+
+  server.once('listening', () => {
+    console.log(`🌟 星语穹庭后端运行中: http://localhost:${port}`);
+    console.log(`   GET  /api/stories               - 获取所有故事`);
+    console.log(`   POST /api/stories               - 投递心事`);
+    console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
+    console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
+
+    // 定时清理过期 token 黑名单（每 10 分钟）
+    setInterval(() => {
+      try { cleanExpiredTokens(); } catch { /* 静默 */ }
+    }, 10 * 60 * 1000);
+
+    // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
+    setImmediate(() => {
+      try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+    });
+  });
+
+  server.on('error', async (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const pid = await resolvePid(port);
+      console.error(`\n❌❌❌ 端口 ${port} 已被占用，启动终止！`);
+      if (pid) {
+        console.error(`   占用者 PID: ${pid}`);
+        if (process.platform === 'win32') {
+          console.error(`   👉 Windows 释放命令:  taskkill /F /PID ${pid}`);
+        } else {
+          console.error(`   👉 Linux/macOS 释放:  kill -9 ${pid}`);
+        }
+      }
+      console.error(`   👉 如果必须使用其他端口，请通过环境变量 API_PORT=${port + 1} 显式指定（同时修改前端 vite 代理 target，否则前端全 502）`);
+      console.error(`   ❌ 绝不自动换端口——防止"后端实际跑在 3001，但前端代理 3000"这种沉默故障上线。\n`);
+      process.exit(1);
+    }
+    console.error('💥 服务启动异常：', err);
+    process.exit(1);
+  });
+}
+
+startServer(PORT);
 
 export { upload };
 export default app;

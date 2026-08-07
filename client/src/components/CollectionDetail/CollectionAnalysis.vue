@@ -239,14 +239,16 @@
 
 
 
-    <!-- ═══ 1. 夜观手记（独立三态 panel） ═══ -->
+    <!-- ═══ 1. 夜观手记 / 钞本题记（按 tone 切换标题） ═══ -->
     <section class="panel-wrapper ca-night-notes">
       <div class="panel-head">
         <Sparkles :size="10" class="pw-icon pw-blue" />
-        <span class="pw-title">夜观手记</span>
+        <span class="pw-title">{{ isAncientTone ? '钞本题记' : '夜观手记' }}</span>
         <span class="pw-count">{{
           hasReal
-            ? `${nightSky.phase} · ${nightSky.term} · ${storyCount} 处光斑`
+            ? (isAncientTone
+                ? `${nightSky.phase} · ${nightSky.term} · 凡 ${storyCount} 首`
+                : `${nightSky.phase} · ${nightSky.term} · ${storyCount} 处光斑`)
             : tooFewStories ? '未生成' : '生成中'
         }}</span>
       </div>
@@ -304,15 +306,15 @@
           <div class="sc-astro sc-astro-night">
             <div class="sc-astro-row">
               <span class="sc-astro-k">时</span>
-              <span class="sc-astro-v sc-astro-v-vg">{{ nightSky.timeSpan.split(' ')[0] }} ~{{ nightSky.timeSpan.split('~')[1].trim().substring(0,5) }}</span>
+              <span class="sc-astro-v sc-astro-v-vg">{{ nightSky.timeSpanStart }} ~{{ nightSky.timeSpanEnd }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">温</span>
-              <span class="sc-astro-v" style="color: #86a8ff">{{ nightSky.meteo[1].v.split(' ')[0] }}</span>
+              <span class="sc-astro-v" style="color: #86a8ff">{{ nightSky.meteoAt(1).v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">风</span>
-              <span class="sc-astro-v" style="color: #caa7ff">{{ nightSky.meteo[2].v.split(' ')[0] }}</span>
+              <span class="sc-astro-v" style="color: #caa7ff">{{ nightSky.meteoAt(2).v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">月</span>
@@ -321,25 +323,46 @@
           </div>
         </div>
 
-        <!-- 右：手记文字（不再是星座主人叙事，改成当夜"你"的视角：从子初坐到卯初，8处光斑散在夜里） -->
+        <!-- 右：手记文字 / 钞本叙录（按 tone 切换文案，古代版不出现“你坐到X时/心事灯火”等现代语境） -->
         <div class="ca-persona-text">
-          <!-- 观夜简介条：从星区→改为「当夜观览·开篇」 -->
+          <!-- 观夜简介条：古代版 → 「钞本叙录·凡例」；现代版 → 「当夜观览·开篇」 -->
           <div class="ca-pt-intro ca-pt-intro-night">
             <component :is="CloudSun" :size="10" />
-            <span>{{ nightSky.season }} · {{ nightSky.timeSpan }} · 共收 {{ storyCount }} 处光斑</span>
+            <span v-if="isAncientTone">
+              {{ nightSky.season }} · {{ nightSky.timeSpan }} · 都 {{ storyCount }} 首
+            </span>
+            <span v-else>
+              {{ nightSky.season }} · {{ nightSky.timeSpan }} · 共收 {{ storyCount }} 则心事
+            </span>
           </div>
-          <p class="ca-pt-para first">
-            这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——你从
-            <b style="color: #ffd98a">{{ nightSky.timeSpan.split(' ')[0] }}</b>
-            一直坐到
-            <b style="color: #86a8ff">{{ nightSky.timeSpan.split('~')[1] }}</b>，
-            8 处心事像灯火一样浮在夜里。
-            {{ persona.paragraphFirst }}
-          </p>
-          <p class="ca-pt-para">
-            {{ persona.paragraphSecond }}
-            月是一弯蛾眉，云是四分散卷；你说话的声音很轻，像江风掠过时带起的槐花。
-          </p>
+
+          <!-- ancient: 钞本叙录口吻（“右《xx》一编，都xx首...”） -->
+          <template v-if="isAncientTone">
+            <p class="ca-pt-para first">
+              <span class="ca-han-hl">{{ nightSky.name }}</span>
+              {{ persona.suggestIntro }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[0] }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[1] }}
+            </p>
+          </template>
+
+          <!-- modern: 原陪伴口吻，但把硬编码「8处心事」「月是一弯蛾眉...槐花」这些露馅点全部替换为动态 -->
+          <template v-else>
+            <p class="ca-pt-para first">
+              这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——
+              从 <b style="color: #ffd98a">{{ nightSky.timeSpanStart }}</b>
+              到 <b style="color: #86a8ff">{{ nightSky.timeSpanEndLong || nightSky.timeSpanEnd }}</b>，
+              共 {{ storyCount }} 则心事，像星点一样浮在夜空里。
+              {{ persona.paragraphs[0] }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[1] }}
+            </p>
+          </template>
 
           <!-- ===== 【那一夜·五大气象维度】一行5列紧凑小卡（原5行横条太高，改成扁平方块网格） ===== -->
           <div class="ca-pt-meteo-five ca-meteo-compact">
@@ -358,9 +381,9 @@
                 <span class="ca-mc-dot"></span>
                 <div class="ca-mc-text">
                   <span class="ca-mc-k">{{ m.k }}</span>
-                  <!-- 具体数值：按 i 对应 nightSky.meteo 或月相 -->
+                  <!-- 具体数值：按 i 对应 nightSky.meteo 或月相（越界安全封装） -->
                   <span class="ca-mc-v">
-                    {{ i===0 ? nightSky.meteo[1].v : i===1 ? nightSky.meteo[2].v : i===2 ? nightSky.phase+'·'+nightSky.moonIllum : i===3 ? nightSky.meteo[4].v : nightSky.meteo[5].v }}
+                    {{ nightSky.weatherValueAt(i as 0|1|2|3|4) }}
                   </span>
                   <span class="ca-mc-en">{{ m.en }}</span>
                 </div>
@@ -400,85 +423,79 @@
 
 
 
-    <!-- ═══ 2. 夜色流转 + 心事投递时间轨迹（双栏：左右都是独立三态 panel） ═══ -->
+    <!-- ═══ 2. AI 选本·代表故事 + 钞本年代/心事时间轨迹（双栏：左=纵向列表，右=轨迹，保持原滚动方向） ═══ -->
     <div class="ca-night-track-wrap">
-      <!-- 左：夜色流转（独立三态 panel，内部 overflow 滚动条） -->
-      <section class="panel-wrapper ca-night-flow ca-night-flow-left">
+      <!-- 左：AI 选本·代表故事（取代原「夜色流转」，纵向卡片列表，走原 y 滚动；视觉对齐共鸣榜 + 情绪洞察） -->
+      <section class="panel-wrapper ca-night-flow ca-night-flow-left ca-night-flow-stories">
         <div class="panel-head">
-          <MoonStar :size="10" class="pw-icon pw-gold" />
-          <span class="pw-title">夜色流转</span>
+          <BookOpen :size="10" class="pw-icon pw-gold" />
+          <span class="pw-title">{{ isAncientTone ? 'AI 选本·代表钞本' : 'AI 选本·代表心事' }}</span>
           <span class="pw-count">{{
             hasReal
-              ? `子流 → 卯散 · ${emotions.length} 种夜色`
+              ? (isAncientTone ? `钞取 ${storyCards.length} 篇` : `精选 ${storyCards.length} 篇`)
               : tooFewStories ? '未生成' : '生成中'
           }}</span>
         </div>
 
-        <div v-if="hasReal" class="ca-emotion-body ca-night-scroll">
-          <div class="ca-emo-left ca-emo-left-full">
-            <!-- 发光球展示：完全对齐 StarDetail emotion-orbs 结构 → flex row 水平一条线均匀分布 -->
-            <div class="emotion-orbs ca-night-orbs">
-              <span
-                v-for="e in emotions"
-                :key="e.name"
-                class="orb ca-night-orb"
-                :style="{
-                  width: orbSize(e.value) + 'px',
-                  height: orbSize(e.value) + 'px',
-                  background: `radial-gradient(circle at 35% 30%, ${e.color}ee, ${e.color}33 70%, transparent)`,
-                  boxShadow: `0 0 ${10 + e.value * 16}px ${e.color}55`,
-                }"
-                :title="`${e.name} · ${Math.round(e.value * 100)}%`"
-              >
-                <span class="orb-label ca-no-label">{{ e.name }}</span>
-                <span class="orb-val ca-no-val">{{ Math.round(e.value * 100) }}</span>
-              </span>
-            </div>
+        <!-- 真实态：1 列纵向卡片（4 条，保持原 y 轴滚动；每条 = rank + 星名/作者 + AI 推荐语 + 节选 + 日期/标签） -->
+        <div v-if="hasReal" class="ca-emotion-body ca-night-scroll ca-story-scroll">
+          <div class="ca-story-grid">
+            <article
+              v-for="(s, i) in storyCards"
+              :key="i"
+              class="ca-story-item"
+              :style="{ '--accent': s.color, '--cs-idx': i } as Record<string, string | number>"
+            >
+              <!-- 左侧色条 + rank（对标共鸣榜 ca-rank-item::before + ca-rank-no） -->
+              <div class="ca-story-side">
+                <span class="ca-story-rank" :class="`ca-story-rank-${i + 1}`">{{ s.rank }}</span>
+              </div>
 
-            <!-- 情绪回顾卡：情感名 · 占% + 故事内容回顾（不再有天文/时辰装饰） -->
-            <div class="ca-emo-insights">
-              <div class="ca-ei-card ca-ei-card-night ca-ei-review" v-for="(c, i) in emotionReviewCards" :key="i">
-                <span class="ca-ei-dot ca-ei-dot-review" :style="{ background: c.color, boxShadow: `0 0 6px ${c.color}88` }"></span>
-                <div class="ca-ei-text ca-ei-text-review">
-                  <div class="ca-ei-title ca-ei-title-review" :style="`--c:${c.color}`">
-                    <span class="ca-ei-title-name ca-ei-name-pct">{{ c.name }} · {{ c.pct }}</span>
-                    <span v-if="c.tag" class="ca-ei-story-tag" :style="{ color: c.color, borderColor: c.color + '66' }">#{{ c.tag }}</span>
+              <!-- 主体：标题/作者 → AI 推荐语（1 句简短） → 节选内容 → 日期/标签 -->
+              <div class="ca-story-body">
+                <div class="ca-story-head">
+                  <span class="ca-story-starnav">{{ s.starName }}</span>
+                  <span class="ca-story-author" v-if="s.author">{{ s.author }}</span>
+                </div>
+
+                <!-- AI 推荐语：✨ 荐： + trimReason 清洗输出（强制剥掉 Top1/次选等排名臭词，就算 DB 旧缓存也干净），超短一句话道神韵，无排名字眼 -->
+                <div class="ca-story-reason">
+                  <Sparkles :size="8" class="ca-story-reason-icon" />
+                  <span class="ca-story-reason-prefix">荐：</span>
+                  <span class="ca-story-reason-text">{{ trimReason(s.reason, s.tags?.[0]) }}</span>
+                </div>
+
+                <!-- 节选内容（推荐语之后，3 行截断：跟「共鸣榜 TopN summary」视觉一致） -->
+                <p class="ca-story-excerpt">{{ s.text }}</p>
+
+                <div class="ca-story-foot">
+                  <span class="ca-story-date" v-if="s.date">
+                    <CalendarClock :size="8" class="ca-story-foot-icon" />
+                    {{ s.date }}
+                  </span>
+                  <div class="ca-story-tags" v-if="s.tags?.length">
+                    <span v-for="(t, ti) in s.tags.slice(0, 2)" :key="ti" class="ca-story-tag">#{{ t }}</span>
                   </div>
-                  <div class="ca-ei-desc ca-ei-desc-review">{{ c.desc }}</div>
                 </div>
               </div>
-            </div>
-
-            <!-- 主调叙事：夜色主调 -->
-            <div class="ca-emo-narrative ca-emo-night-narr">
-              <p class="ca-emo-para">
-                <span class="ca-emo-lead">{{ emotionNarrative.dominant }}</span>
-                <span class="ca-emo-lead-pct">{{ emotionNarrative.dominantPct }}</span>
-                是这一夜的底色，
-                {{ emotionNarrative.summary }}
-              </p>
-              <p class="ca-emo-para ca-emo-para-flow">
-                <component :is="Sparkles" :size="10" class="ca-emo-flow-icon" />
-                {{ emotionNarrative.flow }}
-              </p>
-            </div>
+            </article>
           </div>
         </div>
 
-        <!-- tooFew 空态 -->
+        <!-- tooFew 空态（复用共鸣榜同一套） -->
         <div v-else-if="tooFewStories" class="persona-empty empty-scant">
           <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
           <div class="pe-text">
             <div class="pe-title">心事还不够多</div>
-            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 生成「夜色流转 · 情绪光谱」</div>
+            <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 为你挑选{{ isAncientTone ? '代表篇什' : '代表故事' }}</div>
           </div>
         </div>
-        <!-- loading 骨架 -->
+        <!-- loading 骨架（复用共鸣榜同一套 skeleton） -->
         <div v-else class="persona-empty empty-loading">
           <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
           <div class="pe-text">
-            <div class="pe-title">夜色情绪光谱生成中…</div>
-            <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合情感光谱、夜色叙事与情绪球</div>
+            <div class="pe-title">{{ isAncientTone ? 'AI 正在钞取代表篇什…' : 'AI 正在挑选代表故事…' }}</div>
+            <div class="pe-sub">按共鸣度排序、兼顾情绪覆盖，从 {{ displayStoryCount }} 则中选篇</div>
           </div>
           <div class="skeleton-lines">
             <span class="sk-line sk-1"></span>
@@ -488,14 +505,14 @@
         </div>
       </section>
 
-      <!-- 右：心事投递时间轨迹（独立三态 panel，与左等高） -->
+      <!-- 右：钞本年代·气脉流转 / 心事投递时间轨迹（保留，不变） -->
       <section class="panel-wrapper ca-night-side-track">
         <div class="panel-head">
           <Clock3 :size="10" class="pw-icon pw-purple" />
-          <span class="pw-title">心事投递时间轨迹</span>
+          <span class="pw-title">{{ isAncientTone ? '钞本年代·气脉流转' : '心事投递时间轨迹' }}</span>
           <span class="pw-count">{{
             hasReal
-              ? `${heroStars.length} 段 · 连线=时间轨迹`
+              ? (isAncientTone ? `${heroStars.length} 篇 · 连线=钞次先后` : `${heroStars.length} 段 · 连线=时间轨迹`)
               : tooFewStories ? '未生成' : '生成中'
           }}</span>
         </div>
@@ -542,7 +559,7 @@
                   :opacity="s.opacity * 0.78" />
               </g>
 
-              <!-- 星点=心事（8 颗）+ 时间标签 -->
+              <!-- 星点=心事/钞本篇目（按时间/钞次排序）+ 标签 -->
               <g v-for="(p, i) in heroStars" :key="'hs2'+i">
                 <circle :cx="Math.round(p.x * 420 / 360)" :cy="Math.round(p.y * 280 / 220)" :r="p.r * 1.05"
                   :fill="'url(#hGlow' + p.gid + '2)'" opacity="0.82">
@@ -559,19 +576,31 @@
                 </text>
               </g>
 
-              <!-- 坐标轴（20:00 → 06:00；情绪 +/−） -->
+              <!-- 坐标轴 -->
               <g fill="rgba(220,220,240,0.38)" font-family="SF Mono, Menlo, monospace" font-size="8">
-                <text x="10"  y="270">20:00</text>
-                <text x="140" y="270">00:00</text>
-                <text x="268" y="270">04:00</text>
-                <text x="375" y="270">06:00</text>
-                <text x="6" y="18"   opacity="0.6">+ 情绪</text>
-                <text x="6" y="258"  opacity="0.6">− 情绪</text>
-                <text x="10" y="145"  opacity="0.28" font-size="7">情绪轴</text>
-                <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">时间轴 · 投递时刻</text>
+                <template v-if="isAncientTone">
+                  <text x="10"  y="270">戌初</text>
+                  <text x="140" y="270">子正</text>
+                  <text x="268" y="270">寅正</text>
+                  <text x="375" y="270">卯末</text>
+                  <text x="6" y="18"   opacity="0.6">气之扬</text>
+                  <text x="6" y="258"  opacity="0.6">气之沉</text>
+                  <text x="10" y="145"  opacity="0.28" font-size="7">气脉轴</text>
+                  <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">钞次先后</text>
+                </template>
+                <template v-else>
+                  <text x="10"  y="270">20:00</text>
+                  <text x="140" y="270">00:00</text>
+                  <text x="268" y="270">04:00</text>
+                  <text x="375" y="270">06:00</text>
+                  <text x="6" y="18"   opacity="0.6">+ 情绪</text>
+                  <text x="6" y="258"  opacity="0.6">− 情绪</text>
+                  <text x="10" y="145"  opacity="0.28" font-size="7">情绪轴</text>
+                  <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">时间轴 · 投递时刻</text>
+                </template>
               </g>
 
-              <!-- 星群轮廓线（按时间顺序连接 → 心事投递时间轨迹！） -->
+              <!-- 星群轮廓线（按时间/钞次顺序连接） -->
               <polyline
                 :points="heroStars.map(p => `${Math.round(p.x*420/360)},${Math.round(p.y*280/220)}`).join(' ')"
                 fill="none" stroke="rgba(255,217,138,0.25)" stroke-width="0.8"
@@ -579,41 +608,47 @@
                 style="filter: drop-shadow(0 0 2px rgba(255,217,138,0.2))" />
             </svg>
             <div class="ca-et-legend">
-              <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
-              <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
-              <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
-              <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
-              <span class="ca-h-legend-note">· 连线=时间轨迹</span>
+              <template v-if="isAncientTone">
+                <span><i style="background:#ffd98a"></i>金 · 雅正</span>
+                <span><i style="background:#caa7ff"></i>紫 · 幽忧</span>
+                <span><i style="background:#86a8ff"></i>蓝 · 清远</span>
+                <span><i style="background:#9ae6b4"></i>绿 · 冲淡</span>
+                <span class="ca-h-legend-note">· 连线=钞次先后</span>
+              </template>
+              <template v-else>
+                <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
+                <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
+                <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
+                <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
+                <span class="ca-h-legend-note">· 连线=时间轨迹</span>
+              </template>
             </div>
 
-            <!-- 心事投递统计：一行4小格（紧凑不高） -->
+            <!-- 4 小格统计：从后端动态 heroStats 拉（古代/现代两套文案在后端生成） -->
             <div class="ca-et-stats">
-              <div class="ca-et-stat ca-et-stat-gold">
-                <span class="ca-es-k">夜间投递</span>
-                <span class="ca-es-v">86<span>%</span></span>
-                <span class="ca-es-sub">20:00 ~ 06:00</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-purple">
-                <span class="ca-es-k">情绪波动</span>
-                <span class="ca-es-v">Δ 0.64</span>
-                <span class="ca-es-sub">高 → 低幅度</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-blue">
-                <span class="ca-es-k">最频时辰</span>
-                <span class="ca-es-v">子正</span>
-                <span class="ca-es-sub">23:41 ~ 00:28</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-green">
-                <span class="ca-es-k">最长间隔</span>
-                <span class="ca-es-v">2h 17<span>'</span></span>
-                <span class="ca-es-sub">独坐时没写</span>
+              <div v-for="(s, i) in heroStats.slice(0, 4)" :key="'etst'+i"
+                class="ca-et-stat"
+                :class="{
+                  'ca-et-stat-gold':   i % 4 === 0,
+                  'ca-et-stat-purple': i % 4 === 1,
+                  'ca-et-stat-blue':   i % 4 === 2,
+                  'ca-et-stat-green':  i % 4 === 3,
+                }">
+                <span class="ca-es-k">{{ s.k }}</span>
+                <span class="ca-es-v" v-html="s.v"></span>
+                <span class="ca-es-sub">{{ s.sub }}</span>
               </div>
             </div>
 
-            <!-- 底部一句话说明条 -->
+            <!-- 底部一句话说明条：按 tone 切 -->
             <p class="ca-et-note">
               <component :is="Sparkles" :size="9" class="ca-et-note-icon" />
-              从 20:31 的灯下第一笔，写到 05:42 天将亮 —— 连线是心事出现的顺序，越靠上=情绪越亮。
+              <template v-if="isAncientTone">
+                {{ nightSky.timeSpan.split('·')[0].trim() }} · 凡 {{ storyCount }} 首，以钞次为序，气脉由下而上，由沉而扬。
+              </template>
+              <template v-else>
+                从 20:00 到 06:00，共 {{ storyCount }} 则心事 —— 连线是心事出现的顺序，越靠上=情绪越亮。
+              </template>
             </p>
           </div>
         </div>
@@ -647,20 +682,34 @@
 
 
 
-    <!-- ═══ 4. 时辰热力 ═══ -->
+    <!-- ═══ 4. 时辰热力 / 气脉十二时 → 星河下改为「卷目疏」 ═══ -->
     <section class="panel-wrapper ca-hour">
       <div class="panel-head">
-        <Clock3 :size="10" class="pw-icon pw-purple" />
-        <span class="pw-title">时辰热力</span>
-        <span class="pw-count">{{
-          hasReal
-            ? `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`
-            : tooFewStories ? '未生成' : '生成中'
-        }}</span>
+        <template v-if="!isGalaxy">
+          <Clock3 :size="10" class="pw-icon pw-purple" />
+          <span class="pw-title">{{ isAncientTone ? '气脉十二时' : '时辰热力' }}</span>
+          <span class="pw-count">{{
+            hasReal
+              ? (isAncientTone
+                  ? `盛时 ${DIZHI_PER_2H[peakHour] ?? '子'} · 衰时 ${DIZHI_PER_2H[lowHour] ?? '寅'}`
+                  : `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`)
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
+        </template>
+        <template v-else>
+          <BookText :size="10" class="pw-icon" style="color: #E8B86D" />
+          <span class="pw-title">卷目疏</span>
+          <span class="pw-count">{{
+            hasReal || scrollBooks.length
+              ? `共 ${scrollBooks.length} 卷 · ${scrollBooks.reduce((s, b) => s + b.count, 0)} 则`
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
+        </template>
       </div>
 
+      <!-- ═════════════════════ 非星河：气脉十二时/时辰热力（原结构保留） ═════════════════════ -->
       <!-- 真实态：珠子热力图 + 十二地支轴 + 高峰低谷洞察 -->
-      <div v-if="hasReal" class="ca-hour-body">
+      <div v-if="!isGalaxy && hasReal" class="ca-hour-body">
         <div class="ca-hour-beads">
           <span
             v-for="(v, h) in hourly"
@@ -681,23 +730,39 @@
           <span>申</span><span>酉</span><span>戌</span><span>亥</span>
         </div>
         <div class="ca-hour-insights">
-          <div class="ca-hi ca-hi-peak">
-            <span class="ca-hi-prefix">高峰</span>
-            <span class="ca-hi-time">{{ hourRangeText(peakHour) }}</span>
-            <span class="ca-hi-count">{{ peakPct }}% 投递集中</span>
-            <p class="ca-hi-desc">{{ peakText }}</p>
-          </div>
-          <div class="ca-hi ca-hi-low">
-            <span class="ca-hi-prefix">低谷</span>
-            <span class="ca-hi-time">{{ hourRangeText(lowHour) }}</span>
-            <span class="ca-hi-count">仅 {{ lowPct }}% 故事</span>
-            <p class="ca-hi-desc">{{ lowText }}</p>
-          </div>
+          <template v-if="isAncientTone">
+            <div class="ca-hi ca-hi-peak">
+              <span class="ca-hi-prefix">盛时</span>
+              <span class="ca-hi-time">{{ DIZHI_PER_2H[peakHour] }}时 · {{ pad(peakHour) }}-{{ pad((peakHour+2)%24) }}</span>
+              <span class="ca-hi-count">集中 {{ peakPct }}%</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[peakHour] ?? '子'}时气聚，诸篇什多出于是；或月在梧桐，或灯明窗下，兴会所至，辄复成咏。` }}</p>
+            </div>
+            <div class="ca-hi ca-hi-low">
+              <span class="ca-hi-prefix">衰时</span>
+              <span class="ca-hi-time">{{ DIZHI_PER_2H[lowHour] }}时 · {{ pad(lowHour) }}-{{ pad((lowHour+2)%24) }}</span>
+              <span class="ca-hi-count">仅 {{ lowPct }}%</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[lowHour] ?? '寅'}时声希，卷轴阒然；意兴既阑，天机亦息，俟乎东方之既白。` }}</p>
+            </div>
+          </template>
+          <template v-else>
+            <div class="ca-hi ca-hi-peak">
+              <span class="ca-hi-prefix">高峰</span>
+              <span class="ca-hi-time">{{ hourRangeText(peakHour) }}</span>
+              <span class="ca-hi-count">{{ peakPct }}% 投递集中</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[peakHour] ?? '子'}时最盛——白天没说完的话，总在这一两个小时里，借着夜色写下来。` }}</p>
+            </div>
+            <div class="ca-hi ca-hi-low">
+              <span class="ca-hi-prefix">低谷</span>
+              <span class="ca-hi-time">{{ hourRangeText(lowHour) }}</span>
+              <span class="ca-hi-count">仅 {{ lowPct }}% 故事</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[lowHour] ?? '卯'}时最静——人们多半已睡着，或已开始了新的一天；昨夜的心事，有的随晨光散了。` }}</p>
+            </div>
+          </template>
         </div>
       </div>
 
-      <!-- tooFew：空态（所有框都要显示，只是内部提示不够） -->
-      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+      <!-- tooFew：空态（非星河） -->
+      <div v-else-if="!isGalaxy && tooFewStories" class="persona-empty empty-scant">
         <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
         <div class="pe-text">
           <div class="pe-title">心事还不够多</div>
@@ -705,12 +770,94 @@
         </div>
       </div>
 
-      <!-- loading：骨架屏 -->
-      <div v-else class="persona-empty empty-loading">
+      <!-- loading：骨架屏（非星河） -->
+      <div v-else-if="!isGalaxy" class="persona-empty empty-loading">
         <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
         <div class="pe-text">
           <div class="pe-title">时辰热力生成中…</div>
           <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合 24 时辰投递高峰</div>
+        </div>
+        <div class="skeleton-lines">
+          <span class="sk-line sk-1"></span>
+          <span class="sk-line sk-2"></span>
+          <span class="sk-line sk-3"></span>
+        </div>
+      </div>
+
+      <!-- ═════════════════════ 星河合集：卷目疏（真实/loading/tooFew） ═════════════════════ -->
+      <!-- 真实态：主卷 2 大卡片预览 + 次卷条目条柱 -->
+      <div v-else-if="hasReal || scrollBooks.length > 0" class="scroll-body">
+        <!-- 主卷：两列大卡片 -->
+        <div class="scroll-head-cards">
+          <div
+            v-for="b in scrollBooksTop2"
+            :key="b.name"
+            class="scroll-card"
+            :style="{ '--sc': b.color }"
+          >
+            <div class="sc-banner">
+              <component :is="b.icon" :size="14" class="sc-icon" />
+              <div class="sc-head-text">
+                <span class="sc-name">{{ b.name }}</span>
+                <span class="sc-tag">{{ b.tag }}</span>
+              </div>
+              <span class="sc-count">{{ b.count }} 则</span>
+            </div>
+            <ul class="sc-tops">
+              <li
+                v-for="t in b.topStories"
+                :key="t.id"
+                class="sc-top-item"
+                @click="$emit('story-click', { id: t.id })"
+              >
+                <span class="sc-top-title">{{ t.title }}</span>
+                <span class="sc-top-sub">
+                  <span v-if="t.author" class="sc-top-author">{{ t.author }}</span>
+                  <span v-if="t.resonance > 0" class="sc-top-res">{{ t.resonance }} 共鸣</span>
+                </span>
+              </li>
+              <li v-if="!b.topStories.length" class="sc-top-item sc-top-empty">本卷卷首篇目待补。</li>
+            </ul>
+          </div>
+        </div>
+        <!-- 次卷：横向条柱列表（>2 的其余卷） -->
+        <div v-if="scrollBooks.length > 2" class="scroll-other">
+          <div class="so-title">
+            <BookMarked :size="9" />
+            <span>其余 {{ scrollBooks.length - 2 }} 卷</span>
+          </div>
+          <div class="so-list">
+            <div
+              v-for="b in scrollBooks.slice(2)"
+              :key="b.name"
+              class="so-row"
+              :style="{ '--sc': b.color }"
+            >
+              <component :is="b.icon" :size="9" class="so-icon" />
+              <span class="so-name">{{ b.name }}</span>
+              <span class="so-tag">{{ b.tag }}</span>
+              <div class="so-bar"><span class="so-fill"></span></div>
+              <span class="so-count">{{ b.count }} 则</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 星河：tooFew 空态 -->
+      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+        <div class="pe-icon-wrap pe-scant"><BookText :size="14" /></div>
+        <div class="pe-text">
+          <div class="pe-title">卷轴尚未展开</div>
+          <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 则故事，累计 3 则后按体裁与源流拆卷，编排为《卷目疏》</div>
+        </div>
+      </div>
+
+      <!-- 星河：loading 骨架 -->
+      <div v-else class="persona-empty empty-loading">
+        <div class="pe-icon-wrap pe-loading"><Scroll :size="14" class="spin-slow" /></div>
+        <div class="pe-text">
+          <div class="pe-title">卷目疏缮写中…</div>
+          <div class="pe-sub">正按体裁与文化源流为 {{ displayStoryCount }} 则故事拆卷归类</div>
         </div>
         <div class="skeleton-lines">
           <span class="sk-line sk-1"></span>
@@ -744,7 +891,10 @@
           >
             <div class="ca-rank-no" :class="`ca-rank-no-${i + 1}`">{{ i + 1 }}</div>
             <div class="ca-rank-main">
-              <div class="ca-rank-title">{{ r.title }}</div>
+              <div class="ca-rank-title">
+                {{ r.title }}
+                <span v-if="r.author" class="ca-rank-author">{{ r.author }}</span>
+              </div>
               <div class="ca-rank-summary">{{ r.summary }}</div>
             </div>
             <div class="ca-rank-res">
@@ -854,10 +1004,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, type Component } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
   Feather, Info, Quote, CloudSun, Sparkle, BookDashed, AlertTriangle, RotateCcw,
+  BookOpen, UserSquare2, CalendarClock, Scroll, BookText, BookMarked,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -872,6 +1023,8 @@ const props = defineProps<{
   collectionId: number | null
   collectionName: string
   storyCount: number
+  /** 合集可见性：public/private/anonymous/galaxy；星河会替换时辰/气脉相关面板为官方卷目样式 */
+  visibility?: 'public' | 'private' | 'anonymous' | 'galaxy'
   /** 真实故事列表，用于共鸣榜与星辰归属（若为空则用 mock） */
   stories?: Array<{
     id: number
@@ -881,6 +1034,13 @@ const props = defineProps<{
     createdAt: string
     catalogStarId?: number | null
     catalogStarIds?: number[]
+    /** 作者名：历史故事=苏轼/李清照 等具体人名；用户故事可能为空或匿名 */
+    creator_name?: string | null
+    /** 故事类型：history=历史故事 / user=用户投稿 */
+    type?: 'history' | 'user'
+    /** 文化源流：中国/古希腊/阿拉伯语/近代命名/跨文化…（星河卷目分组用） */
+    origin?: string | null
+    tags?: string[]
   }>
   /** 可选：合集总共鸣数（不传则从 stories.reduce 计算，或 fallback 到 mock 237） */
   resonanceTotal?: number
@@ -896,17 +1056,22 @@ const collAnalysis = useCollectionAnalysis(collId)
 
 // ─── 三态开关（优先级：hasError > hasReal > tooFewStories > isLoading） ───
 // 1) hasError：API 请求失败 → 全局红色 error 条 + 每个 section 内部 v-else 显示错误
-// 2) hasReal：analysis.ready=true 且 nightscape 存在（合集核心） → 真实数据（persona 可空，有兜底）
+// 2) hasReal：ready=true 或 _stale=true → 显示真实数据（三模块任一有值用真实，全空走computed兜底）
+//    放宽：ready=true 不再死卡 nightscape，避免后端返回 ready=true 但某字段为 null 时三态死锁
 // 3) tooFewStories：后端 tooFew=true 或 props.storyCount<3 → 心事不够多
-// 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew） → 生成中骨架
+// 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew/非_stale） → 生成中骨架
 const hasError = computed(() => !!collAnalysis.error.value)
 
 const hasReal = computed(() => {
   const a = collAnalysis.analysis.value
   if (!a) return false
-  // ready=true 视为 AI 已生成结束；至少 nightscape（合集核心）存在即可；persona 为空不影响（computed 有兜底）
-  if (a.ready) return !!a.nightscape
-  return false
+  // 后端 ready=true → AI 明确说生成完了，不管字段全不全都显示（computed 会兜底）
+  if (a.ready) return true
+  // 前端轮询超时标记（_stale=true）：强制降级显示，避免永远骨架「加载完也不自动载入」
+  if (a._stale) return true
+  // 兜底：三大模块至少有 2 个非空 → 视为可用内容（哪怕 ready=false，避免卡骨架）
+  const nonNull = [a.persona, a.emotion, a.nightscape].filter(v => v != null).length
+  return nonNull >= 2
 })
 
 const tooFewStories = computed(() => {
@@ -914,16 +1079,17 @@ const tooFewStories = computed(() => {
   const fromApi = collAnalysis.analysis.value?.tooFewStories
   if (fromApi === true) return true
   if (collAnalysis.analysis.value?.ready) return false // API 明确 ready → 不为 tooFew
+  if (collAnalysis.analysis.value?._stale) return false // 已降级显示 real → 不为 tooFew
   // API 未返回时用 props 兜底（可能是尚未请求到）
   return (props.storyCount ?? 0) < 3
 })
 
 const isLoading = computed(() => {
   if (hasError.value || tooFewStories.value || hasReal.value) return false
-  // loading=true（首次/轮询中） OR ready=false 且后端明确说故事数>=3 → 骨架
+  // loading=true（首次/轮询中） OR ready=false 且后端明确说故事数>=3 且未降级 → 骨架
   if (collAnalysis.loading.value) return true
   const a = collAnalysis.analysis.value
-  if (a && !a.ready && !a.tooFewStories) return true
+  if (a && !a.ready && !a.tooFewStories && !a._stale) return true
   // 兜底：尚未请求到 analysis（例如轮询间隙）且 故事>=3 → 仍视为生成中（避免三态都 false 卡死）
   if (!a && (props.storyCount ?? 0) >= 3) return true
   return false
@@ -933,6 +1099,15 @@ const displayStoryCount = computed(() => {
   const fromApi = collAnalysis.analysis.value?.storyCount
   if (typeof fromApi === 'number') return fromApi
   return props.storyCount ?? 0
+})
+
+/** 合集语气：modern 现代陪伴 / ancient 古籍诗话（根据历史故事占比自动） */
+const isAncientTone = computed(() => {
+  const a = collAnalysis.analysis.value
+  if (!a) return false
+  if (a.tone === 'ancient') return true
+  if (a.nightscape?.tone === 'ancient') return true
+  return false
 })
 
 /** 全局重试按钮：重置状态 + 重新拉取 analysis */
@@ -946,30 +1121,131 @@ const _p = computed(() => collAnalysis.analysis.value?.persona)
 const _e = computed(() => collAnalysis.analysis.value?.emotion)
 const _n = computed<NightscapePayload | null | undefined>(() => collAnalysis.analysis.value?.nightscape)
 
-const persona = computed(() => ({
-  hanName: _p.value?.hanName ?? '夜雨孤灯',
-  constellation: _p.value?.constellation ?? `${props.collectionName} · 默认合集`,
-  tags: _p.value?.tags ?? ['思念', '夜雨', '独行', '回忆', '微光'],
-  quote: _p.value?.quote ?? '每一盏孤灯，都是夜里不肯睡的人。',
-  suggestIntro: _p.value?.suggestIntro ?? '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
-  paragraphFirst: _p.value?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
-  paragraphSecond: _p.value?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
-  dimensions: (_p.value?.dimensions?.length ?? 0) >= 5 ? _p.value!.dimensions : [
-    { left: '内向',   right: '外向',   percent: 78, side: 'left'  as const },
-    { left: '柔和',   right: '锋利',   percent: 34, side: 'left'  as const },
-    { left: '沉静',   right: '炽烈',   percent: 62, side: 'left'  as const },
-    { left: '现实',   right: '梦幻',   percent: 71, side: 'right' as const },
-    { left: '慢热',   right: '热切',   percent: 57, side: 'left'  as const },
-  ],
-}))
+const persona = computed(() => {
+  const p = _p.value
+  if (isAncientTone.value) {
+    // 古代版兜底：不显示现代「夜雨孤灯/每盏孤灯」陪伴口吻，改用温和古籍感表达（哪怕真实数据为空，也不违和）
+    return {
+      hanName: p?.hanName ?? '亭林本事',
+      constellation: p?.constellation ?? `${props.collectionName ?? '合集'} · 钞本`,
+      tags: p?.tags ?? ['思念', '怀旧', '独白', '夜雨', '故人'],
+      quote: p?.quote ?? '「桃李春风一杯酒，江湖夜雨十年灯。」',
+      suggestIntro: p?.suggestIntro ?? `这卷钞本共 ${displayStoryCount.value} 则旧文字，字里行间藏着千年前的心情——和今夜的心事一模一样。`,
+      paragraphFirst: p?.paragraphs?.[0] ?? '这些句子跨越了成百上千年，但想念一个人的心、错过一件事的遗憾、被一阵风一场雨勾起的回忆——全是共通的。它们不是封存在古籍里的文字，而是活生生的、和你我一样的心情。',
+      paragraphSecond: p?.paragraphs?.[1] ?? '读的时候常常会停下来：千年前的某个人，在某个和今夜差不多的雨夜里，写下过和你此刻一样的句子。原来我们都不是孤独的。',
+      paragraphs: [
+        p?.paragraphs?.[0] ?? '这些句子跨越了成百上千年，但想念一个人的心、错过一件事的遗憾、被一阵风一场雨勾起的回忆——全是共通的。它们不是封存在古籍里的文字，而是活生生的、和你我一样的心情。',
+        p?.paragraphs?.[1] ?? '读的时候常常会停下来：千年前的某个人，在某个和今夜差不多的雨夜里，写下过和你此刻一样的句子。原来我们都不是孤独的。',
+      ],
+      dimensions: (p?.dimensions?.length ?? 0) >= 5 ? p!.dimensions : [
+        { left: '怀念', right: '向前', percent: 72, side: 'left' as const },
+        { left: '克制', right: '热烈', percent: 66, side: 'left' as const },
+        { left: '独处', right: '交集', percent: 78, side: 'left' as const },
+        { left: '旧事', right: '来日', percent: 60, side: 'left' as const },
+        { left: '幽深', right: '明亮', percent: 55, side: 'left' as const },
+      ],
+    }
+  }
+  // 现代版兜底（原：夜雨孤灯+陪伴口吻，不变）
+  return {
+    hanName: p?.hanName ?? '夜雨孤灯',
+    constellation: p?.constellation ?? `${props.collectionName} · 默认合集`,
+    tags: p?.tags ?? ['思念', '夜雨', '独行', '回忆', '微光'],
+    quote: p?.quote ?? '每一盏孤灯，都是夜里不肯睡的人。',
+    suggestIntro: p?.suggestIntro ?? '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
+    paragraphFirst: p?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
+    paragraphSecond: p?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
+    paragraphs: [
+      p?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
+      p?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
+    ],
+    dimensions: (p?.dimensions?.length ?? 0) >= 5 ? p!.dimensions : [
+      { left: '内向',   right: '外向',   percent: 78, side: 'left'  as const },
+      { left: '柔和',   right: '锋利',   percent: 34, side: 'left'  as const },
+      { left: '沉静',   right: '炽烈',   percent: 62, side: 'left'  as const },
+      { left: '现实',   right: '梦幻',   percent: 71, side: 'right' as const },
+      { left: '慢热',   right: '热切',   percent: 57, side: 'left'  as const },
+    ],
+  }
+})
 
-const fiveMeteo = computed(() => _n.value?.fiveMeteo ?? [
-  { k: '夜温',   en: 'T · NIGHT',    color: '#86a8ff' },
-  { k: '风向',   en: 'W · NORTHW',   color: '#caa7ff' },
-  { k: '见月',   en: 'M · WANING',   color: '#ffd98a' },
-  { k: '云量',   en: 'C · FOURTH',   color: '#95f0c0' },
-  { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },
-])
+const fiveMeteo = computed(() => {
+  if (isAncientTone.value) {
+    return _n.value?.fiveMeteo ?? [
+      { k: '主调', en: 'Main Theme', color: '#86a8ff' },
+      { k: '群贤', en: 'Top Authors', color: '#caa7ff' },
+      { k: '月相', en: 'Moon Phase',  color: '#ffd98a' },
+      { k: '警句', en: 'Key Words',   color: '#95f0c0' },
+      { k: '共鸣', en: 'Resonance',   color: '#ff8b7d' },
+    ]
+  }
+  return _n.value?.fiveMeteo ?? [
+    { k: '夜温',   en: 'T · NIGHT',    color: '#86a8ff' },
+    { k: '风向',   en: 'W · NORTHW',   color: '#caa7ff' },
+    { k: '见月',   en: 'M · WANING',   color: '#ffd98a' },
+    { k: '云量',   en: 'C · FOURTH',   color: '#95f0c0' },
+    { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },
+  ]
+})
+
+/**
+ * 防御性封装 nightSky，避免模板里直接 .split('~')[1].trim() 等链式调用崩溃
+ * - timeSpan 格式「21:14 ~ 05:42」→ 自动拆 start / end（取前5字符）
+ * - 若格式里不含「~」，end 兜底为空字符串，绝不调用 undefined.trim()
+ * - meteo 数组越界（i >= 5）兜底返回空字符串，绝不 undefined.v
+ * - 分 tone：ancient/modern 兜底 name/timeSpan/season 不一样
+ */
+const nightSky = computed(() => {
+  const n = _n.value?.nightSky
+  const ts = n?.timeSpan ?? (isAncientTone.value ? '凡 143 则 · 以夜半为多 · 亥~寅' : '21:00 ~ 05:00')
+  // 用 ~ 拆，注意兼容中文「～」（全角波浪）
+  const parts = ts.split(/[~～]/)
+  const startRaw = (parts[0] ?? '').trim()
+  const endRaw   = (parts[1] ?? '').trim()
+  const start    = startRaw.split(' ')[0] ?? startRaw
+  const endShort = endRaw.substring(0, 5)
+  const meteoAt = (i: number) => ({ k: '', v: '', color: undefined as string | undefined, ...(n?.meteo?.[i] ?? {}) })
+  const fallbackName = isAncientTone.value ? `《亭林本事》· 钞本卷一` : '《夜雨秋灯》 · 其一卷'
+  const fallbackSeason = isAncientTone.value ? '夜半最密 · 群贤共钞' : '孟秋 · 八月'
+  return {
+    name: n?.name ?? fallbackName,
+    season: n?.season ?? fallbackSeason,
+    timeSpan: ts,
+    timeSpanStart: start,
+    timeSpanEnd: endShort,         // 取前 5 字符给模板用
+    timeSpanEndLong: endRaw.substring(0, 8),
+    phase: n?.phase ?? '下弦残月',
+    moonAge: n?.moonAge ?? '21 日',
+    moonIllum: n?.moonIllum ?? (isAncientTone.value ? '残光 26%' : '26% 残光'),
+    term: n?.term ?? '立秋',
+    ecliptic: n?.ecliptic ?? (isAncientTone.value ? '翼宿 · 鹑尾之次' : '翼宿 · 鹑尾'),
+    termDeg: n?.termDeg ?? 135,
+    meteo: n?.meteo ?? [],
+    meteoAt,                       // 函数式取，越界安全
+    /** 模板里 386 行要的那 5 个长 value 串 */
+    weatherValueAt(i: 0 | 1 | 2 | 3 | 4): string {
+      if (isAncientTone.value) {
+        switch (i) {
+          case 0: return meteoAt(1).v || '思念·怀旧·独白'
+          case 1: return meteoAt(2).v || '苏轼·12，杜甫·8'
+          case 2: return `${n?.phase ?? '下弦残月'}·${n?.moonIllum ?? '残光 26%'}`
+          case 3: return meteoAt(3).v || '「夜雨·故人·灯影」'
+          case 4: return meteoAt(4).v || '9339次·篇均65'
+          default: return ''
+        }
+      }
+      switch (i) {
+        case 0: return meteoAt(1).v || '凉 16℃  体感 14℃'
+        case 1: return meteoAt(2).v || '东北风 3 级'
+        case 2: return `${n?.phase ?? '下弦残月'}·${n?.moonIllum ?? '26% 残光'}`
+        case 3: return meteoAt(3).v || '四分散卷'
+        case 4: return meteoAt(4).v || '5.2  可见 3842'
+        default: return ''
+      }
+    },
+    hourDots: n?.hourDots ?? [],
+  }
+})
 
 const emotions = computed(() => {
   if (_e.value?.emotions && _e.value.emotions.length >= 5) return _e.value.emotions
@@ -1051,6 +1327,164 @@ const storyQuotes = computed(() => {
   ]
 })
 
+/**
+ * AI 选本·代表故事（替代夜色流转）：
+ * - 基础源 = nightscape.storyQuotes（后端按共鸣度排好的 3 条）
+ * - 目标 4 张 → 不够用 props.stories 按 共鸣/长度 挑 top 补齐
+ * - 每张 card 字段：rank / starName / text / tags(<=3) / author / date / color
+ * - tone：ancient → 作者带「出《XX》」「钞本手录」，日期带「椠本/钞藏」；modern → 匿名观星者 + 日期
+ */
+/**
+ * 清洗推荐语：强制剥掉所有排名字眼臭词（Top1/次选/共鸣第/选第/全篇/次篇/三篇/末篇/钞取/补充 等）
+ * 不管后端/缓存里是新老文案，过一遍这函数保证输出短神韵句，无排名臭词
+ */
+function trimReason(raw: string | undefined | null, themeWord = '心事'): string {
+  if (!raw) return shortReasonFallback(themeWord, isAncientTone.value)
+  let s = String(raw).trim()
+  // 1) 剥掉所有「排名 + ·/：」前缀（Top1 · / 共鸣第 1 · / 选第 2 · / 次选 · / 全篇 · / 次篇 · / 三篇 · / 末篇 · / 钞取首篇 · / 补充 · / 共鸣最高 · 等）
+  s = s.replace(/^(共鸣\s*Top\s*\d+|共鸣\s*第\s*\d+|选\s*第\s*\d+|Top\s*\d+|次选|第三篇|第一篇|第二篇|末篇|全篇|次篇|三篇|钞取首篇|钞取|补充|共鸣最高|全篇共鸣最高)\s*[·•\.\-\:：]\s*/i, '')
+  s = s.replace(/^(选第|共鸣第|共鸣Top|Top)\s*\d*\s*[·•\.\-\:：]\s*/gi, '')
+  // 2) 剥掉句中的风人之致 / 光景最真 / 作收束，最见余味 / 很多人的共鸣点 / 写XX情绪最细腻 等老臭词尾句
+  s = s.replace(/[，,]?\s*(最得风人之致|光景最真|光景最真切|最见余味|很多人的共鸣点|情绪最细腻|的一段独白|写\s*\S{2,8}\s*情绪最细腻|以\S{2,10}作收束|作收束[，,]?最见余味)\s*$/gi, '')
+  s = s.replace(/\s*（写[^）]*最[真实细腻戳心]{1,4}）/g, '')
+  s = s.trim().replace(/^[·•\.\-\:：,，]\s*/, '').replace(/\s*[·•\.\-]$/, '')
+  // 3) 共鸣数括号要保留，先切出来最后再拼回去
+  const m = s.match(/（\s*\d+\s*次共鸣\s*）$/)
+  const tail = m ? m[0] : ''
+  if (tail) s = s.slice(0, s.length - tail.length).trim().replace(/[，,·•\.\-：:]$/, '')
+  // 4) 空了/只剩括号了 → 兜底短神韵句
+  if (!s) return shortReasonFallback(themeWord, isAncientTone.value) + (tail ? tail : '')
+  // 5) 句子太长 → 取到第一个标点或前 12 字保证短
+  if (s.length > 14) {
+    const punc = s.search(/[，。,；;、\s]/)
+    if (punc > 4) s = s.slice(0, punc)
+    else if (s.length > 12) s = s.slice(0, 12) + '…'
+  }
+  return s + (tail ? tail : '')
+}
+/** 超短神韵句（6-10字）：trimReason 兜底 + 三分支 fallback 共用 */
+function shortReasonFallback(w: string, ancient: boolean): string {
+  const pool = ancient
+    ? [`「${w}」最入心`, `字字切「${w}」`, `光景最真切`, `余味最长`]
+    : [`「${w}」最戳`, `「${w}」最共鸣`, `深夜心情最真`, `读了会鼻酸`]
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+type StoryCard = {
+  rank: string; starName: string; text: string
+  tags: string[]; author: string; date: string; color: string
+  reason?: string
+}
+const storyCards = computed<StoryCard[]>(() => {
+  const rankPool = ['α', 'β', 'γ', 'δ', 'ε', 'ζ']
+  const fallbackStars = ['δ · 灯下偶书', 'δ · 夜半抄录', 'δ · 灯下寄远']
+  const palette = ['#ffd98a', '#caa7ff', '#9ae6b4', '#86a8ff', '#ff8b7d']
+
+  // 先取后端 storyQuotes（带 reason）
+  const base: StoryCard[] = storyQuotes.value.map((q, i) => {
+    const themeWord = (q.tags?.[0]) ?? '心事'
+    // 后端 reason 兜底：超短神韵句（≤10字），和后端模板对齐
+    const ancientReason = [
+      `「${themeWord}」最入心`,
+      `字字切「${themeWord}」`,
+      `光景最真切`,
+      `余味最长的「${themeWord}」`,
+    ]
+    const modernReason = [
+      `「${themeWord}」最戳`,
+      `「${themeWord}」最共鸣`,
+      `深夜心情最真`,
+      `读了鼻酸的「${themeWord}」`,
+    ]
+    const fallbackPool = isAncientTone.value ? ancientReason : modernReason
+    return {
+      rank: q.rank ?? rankPool[i] ?? 'δ',
+      starName: q.starName ?? fallbackStars[i % fallbackStars.length],
+      text: (q.text ?? '').trim() || '（此处为摘录片段）',
+      tags: (q.tags ?? []).slice(0, 3),
+      author: q.author ?? (isAncientTone.value ? '钞本手录 · 佚名' : '匿名观星者'),
+      date: q.date ?? (isAncientTone.value ? '宋元椠本' : '2026-08-05'),
+      color: q.color ?? palette[i % palette.length],
+      reason: (q as any).reason ?? fallbackPool[i % fallbackPool.length],
+    }
+  })
+
+  // 不够 4 张 → 从 props.stories 按 resonanceCount 降序补（跳过已存在的作者+文本近似的）
+  if (base.length < 4 && (props.stories?.length ?? 0) > 0) {
+    const seen = new Set(base.map(b => `${b.author}|${b.text.slice(0, 20)}`))
+    const pick = [...(props.stories ?? [])]
+      .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
+      .filter(r => {
+        const key = `${r.creator_name ?? (isAncientTone.value ? '佚名' : '匿名')}|${(r.content ?? '').slice(0, 20)}`
+        if (seen.has(key)) return false
+        seen.add(key); return true
+      })
+      .slice(0, 4 - base.length)
+
+    for (let i = 0; i < pick.length; i++) {
+      const r = pick[i]
+      const idx = base.length + i
+      const raw = (r.title ? `${r.title} · ` : '') + (r.content ?? '')
+      const text = raw.length > 70 ? raw.slice(0, 68) + '…' : raw
+      const creator = r.creator_name ?? (isAncientTone.value ? '佚名' : '匿名观星者')
+      const author = isAncientTone.value
+        ? (r.type === 'history' ? `出《${creator}》` : `${creator} · 钞存`)
+        : (r.creator_name ? `@${r.creator_name}` : '匿名观星者')
+      const date = isAncientTone.value
+        ? (r.type === 'history' ? '明钞本' : '今人钞录')
+        : (r.createdAt ? r.createdAt.slice(0, 10) : '2026-08-05')
+      const tagList = (r.catalogStarIds?.length ?? 0) > 0 ? [getStarNameInfo(r.catalogStarIds?.[0] ?? 0)?.name ?? ''] : []
+      const themeWords = (r.content?.match(/[\u4e00-\u9fa5]{2,3}/g) ?? []).slice(0, 3)
+      const tags = (tagList.length ? tagList : themeWords).slice(0, 3) || ['思念', '夜雨', '独白']
+      const themeWord = tags[0] ?? '夜'
+      const resN = Number(r.resonanceCount ?? 0)
+      // 超短神韵句（≤10字），不点名次
+      const ancientReason = [
+        `「${themeWord}」最入心`,
+        `字字切「${themeWord}」`,
+        `光景最真切`,
+        `余味最长的「${themeWord}」`,
+      ]
+      const modernReason = [
+        `「${themeWord}」最戳`,
+        `「${themeWord}」最共鸣`,
+        `深夜心情最真`,
+        `读了鼻酸的「${themeWord}」`,
+      ]
+      const pool = isAncientTone.value ? ancientReason : modernReason
+      const reason = pool[idx % pool.length]
+      base.push({
+        rank: rankPool[idx] ?? 'δ',
+        starName: fallbackStars[idx % fallbackStars.length],
+        text, tags, author, date,
+        color: palette[idx % palette.length],
+        reason: resN > 0 ? `${reason}（${resN}次共鸣）` : reason,
+      })
+    }
+  }
+
+  // 还是不够 → mock 兜底（保证 4 张不塌）
+  while (base.length < 4) {
+    const i = base.length
+    const themePair = [['思念', '夜雨'], ['怀旧', '独白'], ['故人', '灯影'], ['释然', '江岸']][i]
+    const themeWord = themePair[0]
+    base.push({
+      rank: rankPool[i] ?? 'δ',
+      starName: fallbackStars[i % fallbackStars.length],
+      text: isAncientTone.value
+        ? ['桃李春风一杯酒，江湖夜雨十年灯。', '思君如满月，夜夜减清辉。', '还将两行泪，遥寄海西头。', '落叶他乡树，寒灯独夜人。'][i]
+        : ['有些心事，只能说给星星听。', '天亮之后，把昨夜留给昨夜。', '每一盏灯，都有它想等的人。', '风会记得槐花的香气。'][i],
+      tags: themePair,
+      author: isAncientTone.value ? ['出《中州集》', '钞本手录·佚名', '宋元椠本', '汲古阁藏版'][i] : ['匿名星客', '夜归人', '桥上客', '灯下听风'][i],
+      date: isAncientTone.value ? ['宋元椠本', '明钞本', '汲古阁藏版', '清晖阁题款'][i] : ['03/12', '03/25', '04/30', '05/08'][i],
+      color: palette[i % palette.length],
+      // mock 兜底 reason：超短神韵句（≤10字）
+      reason: shortReasonFallback(themeWord, isAncientTone.value),
+    })
+  }
+  return base.slice(0, 4)
+})
+
 const heroStars = computed(() => _n.value?.heroStars ?? [
   { x: 58,  y: 150, r: 4.9, fill: '#ffd98a', gid: 'Gold'   as const, label: '20:31' },
   { x: 150, y: 52,  r: 4.6, fill: '#caa7ff', gid: 'Purple' as const, label: '01:12' },
@@ -1069,40 +1503,115 @@ const heroStats = computed(() => _n.value?.heroStats ?? [
   { k: '覆盖时辰', v: `${positivesCountFn(hourly.value)}/24`, sub: '段', color: '#9ae6b4' },
 ])
 
+const isGalaxy = computed(() => props.visibility === 'galaxy')
+
+/* ── 星河合集专用：卷目疏（替代气脉十二时） ──
+   把合集中故事按作者/出处/首字/卷名拆成「诗卷 / 词卷 / 曲卷 / 史卷 / 星官卷 / 神话卷 / 笔记卷 / 语录卷 / 杂钞卷」等卷目 */
+type BookMeta = { name: string; order: number; color: string; icon: Component; tag: string }
+const BOOK_RULES: Array<{ test: (s: any) => boolean; meta: BookMeta }> = [
+  {
+    test: s => /诗|唐诗|绝句|律诗|韵|子规|巴山|夜雨寄北|登高|月下|江村|江雪/.test(s.title ?? '')
+      || /李白|杜甫|王维|白居易|孟浩然|苏轼(?![文])|王安石|柳宗元|贺知章|李清照(?![词])|辛弃疾(?![词])|陆游(?![词])/.test(s.creator_name ?? '')
+      || /五言|七言|《诗》/.test(s.content.slice(0, 60)),
+    meta: { name: '诗卷', order: 1, color: '#E8B86D', icon: Scroll as Component, tag: '韵文·吟物' }
+  },
+  {
+    test: s => /词|宋词|长短句|江城子|水调歌头|念奴娇|声声慢|青玉案|满江红|虞美人|蝶恋花|浣溪沙|如梦令|一剪梅/.test(s.title ?? '')
+      || /苏轼(?=\s*[词《])|李清照|辛弃疾|柳永|秦观|周邦彦|晏殊|晏几道|欧阳修(?=\s*[词《])|陆游|姜夔|吴文英/.test(s.creator_name ?? ''),
+    meta: { name: '词卷', order: 2, color: '#CAA7FF', icon: BookText as Component, tag: '倚声·填阕' }
+  },
+  {
+    test: s => /曲|杂剧|传奇|戏曲|西厢|牡丹亭|桃花扇|窦娥冤|汉宫秋|梧桐雨|赵氏孤儿/.test(s.title ?? '')
+      || /关汉卿|王实甫|汤显祖|孔尚任|洪昇|马致远|白朴|纪君祥/.test(s.creator_name ?? ''),
+    meta: { name: '曲卷', order: 3, color: '#F4A8B8', icon: BookMarked as Component, tag: '梨园·院本' }
+  },
+  {
+    test: s => /星官|天官|步天歌|史记·天官|晋书·天文|灵台|观星|星经|甘石|三家星|紫微垣|太微垣|天市垣|二十八宿|星宿|星野/.test(s.title ?? s.content.slice(0, 120))
+      || /石申|甘德|落下闳|张衡|祖冲之|一行|郭守敬|梅文鼎|李善兰/.test(s.creator_name ?? ''),
+    meta: { name: '星官卷', order: 4, color: '#7AB8F0', icon: Orbit as Component, tag: '观星·步天' }
+  },
+  {
+    test: s => /神话|神话考|创世|补天|射日|奔月|治水|移山|填海|奥林匹斯|宙斯|阿波罗|赫拉|雅典娜|波塞冬|阿瑞斯|赫尔墨斯|狄俄倪索斯|珀耳塞福涅|太阳神|月神/.test(s.title ?? s.content.slice(0, 120))
+      || /赫西俄德|荷马|奥维德|阿波罗多洛斯|埃斯库罗斯|索福克勒斯|欧里庇得斯/.test(s.creator_name ?? ''),
+    meta: { name: '神话卷', order: 5, color: '#95E0C0', icon: MoonStar as Component, tag: '创世·神祇' }
+  },
+  {
+    test: s => /史|史记|汉书|后汉书|三国志|资治通鉴|通鉴|纪事本末|编年史|本纪|列传|世家|书|志|表/.test(s.title ?? '')
+      || /司马迁|班固|陈寿|司马光|范晔|裴松之|刘知几|章学诚/.test(s.creator_name ?? ''),
+    meta: { name: '史卷', order: 6, color: '#FFD98A', icon: BookOpen as Component, tag: '简册·载笔' }
+  },
+  {
+    test: s => /笔记|录异|志怪|志异|搜神|幽明|酉阳杂俎|容斋|梦溪笔谈|东京梦华|武林旧事|陶庵梦忆|阅微草堂|聊斋|子不语|世说新语|拾遗记|述异记|太平广记/.test(s.title ?? s.content.slice(0, 120))
+      || /干宝|刘义庆|段成式|沈括|孟元老|周密|张岱|纪晓岚|蒲松龄|袁枚|洪迈|吴淑/.test(s.creator_name ?? ''),
+    meta: { name: '笔记卷', order: 7, color: '#A8E89C', icon: Feather as Component, tag: '志怪·琐记' }
+  },
+  {
+    test: s => /语录|论语|孟子|朱子语类|传习录|坛经|大学|中庸|近思录|菜根谭|围炉夜话|小窗幽记|幽梦影/.test(s.title ?? s.content.slice(0, 80))
+      || /孔子|孟子|朱熹|王阳明|释慧能|六祖|老子|庄子|列子|荀子|韩非子|墨子|陈继儒|张潮|洪应明/.test(s.creator_name ?? ''),
+    meta: { name: '语录卷', order: 8, color: '#FFB48A', icon: Quote as Component, tag: '微言·理致' }
+  },
+  {
+    test: s => /阿拉伯|伊斯兰|阿尔·|al-|苏菲|可兰|天方|一千零一夜|卡布斯|巴努|库赛|乌姆鲁勒|穆太奈比|麦阿里/.test((s.title ?? '') + s.content.slice(0, 100) + ' ' + (s.creator_name ?? ''))
+      || /大食|撒马尔罕|巴格达|大马士革|开罗|科尔多瓦|托莱多/.test(s.title ?? s.content.slice(0, 120)),
+    meta: { name: '海外卷', order: 9, color: '#C09969', icon: Route as Component, tag: '天方·异闻' }
+  },
+]
+const FALLBACK_BOOK: BookMeta = { name: '杂钞卷', order: 99, color: '#B59FD4', icon: Sparkles as Component, tag: '无类·汇存' }
+
+function matchBook(s: any): BookMeta {
+  for (const r of BOOK_RULES) if (r.test(s)) return r.meta
+  return FALLBACK_BOOK
+}
+
+type ScrollBook = {
+  name: string; order: number; color: string; icon: Component; tag: string;
+  count: number;
+  total: number;
+  /** 卷内共鸣最盛 3 条故事预览 */
+  topStories: { id: number; title: string; resonance: number; author?: string }[]
+}
+const scrollBooks = computed<ScrollBook[]>(() => {
+  const real = props.stories ?? []
+  if (!real.length) {
+    // mock 兜底：配合 mock heroStats 的 18-24 则故事量，出一个典型卷目结构
+    return [
+      { name: '诗卷',   order: 1, color: '#E8B86D', icon: Scroll as Component,   tag: '韵文·吟物', count: 8,  total: 8,
+        topStories: [{ id: 1, title: '夜雨寄北', resonance: 9, author: '李商隐' }, { id: 2, title: '水调歌头·明月几时有', resonance: 6, author: '苏轼' }] },
+      { name: '星官卷', order: 4, color: '#7AB8F0', icon: Orbit as Component,    tag: '观星·步天', count: 5,  total: 5,
+        topStories: [{ id: 3, title: '步天歌·紫微垣', resonance: 4, author: '丹元子' }, { id: 4, title: '天官书', resonance: 2, author: '司马迁' }] },
+      { name: '史卷',   order: 6, color: '#FFD98A', icon: BookOpen as Component, tag: '简册·载笔', count: 4,  total: 4,
+        topStories: [{ id: 5, title: '太史公自序', resonance: 3, author: '司马迁' }] },
+      { name: '笔记卷', order: 7, color: '#A8E89C', icon: Feather as Component,  tag: '志怪·琐记', count: 3,  total: 3,
+        topStories: [{ id: 6, title: '幽明录·夜星', resonance: 2 }] },
+    ]
+  }
+  const groups = new Map<string, ScrollBook>()
+  for (const s of real) {
+    const meta = matchBook(s)
+    if (!groups.has(meta.name)) groups.set(meta.name, {
+      name: meta.name, order: meta.order, color: meta.color, icon: meta.icon, tag: meta.tag,
+      count: 0, total: real.length, topStories: [],
+    })
+    const g = groups.get(meta.name)!
+    g.count++
+    g.topStories.push({
+      id: s.id,
+      title: s.title || s.content.slice(0, 16) + (s.content.length > 16 ? '…' : ''),
+      resonance: s.resonanceCount ?? 0,
+      author: s.creator_name || undefined,
+    })
+  }
+  return Array.from(groups.values())
+    .map(g => ({ ...g, topStories: [...g.topStories].sort((a, b) => b.resonance - a.resonance).slice(0, 3) }))
+    .sort((a, b) => a.order - b.order)
+})
+const scrollBooksTop2 = computed(() => scrollBooks.value.slice(0, 2)) // 预览 2 大卷
+
 const hourly = computed<number[]>(() => _n.value?.hourly ?? [2,1,1,0,0,1,3,5,4,3,2,2,4,3,2,1,2,3,4,6,9,12,8,5])
 const peakHour = computed<number>(() => _n.value?.peakHour ?? 21)
 const lowHour  = computed<number>(() => _n.value?.lowHour  ?? 4)
 const peakText = computed<string>(() => '子时雨最盛，心事也最稠。你总在别人入睡后才点亮自己那盏灯，把白天没说完的话留给夜雨。')
 const lowText  = computed<string>(() => '卯时天将明，是这卷星笺最安静的时辰。或许醒来之后，有些情绪就随晨光散了。')
-
-const nightSky = computed(() => _n.value?.nightSky ?? {
-  name: `${persona.value.hanName} · 那一夜`,
-  season: '甲辰年 · 春分后第三夜',
-  timeSpan: '子初 22:47 ~ 卯初 05:21',
-  phase: '残月 · 蛾眉',
-  moonIllum: '22%',
-  moonAge: '26.4 日龄',
-  term: '春分后三',
-  ecliptic: 'λ 3°12′',
-  termDeg: 3 + 12 / 60 * 15,
-  meteo: [
-    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
-    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
-    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
-    { k: '能见度', v: '薄云 · 7.2km', color: '#9ae6b4' },
-    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
-    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
-  ],
-  hourDots: [
-    { pos: 10,  size: 12, color: '#ffd98a' },
-    { pos: 22,  size: 8,  color: '#ffd98a' },
-    { pos: 38,  size: 10, color: '#caa7ff' },
-    { pos: 52,  size: 5,  color: '#95f0c0' },
-    { pos: 66,  size: 7,  color: '#caa7ff' },
-    { pos: 78,  size: 6,  color: '#95f0c0' },
-    { pos: 88,  size: 4,  color: '#86a8ff' },
-  ],
-})
 
 function positivesCountFn(arr: number[]) { return arr.filter(v => v > 0).length }
 
@@ -1475,19 +1984,40 @@ const deepSpaceStars = Array.from({ length: 22 }, (_, i) => {
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
 const trajExpanded = ref(false)
 
-/* hourly / peakHour / lowHour / peakText / lowText 已在上方用 computed 从 API/nightscape 映射，
-   这一组常量是旧 mock 版本，删除避免重复声明报错 */
-
-const trajectory = [
-  { emotion: '思念', color: '#ffd98a', date: '03/12', title: '雨夜寄北', snippet: '把没寄出的话折成纸船，放进窗外的雨里。' },
-  { emotion: '孤独', color: '#caa7ff', date: '03/18', title: '一个人的地铁', snippet: '末班车空荡荡，影子比人先到站。' },
-  { emotion: '思念', color: '#ffd98a', date: '03/25', title: '旧照片', snippet: '翻到那张合影，才发现你笑得比我记得的还要年轻。' },
-  { emotion: '释然', color: '#95f0c0', date: '04/02', title: '江边走走', snippet: '风把帽子吹进水里，我居然笑了出来。' },
-  { emotion: '孤独', color: '#caa7ff', date: '04/09', title: '凌晨四点', snippet: '整座城市都睡了，只有我和一盏台灯还醒着。' },
-  { emotion: '希望', color: '#86a8ff', date: '04/15', title: '阳台的种子', snippet: '埋下去第十天，今天早上冒了一点绿。' },
-  { emotion: '思念', color: '#ffd98a', date: '04/22', title: '故乡的槐花', snippet: '又到开花的季节，只是树下的人不在了。' },
-  { emotion: '释然', color: '#95f0c0', date: '04/30', title: '合上这一卷', snippet: '把散落的纸页收好，灯灭了，雨也停了。' },
-]
+/**
+ * 情感轨迹：用后端 storyQuotes（Top 5 精选）动态生成，不再是硬编码 mock。
+ * - emotion：取 tags[0] 或默认情绪词
+ * - color：直接用后端分配的故事色
+ * - date：古代版=钞本年代；现代版=故事记录日期
+ * - title：故事首句（已由后端裁剪）
+ * - snippet：tags 拼接
+ */
+const trajectory = computed(() => {
+  const quotes = _n.value?.storyQuotes
+  if (!quotes || quotes.length === 0) {
+    // 兜底：storyQuotes 缺失时给一个静态空状态，避免白屏
+    return [
+      { emotion: '思念', color: '#ffd98a', date: isAncientTone.value ? '钞次一' : '03/12', title: '节选·其一', snippet: '待故事更多，AI 会自动生成时间线。' },
+      { emotion: '释然', color: '#9ae6b4', date: isAncientTone.value ? '钞次二' : '04/02', title: '节选·其二', snippet: '—' },
+    ]
+  }
+  return quotes.map((q, i) => {
+    const emo = (q.tags && q.tags[0]) ?? (i % 3 === 0 ? '思念' : i % 3 === 1 ? '孤独' : '释然')
+    const snippetRaw = (q.tags && q.tags.length > 1)
+      ? q.tags.slice(0, 3).join(' · ')
+      : q.starName ?? ''
+    return {
+      emotion: emo,
+      color: q.color ?? (['#ffd98a', '#caa7ff', '#86a8ff', '#9ae6b4', '#d5b4ff'][i % 5]),
+      // ancient 版：显示钞次+钞本年代/钞者，modern 版：显示 date 字段
+      date: isAncientTone.value
+        ? (q.author && q.author !== '古人' ? `${q.author}` : q.date)
+        : q.date,
+      title: q.text.slice(0, 18) + (q.text.length > 18 ? '…' : ''),
+      snippet: snippetRaw,
+    }
+  })
+})
 
 /** AI 总叙结构化数据（【观星手记】星空绑定版本：星图总志 + 星轨四步 + 星座神话 + 观星者手记） */
 const narrative = {
@@ -1561,19 +2091,40 @@ const rankList = computed(() => {
     .slice()
     .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
     .slice(0, 3)
-    .map(s => ({
-      id: s.id,
-      title: s.title || '未命名故事',
-      summary: storySummary(s.content),
-      resonance: s.resonanceCount ?? 0,
-    }))
+    .map(s => {
+      // 作者名：有 creator_name 用它；否则古代版=佚名·钞，现代版=匿名
+      let author = s.creator_name || ''
+      if (!author) {
+        author = isAncientTone.value ? '佚名 · 钞' : '匿名'
+      }
+      // 古代版作者统一：如果不是具体人名则加"·钞"
+      if (isAncientTone.value && author && author !== '古人' && !author.endsWith('钞') && !author.includes('·')) {
+        author = `${author} · 钞`
+      }
+      if (author === '古人' && isAncientTone.value) {
+        author = '佚名 · 钞'
+      }
+      return {
+        id: s.id,
+        title: s.title || '未命名故事',
+        summary: storySummary(s.content),
+        resonance: s.resonanceCount ?? 0,
+        author,
+      }
+    })
   if (real.length >= 3) return real
-  // 不足 3 则用 mock 补足
-  const mock = [
-    { id: -1, title: '雨夜寄北', summary: '把没寄出的话折成纸船，放进窗外的雨里。', resonance: 42 },
-    { id: -2, title: '凌晨四点', summary: '整座城市都睡了，只有我和一盏台灯还醒着。', resonance: 35 },
-    { id: -3, title: '故乡的槐花', summary: '又到开花的季节，只是树下的人不在了。', resonance: 28 },
+  // 不足 3 则用 mock 补足（mock 也要带 author，按 tone 切）
+  const mockAncient = [
+    { id: -1, title: '夜雨寄北', summary: '何当共剪西窗烛，却话巴山夜雨时。', resonance: 42, author: '李商隐 · 钞' },
+    { id: -2, title: '水调歌头·明月几时有', summary: '但愿人长久，千里共婵娟。', resonance: 35, author: '苏轼 · 钞' },
+    { id: -3, title: '天净沙·秋思', summary: '夕阳西下，断肠人在天涯。', resonance: 28, author: '马致远 · 钞' },
   ]
+  const mockModern = [
+    { id: -1, title: '雨夜寄北', summary: '把没寄出的话折成纸船，放进窗外的雨里。', resonance: 42, author: '匿名' },
+    { id: -2, title: '凌晨四点', summary: '整座城市都睡了，只有我和一盏台灯还醒着。', resonance: 35, author: '匿名' },
+    { id: -3, title: '故乡的槐花', summary: '又到开花的季节，只是树下的人不在了。', resonance: 28, author: '匿名' },
+  ]
+  const mock = isAncientTone.value ? mockAncient : mockModern
   return [...real, ...mock.slice(real.length)].slice(0, 3)
 })
 
@@ -3250,6 +3801,218 @@ function tagStyle(tag: string): Record<string, string> {
   color: rgba(255, 255, 255, 0.48);
 }
 
+/* ═══ 星河合集：卷目疏 样式（替代气脉十二时） ═══ */
+.scroll-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scroll-head-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.scroll-card {
+  --sc: #E8B86D;
+  position: relative;
+  border: 0.5px solid color-mix(in srgb, var(--sc) 22%, transparent);
+  border-radius: 10px;
+  padding: 10px 10px 9px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sc) 6%, transparent) 0%, rgba(255,255,255,0.01) 100%);
+  overflow: hidden;
+  cursor: default;
+}
+.scroll-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--sc) 55%, transparent), transparent);
+  opacity: 0.6;
+}
+.sc-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--sc) 22%, transparent);
+}
+.sc-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sc) 18%, transparent);
+  color: var(--sc);
+}
+.sc-head-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sc-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.82);
+}
+.sc-tag {
+  font-size: 0.54rem;
+  color: color-mix(in srgb, var(--sc) 75%, rgba(255,255,255,0.5));
+  letter-spacing: 0.08em;
+}
+.sc-count {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.sc-tops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-top-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.sc-top-item:hover { background: color-mix(in srgb, var(--sc) 10%, transparent); }
+.sc-top-title {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sc-top-item:hover .sc-top-title { color: var(--sc); }
+.sc-top-sub {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-top-author {
+  font-size: 0.56rem;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.03em;
+}
+.sc-top-res {
+  font-size: 0.54rem;
+  color: #ff8b7d;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.sc-top-empty {
+  cursor: default;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+  grid-column: 1 / -1;
+  padding: 4px 6px 3px;
+}
+
+.scroll-other {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.so-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.so-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.so-row {
+  --sc: #E8B86D;
+  display: grid;
+  grid-template-columns: 18px 42px auto 1fr 36px;
+  align-items: center;
+  column-gap: 7px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 0.5px solid color-mix(in srgb, var(--sc) 14%, transparent);
+  background: color-mix(in srgb, var(--sc) 4%, transparent);
+}
+.so-icon {
+  color: var(--sc);
+  opacity: 0.8;
+  justify-self: center;
+}
+.so-name {
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.so-tag {
+  font-size: 0.52rem;
+  color: color-mix(in srgb, var(--sc) 65%, rgba(255,255,255,0.5));
+  letter-spacing: 0.06em;
+}
+.so-bar {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  min-width: 0;
+}
+.so-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sc) 60%, transparent), var(--sc));
+  border-radius: 999px;
+}
+.so-count {
+  justify-self: end;
+  font-size: 0.54rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .scroll-head-cards { grid-template-columns: 1fr; }
+  .so-row { grid-template-columns: 18px 42px 1fr 32px; }
+  .so-tag { display: none; }
+}
+
 /* ═══ 5. Trajectory（限高滚动+渐隐+展开） ═══ */
 .ca-traj-toggle {
   margin-left: auto;
@@ -3433,6 +4196,20 @@ function tagStyle(tag: string): Record<string, string> {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ca-rank-author {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: #caa78c;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 217, 138, 0.08);
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .ca-rank-summary {
   font-size: 0.66rem;
@@ -4806,6 +5583,284 @@ function tagStyle(tag: string): Record<string, string> {
   border: none !important;
   padding: 2px 0 0 !important;
   gap: 10px;
+}
+
+/* ══════════ AI 选本·代表故事（替代夜色流转左栏，纵向·复用共鸣榜 + 情绪洞察的成熟视觉语言） ══════════ */
+/* 滚动用原来的 ca-night-scroll（y 轴），不再搞横向 */
+.ca-night-flow-stories .ca-story-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 2px 2px 4px;
+  margin-right: -2px;
+}
+.ca-story-grid {
+  display: grid;
+  grid-template-columns: 1fr;           /* 1 列纵向，不 2×2 */
+  grid-auto-rows: auto;                  /* ← 去掉 minmax(180px)：卡片高度贴合内容，不长空白 */
+  gap: 10px;
+}
+.ca-story-item {
+  --accent: #ffd98a;
+  display: flex;
+  flex-direction: row;
+  gap: 9px;
+  padding: 12px 12px 12px 0;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  /* 用 StoryDetailCard 同款设计系统 transition/ease */
+  transition:
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    transform var(--transition-fast),
+    box-shadow var(--transition-normal);
+  /* 入场 stagger：每条依次错峰进入（0, 50, 100, 150ms），仿 sc-enter-inner */
+  animation: cs-story-enter 0.55s var(--ease-out) both;
+  animation-delay: calc(var(--cs-idx, 0) * 50ms);
+}
+/* 入场 stagger 索引 --cs-idx 直接由模板 :style 注入，不再靠 nth-child fallback（兼容 Vue scoped 变量注入） */
+@keyframes cs-story-enter {
+  0%   { opacity: 0; transform: translateY(18px) scale(0.985); box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+  100% { opacity: 1; transform: translateY(0) scale(1);      box-shadow: 0 0 0 0.5px rgba(255,255,255,0.02) inset; }
+}
+/* 左侧色条 1px 纯色，扁平 */
+.ca-story-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+/* hover：StoryDetailCard 同款 —— 轻微上浮（-1px）+ 淡阴影（中性色不光辉）+ 微提亮边框 */
+.ca-story-item:hover {
+  background: rgba(255,255,255,0.035);
+  border-color: rgba(255,255,255,0.10);
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.26),
+    0 0 0 0.5px rgba(255,255,255,0.03) inset;
+  /* 不搞 accent 光辉的彩色 shadow，保持扁平中性色 */
+}
+/* rank 圆：扁平 + StoryDetailCard 同款 hover 响应（translateY + brightness） */
+.ca-story-side {
+  padding: 8px 0 0 10px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ca-story-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Georgia', 'Songti SC', serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow: none !important;
+  /* 同款设计系统 transition，hover 时轻上浮+提亮 */
+  transition: transform var(--transition-fast), filter var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.ca-story-rank-1,
+.ca-story-rank-2,
+.ca-story-rank-3,
+.ca-story-rank-4 {
+  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+  color: var(--accent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent) !important;
+  box-shadow: none !important;
+}
+.ca-story-item:hover .ca-story-rank {
+  transform: translateY(-0.5px);
+  filter: brightness(1.12);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent) !important;
+}
+
+/* 主体：标题行 + 摘录 + 底栏（日期/标签），间距/字号复用情绪洞察 */
+.ca-story-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 2px;
+  padding-right: 2px;
+}
+.ca-story-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+/* 星名（α · 雨夜寄北）：复用 ca-ei-title 字号 0.74rem，font-weight 600，颜色 68% 不透明白；StoryDetailCard 同款 hover */
+.ca-story-starnav {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.01em;
+  line-height: 1.55;
+  transition: transform var(--transition-fast), filter var(--transition-fast), color var(--transition-fast);
+}
+.ca-story-item:hover .ca-story-starnav {
+  transform: translateY(-0.3px);
+  filter: brightness(1.12);
+  color: rgba(255,255,255,0.78);
+}
+/* 作者 pill：扁平 + StoryDetailCard 同款 hover（轻上浮 + brightness + 边框提亮） */
+.ca-story-author {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.58);
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  margin-left: auto;
+  line-height: 1.4;
+  max-width: 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: transform var(--transition-fast), filter var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.ca-story-item:hover .ca-story-author {
+  transform: translateY(-0.5px);
+  filter: brightness(1.1);
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.035);
+  color: rgba(255,255,255,0.66);
+}
+/* 摘录：StoryDetailCard 同款 transition（hover 不截断，摘录本身不做动效）；字号 0.71rem / 行高 1.75，3 行截断 */
+.ca-story-excerpt {
+  margin: 0;
+  font-size: 0.71rem;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.58);
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;                 /* 3 行截断 + 省略号，不挤爆 1 列卡片 */
+  overflow: hidden;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+.ca-story-item:hover .ca-story-excerpt {
+  color: rgba(255,255,255,0.64);
+}
+/* AI 推荐语：扁平 + StoryDetailCard 同款 hover（轻上浮 + brightness + 边框提亮） */
+.ca-story-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  margin: 2px 0 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  width: fit-content;
+  max-width: 100%;
+  transition: transform var(--transition-fast), filter var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.ca-story-item:hover .ca-story-reason {
+  transform: translateY(-0.5px);
+  filter: brightness(1.1);
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.035);
+}
+.ca-story-reason-icon {
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.52);            /* 正常灰，不太淡太看不见 */
+  opacity: 1;
+}
+.ca-story-reason-prefix {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.58);            /* 前缀正常灰，不晦涩 */
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.ca-story-reason-text {
+  font-size: 0.66rem;
+  color: rgba(255,255,255,0.70);            /* 推荐语文本提亮到 70%，看得清 */
+  white-space: nowrap;
+  max-width: calc(100% - 30px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.55;
+}
+
+/* 底栏：日期 + 标签（去掉 margin-top:auto：它会把底栏压到卡片最底部，中间产生一大块长空白；现在让底栏紧跟在摘录后面） */
+.ca-story-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}
+.ca-story-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.42);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
+}
+.ca-story-foot-icon { opacity: 1; flex-shrink: 0; color: rgba(255,255,255,0.32); transition: color var(--transition-fast); }
+.ca-story-tags {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* 标签 pill：扁平 + StoryDetailCard 同款 hover（轻上浮 + brightness） */
+.ca-story-tag {
+  font-size: 0.58rem;
+  padding: 1px 6px;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 99px;
+  background: rgba(255,255,255,0.015);
+  color: rgba(255,255,255,0.52);
+  font-family: 'Inter', 'PingFang SC', sans-serif;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  transition: transform var(--transition-fast), filter var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.ca-story-item:hover .ca-story-tag {
+  transform: translateY(-0.5px);
+  filter: brightness(1.1);
+  border-color: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  color: rgba(255,255,255,0.60);
+}
+.ca-story-item:hover .ca-story-foot-icon {
+  color: rgba(255,255,255,0.40);
+}
+
+/* 移动端：1 列（已经是 1 列，不需要改），reason 文字可以允许 wrap，别太挤 */
+@media (max-width: 820px) {
+  .ca-story-grid {
+    grid-auto-rows: minmax(160px, auto);
+    gap: 8px;
+  }
+  .ca-story-excerpt { -webkit-line-clamp: 3; }
+  .ca-story-reason-text { white-space: normal; max-width: 100%; }
 }
 
 /* ═══════════════════════════════════════════════════════════

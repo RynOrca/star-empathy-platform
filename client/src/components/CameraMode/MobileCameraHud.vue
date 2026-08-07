@@ -11,21 +11,21 @@
       <div class="mch-mode-toggles">
         <button
           class="mch-mode-btn"
-          :class="{ active: filters.mode === 'gazing' }"
-          :aria-pressed="filters.mode === 'gazing'"
-          @click="$emit('setMode', 'gazing')"
-          title="观星：仅展示星星本身的介绍"
-        >
-          <TelescopeIcon /><span>观星</span>
-        </button>
-        <button
-          class="mch-mode-btn"
           :class="{ active: filters.mode === 'listening' }"
           :aria-pressed="filters.mode === 'listening'"
           @click="$emit('setMode', 'listening')"
-          title="听语：展示星星的情感故事"
+          title="听语：收录星友心声，未看过+共鸣热度优先"
         >
           <MessageCircleIcon /><span>听语</span>
+        </button>
+        <button
+          class="mch-mode-btn"
+          :class="{ active: filters.mode === 'gazing' }"
+          :aria-pressed="filters.mode === 'gazing'"
+          @click="$emit('setMode', 'gazing')"
+          title="观星：品读星辰神话与千年历史故事"
+        >
+          <TelescopeIcon /><span>观星</span>
         </button>
       </div>
     </div>

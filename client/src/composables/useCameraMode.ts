@@ -56,7 +56,7 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
   const activeCardStar = ref<StarData | null>(null)
 
   const filters = reactive<CameraFilters>({
-    mode: 'gazing',
+    mode: 'listening',
   })
 
   const starsInFrame = ref<StarInFrame[]>([])

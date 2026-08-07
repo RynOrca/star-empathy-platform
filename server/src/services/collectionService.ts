@@ -1,5 +1,9 @@
 import db from '../db';
 import { getStoriesByCollectionId } from './starService';
+import { invalidateCollectionAnalysisCache } from './collectionAnalysis';
+
+export type CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy';
+export const PUBLIC_VISIBILITIES: CollectionVisibility[] = ['public', 'anonymous', 'galaxy']; // 匿名/星河也公开展示
 
 export interface Collection {
   id: number;
@@ -7,7 +11,7 @@ export interface Collection {
   name: string;
   description: string | null;
   cover_color: string | null;
-  visibility: 'public' | 'private';
+  visibility: CollectionVisibility;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -17,12 +21,16 @@ export interface CollectionInput {
   name: string;
   description?: string | null;
   coverColor?: string | null;
-  visibility?: 'public' | 'private';
+  visibility?: CollectionVisibility;
 }
 
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
-// 校验合集输入，返回错误信息或 null
+/**
+ * 校验合集输入：
+ * - 星河合集仅由后台/DB 管理，普通 API 一律拒绝创建或切换到 galaxy
+ * - anonymous：公开展示，对外隐藏故事作者名
+ */
 export function validateCollectionInput(input: CollectionInput): string | null {
   const name = (input.name || '').trim();
   if (!name) return '合集名称不能为空';
@@ -33,10 +41,31 @@ export function validateCollectionInput(input: CollectionInput): string | null {
   if (input.coverColor != null && input.coverColor !== '' && !HEX_RE.test(input.coverColor)) {
     return '主题色需为 #RRGGBB 格式';
   }
-  if (input.visibility != null && !['public', 'private'].includes(input.visibility)) {
-    return '可见性仅支持 public/private';
+  if (input.visibility != null && !['public', 'private', 'anonymous', 'galaxy'].includes(input.visibility)) {
+    return '可见性仅支持 public/private/anonymous/galaxy';
+  }
+  if (input.visibility === 'galaxy') {
+    return '星河合集仅由官方后台统一维护，不开放自建';
   }
   return null;
+}
+
+/**
+ * 故事用户名/作者名隐藏规则：
+ *   - anonymous 合集：对外隐藏作者（仅合集创建者自己可见）
+ *   - 故事单篇 is_anonymous=1：对外隐藏（保留老机制）
+ */
+export function shouldHideAuthor(params: {
+  collectionVisibility?: CollectionVisibility | string | null;
+  collectionUserId?: number;
+  storyIsAnonymous?: number | boolean;
+  currentUserId?: number;
+}): boolean {
+  const { collectionVisibility, collectionUserId, storyIsAnonymous, currentUserId } = params;
+  const isOwner = currentUserId === collectionUserId;
+  if (Number(storyIsAnonymous) === 1 && !isOwner) return true;
+  if (collectionVisibility === 'anonymous' && !isOwner) return true;
+  return false;
 }
 
 // 给合集行附加 storyCount（聚合 stars.collection_id）
@@ -52,12 +81,84 @@ function attachStoryCount(rows: any[]): any[] {
   return rows.map((r) => ({ ...r, story_count: map.get(r.id) ?? 0 }));
 }
 
-// 我的合集列表（可选按可见性过滤）
-export function listCollections(userId: number, visibility?: 'public' | 'private'): any[] {
+// 计算合集列表项的 resonanceTotal（合辑内所有故事 resonance_count 总和）
+function attachResonanceTotal(rows: any[]): any[] {
+  if (rows.length === 0) return rows;
+  const ids = rows.map((r) => r.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const sums = db.prepare(
+    `SELECT collection_id, COALESCE(SUM(resonance_count), 0) as total FROM stars WHERE collection_id IN (${placeholders}) GROUP BY collection_id`
+  ).all(...ids) as { collection_id: number; total: number }[];
+  const map = new Map<number, number>();
+  for (const s of sums) map.set(s.collection_id, s.total);
+  return rows.map((r) => ({ ...r, resonance_total: map.get(r.id) ?? 0 }));
+}
+
+/**
+ * 合集行归一化：
+ *   - 双写 snake_case → camelCase（userId / coverColor / sortOrder / createdAt / updatedAt / storyCount / favoriteCount / resonanceTotal）
+ *   - 保留原始 snake 字段（兼容可能的旧调用方）
+ *   - 对故事数组（如有）也做 camelCase 双写（resonanceCount / viewCount / createdAt / updatedAt / catalogStarId / locationLat / locationLng / isAnonymous / storyTags 等）
+ */
+function normalizeStory(s: any): any {
+  if (!s || typeof s !== 'object') return s;
+  return {
+    ...s,
+    // 主键字段
+    catalogStarId: s.catalog_star_id ?? s.catalogStarId,
+    collectionId: s.collection_id ?? s.collectionId,
+    // 计数字段
+    resonanceCount: s.resonance_count ?? s.resonanceCount ?? 0,
+    viewCount: s.view_count ?? s.viewCount ?? 0,
+    // 时间字段
+    createdAt: s.created_at ?? s.createdAt,
+    updatedAt: s.updated_at ?? s.updatedAt,
+    // 位置字段
+    locationLat: s.location_lat ?? s.locationLat,
+    locationLng: s.location_lng ?? s.locationLng,
+    // 匿名字段
+    isAnonymous: s.is_anonymous ?? s.isAnonymous,
+    authorHidden: s.author_hidden ?? s.authorHidden,
+    // 标签字段（tags 一般 JSON 字符串解析后是数组，这里不重复转换内容，只转键）
+    storyTags: s.story_tags ?? s.storyTags ?? s.tags,
+    // 作者字段
+    username: s.username ?? (s as any).user_name,
+    userId: s.user_id ?? s.userId,
+  };
+}
+export function normalizeCollectionRow(row: any, opts?: { withStories?: boolean }): any {
+  if (!row || typeof row !== 'object') return row;
+  const withStories = opts?.withStories ?? true;
+  const storiesRaw = row.stories ?? (row as any).story_list;
+  const stories = withStories && Array.isArray(storiesRaw) ? storiesRaw.map(normalizeStory) : storiesRaw;
+  return {
+    ...row,
+    // id / name / description / visibility 一般本身就一致，不动
+    userId: row.user_id ?? row.userId,
+    coverColor: row.cover_color ?? row.coverColor,
+    sortOrder: row.sort_order ?? row.sortOrder,
+    createdAt: row.created_at ?? row.createdAt,
+    updatedAt: row.updated_at ?? row.updatedAt,
+    // 计数：snake 已经由 attachStoryCount / 详情 SQL 计算，这里直接双写
+    storyCount: row.story_count ?? row.storyCount ?? (withStories && Array.isArray(stories) ? stories.length : 0),
+    favoriteCount: row.favorite_count ?? row.favoriteCount ?? 0,
+    resonanceTotal: row.resonance_total ?? row.resonanceTotal ?? (
+      withStories && Array.isArray(stories)
+        ? stories.reduce((sum: number, s: any) => sum + (s.resonanceCount ?? s.resonance_count ?? 0), 0)
+        : 0
+    ),
+    // 故事数组（如有）也归一化
+    ...(stories !== undefined ? { stories } : {}),
+  };
+}
+
+// 我的合集列表（可选按可见性过滤，支持 anonymous/galaxy 过滤）
+export function listCollections(userId: number, visibility?: CollectionVisibility): any[] {
   const rows = visibility
     ? db.prepare('SELECT * FROM collections WHERE user_id = ? AND visibility = ? ORDER BY sort_order ASC, created_at DESC').all(userId, visibility)
     : db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at DESC').all(userId);
-  return attachStoryCount(rows as any[]);
+  const enriched = attachResonanceTotal(attachStoryCount(rows as any[]));
+  return enriched.map((r) => normalizeCollectionRow(r, { withStories: false }));
 }
 
 // 创建合集
@@ -72,15 +173,32 @@ export function createCollection(userId: number, input: CollectionInput): { erro
   ).run(userId, name, input.description?.trim() || null, coverColor, input.visibility || 'public');
   const id = result.lastInsertRowid as number;
   const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(id);
-  return { collection: attachStoryCount([row as any])[0] };
+  const enriched = attachResonanceTotal(attachStoryCount([row as any]));
+  return { collection: normalizeCollectionRow(enriched[0], { withStories: false }) };
 }
 
-// 合集详情（含故事列表）。可见性：private 仅 owner 可见，否则返回 null（404，不暴露存在性）
+// 合集详情（含故事列表）。可见性：
+//   - private：仅 owner 可见，否则 404
+//   - public / anonymous / galaxy：对所有人可见
+// 故事作者名：anonymous 合集对外隐藏，owner 可看到
 export function getCollectionDetail(id: number, currentUserId?: number): any | null {
   const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!row) return null;
-  if (row.visibility === 'private' && row.user_id !== currentUserId) return null;
+  const isOwner = currentUserId === row.user_id;
+  if (row.visibility === 'private' && !isOwner) return null;
   const stories = getStoriesByCollectionId(id);
+  // 匿名合集对外隐藏故事作者名
+  const storiesSanitized = stories.map((s: any) => {
+    if (shouldHideAuthor({
+      collectionVisibility: row.visibility,
+      collectionUserId: row.user_id,
+      storyIsAnonymous: s.is_anonymous,
+      currentUserId,
+    })) {
+      return { ...s, username: null, authorHidden: true };
+    }
+    return s;
+  });
   // 收藏数：合集故事所属 catalog star 被收藏的总次数（含 story_catalog_stars 多对多绑定）
   const favRow = db.prepare(`
     SELECT COUNT(*) as cnt FROM favorites
@@ -91,13 +209,16 @@ export function getCollectionDetail(id: number, currentUserId?: number): any | n
       JOIN stars s ON s.id = scs.story_id WHERE s.collection_id = ?
     )
   `).get(id, id) as { cnt: number };
-  const enriched = { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories };
-  // 双写：同时返回 snake_case (story_count) 和 camelCase (storyCount)，兼容前端/路由不同命名
-  enriched.storyCount = enriched.story_count ?? stories.length;
-  return enriched;
+  const enriched = {
+    ...attachStoryCount([row])[0],
+    resonance_total: storiesSanitized.reduce((sum: number, s: any) => sum + (s.resonance_count ?? 0), 0),
+    favorite_count: favRow.cnt,
+    stories: storiesSanitized,
+  };
+  return normalizeCollectionRow(enriched, { withStories: true });
 }
 
-// 编辑合集（owner 校验）
+// 编辑合集（仅 owner 可编辑；星河合集仅后台/DB 管理，普通 API 直接拒绝创建/更新 visibility=galaxy）
 export function updateCollection(
   id: number,
   userId: number,
@@ -105,12 +226,17 @@ export function updateCollection(
 ): { error?: string; collection?: any; notFound?: boolean; forbidden?: boolean } {
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
-  if (existing.user_id !== userId) return { forbidden: true };
+  // 星河合集：仅后台/DB 管理，普通前端接口不允许改
+  if (existing.visibility === 'galaxy') return { forbidden: true };
+  if (userId !== existing.user_id) return { forbidden: true };
+  // 切换到 galaxy：不开放（后台管理）
+  const nextVisibility = patch.visibility ?? existing.visibility;
+  if (nextVisibility === 'galaxy') return { error: '星河合集仅由官方后台统一维护，不开放自建' };
   const input: CollectionInput = {
     name: patch.name ?? existing.name,
     description: patch.description !== undefined ? patch.description : existing.description,
     coverColor: patch.coverColor !== undefined ? patch.coverColor : existing.cover_color,
-    visibility: patch.visibility ?? existing.visibility,
+    visibility: nextVisibility,
   };
   const err = validateCollectionInput(input);
   if (err) return { error: err };
@@ -121,37 +247,152 @@ export function updateCollection(
     `UPDATE collections SET name = ?, description = ?, cover_color = ?, visibility = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?`
   ).run(input.name.trim(), input.description?.trim() || null, coverColor, input.visibility || 'public', sortOrder, id);
   const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(id);
-  return { collection: attachStoryCount([row as any])[0] };
+  const enriched = attachResonanceTotal(attachStoryCount([row as any]));
+  return { collection: normalizeCollectionRow(enriched[0], { withStories: false }) };
 }
 
-// 删除合集（owner 校验；故事 collection_id 置 NULL，故事保留）
+// 删除合集（仅 owner 可删；星河合集仅后台/DB 管理，接口层面不允许删）
 export function deleteCollection(id: number, userId: number): { notFound?: boolean; forbidden?: boolean } {
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
-  if (existing.user_id !== userId) return { forbidden: true };
+  if (existing.visibility === 'galaxy') return { forbidden: true };
+  if (userId !== existing.user_id) return { forbidden: true };
+  invalidateCollectionAnalysisCache(id);
   db.prepare('UPDATE stars SET collection_id = NULL WHERE collection_id = ?').run(id);
   db.prepare('DELETE FROM collections WHERE id = ?').run(id);
   return {};
 }
 
-// 公开合集列表（分页，可按 userId 过滤某作者）
-export function listPublicCollections(
-  userId?: number,
-  page = 1,
-  limit = 20,
-): { items: any[]; total: number; page: number; limit: number; totalPages: number } {
-  const p = Math.max(1, Math.floor(page));
-  const l = Math.max(1, Math.min(100, Math.floor(limit)));
-  const offset = (p - 1) * l;
-  const where = userId ? 'visibility = ? AND user_id = ?' : 'visibility = ?';
-  const countParams = userId ? (['public', userId] as any[]) : (['public'] as any[]);
-  const listParams = userId ? (['public', userId, l, offset] as any[]) : (['public', l, offset] as any[]);
+export type PublicCollectionsSort =
+  | 'hot'       // 热度：storyCount*2 + 合辑内故事总共鸣数
+  | 'new'       // 最近创建（默认）
+  | 'resonance' // 合辑内故事总共鸣数 DESC
+  | 'name_asc'  // 合集名拼音排序（SQLite 默认 utf-8 字节序就行）
+  | 'stories_desc'; // 故事数 DESC
 
-  const totalRow = db.prepare(`SELECT COUNT(*) as cnt FROM collections WHERE ${where}`).get(...countParams) as { cnt: number };
+// 公开合集列表（分页，可按 userId/sort/visibility/keyword 过滤）
+// 公开 = visibility IN ('public', 'anonymous', 'galaxy')，星河/匿名合集也对外展示
+export function listPublicCollections(params: {
+  userId?: number;
+  page?: number;
+  limit?: number;
+  sort?: PublicCollectionsSort;
+  /** 只返回指定 visibility 的公开子集：'public' 纯公开 / 'anonymous' 匿名 / 'galaxy' 星河 / 默认=全部 */
+  visibility?: 'public' | 'anonymous' | 'galaxy';
+  /** 关键字模糊搜索：合集 name / description / 合集中故事 title / content / tags */
+  keyword?: string;
+}): { items: any[]; total: number; page: number; limit: number; totalPages: number } {
+  const p = Math.max(1, Math.floor(params.page ?? 1));
+  const l = Math.max(1, Math.min(100, Math.floor(params.limit ?? 20)));
+  const offset = (p - 1) * l;
+  const sort = params.sort ?? 'new';
+
+  // WHERE 构造
+  const visibilities: CollectionVisibility[] = params.visibility
+    ? [params.visibility]
+    : PUBLIC_VISIBILITIES;
+  const placeholders = visibilities.map(() => '?').join(',');
+  let where = `visibility IN (${placeholders})`;
+  const countParams: any[] = [...visibilities];
+  const listParams: any[] = [...visibilities];
+
+  if (params.userId) {
+    where += ' AND user_id = ?';
+    countParams.push(params.userId);
+    listParams.push(params.userId);
+  }
+
+  // 关键字搜索：合集名/描述 或 合集中任一故事的标题/正文/tags 命中（LIKE 模糊匹配，大小写不敏感）
+  const kwRaw = (params.keyword ?? '').trim();
+  if (kwRaw) {
+    // LIKE 通配符 % 包裹；SQLite 默认 LIKE 已对 ASCII 大小写不敏感，中文按字节匹配无影响
+    const likeKw = `%${kwRaw}%`;
+    where += ` AND (
+      c.name LIKE ?
+      OR c.description LIKE ?
+      OR EXISTS (
+        SELECT 1 FROM stars s
+        WHERE s.collection_id = c.id
+          AND (s.title LIKE ? OR s.content LIKE ? OR COALESCE(s.tags, '') LIKE ?)
+      )
+    )`;
+    countParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
+    listParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
+  }
+
+  // ORDER 构造
+  // 注意：这里不能用 c.story_count（DB 冗余列，可能恒为 0 未及时回写），
+  //       一律走子查询：
+  //         real_story_count  = (SELECT COUNT(*) FROM stars s WHERE s.collection_id = c.id)
+  //         real_resonance_sum = (SELECT COALESCE(SUM(resonance_count),0) FROM stars s WHERE s.collection_id = c.id)
+  const realSC = '(SELECT COUNT(*) FROM stars s WHERE s.collection_id = c.id)';
+  const realRS = '(SELECT COALESCE(SUM(resonance_count),0) FROM stars s WHERE s.collection_id = c.id)';
+  let orderBy: string;
+  switch (sort) {
+    case 'hot':
+      orderBy = `((${realSC} * 2) + ${realRS}) DESC, c.created_at DESC`;
+      break;
+    case 'resonance':
+      orderBy = `${realRS} DESC, c.created_at DESC`;
+      break;
+    case 'stories_desc':
+      orderBy = `${realSC} DESC, c.sort_order ASC, c.created_at DESC`;
+      break;
+    case 'name_asc':
+      orderBy = 'COALESCE(c.name, "") COLLATE NOCASE ASC';
+      break;
+    case 'new':
+    default:
+      orderBy = 'c.created_at DESC';
+      break;
+  }
+
+  const totalRow = db.prepare(`SELECT COUNT(*) as cnt FROM collections c WHERE ${where}`).get(...countParams) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l) || 0;
-  const rows = db.prepare(`SELECT * FROM collections WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...listParams);
-  return { items: attachStoryCount(rows as any[]), total, page: p, limit: l, totalPages };
+  const rows = db.prepare(
+    `SELECT c.* FROM collections c WHERE ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
+  ).all(...listParams, l, offset);
+  const enriched = attachResonanceTotal(attachStoryCount(rows as any[]));
+  return {
+    items: enriched.map((r) => normalizeCollectionRow(r, { withStories: false })),
+    total, page: p, limit: l, totalPages,
+  };
+}
+
+/**
+ * 星笺广场推荐 Picks：
+ *   - 固定前 N 本（默认前 3）取官方「星河」合辑，按 sort_order ASC 取最前排的
+ *   - 再填充：最近 14 天内「热度 hot」Top (wanted - galaxyN) 本公开/匿名星笺（排除已选星河）
+ * 返回 wanted 本（默认 6）；若不够就用所有非星河合辑 hot 排序补足
+ */
+export function getPublicCollectionPicks(wanted = 6, galaxyN = 3): any[] {
+  // 与 listPublicCollections 保持一致：不依赖 DB 冗余列，走真实聚合子查询
+  const realSC = '(SELECT COUNT(*) FROM stars s WHERE s.collection_id = c.id)';
+  const realRS = '(SELECT COALESCE(SUM(resonance_count),0) FROM stars s WHERE s.collection_id = c.id)';
+
+  // 官方星河卷：优先真实故事数多的卷轴排前（避免空壳占坑）；同档按 sort_order ASC（官方预设卷次）
+  const galaxyTopN = db.prepare(
+    `SELECT c.* FROM collections c WHERE c.visibility = 'galaxy'
+     ORDER BY ${realSC} DESC, c.sort_order ASC, c.id ASC LIMIT ?`
+  ).all(galaxyN) as any[];
+
+  const ids = new Set<number>(galaxyTopN.map(x => x.id));
+  const fill = Math.max(0, wanted - galaxyTopN.length);
+  let filled: any[] = [];
+  if (fill > 0) {
+    const nonGalaxy = db.prepare(
+      `SELECT c.* FROM collections c
+       WHERE c.visibility IN ('public','anonymous') AND c.id NOT IN (${galaxyTopN.length ? galaxyTopN.map(() => '?').join(',') : '0'})
+       ORDER BY ((${realSC} * 2) + ${realRS}) DESC, c.created_at DESC
+       LIMIT ?`
+    ).all(...(galaxyTopN.length ? galaxyTopN.map(x => x.id) : []), fill) as any[];
+    filled = nonGalaxy.filter(x => !ids.has(x.id));
+  }
+
+  const list = [...galaxyTopN, ...filled].slice(0, wanted);
+  const enriched = attachResonanceTotal(attachStoryCount(list));
+  return enriched.map((r) => normalizeCollectionRow(r, { withStories: false }));
 }
 
 // 校验合集归属当前用户（投递故事时用）
@@ -240,7 +481,13 @@ export function getOrCreateDefaultCollections(userId: number): DefaultCollection
   }
 
   return {
-    publicCollection: attachStoryCount([publicColl as any])[0],
-    privateCollection: attachStoryCount([privateColl as any])[0],
+    publicCollection: normalizeCollectionRow(
+      attachResonanceTotal(attachStoryCount([publicColl as any]))[0],
+      { withStories: false }
+    ),
+    privateCollection: normalizeCollectionRow(
+      attachResonanceTotal(attachStoryCount([privateColl as any]))[0],
+      { withStories: false }
+    ),
   };
 }

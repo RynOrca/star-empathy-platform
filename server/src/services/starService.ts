@@ -1,5 +1,7 @@
 import db from '../db';
 import { generatePosition } from '../utils/position';
+import { invalidateCollectionAnalysisCache } from './collectionAnalysis';
+import { PUBLIC_VISIBILITIES, shouldHideAuthor, CollectionVisibility } from './collectionService';
 
 export interface Star {
   id: number;
@@ -70,7 +72,7 @@ function attachCollectionInfo(stories: any[]): any[] {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db.prepare(
     `SELECT c.id, c.name, c.cover_color, c.visibility,
-       (SELECT COUNT(*) FROM stars s2 WHERE s2.collection_id = c.id AND s2.type = 'user') as story_count
+       (SELECT COUNT(*) FROM stars s2 WHERE s2.collection_id = c.id) as story_count
      FROM collections c WHERE c.id IN (${placeholders})`
   ).all(...ids) as { id: number; name: string; cover_color: string | null; visibility: string; story_count: number }[];
   const map = new Map<number, { name: string; cover_color: string | null; visibility: string; story_count: number }>();
@@ -110,29 +112,70 @@ function attachCatalogStarIds(stories: any[]): any[] {
   return attachCollectionInfo(withIds);
 }
 
-// 可见性过滤：私有合集（collections.visibility='private'）内的故事仅作者本人可见；
-// 无合集故事（collection_id IS NULL）与公开合集故事对所有人可见。
+// 可见性过滤：
+//   - private 合集内的故事：仅合集作者本人可见
+//   - public / anonymous / galaxy 合集：对所有人可见（星河/匿名也公开）
+//   - 无合集故事（collection_id IS NULL）：对所有人可见
 // 未登录时 currentUserId 传 null，`s.user_id = NULL` 永假，自动只剩公开内容。
-const VISIBILITY_FILTER = '(s.collection_id IS NULL OR c.visibility = \'public\' OR s.user_id = ?)';
+function buildVisibilityFilter(currentUserId?: number): { sql: string; params: any[] } {
+  const params: any[] = [];
+  const publicIn = PUBLIC_VISIBILITIES.map(() => '?').join(','); // ?,?,?
+  params.push(...PUBLIC_VISIBILITIES);
+  let sql = `(s.collection_id IS NULL OR c.visibility IN (${publicIn})`;
+  if (currentUserId != null) {
+    sql += ` OR (c.visibility = 'private' AND s.user_id = ?)`;
+    params.push(currentUserId);
+  }
+  sql += ')';
+  return { sql, params };
+}
+// 故事用户名隐藏：anonymous 合集对外 / 合集故事 is_anonymous=1 对外隐藏；owner 可见
+function hideAuthorForRows(rows: any[], collectionMap: Map<number, { visibility: CollectionVisibility | string; user_id: number }>, currentUserId?: number): any[] {
+  return rows.map((r: any) => {
+    const coll = r.collection_id != null ? collectionMap.get(r.collection_id) : undefined;
+    const needHide = shouldHideAuthor({
+      collectionVisibility: coll?.visibility,
+      collectionUserId: coll?.user_id,
+      storyIsAnonymous: r.is_anonymous,
+      currentUserId,
+    });
+    if (!needHide) return r;
+    return { ...r, username: null, authorHidden: true };
+  });
+}
+// 批量根据 collection_id 查 visibility + user_id，给 hideAuthorForRows 用
+function buildCollectionMap(rows: any[]): Map<number, { visibility: CollectionVisibility | string; user_id: number }> {
+  const ids = Array.from(new Set(rows.map((r: any) => r.collection_id).filter((id: any) => id != null))) as number[];
+  const map = new Map<number, { visibility: CollectionVisibility | string; user_id: number }>();
+  if (ids.length === 0) return map;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows2 = db.prepare(
+    `SELECT id, visibility, user_id FROM collections WHERE id IN (${placeholders})`
+  ).all(...ids) as { id: number; visibility: CollectionVisibility | string; user_id: number }[];
+  for (const r of rows2) map.set(r.id, { visibility: r.visibility, user_id: r.user_id });
+  return map;
+}
 
 // 获取所有星星（含用户名、用户 ID 和标签）
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(currentUserId?: number): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[] {
+export function getAllStars(currentUserId?: number): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean })[] {
+  const { sql: filterSql, params: filterParams } = buildVisibilityFilter(currentUserId);
   const rows = db.prepare(`
-    SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+    SELECT s.*, u.username as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE ${VISIBILITY_FILTER}
+    WHERE ${filterSql}
     ORDER BY s.created_at DESC
-  `).all(currentUserId ?? null) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
-  return attachCatalogStarIds(rows);
+  `).all(...filterParams) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  const collMap = buildCollectionMap(rows as any[]);
+  const hidden = hideAuthorForRows(rows as any[], collMap, currentUserId);
+  return attachCatalogStarIds(hidden);
 }
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number, currentUserId?: number): {
-  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[] })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean })[];
   total: number;
   page: number;
   limit: number;
@@ -141,28 +184,30 @@ export function getAllStarsPaged(page: number, limit: number, currentUserId?: nu
   const p = Math.max(1, Math.floor(page));
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
-  const uid = currentUserId ?? null;
 
+  const { sql: countFilterSql, params: countParams } = buildVisibilityFilter(currentUserId);
   const totalRow = db.prepare(`
     SELECT COUNT(*) as cnt FROM stars s
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE ${VISIBILITY_FILTER}
-  `).get(uid) as { cnt: number };
+    WHERE ${countFilterSql}
+  `).get(...countParams) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l);
 
+  const { sql: listFilterSql, params: listParams } = buildVisibilityFilter(currentUserId);
   const items = db.prepare(`
-    SELECT s.*,
-      CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
+    SELECT s.*, u.username as username
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE ${VISIBILITY_FILTER}
+    WHERE ${listFilterSql}
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(uid, l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all(...listParams, l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 
-  return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
+  const collMap = buildCollectionMap(items as any[]);
+  const hidden = hideAuthorForRows(items as any[], collMap, currentUserId);
+  return { items: attachCatalogStarIds(hidden), total, page: p, limit: l, totalPages };
 }
 
 // 创建星星
@@ -250,6 +295,12 @@ export function createStar(
     WHERE s.id = ?
   `).get(storyId) as unknown as Star & { username: string | null; userId: number | null };
   const normalized = normalizeTagsForStories([row])[0];
+
+  // 新增故事到某合集 → 合集分析缓存失效（下次重算）
+  if (collectionId != null) {
+    try { invalidateCollectionAnalysisCache(collectionId); } catch { /* ignore */ }
+  }
+
   return { ...normalized, catalogStarIds: effectiveCatalogStarId != null ? [effectiveCatalogStarId] : [] };
 }
 
@@ -400,7 +451,8 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 }
 
 // 单星下的所有故事（通过连接表多对多查询）
-export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
+export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[]; authorHidden?: boolean })[] {
+  const { sql: filterSql, params: filterParams } = buildVisibilityFilter(currentUserId);
   const rows = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
@@ -408,10 +460,12 @@ export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?:
     JOIN story_catalog_stars scs ON s.id = scs.story_id
     LEFT JOIN users u ON s.user_id = u.id
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE scs.catalog_star_id = ? AND ${VISIBILITY_FILTER}
+    WHERE scs.catalog_star_id = ? AND ${filterSql}
     ORDER BY s.created_at DESC
-  `).all(catalogStarId, currentUserId ?? null);
-  return attachCatalogStarIds(rows);
+  `).all(catalogStarId, ...filterParams);
+  const collMap = buildCollectionMap(rows as any[]);
+  const hidden = hideAuthorForRows(rows as any[], collMap, currentUserId);
+  return attachCatalogStarIds(hidden);
 }
 
 // 某合集下的所有故事（合集详情用；可见性由调用方 collectionService 校验）

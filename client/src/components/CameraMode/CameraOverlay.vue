@@ -12,11 +12,10 @@
       <ViewportInfo
         :stars-in-frame="starsInFrame"
         :story-count="frameStories.length"
+        :region="region"
       />
       <ZoomFilterControl
-        :zoom-level="zoomLevel"
         :filters="filters"
-        @set-zoom="onSetZoom"
         @set-mode="onSetMode"
       />
       <FrameStoriesPanel
@@ -51,6 +50,7 @@
       :is-mobile="isMobile"
       :is-guest="isGuest"
       @close="onCloseCard"
+      @collection-click="onCollectionClick"
     />
   </div>
 </template>
@@ -77,7 +77,6 @@ const props = defineProps<{
   activeStarId: number | null
   activeCardStar: StarData | null
   filters: CameraFilters
-  zoomLevel: number
   centerCelestial: { ra: string; dec: string }
   currentFov: number
   region: string
@@ -88,8 +87,8 @@ const emit = defineEmits<{
   storyClick: [star: StarData]
   activeChange: [starId: number]
   closeCard: []
-  setZoom: [level: number]
   setMode: [mode: CameraFilterMode]
+  collectionClick: [collectionId: number]
 }>()
 
 const panelRef = ref<InstanceType<typeof FrameStoriesPanel> | null>(null)
@@ -112,12 +111,12 @@ function onCloseCard() {
   emit('closeCard')
 }
 
-function onSetZoom(level: number) {
-  emit('setZoom', level)
-}
-
 function onSetMode(mode: CameraFilterMode) {
   emit('setMode', mode)
+}
+
+function onCollectionClick(collectionId: number) {
+  emit('collectionClick', collectionId)
 }
 
 defineExpose({ panelRef })

@@ -4,6 +4,7 @@ import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
 import { verifyCollectionOwnership, createCollection, ensureDefaultCollection, getOrCreateDefaultCollections } from '../services/collectionService';
+import { resolveValidCatalogIds } from '../services/catalogMeta';
 
 const router = Router();
 
@@ -69,10 +70,17 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
       return badRequest(res, 'content 长度需在 1~2000 字之间');
     }
 
-    const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
-    const catalogStarIds: number[] | undefined = Array.isArray(catalog_star_ids)
-      ? catalog_star_ids.filter((id: unknown) => typeof id === 'number')
-      : undefined;
+    // ─── 归属星（必填）：要么对着星星填故事，要么 AI 帮忙挑星，绝不允许无归属 ───
+    const resolved = resolveValidCatalogIds(catalog_star_id, catalog_star_ids);
+    if (!resolved) {
+      return badRequest(
+        res,
+        '必须选择或 AI 匹配一颗归属星辰（catalogStarId 或 catalogStarIds 至少含一颗有效星表星/太阳系行星 id）'
+      );
+    }
+    const { ids: effectiveCatalogStarIds, primaryId: starId } = resolved;
+    // 兼容旧字段：把最终有效 ids 数组写回（后面 createStar 会用 catalogStarIds 字段）
+    const catalogStarIds: number[] = effectiveCatalogStarIds;
 
     let locationData: { lat: number; lng: number } | undefined;
     if (
@@ -105,8 +113,8 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
       }
       finalCollectionId = collectionId;
     } else if (typeof collectionName === 'string' && collectionName.trim()) {
-      const visi = typeof collectionVisibility === 'string' && ['public', 'private'].includes(collectionVisibility)
-        ? collectionVisibility as 'public' | 'private'
+      const visi = typeof collectionVisibility === 'string' && ['public', 'private', 'anonymous'].includes(collectionVisibility)
+        ? collectionVisibility as 'public' | 'private' | 'anonymous'
         : undefined;
       const created = createCollection(user.id, { name: collectionName.trim(), visibility: visi });
       if (created.error) return badRequest(res, created.error);

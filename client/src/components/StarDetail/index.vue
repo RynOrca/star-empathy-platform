@@ -188,11 +188,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -206,8 +212,11 @@
               :displayResonance="(s: any) => getDisplayResonance(s)"
               :displayViews="(s: any) => getStoryViewCount(s.id)"
               :isResonated="(s: any) => justResonatedId === s.id"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -225,11 +234,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -247,10 +262,13 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @update:searchQuery="searchQuery = $event"
               @update:sortKey="onSortKeyChange"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -273,11 +291,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
               :collection-clickable="true"
               @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -293,8 +317,11 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -894,11 +921,17 @@
                 :currentUserId="currentUserId"
                 :formattedTime="formatTime(detailStory.createdAt)"
                 :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+                :viewCount="getStoryViewCount(detailStory.id)"
+                :origin="detailStory.origin ?? null"
+                :createdAtIso="detailStory.createdAt"
+                :siblingStories="siblingStoriesFor(detailStory)"
+                :showStarBelonging="false"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
                 :collection-clickable="true"
                 @collection-click="onCollectionClick"
+                @open-story="openStoryDetail"
               />
             </div>
           </div>
@@ -1088,6 +1121,16 @@ const props = defineProps<{
   isPlanetCloseup?: boolean
   /** 观察模式：隐藏故事面板和模糊背景，露出 3D 行星特写供用户观察 */
   observeMode?: boolean
+  /**
+   * 外部强制打开某则故事的详情页（v-model:targetStoryId）。
+   * - 父级设置为某 story.id → 本组件自动：
+   *   ① 在 realStories 中找到该 story；
+   *   ② 根据 type 切换到对应 Tab（history→history，其余→all）；
+   *   ③ 切 Tab 完成后打开 StoryDetail 页面（等价于用户点击该故事卡片）；
+   *   ④ 完成后 emit('update:targetStoryId', null) 让父级清零，避免下次同值不触发 watch。
+   * - 找不到或传 null 时不会产生任何动作。
+   */
+  targetStoryId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -1110,7 +1153,9 @@ const emit = defineEmits<{
   /** PC 端行星特写：点击 overlay 空白切换观察模式（隐藏故事面板露出行星） */
   toggleObserve: []
   /** 合集徽章点击：透传合集信息给父组件，由父组件决定如何展示合集内所有故事 */
-  'collection-click': [data: { collectionId: number; collectionName: string | null }]
+  'collection-click': [data: { collectionId: number; collectionName: string | null; userId: number | null }]
+  /** 配合 props.targetStoryId 做 v-model 双向绑定：消费完 targetStoryId 后 emit 给父级清零 */
+  'update:targetStoryId': [id: number | null]
 }>()
 
 const router = useRouter()
@@ -1231,6 +1276,38 @@ function getStoryViewCount(storyId: number): number {
   return s?.viewCount ?? 0
 }
 
+/** 同星其他故事推荐：按 catalogStarId 匹配（共享任一归属星视为同星），最多返回 4 条预览 */
+import type { SiblingStoryPreview } from './StoryDetail.vue'
+function siblingStoriesFor(story: any): SiblingStoryPreview[] {
+  if (!story?.id) return []
+  const ownIds = new Set<number>()
+  if (typeof story.catalogStarId === 'number' && story.catalogStarId !== 0) ownIds.add(story.catalogStarId)
+  if (Array.isArray(story.catalogStarIds)) {
+    for (const n of story.catalogStarIds) if (typeof n === 'number' && n !== 0) ownIds.add(n)
+  }
+  const sharesStar = (s: any): boolean => {
+    if (s.id === story.id) return false
+    if (ownIds.size === 0) return false
+    if (typeof s.catalogStarId === 'number' && ownIds.has(s.catalogStarId)) return true
+    if (Array.isArray(s.catalogStarIds)) {
+      for (const n of s.catalogStarIds) if (typeof n === 'number' && ownIds.has(n)) return true
+    }
+    return false
+  }
+  const pool = realStories.value.filter(sharesStar)
+    .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
+    .slice(0, 4)
+  return pool.map<SiblingStoryPreview>((s: any) => ({
+    id: s.id,
+    title: s.title ?? null,
+    type: s.type === 'history' ? 'history' : 'user',
+    isNew: !!s.isNew,
+    resonanceCount: s.resonanceCount ?? 0,
+    viewCount: s.viewCount ?? 0,
+    contentPreview: ((s.content ?? '').replace(/\s+/g, ' ').slice(0, 60)),
+  }))
+}
+
 const detailStoryId = ref<number | null>(null)
 const detailStory = computed(() => {
   if (detailStoryId.value === null) return null
@@ -1307,6 +1384,35 @@ watch(() => props.catalogStarId, (id) => {
 watch(activeTab, () => {
   detailStoryId.value = null
 })
+
+// ─── 外部驱动：打开指定 storyId 的详情页（支持父级 v-model:targetStoryId）───
+/**
+ * 执行顺序（关键：必须等 activeTab 切换的 watch 把 detailStoryId=null 跑完之后再赋值）：
+ *  1. 定位到 targetStoryId 对应的 story；
+ *  2. 切 Tab：history 类 → activeTab='history'，其他（用户故事）→ activeTab='all'；
+ *  3. nextTick 等 activeTab 的 watch 清空 detailStoryId 后；
+ *  4. 设置 detailStoryId.value = targetStoryId → StoryDetail 页面展示；
+ *  5. emit('update:targetStoryId', null) 让父级清零，避免下次传同样 id watch 不触发。
+ */
+watch(
+  () => props.targetStoryId,
+  async (id) => {
+    if (id == null) return
+    const target = realStories.value.find(s => s.id === id)
+    if (!target) {
+      emit('update:targetStoryId', null)
+      return
+    }
+    const needTab: TabId = target.type === 'history' ? 'history' : 'all'
+    if (activeTab.value !== needTab) {
+      activeTab.value = needTab
+    }
+    await nextTick()
+    detailStoryId.value = id
+    emit('update:targetStoryId', null)
+  },
+  { flush: 'post' }
+)
 
 // ─── AI 内核标签 ───
 const kernel = useKernel()
@@ -1507,27 +1613,29 @@ function onWriteStory() { if (guestGuard()) return; emit('writeStory') }
 const showChat = ref(false)
 function openChat() { if (guestGuard()) return; showChat.value = true }
 
-function openStoryDetail(story: { id: number }) {
-  detailStoryId.value = story.id
-  const current = getStoryViewCount(story.id)
-  viewCountOverrides.set(story.id, current + 1)
+function openStoryDetail(input: { id: number } | number) {
+  const id: number = typeof input === 'number' ? input : input.id
+  detailStoryId.value = id
+  const current = getStoryViewCount(id)
+  viewCountOverrides.set(id, current + 1)
   emit('incrementViews')
-  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
+  fetch(`/api/stories/${id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
-      viewCountOverrides.set(story.id, current)
+      viewCountOverrides.set(id, current)
     })
 }
 
 /**
  * 合集徽章点击：透传合集信息给父组件（SkyPage）。
- * 具体的合集详情视图（展示合集内所有故事）暂未实现，由父组件后续接入。
+ * 具体的合集详情视图由父组件决定如何展示（弹窗/路由跳转）
  */
 function onCollectionClick(story: any) {
   if (story?.collectionId != null) {
     emit('collection-click', {
       collectionId: story.collectionId,
       collectionName: story.collectionName ?? null,
+      userId: story.userId ?? null,
     })
   }
 }
@@ -2863,9 +2971,11 @@ watch(() => props.catalogStarId, () => {
 
 .mobile-story-detail-body {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 16px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
 }
 
 /* ─── Mobile Transitions ─── */
