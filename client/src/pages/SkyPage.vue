@@ -249,7 +249,8 @@
 
     <!-- 叙事引导牌（相机模式隐藏）：上方 4 卡是信息层（宽 ~900px），下方动作条是独立窄条（为信息服务） -->
     <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-shell">
-      <!-- ① 四张引导卡：宽而舒展，独立一层 -->
+      <!-- ① 四张引导卡：暂时隐藏（用户要求只要下方按钮），后续恢复解开下面这段 HTML 注释即可 -->
+      <!--
       <div class="guide-cards" :class="{ collapsed: !guideCardsOpen }">
         <Transition name="guide-cards-row" mode="out-in">
           <div v-show="guideCardsOpen" class="guide-cards-row">
@@ -284,6 +285,8 @@
           </div>
         </Transition>
       </div>
+      -->
+      <!-- end: 四张引导卡（TBD 恢复时移除前后注释） -->
 
       <!-- ② 引导动作条：窄版、为信息服务（不追求占满 4 卡宽度）
            顺序：1.记录 2.天镜 3.书局 4.折叠(正方形) -->
