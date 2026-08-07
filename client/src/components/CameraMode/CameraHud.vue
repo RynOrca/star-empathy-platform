@@ -1,8 +1,16 @@
 <template>
   <div class="camera-hud">
-    <!-- 顶部 HUD：胶囊式独立 panel，不再是整屏渐变条 -->
+    <!--
+      ═══ 顶部 HUD：严格盒模型对齐 ═══
+      1. .hud-top: 外层 flex row, 子元素统一 display:inline-flex, align-items:center
+      2. 每一个胶囊/chip 都是 height:36px, box-sizing:border-box, border:1px 统一
+      3. backdrop-filter blur 移入 ::before 伪元素独立图层，
+         避免 blur 像素外扩影响内容盒边框的几何对齐。
+      4. 子元素统一 vertical-align:middle / line-height:1 / flex-center 内对齐，
+         保证三项外边缘（上边框 / 下边框）y 坐标完全一致。
+    -->
     <div class="hud-top">
-      <!-- 左：退出按钮（采用主 UI 的 panel-wrapper 语义：图标 + 标题 + 胶囊） -->
+      <!-- 左：退出按钮 -->
       <button class="hud-pill hud-exit" @click="$emit('exit')">
         <span class="pill-icon-wrap pill-icon-gold">
           <ApertureIcon />
@@ -10,13 +18,13 @@
         <span class="pill-label">天镜览星</span>
       </button>
 
-      <!-- 中：模式标签（柔和胶囊，避免"录像红点"过强） -->
+      <!-- 中：模式标签 PHOTO·取景中 -->
       <div class="hud-pill hud-mode">
         <span class="pill-dot" />
         <span class="pill-mode-text">PHOTO · 取景中</span>
       </div>
 
-      <!-- 右：RA / DEC / FOV chip 组（紧凑、圆角、柔和 border） -->
+      <!-- 右：RA / DEC / FOV chip 组（组本身不设外框，内部单个 chip 有） -->
       <div class="hud-chips">
         <div class="hud-chip">
           <span class="chip-label">RA</span>
@@ -111,48 +119,82 @@ onBeforeUnmount(() => {
   color: var(--hud-text-strong);
 }
 
-/* ═══ 顶部 HUD ═══ */
+/* ═══ 顶部 HUD：外层 row，3 项两端对齐 ═══ */
 .hud-top {
   position: absolute;
   top: 20px;
   left: 36px;
   right: 36px;
   display: flex;
-  align-items: center;
+  align-items: center;              /* 关键：子元素垂直中心线对齐 */
   justify-content: space-between;
   gap: 16px;
   pointer-events: none;
 }
 
-/* 通用胶囊：主 UI 的 panel 风格 —— 统一高度 36px，保证三个顶部元素垂直对齐 */
+/* ════════════════════════════════════════════════════════════════
+   通用 HUD 胶囊盒子 —— 严格盒模型保证：
+   • 总高度 = 36px （content + padding + border 三者之和）
+   • 上边框 y 坐标、下边框 y 坐标 在三个胶囊之间完全一致
+   • 所有视觉装饰（blur / shadow）放到 ::before 伪元素，
+     不参与内容盒尺寸计算，避免 blur 渲染扩张导致对齐偏差
+   ════════════════════════════════════════════════════════════════ */
 .hud-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  height: 36px;                   /* 固定盒子高度 */
   padding: 0 14px;
-  height: 36px;
-  line-height: 36px;
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid var(--hud-border);
+  background: var(--hud-bg);
+  color: var(--ink);
+  box-sizing: border-box;         /* 高度包含 1px 上下边框 → content=34px */
+  line-height: 1;                 /* 禁止行高干扰 */
   pointer-events: auto;
-  box-sizing: border-box;
+  overflow: visible;
+  isolation: isolate;             /* 保证 ::before 在独立层 */
+}
+/* 视觉装饰独立层：blur + 阴影，不影响几何盒尺寸 */
+.hud-pill::before {
+  content: '';
+  position: absolute;
+  inset: -1px;                    /* 覆盖边框外 1px，让 blur 均匀 */
+  border-radius: inherit;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: var(--shadow-md);
+  z-index: -1;
+  pointer-events: none;
 }
 
-/* 左：退出按钮（点击放大 + 金色强调） */
+/* 内部文字统一基线 */
+.hud-pill > * {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  vertical-align: middle;
+  margin: 0;
+  padding: 0;
+}
+
+/* 左：退出按钮 hover 金色强调 */
 .hud-exit {
   cursor: pointer;
   font-family: var(--font);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), transform var(--transition-normal), background var(--transition-normal);
 }
 .hud-exit:hover {
   border-color: var(--accent-border);
   background: var(--accent-subtle);
   transform: translateY(-1px);
+}
+.hud-exit:hover::before {
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--accent-border);
 }
+
+/* 退出胶囊内：金色图标容器 22×22 */
 .pill-icon-wrap {
   width: 22px;
   height: 22px;
@@ -160,6 +202,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .pill-icon-gold {
   background: var(--accent-subtle);
@@ -167,56 +210,73 @@ onBeforeUnmount(() => {
   border: 0.5px solid var(--accent-border);
 }
 .pill-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-sm);     /* 13px */
   font-weight: 500;
   color: var(--ink);
   letter-spacing: 0.02em;
 }
 
-/* 中：模式标签（柔和呼吸动画，不再闪烁红点） */
-.hud-mode {
-  gap: 6px;
-}
+/* 中：PHOTO·取景中 模式胶囊 */
+.hud-mode { gap: 6px; }
 .pill-dot {
   width: 7px;
   height: 7px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent-glow);
   animation: pill-breathe 2.4s ease-in-out infinite;
 }
 @keyframes pill-breathe {
-  0%, 100% { opacity: 1; transform: scale(1); }
+  0%, 100% { opacity: 1;    transform: scale(1); }
   50%      { opacity: 0.55; transform: scale(0.85); }
 }
 .pill-mode-text {
-  font-size: var(--text-xs);
+  font-size: var(--text-xs);     /* 11/12px */
   font-weight: 500;
   letter-spacing: 0.08em;
   color: var(--ink-secondary);
   text-transform: uppercase;
 }
 
-/* 右：RA / DEC / FOV chips */
+/* 右：Chip 组 —— 组本身不设框，仅作为容器 */
 .hud-chips {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  height: 36px;                  /* 关键：与胶囊同高，保证垂直中心对齐 */
 }
+
+/* 单个 Chip —— 同样 36px 高，box-sizing:border-box，1px border */
 .hud-chip {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
-  justify-content: center;
-  padding: 0 11px 0 13px;
+  justify-content: center;        /* 内部两行（label + value）垂直居中 */
+  gap: 2px;
   height: 36px;
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  border-radius: var(--radius-md);
-  backdrop-filter: blur(14px) saturate(1.1);
+  padding: 0 11px 0 13px;
   min-width: 72px;
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--transition-fast);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hud-border);
+  background: var(--hud-bg);
   box-sizing: border-box;
+  line-height: 1;
+  overflow: visible;
+  isolation: isolate;
+  transition: border-color var(--transition-fast);
+}
+.hud-chip::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: var(--shadow-sm);
+  z-index: -1;
+  pointer-events: none;
 }
 .hud-chip:hover { border-color: var(--rule-hover); }
 .hud-chip.chip-accent {
@@ -225,17 +285,17 @@ onBeforeUnmount(() => {
 }
 .chip-label {
   font-size: 10px;
-  line-height: 1;
+  font-weight: 500;
   letter-spacing: 0.14em;
   color: var(--muted);
-  margin-bottom: 2px;
   text-transform: uppercase;
+  line-height: 1;
 }
 .chip-value {
   font-size: 13px;
-  line-height: 1.1;
   font-weight: 500;
   color: var(--hud-accent);
+  line-height: 1.1;
 }
 .tabular { font-variant-numeric: tabular-nums; }
 
@@ -251,19 +311,15 @@ onBeforeUnmount(() => {
   gap: 12px;
   pointer-events: none;
 }
-
 .hud-params, .hud-meta {
-  display: inline-flex;
-  align-items: center;
   gap: 12px;
-  font-family: var(--font);
   font-size: var(--text-xs);
 }
-
 .param, .meta-item {
   display: inline-flex;
   align-items: baseline;
   gap: 5px;
+  line-height: 1;
 }
 .param-label, .meta-label {
   color: var(--muted);
@@ -275,9 +331,7 @@ onBeforeUnmount(() => {
   color: var(--ink-secondary);
   font-weight: 500;
 }
-.meta-fps {
-  color: var(--accent);
-}
+.meta-fps { color: var(--accent); }
 .param-sep {
   width: 1px;
   height: 14px;
