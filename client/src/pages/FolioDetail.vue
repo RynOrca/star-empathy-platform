@@ -255,10 +255,11 @@ watch(idFromRoute, () => {
 }
 .fdp-pill-link:hover { background: var(--overlay-08); color: var(--ink); }
 .fdp-pill-warm {
-  background: linear-gradient(135deg, var(--accent-subtle) 0%, rgba(255, 217, 138, 0.14) 100%);
+  background: var(--accent-subtle);
   color: var(--accent);
+  box-shadow: none;
 }
-.fdp-pill-warm:hover { box-shadow: 0 6px 18px rgba(255, 217, 138, 0.12); }
+.fdp-pill-warm:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: none; }
 
 /* 纯图标按钮：30×30 radius-sm，纯块无硬边 */
 .fdp-icon-btn {

@@ -49,19 +49,6 @@
     </header>
 
     <main class="fs-main">
-      <!-- ═══════ 卷目二级筛选（sticky 第二排，仅排序；卷目 Tab 移到「全部卷」书架标题下方） ═══════ -->
-      <section class="fs-filters" aria-label="星笺筛选">
-        <div class="fs-sorts">
-          <label class="fs-sort-label">
-            <ArrowUpDown :size="10" />
-            <span>排序</span>
-          </label>
-          <select v-model="activeSort" class="fs-sort-select" aria-label="排序方式">
-            <option v-for="s in SORTS" :key="s.key" :value="s.key">{{ s.label }}</option>
-          </select>
-        </div>
-      </section>
-
       <!-- ═══════ ① 官方星河·八卷轴（横滑） ═══════ -->
       <section v-if="galaxyReels.length || galaxyLoading" class="fs-reels-section" aria-label="官方星河八卷">
         <header class="fs-section-head">
@@ -70,7 +57,7 @@
             <h2 class="fs-head-title">官方星河·八卷轴</h2>
             <span class="fs-head-sub">官方整理·历朝历代的星语心事</span>
           </div>
-          <!-- 翻页按钮放 section-head 右侧（不盖卡片，操作集中） + 查看全部链接 -->
+          <!-- 翻页按钮放 section-head 右侧（不盖卡片，操作集中） -->
           <div class="fs-head-actions">
             <div class="fs-reels-nav-group" role="group" aria-label="翻卷">
               <button
@@ -92,9 +79,6 @@
                 <ChevronRight :size="16" />
               </button>
             </div>
-            <button type="button" class="fs-head-link" @click="setVolume('galaxy')">
-              查看全部星河卷 →
-            </button>
           </div>
         </header>
         <div v-if="galaxyLoading" class="fs-reels fs-reels-loading">
@@ -135,18 +119,18 @@
         </div>
       </section>
 
-      <!-- ═══════ ② 本周推荐·三笺（P1：先接 /picks 前 3 条，以后接 AI 荐语） ═══════ -->
+      <!-- ═══════ ② 本周推荐（P1：先接 /picks 前 6 条，以后接 AI 荐语） ═══════ -->
       <section v-if="picks.length || picksLoading" class="fs-picks-section" aria-label="本周推荐星笺">
         <header class="fs-section-head">
           <div class="fs-head-left">
             <span class="fs-head-icon-wrap spark" aria-hidden="true"><Sparkles :size="14" /></span>
-            <h2 class="fs-head-title">本周推荐·三笺</h2>
-            <span class="fs-head-sub">三册最适合今夜开卷的星笺</span>
+            <h2 class="fs-head-title">本周推荐·夜读星笺</h2>
+            <span class="fs-head-sub">最适合今夜开卷的星笺精选</span>
           </div>
           <span class="fs-head-hint">每 7 日更新 · Picks</span>
         </header>
         <div v-if="picksLoading" class="fs-picks fs-picks-loading">
-          <div v-for="i in 3" :key="i" class="fs-pick fs-pick-skel"></div>
+          <div v-for="i in 6" :key="i" class="fs-pick fs-pick-skel"></div>
         </div>
         <div v-else class="fs-picks">
           <article
@@ -161,7 +145,7 @@
               <div class="fs-pick-head">
                 <span class="fs-pick-pickchip" :class="`fs-pick-pickchip-${i + 1}`">
                   <Sparkles :size="10" />
-                  <span>推荐 {{ ['壹','贰','叁'][i] || String(i + 1) }}</span>
+                  <span>推荐 {{ ['壹','贰','叁','肆','伍','陆'][i] || String(i + 1) }}</span>
                 </span>
                 <span v-if="p.visibility === 'galaxy'" class="fs-pick-tag fs-pick-tag-galaxy"><Sparkles :size="9" />星河</span>
                 <span v-else-if="p.visibility === 'anonymous'" class="fs-pick-tag fs-pick-tag-anonymous"><Ghost :size="9" />匿名</span>
@@ -286,7 +270,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit,
   Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User,
-  ArrowUpDown, Flame, Clock, Hash,
 } from 'lucide-vue-next'
 import FolioGrid, { type FolioLike } from '../components/FolioGrid.vue'
 import { authFetch, authHeaders, useAuth } from '../stores/auth'
@@ -1102,6 +1085,9 @@ updateVolumeCountsQuick()
 }
 .fs-pick-pickchip-2 { background: rgba(202, 167, 255, 0.12); color: var(--star-purple); }
 .fs-pick-pickchip-3 { background: rgba(244, 168, 184, 0.12); color: #f4a8b8; }
+.fs-pick-pickchip-4 { background: rgba(122, 184, 240, 0.12); color: #7ab8f0; }
+.fs-pick-pickchip-5 { background: rgba(149, 224, 192, 0.12); color: #95e0c0; }
+.fs-pick-pickchip-6 { background: rgba(255, 217, 138, 0.12); color: #ffd98a; }
 
 .fs-pick-title-block {
   display: flex; align-items: center; gap: 8px;
