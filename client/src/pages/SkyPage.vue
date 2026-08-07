@@ -247,45 +247,47 @@
       </div>
     </Transition>
 
-    <!-- 叙事引导牌（相机模式隐藏）：两行 4 列 grid，对齐零偏差；天镜览星 / 穹庭书局 / 折叠 -->
-    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-cards" :class="{ collapsed: !guideCardsOpen }">
-      <!-- 第 1 行：四张引导卡（可折叠，收起时隐藏 -->
-      <Transition name="guide-cards-row" mode="out-in">
-        <div v-show="guideCardsOpen" class="guide-cards-row">
-          <div class="guide-card">
-            <div class="guide-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <!-- 叙事引导牌（相机模式隐藏）：上方 4 卡是信息层（宽 ~900px），下方动作条是独立窄条（为信息服务） -->
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-shell">
+      <!-- ① 四张引导卡：宽而舒展，独立一层 -->
+      <div class="guide-cards" :class="{ collapsed: !guideCardsOpen }">
+        <Transition name="guide-cards-row" mode="out-in">
+          <div v-show="guideCardsOpen" class="guide-cards-row">
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="guide-title">历史里的星</p>
+              <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
             </div>
-            <p class="guide-title">历史里的星</p>
-            <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
-          </div>
-          <div class="guide-card">
-            <div class="guide-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              </div>
+              <p class="guide-title">路过别人的星光</p>
+              <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
             </div>
-            <p class="guide-title">路过别人的星光</p>
-            <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
-          </div>
-          <div class="guide-card">
-            <div class="guide-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+              </div>
+              <p class="guide-title">挂上我的故事</p>
+              <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
             </div>
-            <p class="guide-title">挂上我的故事</p>
-            <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
-          </div>
-          <div class="guide-card guide-action-card">
-            <div class="guide-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+            <div class="guide-card guide-action-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+              </div>
+              <p class="guide-title">点开一颗星</p>
+              <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
             </div>
-            <p class="guide-title">点开一颗星</p>
-            <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
           </div>
-        </div>
-      </Transition>
+        </Transition>
+      </div>
 
-      <!-- 第 2 行：四个主功能按钮（始终显示）：
-           1) 记录心事  2) 天镜览星  3) 穹庭书局  4) 展开/收起 -->
-      <div class="guide-actions" aria-label="引导动作区">
+      <!-- ② 引导动作条：窄版、为信息服务（不追求占满 4 卡宽度）
+           顺序：1.记录 2.天镜 3.书局 4.折叠(正方形) -->
+      <div class="guide-actions-bar" aria-label="引导动作区">
         <button
           type="button"
           class="guide-action guide-action-record"
@@ -294,7 +296,7 @@
           <span class="ga-icon"><PenLine :size="18" /></span>
           <span class="ga-text-block">
             <span class="ga-title">记录心事</span>
-            <span class="ga-sub">AI 为你寻归属星辰 →</span>
+            <span class="ga-sub">AI 寻归属星辰 →</span>
           </span>
         </button>
         <button
@@ -306,7 +308,7 @@
           <span class="ga-icon"><ApertureIcon /></span>
           <span class="ga-text-block">
             <span class="ga-title">天镜览星</span>
-            <span class="ga-sub">今夜取景观星 →</span>
+            <span class="ga-sub">今夜观景 →</span>
           </span>
         </button>
         <button
@@ -318,7 +320,7 @@
           <span class="ga-icon"><ApertureIcon /></span>
           <span class="ga-text-block">
             <span class="ga-title">天镜览星</span>
-            <span class="ga-sub">等待定位就绪</span>
+            <span class="ga-sub">等待定位</span>
           </span>
         </button>
         <button
@@ -329,7 +331,7 @@
           <span class="ga-icon"><BookMarked :size="18" /></span>
           <span class="ga-text-block">
             <span class="ga-title">穹庭书局</span>
-            <span class="ga-sub">翻开星笺广场 →</span>
+            <span class="ga-sub">星笺广场 →</span>
           </span>
         </button>
         <button
@@ -2756,37 +2758,40 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(40, 35, 18, 0.6);
 }
 
-/* ─── 叙事引导牌（大号黄色悬浮卡片）：两行 4 列 grid 对齐，列宽一致零偏差 ─── */
-.guide-cards {
+/* ─── 引导外壳：包上方4卡(信息层/宽) + 下方动作条(操作层/窄)，底层统一 fixed 定位 ─── */
+.guide-shell {
   position: fixed;
   bottom: 3.2rem;
   left: 50%;
   transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: auto auto;
-  column-gap: 0.75rem;
-  row-gap: 10px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   z-index: 15;
   pointer-events: none;
-  width: calc((220px * 4) + (0.75rem * 3)); /* 卡宽 × 4 + 间隙 × 3，消除弹性偏差 */
-  max-width: calc(100vw - 40px);
+  width: min(960px, 100vw - 40px);
 }
-/* 第一行四张卡：放在 grid-row:1，全部填满 4 列 gap */
-.guide-cards-row {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  display: grid;
-  grid-template-columns: subgrid;     /* 子 grid 继承父 4 列，精准同宽 */
-  column-gap: 0.75rem;
+
+/* ─── 叙事引导牌（大号黄色悬浮卡片）：信息层 · 独立一行 4 列等宽 ─── */
+.guide-cards {
+  position: static;          /* 外层 guide-shell 统一 fixed 定位 */
+  display: block;
   width: 100%;
+  transition: opacity 0.22s, visibility 0.22s;
+}
+/* 四张卡一层：4列等宽 */
+.guide-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 0.75rem;
   pointer-events: none;
 }
 .guide-cards-row > .guide-card { pointer-events: auto; }
 
 .guide-card {
-  width: 100%; /* 占满各自列宽 */
+  width: 100%;
   min-width: 0;
   padding: 0.65rem 0.9rem 0.55rem;
   border-radius: var(--radius-lg, 12px);
@@ -2821,7 +2826,7 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
 
-/* 引导卡收起动画（v-show 切换 .guide-cards-row） */
+/* 引导卡收起动画 */
 .guide-cards-row-enter-active,
 .guide-cards-row-leave-active {
   transition: opacity 0.22s ease, transform 0.22s ease;
@@ -2830,27 +2835,31 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-cards-row-enter-from { opacity: 0; transform: translateY(10px) scale(0.98); }
 .guide-cards-row-leave-to   { opacity: 0; transform: translateY(14px) scale(0.96); }
 
-/* ═══ 第二行：4 引导动作按钮：独立列宽 (1fr 1fr 1fr auto)，与上方 4 卡列宽明显错位 ═══ */
-.guide-actions {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto; /* 第4列自适应正方形，不跟随卡宽 */
-  column-gap: 0.75rem;
-  width: 100%;
-  pointer-events: auto;
+/* ═══ 引导动作条：更窄、独立、为信息服务（不追 4 卡宽度） ═══ */
+.guide-actions-bar {
+  display: inline-flex;
   align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  width: auto;
+  max-width: 100%;
+  pointer-events: auto;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: rgba(15, 13, 32, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .guide-action {
-  width: 100%;
+  width: auto;          /* 内容驱动宽度，不再占满父容器 */
   min-width: 0;
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 10px 14px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: left;
   font-family: var(--font);
@@ -2860,13 +2869,14 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  flex-shrink: 1;
 }
-.guide-action:hover:not(:disabled) { transform: translateY(-2px); }
+.guide-action:hover:not(:disabled) { transform: translateY(-1.5px); }
 .guide-action:active:not(:disabled) { transform: translateY(0); }
 .guide-action:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .guide-action .ga-icon {
-  width: 38px; height: 38px;
+  width: 34px; height: 34px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -2876,21 +2886,22 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-action .ga-text-block {
   display: inline-flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.15;
   min-width: 0;
-  flex: 1 1 0;
 }
 .guide-action .ga-title {
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .guide-action .ga-sub {
-  margin-top: 3px;
-  font-size: 0.7rem;
+  margin-top: 2px;
+  font-size: 0.67rem;
   opacity: 0.72;
   font-weight: 500;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 /* ① 记录心事：暖金调 */
@@ -2917,13 +2928,13 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-action-square:hover:not(:disabled) { background: color-mix(in srgb, #caa7ff 22%, transparent); }
 .guide-action-square .ga-icon { background: rgba(202, 167, 255, 0.1); color: var(--star-purple); }
 
-/* ④ 引导折叠：正方形（宽=高），与上方第四张宽卡明显错位，避免误以为列一一对应 */
+/* ④ 引导折叠：正方形（宽=高），最后一个跟随行高  */
 .guide-action-collapse {
-  /* 取 guide-action 高度 ≈ 其他三按钮总高度 */
+  align-self: stretch;
   width: auto;
-  min-width: 82px;
+  min-width: 72px;
   aspect-ratio: 1 / 1;
-  padding: 8px 10px;
+  padding: 6px 8px;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -2941,15 +2952,15 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 }
 .guide-action-collapse:hover:not(:disabled) .gac-icon { color: var(--accent); }
 .guide-action-collapse .gac-label {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   opacity: 0.82;
   white-space: nowrap;
 }
 
-/* 引导卡收起后：整个 guide-cards 不改变 bottom 位置（只改行高更紧凑） */
-.guide-cards.collapsed { row-gap: 0; }
+/* 引导卡收起时：整个 guide-shell 底部 gap 归零，让动作条紧贴原来位置（减少跳空） */
+.guide-shell:has(.guide-cards.collapsed) { gap: 4px; }
 
 .toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
