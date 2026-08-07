@@ -186,28 +186,105 @@ export function deleteCollection(id: number, userId: number): { notFound?: boole
   return {};
 }
 
-// 公开合集列表（分页，可按 userId 过滤某作者）
-// 公开 = visibility IN ('public', 'anonymous', 'galaxy')，星河/匿名合集也对外展示
-export function listPublicCollections(
-  userId?: number,
-  page = 1,
-  limit = 20,
-): { items: any[]; total: number; page: number; limit: number; totalPages: number } {
-  const p = Math.max(1, Math.floor(page));
-  const l = Math.max(1, Math.min(100, Math.floor(limit)));
-  const offset = (p - 1) * l;
-  const publicValues = PUBLIC_VISIBILITIES.map(() => '?').join(','); // ?,?,?
-  const where = userId
-    ? `visibility IN (${publicValues}) AND user_id = ?`
-    : `visibility IN (${publicValues})`;
-  const countParams: any[] = userId ? [...PUBLIC_VISIBILITIES, userId] : [...PUBLIC_VISIBILITIES];
-  const listParams: any[] = userId ? [...PUBLIC_VISIBILITIES, userId, l, offset] : [...PUBLIC_VISIBILITIES, l, offset];
+export type PublicCollectionsSort =
+  | 'hot'       // 热度：storyCount*2 + 合辑内故事总共鸣数
+  | 'new'       // 最近创建（默认）
+  | 'resonance' // 合辑内故事总共鸣数 DESC
+  | 'name_asc'  // 合集名拼音排序（SQLite 默认 utf-8 字节序就行）
+  | 'stories_desc'; // 故事数 DESC
 
-  const totalRow = db.prepare(`SELECT COUNT(*) as cnt FROM collections WHERE ${where}`).get(...countParams) as { cnt: number };
+// 公开合集列表（分页，可按 userId/sort/visibility 过滤）
+// 公开 = visibility IN ('public', 'anonymous', 'galaxy')，星河/匿名合集也对外展示
+export function listPublicCollections(params: {
+  userId?: number;
+  page?: number;
+  limit?: number;
+  sort?: PublicCollectionsSort;
+  /** 只返回指定 visibility 的公开子集：'public' 纯公开 / 'anonymous' 匿名 / 'galaxy' 星河 / 默认=全部 */
+  visibility?: 'public' | 'anonymous' | 'galaxy';
+}): { items: any[]; total: number; page: number; limit: number; totalPages: number } {
+  const p = Math.max(1, Math.floor(params.page ?? 1));
+  const l = Math.max(1, Math.min(100, Math.floor(params.limit ?? 20)));
+  const offset = (p - 1) * l;
+  const sort = params.sort ?? 'new';
+
+  // WHERE 构造
+  const visibilities: CollectionVisibility[] = params.visibility
+    ? [params.visibility]
+    : PUBLIC_VISIBILITIES;
+  const placeholders = visibilities.map(() => '?').join(',');
+  let where = `visibility IN (${placeholders})`;
+  const countParams: any[] = [...visibilities];
+  const listParams: any[] = [...visibilities];
+
+  if (params.userId) {
+    where += ' AND user_id = ?';
+    countParams.push(params.userId);
+    listParams.push(params.userId);
+  }
+
+  // ORDER 构造
+  let orderBy: string;
+  switch (sort) {
+    case 'hot':
+      orderBy = `(
+        (COALESCE(c.story_count, 0) * 2) +
+        COALESCE((SELECT SUM(s.resonance_count) FROM stars s WHERE s.collection_id = c.id), 0)
+      ) DESC, c.created_at DESC`;
+      break;
+    case 'resonance':
+      orderBy = `COALESCE((SELECT SUM(s.resonance_count) FROM stars s WHERE s.collection_id = c.id), 0) DESC, c.created_at DESC`;
+      break;
+    case 'stories_desc':
+      orderBy = 'COALESCE(c.story_count, 0) DESC, c.created_at DESC';
+      break;
+    case 'name_asc':
+      orderBy = 'COALESCE(c.name, "") COLLATE NOCASE ASC';
+      break;
+    case 'new':
+    default:
+      orderBy = 'c.created_at DESC';
+      break;
+  }
+
+  const totalRow = db.prepare(`SELECT COUNT(*) as cnt FROM collections c WHERE ${where}`).get(...countParams) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l) || 0;
-  const rows = db.prepare(`SELECT * FROM collections WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...listParams);
+  const rows = db.prepare(
+    `SELECT c.* FROM collections c WHERE ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
+  ).all(...listParams, l, offset);
   return { items: attachStoryCount(rows as any[]), total, page: p, limit: l, totalPages };
+}
+
+/**
+ * 星笺广场推荐 Picks：
+ *   - 固定前 N 本（默认前 3）取官方「星河」合辑，按 sort_order ASC 取最前排的
+ *   - 再填充：最近 14 天内「热度 hot」Top (wanted - galaxyN) 本公开/匿名星笺（排除已选星河）
+ * 返回 wanted 本（默认 6）；若不够就用所有非星河合辑 hot 排序补足
+ */
+export function getPublicCollectionPicks(wanted = 6, galaxyN = 3): any[] {
+  const galaxyTopN = db.prepare(
+    `SELECT c.* FROM collections c WHERE c.visibility = 'galaxy' ORDER BY c.sort_order ASC, c.id ASC LIMIT ?`
+  ).all(galaxyN) as any[];
+
+  const ids = new Set<number>(galaxyTopN.map(x => x.id));
+  const fill = Math.max(0, wanted - galaxyTopN.length);
+  let filled: any[] = [];
+  if (fill > 0) {
+    const nonGalaxy = db.prepare(
+      `SELECT c.* FROM collections c
+       WHERE c.visibility IN ('public','anonymous') AND c.id NOT IN (${galaxyTopN.length ? galaxyTopN.map(() => '?').join(',') : '0'})
+       ORDER BY (
+         (COALESCE(c.story_count, 0) * 2) +
+         COALESCE((SELECT SUM(s.resonance_count) FROM stars s WHERE s.collection_id = c.id), 0)
+       ) DESC, c.created_at DESC
+       LIMIT ?`
+    ).all(...(galaxyTopN.length ? galaxyTopN.map(x => x.id) : []), fill) as any[];
+    filled = nonGalaxy.filter(x => !ids.has(x.id));
+  }
+
+  const list = [...galaxyTopN, ...filled].slice(0, wanted);
+  return attachStoryCount(list);
 }
 
 // 校验合集归属当前用户（投递故事时用）

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -66,6 +66,15 @@
         <!-- 记录：AI 匹配星辰写故事（相机模式隐藏，不依赖定位，首帧就显示） -->
         <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
           <PenLine :size="18" />
+        </button>
+        <!-- 星笺广场：穹庭书局入口 -->
+        <button
+          v-if="cameraMode.cameraMode.value !== 'observe'"
+          class="nav-icon-btn nav-square-btn"
+          @click="goFolioSquare"
+          title="穹庭书局 · 星笺广场"
+        >
+          <BookMarked :size="18" />
         </button>
         <!-- 星笺：打开我的合集（相机模式隐藏） -->
         <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
@@ -569,7 +578,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit } from 'lucide-vue-next'
+import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit, BookMarked } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -1979,6 +1988,11 @@ function onToggleObserve() {
   skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
 }
 
+/** 星笺广场（穹庭书局）跳转 */
+function goFolioSquare() {
+  router.push('/folios')
+}
+
 /**
  * 右上角「星笺」按钮：打开当前用户的合集列表。
  * 拉取用户合集后，默认打开第一个（默认合集），并在 overlay 内可通过合集列表 tab 切换。
@@ -3254,6 +3268,21 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border-color: rgba(255, 217, 138, 0.55) !important;
   background: linear-gradient(135deg, rgba(255, 217, 138, 0.18), rgba(255, 176, 96, 0.1)) !important;
   box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
+}
+
+/* 穹庭书局 · 星笺广场（导航栏按钮）：紫金调，记录暖色 & 记录按钮呼应 */
+.nav-square-btn {
+  color: #ead6ff !important;
+  border-color: rgba(202, 167, 255, 0.28) !important;
+  background: rgba(202, 167, 255, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(202, 167, 255, 0.06), inset 0 0 12px rgba(202, 167, 255, 0.04);
+  transition: all 0.2s ease !important;
+}
+.nav-square-btn:hover {
+  color: #fff !important;
+  border-color: rgba(202, 167, 255, 0.55) !important;
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.2), rgba(149, 224, 192, 0.1)) !important;
+  box-shadow: 0 0 16px rgba(202, 167, 255, 0.28), inset 0 0 14px rgba(202, 167, 255, 0.08);
 }
 
 /* ═══════════════════════════════════════════════

@@ -8,7 +8,9 @@ import {
   updateCollection,
   deleteCollection,
   listPublicCollections,
+  getPublicCollectionPicks,
   CollectionVisibility,
+  PublicCollectionsSort,
 } from '../services/collectionService';
 import { readCollectionAnalysis, triggerAnalysisIfNeeded, invalidateCollectionAnalysisCache } from '../services/collectionAnalysis';
 
@@ -51,10 +53,34 @@ router.get('/public', authOptional, (req: Request, res: Response) => {
     const userIdParsed = userIdRaw ? parseInt(userIdRaw, 10) : NaN;
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 20;
-    const result = listPublicCollections(!isNaN(userIdParsed) ? userIdParsed : undefined, page, limit);
+    const sort = (req.query.sort as PublicCollectionsSort | undefined) ?? 'new';
+    const visibility = req.query.visibility as ('public' | 'anonymous' | 'galaxy') | undefined;
+    const validSorts: PublicCollectionsSort[] = ['hot', 'new', 'resonance', 'name_asc', 'stories_desc'];
+    const validSort = validSorts.includes(sort) ? sort : 'new';
+    const validVis = visibility === 'public' || visibility === 'anonymous' || visibility === 'galaxy' ? visibility : undefined;
+    const result = listPublicCollections({
+      userId: !isNaN(userIdParsed) ? userIdParsed : undefined,
+      page, limit, sort: validSort, visibility: validVis,
+    });
     ok(res, 'success', result);
   } catch (error) {
     console.error('GET /api/collections/public error:', error);
+    serverError(res);
+  }
+});
+
+// 星笺广场推荐 Picks（官方星河 N 本 + 热度 Top 补齐，默认 6 本）
+router.get('/picks', authOptional, (_req: Request, res: Response) => {
+  try {
+    const wanted = parseInt(_req.query.wanted as string, 10) || 6;
+    const galaxyN = parseInt(_req.query.galaxyN as string, 10) || 3;
+    const picks = getPublicCollectionPicks(
+      Math.max(1, Math.min(20, wanted)),
+      Math.max(0, Math.min(8, galaxyN))
+    );
+    ok(res, 'success', picks);
+  } catch (error) {
+    console.error('GET /api/collections/picks error:', error);
     serverError(res);
   }
 });

@@ -326,13 +326,24 @@
             </div>
           </div>
 
-          <!-- 底部操作（仅 owner） -->
-          <div v-if="isOwner && detail" class="info-footer">
-            <button class="footer-btn footer-edit" @click="emit('edit', detail)">
-              <Pencil :size="12" /><span>编辑星笺</span>
-            </button>
-            <button class="footer-btn footer-delete" @click="emit('delete', detail)">
-              <Trash2 :size="12" /><span>删除</span>
+          <!-- 底部操作（仅 owner = 编辑/删除；非 owner = 更多星笺胶囊） -->
+          <div v-if="detail" class="info-footer">
+            <template v-if="isOwner">
+              <button class="footer-btn footer-edit" @click="emit('edit', detail)">
+                <Pencil :size="12" /><span>编辑星笺</span>
+              </button>
+              <button class="footer-btn footer-delete" @click="emit('delete', detail)">
+                <Trash2 :size="12" /><span>删除</span>
+              </button>
+            </template>
+            <button
+              v-else
+              type="button"
+              class="footer-btn footer-square"
+              @click="goFolioSquare"
+            >
+              <Galaxy :size="11" />
+              <span>🌌 更多星笺 · 穹庭书局</span>
             </button>
           </div>
         </div>
@@ -658,13 +669,24 @@
           </template>
         </div>
 
-        <!-- 移动端底部操作栏（仅 owner） -->
-        <div v-if="isOwner && detail && activeTab === 'info'" class="mobile-bottom-bar">
-          <button class="footer-btn footer-edit" @click="emit('edit', detail)">
-            <Pencil :size="12" /><span>编辑</span>
-          </button>
-          <button class="footer-btn footer-delete" @click="emit('delete', detail)">
-            <Trash2 :size="12" /><span>删除</span>
+        <!-- 移动端底部操作栏（owner=编辑/删除；非owner=更多星笺） -->
+        <div v-if="detail && activeTab === 'info'" class="mobile-bottom-bar">
+          <template v-if="isOwner">
+            <button class="footer-btn footer-edit" @click="emit('edit', detail)">
+              <Pencil :size="12" /><span>编辑</span>
+            </button>
+            <button class="footer-btn footer-delete" @click="emit('delete', detail)">
+              <Trash2 :size="12" /><span>删除</span>
+            </button>
+          </template>
+          <button
+            v-else
+            type="button"
+            class="footer-btn footer-square mobile-footer-square"
+            @click="goFolioSquare"
+          >
+            <Galaxy :size="12" />
+            <span>更多星笺</span>
           </button>
         </div>
 
@@ -714,7 +736,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, onBeforeUnmount, watch, nextTick, type Component } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   X, Lock, Globe, BookOpen, BookMarked, Heart, Eye, Clock, Pencil, Trash2,
   ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Activity, Tag, Hash,
@@ -737,6 +759,12 @@ marked.setOptions({ breaks: true, gfm: true })
 const { isMobile } = useMediaQuery()
 const { fetchDetail } = useCollections()
 const route = useRoute()
+const router = useRouter()
+
+/** 跳穹庭书局 · 星笺广场 */
+function goFolioSquare() {
+  router.push('/folios')
+}
 
 /** 点击星星小框跳转 /sky?star=xxx 或任何路由变化 → 自动关闭合集详情弹窗 */
 watch(
@@ -1803,6 +1831,25 @@ function infoTagStyle(tag: string): Record<string, string> {
   color: #ff8aa6;
 }
 .footer-delete:hover { background: rgba(255, 107, 138, 0.12); }
+
+/* 穹庭书局 · 更多星笺 胶囊：紫金调 */
+.footer-square {
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.12), rgba(149, 224, 192, 0.06));
+  border: 1px solid rgba(202, 167, 255, 0.3);
+  color: rgba(234, 214, 255, 0.96);
+  margin-left: auto;
+}
+.footer-square:hover {
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.1));
+  border-color: rgba(202, 167, 255, 0.6);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(202, 167, 255, 0.28);
+}
+.mobile-footer-square {
+  margin-left: 0;
+  width: 100%;
+  justify-content: center;
+}
 
 /* ─── Collections Tab ─── */
 .collections-tab {
