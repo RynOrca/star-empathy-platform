@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1394,14 +1394,24 @@ async function onCameraStoryClick(star: any) {
   const centered = panel?.isCardCentered ? panel.isCardCentered(star.id) : true
   if (!centered) panel?.scrollToCardCenter?.(star.id)
 
-  // 决定归属星表星 ID（星表恒星优先用自己的 id；用户故事星用其归属 catalogStarId）
-  const isCatalogStar = (star.catalogStarId == null || star.catalogStarId === undefined)
-  const catalogStarIdNum: number = isCatalogStar
-    ? Number(star.id)
-    : Number(star.catalogStarId)
-  const storyStarIdNum: number = Number(star.id)   // 用户故事星本身 id（用于找 activeIndex）
+  // ────────────────────────────────────────────────────────────
+  // 解析 & 分类：右下角条目到底是哪一种？
+  //   TYPE_A = 纯 catalog 星介绍：有 catalogStarId 且 star.id === catalogStarId（观星模式）
+  //   TYPE_B = 归属星表星的具体故事：有 catalogStarId 但 star.id !== catalogStarId（用户/历史故事挂在星星下）
+  //   TYPE_C = 纯用户心声（无归属星表星）：catalogStarId 为空（后端随机 3D 坐标生成的独立故事星）
+  // ────────────────────────────────────────────────────────────
+  const hasCatalogStar: boolean = star.catalogStarId != null && !Number.isNaN(Number(star.catalogStarId))
+  const rawCatalogId: number | null = hasCatalogStar ? Number(star.catalogStarId) : null
+  const rawStoryId: number = Number(star.id)
+  const catalogStarIdNum: number = rawCatalogId ?? rawStoryId
 
-  // 步骤2：镜头飞行到该星（zoomLevel=3 拉近）— 传原始 star 对象，避免 TS 类型冲突
+  const isTypeC_PureUserStory: boolean = !hasCatalogStar          // 纯用户心声（无归属星）
+  const isTypeB_StoryUnderCatalog: boolean =
+    hasCatalogStar && rawCatalogId !== rawStoryId                 // 挂在 catalog 星下的具体故事（用户/历史）
+  const isTypeA_CatalogStarIntro: boolean =
+    hasCatalogStar && rawCatalogId === rawStoryId                 // 纯 catalog 星介绍（观星模式）
+
+  // 步骤2：镜头飞行到该星（zoomLevel=3 拉近）— 传原始 star 对象
   sky.flyToStar3D(star, { zoomLevel: 3 })
 
   // 步骤3：等飞行 700ms，让用户看到飞行动画
@@ -1419,27 +1429,82 @@ async function onCameraStoryClick(star: any) {
     query: { ...route.query, star: String(catalogStarIdNum) },
   })
 
-  // 4.3 调用 onStarClick() 赋值 selectedStarInfo / selectedStories / catalogStats
-  //     — onStarClick 内部对相机模式的拦截已被改为 !cameraDetailOpen，因此会正常执行
-  onStarClick(catalogStarIdNum)
-
-  // 4.4 只有「听语」模式下的具体故事（不是单纯的星表星介绍）才需要精确打开 StoryDetail 页面：
-  //       - isCatalogStar=false（右下角故事卡片来自听语列表，而非观星星星列表）
-  //       - storyStarIdNum 是一个合法的故事 id，并且不等于归属星 catalogStarId（排除占位）
-  //     → 触发 detailTargetStoryId.value = storyStarIdNum，StarDetail 内部 v-model:targetStoryId watcher 会：
-  //        ① 自动切 Tab 到 history（历史故事）或 all（用户故事）
-  //        ② nextTick 后打开对应 StoryDetail 详情页面
-  //        ③ emit('update:targetStoryId', null) 自动清除父级，避免同值 watch 不触发
-  //     额外加两次 nextTick + setTimeout(0) 确保：
-  //        - StarDetail 已经被 v-if="selectedStarInfo" 挂载完毕
-  //        - onStarClick 内部 selectedStories 赋值已完成
-  //        - StarDetail 内部 props.stories realStories computed 计算完成
-  if (!isCatalogStar && !Number.isNaN(storyStarIdNum) && storyStarIdNum !== catalogStarIdNum && storyStarIdNum > 0) {
+  // 4.3 打开 StarDetail（按 TYPE_A/B/C 分三路）
+  if (isTypeC_PureUserStory) {
+    // ──────────────────────────────────────────────────────
+    // TYPE_C：纯用户心声（无归属星表星）
+    //   - catalogStarLookup 和 storiesByStarId 里都没有它的记录
+    //   - 所以不能走 onStarClick()（会 catalogStarLookup.get() 查不到直接 return）
+    //   - 必须手动构造 StarDetail 需要的最小 props，然后把唯一的一条故事塞进 selectedStories，
+    //     再通过 detailTargetStoryId 触发 StarDetail 内部打开 StoryDetail 页面
+    // ──────────────────────────────────────────────────────
+    selectedStories.value = [{
+      id: rawStoryId,
+      title: star.title ?? null,
+      content: star.content ?? '',
+      resonanceCount: star.resonanceCount ?? 0,
+      catalogStarId: 0,          // 无归属星 → 给 0 作为占位（不参与渲染）
+      catalogStarIds: [],
+      createdAt: star.createdAt ?? '',
+      locationLat: star.locationLat ?? null,
+      locationLng: star.locationLng ?? null,
+      type: star.type ?? 'user',
+      viewCount: star.viewCount ?? 0,
+      origin: star.origin ?? null,
+      username: star.username ?? null,
+      tag: star.tag ?? null,
+      tags: star.tags ?? (star.tag ? [star.tag] : []),
+      userId: star.userId ?? null,
+      imageUrl: star.imageUrl ?? null,
+      collectionId: star.collectionId ?? null,
+      collectionName: star.collectionName ?? null,
+      collectionCoverColor: star.collectionCoverColor ?? null,
+      collectionVisibility: star.collectionVisibility ?? null,
+      collectionStoryCount: star.collectionStoryCount ?? null,
+    }]
+    selectedCatalogStarId.value = rawStoryId     // 用故事 id 占位（避免 number|null 报错）
+    selectedStarInfo.value = {
+      id: rawStoryId,
+      displayName: star.title || `星 #${rawStoryId}`,
+      con: 'user',                                // 无星座 → 占位
+      mag: 99,
+      conName: '星友心声',                         // 右栏星座名显示"星友心声"
+      distance: null,
+      ra: star.ra ?? 0,                           // 3D 坐标（若有）
+      dec: star.dec ?? 0,
+      color: '#caa7ff',                           // 用户心声固定紫色（与主设计系统一致）
+    }
+    catalogStats.value = {
+      storyCount: 1,
+      totalResonance: star.resonanceCount ?? 0,
+      totalViews: star.viewCount ?? 0,
+      starViews: 0,
+      favoriteCount: 0,
+    }
+    // 唯一的一条故事 → 自动打开 StoryDetail 详情页
     await nextTick()
     await nextTick()
     setTimeout(() => {
-      detailTargetStoryId.value = storyStarIdNum
+      detailTargetStoryId.value = rawStoryId
     }, 0)
+  } else {
+    // ──────────────────────────────────────────────────────
+    // TYPE_A 或 TYPE_B：有归属星表星
+    //   → 正常走 onStarClick：catalogStarLookup 能查到 → selectedStarInfo / selectedStories / catalogStats 自动赋值
+    // ──────────────────────────────────────────────────────
+    onStarClick(catalogStarIdNum)
+
+    // TYPE_B：挂在 catalog 星下的具体故事 → 触发精确打开对应 StoryDetail 页面
+    //   - user 故事 → 切 Tab 到「所有故事」并打开详情
+    //   - history 故事 → 切 Tab 到「历史故事」并打开详情
+    //   - TYPE_A 纯 catalog 星介绍 → 不触发（保持默认 AI 叙事 Tab）
+    if (isTypeB_StoryUnderCatalog && rawStoryId > 0) {
+      await nextTick()
+      await nextTick()
+      setTimeout(() => {
+        detailTargetStoryId.value = rawStoryId
+      }, 0)
+    }
   }
 }
 
