@@ -619,17 +619,14 @@ updateVolumeCountsQuick()
 .pw-icon-gold {
   background: var(--accent-subtle);
   color: var(--accent);
-  border: 0.5px solid var(--accent-border);
 }
 .pw-icon-purple {
   background: rgba(202, 167, 255, 0.1);
   color: var(--star-purple);
-  border: 0.5px solid rgba(202, 167, 255, 0.22);
 }
 .pw-icon-blue {
   background: rgba(158, 198, 255, 0.1);
   color: var(--star-blue);
-  border: 0.5px solid rgba(158, 198, 255, 0.22);
 }
 
 /* ═══ 主内容：相对定位，盖在背景上 ═══ */
@@ -641,7 +638,7 @@ updateVolumeCountsQuick()
   padding: 76px 20px 40px;
 }
 
-/* ═══ 顶部 Sticky Bar（对齐相机模式面板：模糊 + 轻线 + --rule） ═══ */
+/* ═══ 顶部 Sticky Bar（极简扁平：纯色背景，无玻璃模糊/渐变/光辉） ═══ */
 .fs-top {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -651,9 +648,7 @@ updateVolumeCountsQuick()
   align-items: center;
   gap: 14px;
   padding: 10px 20px;
-  backdrop-filter: blur(12px) saturate(1.3);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  background: linear-gradient(180deg, rgba(10,11,28,0.82) 0%, rgba(10,11,28,0.42) 80%, rgba(10,11,28,0) 100%);
+  background: rgba(10, 11, 28, 0.9);
 }
 .fs-top-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .fs-back {
@@ -687,9 +682,9 @@ updateVolumeCountsQuick()
   padding: 7px 12px;
   border-radius: var(--radius-full);
   background: var(--overlay-04);
-  transition: background var(--transition-normal), box-shadow var(--transition-normal);
+  transition: background var(--transition-normal);
 }
-.fs-search:hover { background: var(--overlay-08); box-shadow: inset 0 0 0 1px var(--accent-border); }
+.fs-search:hover { background: var(--overlay-08); }
 .fs-search-icon { color: var(--muted); flex-shrink: 0; }
 .fs-search-input {
   flex: 1; min-width: 0;
@@ -707,32 +702,29 @@ updateVolumeCountsQuick()
   height: 32px;
   padding: 0 14px;
   border-radius: var(--radius-full);
+  border: none;
   font-family: var(--font);
   font-size: 11.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: transform 0.12s ease, background var(--transition-normal), color var(--transition-normal), box-shadow var(--transition-normal);
+  transition: background var(--transition-normal), color var(--transition-normal);
   user-select: none;
 }
-.fs-btn:active { transform: scale(0.97); }
-/* 次按钮：纯 overlay-04 块，不要硬线 */
+/* 次按钮：纯 overlay 色块，无玻璃、无投影、无光辉 */
 .fs-btn-glass {
   background: var(--overlay-04);
   color: var(--ink-secondary);
 }
 .fs-btn-glass:hover { background: var(--overlay-08); color: var(--ink); }
-/* 主按钮：warm = accent 渐变（对齐 resonate 按钮），无硬线 */
+/* 主按钮：warm = accent 纯色块（无渐变），无阴影 */
 .fs-btn-warm {
-  background: linear-gradient(135deg, var(--accent-subtle) 0%, rgba(255, 217, 138, 0.14) 100%);
+  background: var(--accent-subtle);
   color: var(--accent);
 }
-.fs-btn-warm:hover {
-  transform: translateY(-0.5px);
-  box-shadow: 0 6px 20px rgba(255, 217, 138, 0.15);
-}
+.fs-btn-warm:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
-/* ═══ 卷目筛选条（第 2 段 sticky）：纯背景块，无硬边框 ═══ */
+/* ═══ 卷目筛选条（第 2 段 sticky）：纯背景色块，无玻璃模糊/硬边框 ═══ */
 .fs-filters {
   position: sticky;
   top: 54px;
@@ -745,8 +737,6 @@ updateVolumeCountsQuick()
   margin: 0 0 18px;
   border-radius: var(--radius-md);
   background: var(--overlay-04);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 .fs-volumes {
   display: inline-flex; align-items: center; gap: 6px;
@@ -758,6 +748,7 @@ updateVolumeCountsQuick()
   border-radius: var(--radius-full);
   background: var(--overlay-04);
   color: var(--ink-secondary);
+  border: none;
   font-family: var(--font); font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
@@ -795,13 +786,14 @@ updateVolumeCountsQuick()
   appearance: none; -webkit-appearance: none;
   padding: 5px 24px 5px 10px;
   border-radius: var(--radius-sm);
+  border: none;
   background: var(--overlay-04) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>') no-repeat right 8px center;
   color: var(--ink-secondary);
   font-family: var(--font); font-size: 11.5px;
   cursor: pointer;
   font-weight: 500;
 }
-.fs-sort-select:hover { box-shadow: inset 0 0 0 1px var(--accent-border); color: var(--accent); }
+.fs-sort-select:hover { color: var(--accent); background-color: var(--overlay-08); }
 
 /* ═══ section 通用头：对齐 StoryDetailCard 的标题节奏 ═══ */
 .fs-section-head {
@@ -845,12 +837,15 @@ updateVolumeCountsQuick()
 .fs-head-link:hover { filter: brightness(1.1); }
 .fs-head-hint { cursor: default; color: var(--muted); font-weight: 500; }
 
-/* ═══ ① 官方星河·八卷轴（横滑） ═══ */
+/* ═══ ① 官方星河·八卷轴（横滑）═══════════════════════════════
+   · 容器左右 padding=0，卷轴卡最左/最右与下方本周推荐边界对齐（一致）
+   · 左右翻页按钮 absolute 悬浮，不占文档流宽度
+   · 全程扁平：无玻璃模糊、无渐变、无光辉投影 ═══════════════ */
 .fs-reels-section { position: relative; }
 .fs-reels {
   position: relative;
-  padding: 10px 40px;
-  overflow: hidden;
+  padding: 10px 0;
+  overflow: visible;
 }
 .fs-reels-track {
   display: flex;
@@ -868,6 +863,7 @@ updateVolumeCountsQuick()
   background: var(--rule);
   border-radius: 4px;
 }
+/* 翻页按钮：absolute 悬浮在卷轴容器左右边缘之上，不占宽，扁平无玻璃 */
 .fs-reels-nav {
   position: absolute;
   top: 50%;
@@ -875,23 +871,21 @@ updateVolumeCountsQuick()
   width: 30px; height: 30px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--radius-sm);
-  background: var(--overlay-04);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: var(--surface);
   color: var(--ink-secondary);
   cursor: pointer;
-  z-index: 2;
-  transition: all var(--transition-normal);
+  z-index: 3;
+  transition: background var(--transition-normal), color var(--transition-normal);
   padding: 0;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
 }
 .fs-reels-nav:hover:not(:disabled) { background: var(--accent-subtle); color: var(--accent); }
 .fs-reels-nav:disabled { opacity: 0.25; cursor: default; }
-.fs-reels-nav-left { left: 0; }
-.fs-reels-nav-right { right: 0; }
+.fs-reels-nav-left { left: -15px; }
+.fs-reels-nav-right { right: -15px; }
 
-/* 单卷轴 card：极简扁平，块面（surface）+ 轻阴影，无硬边框、无左侧色条。
-   StoryDetailCard 之所以有 border 和色条是因为它叠在全屏遮罩上做轮廓锚点；
-   广场页面容器之间靠底色差和阴影区分，不需要边条。 */
+/* 单卷轴 card：极简扁平，纯 surface + 极轻阴影，无硬边框、无左色条、无浮起光辉 */
 .fs-reel {
   --r-color: var(--accent);
   flex: 0 0 220px;
@@ -901,9 +895,9 @@ updateVolumeCountsQuick()
   flex-direction: column;
   background: var(--surface);
   border-radius: var(--radius-xl);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
   cursor: pointer;
-  transition: transform var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
+  transition: background var(--transition-normal), box-shadow var(--transition-normal);
   overflow: hidden;
   color: var(--ink);
 }
@@ -915,9 +909,8 @@ updateVolumeCountsQuick()
   flex: 1;
 }
 .fs-reel:hover {
-  transform: translateY(-1px);
   background: var(--surface-hover);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 .fs-reel-banner {
   display: flex;
@@ -925,7 +918,7 @@ updateVolumeCountsQuick()
   justify-content: space-between;
   padding-bottom: 8px;
   margin-bottom: 2px;
-  background: linear-gradient(180deg, transparent 60%, var(--overlay-02) 100%);
+  background: var(--overlay-02);
 }
 .fs-reel-num {
   font-size: 11px;
@@ -1015,7 +1008,7 @@ updateVolumeCountsQuick()
   0% { background-position: 200% 0; } 100% { background-position: -200% 0; }
 }
 
-/* 本周推荐·三笺（极简扁平块面 + 轻阴影，无硬边框、无左色条） */
+/* 本周推荐·三笺（极简扁平块面 + 轻阴影，无硬边框、无左色条、无渐变光辉） */
 .fs-picks-section {}
 .fs-picks {
   display: grid;
@@ -1029,9 +1022,9 @@ updateVolumeCountsQuick()
   border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
   cursor: pointer;
-  transition: transform var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
+  transition: background var(--transition-normal), box-shadow var(--transition-normal);
   color: var(--ink);
 }
 .fs-pick-body {
@@ -1043,12 +1036,11 @@ updateVolumeCountsQuick()
   box-sizing: border-box;
 }
 .fs-pick:hover {
-  transform: translateY(-1px);
   background: var(--surface-hover);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
-.fs-pick.galaxy { background: linear-gradient(180deg, rgba(255, 217, 138, 0.06) 0%, var(--surface) 60%); }
-.fs-pick.anonymous { background: linear-gradient(180deg, rgba(202, 167, 255, 0.06) 0%, var(--surface) 60%); }
+.fs-pick.galaxy { background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.fs-pick.anonymous { background: color-mix(in srgb, var(--star-purple) 4%, var(--surface)); }
 
 .fs-pick-head {
   display: flex;
@@ -1074,9 +1066,7 @@ updateVolumeCountsQuick()
 .fs-pick-title-block {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 11px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--p-color) 10%, transparent) 0%,
-    rgba(202, 167, 255, 0.05) 100%);
+  background: color-mix(in srgb, var(--p-color) 8%, transparent);
   border-radius: var(--radius-md);
 }
 .fs-pick-open {
@@ -1256,7 +1246,7 @@ updateVolumeCountsQuick()
   .fs-pick { min-height: auto; }
   .fs-filters { flex-direction: column; align-items: stretch; }
   .fs-sorts { align-self: flex-end; }
-  .fs-reels { padding: 8px 28px; }
+  .fs-reels { padding: 8px 0; }
   .fs-reel { flex-basis: 180px; min-height: 200px; }
 }
 @media (max-width: 420px) {
