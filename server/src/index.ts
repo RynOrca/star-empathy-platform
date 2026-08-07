@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import fs from 'node:fs';
+import { exec } from 'node:child_process';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import starsRouter from './routes/stars';
@@ -260,24 +261,84 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   serverError(res);
 });
 
-// 启动服务
-app.listen(PORT, () => {
-  console.log(`🌟 星语穹庭后端运行中: http://localhost:${PORT}`);
-  console.log(`   GET  /api/stories               - 获取所有故事`);
-  console.log(`   POST /api/stories               - 投递心事`);
-  console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
-  console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
+// 启动服务（带端口被占自动 fallback 友好处理）
+const MAX_FALLBACK = 3;
 
-  // 定时清理过期 token 黑名单（每 10 分钟）
-  setInterval(() => {
-    try { cleanExpiredTokens(); } catch { /* 静默 */ }
-  }, 10 * 60 * 1000);
-
-  // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
-  setImmediate(() => {
-    try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+/**
+ * 解析 Windows/Linux 下占用某 TCP 端口的 PID
+ */
+function resolvePid(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32'
+      ? `netstat -ano | findstr ":${port}" | findstr LISTENING`
+      : `lsof -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null`;
+    exec(cmd, { timeout: 2000 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      const line = stdout.trim().split(/\r?\n/)[0];
+      if (!line) return resolve(null);
+      // Windows: 最后一列 = PID；Linux lsof -t = PID
+      const parts = line.split(/\s+/).filter(Boolean);
+      if (process.platform === 'win32') {
+        resolve(parts[parts.length - 1] || null);
+      } else {
+        resolve(parts[0] || null);
+      }
+    });
   });
-});
+}
+
+function startServer(port: number, fallbackCount = 0) {
+  const server = app.listen(port);
+
+  server.once('listening', async () => {
+    if (fallbackCount > 0) {
+      console.log(`⚠️  原始端口 ${PORT} 被占用，已自动 fallback → ${port}`);
+    }
+    console.log(`🌟 星语穹庭后端运行中: http://localhost:${port}`);
+    console.log(`   GET  /api/stories               - 获取所有故事`);
+    console.log(`   POST /api/stories               - 投递心事`);
+    console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
+    console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
+    if (port !== PORT) {
+      console.log(`💡 提示：前端 vite.config.ts /api 代理仍指向 ${PORT}，请手动 "taskkill /F /PID <占用者PID>" 释放 ${PORT} 后重试，或临时把前端代理改到 ${port}`);
+    }
+
+    // 定时清理过期 token 黑名单（每 10 分钟）
+    setInterval(() => {
+      try { cleanExpiredTokens(); } catch { /* 静默 */ }
+    }, 10 * 60 * 1000);
+
+    // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
+    setImmediate(() => {
+      try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+    });
+  });
+
+  server.on('error', async (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const pid = await resolvePid(port);
+      console.error(`❌ 端口 ${port} 被占用 ${pid ? `(PID: ${pid})` : ''}`);
+      if (port === PORT && pid) {
+        console.log(`👉  建议执行：  taskkill /F /PID ${pid}    然后再 npm run dev`);
+      }
+      if (fallbackCount < MAX_FALLBACK && port === PORT) {
+        // 仅在首次（使用默认 PORT 被占）时允许 fallback，避免用户迷惑
+        const nextPort = PORT + fallbackCount + 1;
+        console.log(`🔄  正在尝试 fallback 端口 ${nextPort} ...`);
+        server.close(() => {
+          setTimeout(() => startServer(nextPort, fallbackCount + 1), 300);
+        });
+        return;
+      }
+      console.error('💥 无法启动服务，所有候选端口均不可用。请执行上方 taskkill 命令后重试。');
+      process.exit(1);
+    }
+    console.error('💥 服务启动异常：', err);
+    process.exit(1);
+  });
+}
+
+startServer(PORT);
 
 export { upload };
 export default app;
