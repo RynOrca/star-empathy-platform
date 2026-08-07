@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -3270,19 +3270,15 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
 }
 
-/* 穹庭书局 · 星笺广场（导航栏按钮）：紫金调，记录暖色 & 记录按钮呼应 */
+/* 穹庭书局 · 星笺广场（导航栏按钮）：紫金调纯块，无硬边、无光辉 */
 .nav-square-btn {
   color: #ead6ff !important;
-  border-color: rgba(202, 167, 255, 0.28) !important;
-  background: rgba(202, 167, 255, 0.08) !important;
-  box-shadow: 0 0 0 1px rgba(202, 167, 255, 0.06), inset 0 0 12px rgba(202, 167, 255, 0.04);
+  background: rgba(202, 167, 255, 0.12) !important;
   transition: all 0.2s ease !important;
 }
 .nav-square-btn:hover {
   color: #fff !important;
-  border-color: rgba(202, 167, 255, 0.55) !important;
-  background: linear-gradient(135deg, rgba(202, 167, 255, 0.2), rgba(149, 224, 192, 0.1)) !important;
-  box-shadow: 0 0 16px rgba(202, 167, 255, 0.28), inset 0 0 14px rgba(202, 167, 255, 0.08);
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12)) !important;
 }
 
 /* ═══════════════════════════════════════════════

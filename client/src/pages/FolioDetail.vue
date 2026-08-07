@@ -27,7 +27,7 @@
           v-if="detail?.visibility !== 'galaxy' || true"
         >
           <Sparkles :size="11" />
-          <span>🌌 更多星笺</span>
+          <span>更多星笺</span>
         </button>
         <button type="button" class="fdp-icon-btn" @click="reloadDetail" aria-label="刷新">
           <RotateCcw :size="12" />
@@ -184,12 +184,12 @@ watch(idFromRoute, () => {
     radial-gradient(1200px 600px at 85% -10%, rgba(82, 88, 150, 0.22), transparent 60%),
     radial-gradient(900px 520px at 5% 5%, rgba(183, 136, 98, 0.14), transparent 60%),
     linear-gradient(180deg, #0b0b1a 0%, #0a0b1c 42%, #0b0b1a 100%);
-  color: #f0f0fa;
-  font-family: inherit;
+  color: var(--ink);
+  font-family: var(--font);
   overflow-x: hidden;
 }
 
-/* ── 背景（复用 FolioSquare 风格，减少动画量保证详情阅读不抖） ── */
+/* ── 背景：复用 FolioSquare 风格，减少动画量保证详情阅读不抖 ── */
 .fdp-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .fdp-bg-milky {
   position: absolute; top: -10vh; right: -10vw;
@@ -213,68 +213,75 @@ watch(idFromRoute, () => {
   opacity: 0.45;
 }
 
-/* ── 顶部 Bar ── */
+/* ── 顶部 Bar（极简：纯模糊 + 渐变，不用 0.5px 硬下边框，色阶做区分） ── */
 .fdp-top {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
   padding: 10px 20px;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
   background: linear-gradient(180deg, rgba(10,11,28,0.8) 0%, rgba(10,11,28,0.44) 80%, rgba(10,11,28,0) 100%);
-  border-bottom: 0.5px solid rgba(255,255,255,0.05);
 }
 .fdp-top-left, .fdp-top-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* 返回按钮：30×30 对齐 sc-close，纯 overlay 块无硬边 */
 .fdp-back {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.78);
+  border-radius: var(--radius-sm);
+  background: var(--overlay-04);
+  color: var(--ink-secondary);
   cursor: pointer;
-  transition: background .15s, transform .15s;
+  transition: background var(--transition-normal), color var(--transition-normal), transform var(--transition-fast);
+  padding: 0;
 }
-.fdp-back:hover { background: rgba(255, 217, 138, 0.12); color: #ffe5a8; transform: translateX(-1px); }
+.fdp-back:hover { background: var(--accent-subtle); color: var(--accent); transform: translateX(-1px); }
+
+/* 胶囊：高度统一 30px（对齐 FolioSquare.fs-btn），纯背景块无硬边框 */
 .fdp-pill {
   display: inline-flex; align-items: center; gap: 5px;
   height: 30px; padding: 0 12px;
-  border-radius: 100px;
-  font-family: inherit; font-size: 0.72rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font); font-size: 11.5px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background .15s, transform .12s;
+  transition: background var(--transition-normal), transform var(--transition-fast);
 }
 .fdp-pill:active { transform: scale(0.97); }
 .fdp-pill-link {
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.78);
+  background: var(--overlay-04);
+  color: var(--ink-secondary);
 }
-.fdp-pill-link:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.94); }
+.fdp-pill-link:hover { background: var(--overlay-08); color: var(--ink); }
 .fdp-pill-warm {
-  background: rgba(255, 217, 138, 0.12);
-  border: 0.5px solid rgba(255, 217, 138, 0.28);
-  color: #ffe5a8;
+  background: linear-gradient(135deg, var(--accent-subtle) 0%, rgba(255, 217, 138, 0.14) 100%);
+  color: var(--accent);
 }
-.fdp-pill-warm:hover { background: rgba(255, 217, 138, 0.2); }
+.fdp-pill-warm:hover { box-shadow: 0 6px 18px rgba(255, 217, 138, 0.12); }
+
+/* 纯图标按钮：30×30 radius-sm，纯块无硬边 */
 .fdp-icon-btn {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.72);
+  border-radius: var(--radius-sm);
+  background: var(--overlay-04);
+  color: var(--ink-secondary);
   cursor: pointer;
-  transition: background .15s, color .15s;
+  transition: background var(--transition-normal), color var(--transition-normal);
+  padding: 0;
 }
-.fdp-icon-btn:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.92); }
+.fdp-icon-btn:hover { background: var(--overlay-08); color: var(--ink); }
+
 .fdp-sep {
-  color: rgba(255,255,255,0.24);
+  color: var(--muted);
   font-size: 0.8rem;
   padding: 0 2px;
+  opacity: 0.7;
 }
 .fdp-crumb-title {
-  font-size: 0.78rem;
-  color: rgba(255, 229, 168, 0.94);
-  letter-spacing: 0.05em;
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  font-weight: 500;
   max-width: 48vw;
   white-space: nowrap;
   overflow: hidden;
@@ -296,35 +303,32 @@ watch(idFromRoute, () => {
 .fdp-loading {
   display: inline-flex; align-items: center; gap: 10px;
   padding: 14px 24px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.03);
-  border: 0.5px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.6);
-  font-size: 0.82rem;
+  border-radius: var(--radius-lg);
+  background: var(--overlay-04);
+  color: var(--muted);
+  font-size: 12px;
   letter-spacing: 0.05em;
+  font-weight: 500;
 }
 .spin-slow { animation: fdp-spin 1.6s linear infinite; }
 @keyframes fdp-spin { to { transform: rotate(360deg); } }
 
+/* 404 空态：纯块面，无 1px 硬边 */
 .fdp-empty {
   margin: 14vh auto 0;
   max-width: 420px;
   text-align: center;
-  padding: 32px 24px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.025);
-  border: 0.5px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.78);
+  padding: 36px 28px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.3);
+  color: var(--ink);
 }
-.fdp-empty :deep(.lucide) { color: rgba(255,255,255,0.28); margin-bottom: 8px; }
-.fdp-empty h2 { margin: 4px 0 6px; font-size: 1.08rem; color: rgba(255,255,255,0.9); }
-.fdp-empty p { margin: 0; font-size: 0.78rem; color: rgba(255,255,255,0.44); }
+.fdp-empty :deep(.lucide) { color: var(--muted); opacity: 0.5; margin-bottom: 10px; }
+.fdp-empty h2 { margin: 6px 0 8px; font-size: 16px; font-weight: 600; color: var(--ink); }
+.fdp-empty p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
 
-/* ═══ 关键：把 CollectionDetail 原本的 Modal/Overlay 壳「拍平」为普通内容 ═══
-   CollectionDetail 内部：
-     PC：.pc-detail-mask + .pc-detail-modal（position:fixed 全屏）
-     手机：.mobile-sheet-overlay（fixed）+ .mobile-sheet
-   我们通过 :deep 把 fixed → relative/static，去掉 mask 背景/层级。 */
+/* ═══ 关键：把 CollectionDetail 原本的 Modal/Overlay 壳「拍平」为普通内容 ═══ */
 .fdp-content-wrap {
   position: relative;
   z-index: 1;
@@ -332,7 +336,6 @@ watch(idFromRoute, () => {
 }
 .fdp-content-wrap :deep(.pc-detail-mask),
 .fdp-content-wrap :deep(.mobile-sheet-overlay) {
-  /* 原本是全屏半透明黑遮罩 + 居中 Modal；拍平：不显示遮罩，不弹层 */
   position: static !important;
   inset: auto !important;
   background: transparent !important;
@@ -344,36 +347,34 @@ watch(idFromRoute, () => {
 }
 .fdp-content-wrap :deep(.pc-detail-modal) {
   position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
+  top: auto !important; left: auto !important; right: auto !important;
   transform: none !important;
   width: 100% !important;
   max-width: 1200px !important;
   max-height: none !important;
   height: auto !important;
   margin: 0 auto !important;
-  border-radius: 22px !important;
+  border-radius: var(--radius-xl) !important;
   overflow: visible !important;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35) !important;
+  background: var(--surface) !important;
+  border: none !important;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.35) !important;
 }
-/* PC: CollectionDetail 默认是左右分栏，作为详情页主内容可以更宽一些 */
 .fdp-content-wrap :deep(.pc-detail-inner) {
   max-height: none !important;
   overflow: visible !important;
 }
-/* 详情页不需要"关闭 X 按钮"的点击感（仍保留，点击=回书局），让它颜色更协调 */
+/* 详情页关闭按钮：纯 overlay 块，无硬边 */
 .fdp-content-wrap :deep(.close-btn),
 .fdp-content-wrap :deep(.mobile-close-btn) {
-  background: rgba(255,255,255,0.05) !important;
-  color: rgba(255,255,255,0.62) !important;
-  border: 0.5px solid rgba(255,255,255,0.08) !important;
+  background: var(--overlay-04) !important;
+  color: var(--ink-secondary) !important;
+  border: none !important;
 }
 .fdp-content-wrap :deep(.close-btn:hover),
 .fdp-content-wrap :deep(.mobile-close-btn:hover) {
-  background: rgba(255, 217, 138, 0.14) !important;
-  color: #ffe5a8 !important;
-  border-color: rgba(255, 217, 138, 0.26) !important;
+  background: var(--accent-subtle) !important;
+  color: var(--accent) !important;
 }
 /* Mobile: 改 sheet 为正常流容器 */
 .fdp-content-wrap :deep(.mobile-sheet) {
@@ -381,7 +382,7 @@ watch(idFromRoute, () => {
   bottom: auto !important;
   width: 100% !important;
   max-height: none !important;
-  border-radius: 22px !important;
+  border-radius: var(--radius-xl) !important;
   margin: 10px auto 0 !important;
   transform: none !important;
 }

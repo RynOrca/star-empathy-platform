@@ -343,7 +343,7 @@
               @click="goFolioSquare"
             >
               <Galaxy :size="11" />
-              <span>🌌 更多星笺 · 穹庭书局</span>
+              <span>更多星笺 · 穹庭书局</span>
             </button>
           </div>
         </div>
@@ -1832,18 +1832,16 @@ function infoTagStyle(tag: string): Record<string, string> {
 }
 .footer-delete:hover { background: rgba(255, 107, 138, 0.12); }
 
-/* 穹庭书局 · 更多星笺 胶囊：紫金调 */
+/* 穹庭书局 · 更多星笺 胶囊：紫金调纯块，无硬边、无光辉阴影 */
 .footer-square {
-  background: linear-gradient(135deg, rgba(202, 167, 255, 0.12), rgba(149, 224, 192, 0.06));
-  border: 1px solid rgba(202, 167, 255, 0.3);
-  color: rgba(234, 214, 255, 0.96);
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.14), rgba(149, 224, 192, 0.08));
+  color: var(--star-purple);
   margin-left: auto;
+  font-weight: 600;
 }
 .footer-square:hover {
-  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.1));
-  border-color: rgba(202, 167, 255, 0.6);
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12));
   color: #fff;
-  box-shadow: 0 0 18px rgba(202, 167, 255, 0.28);
 }
 .mobile-footer-square {
   margin-left: 0;

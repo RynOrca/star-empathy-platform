@@ -179,68 +179,73 @@ function formatDate(s: string | null | undefined): string {
 }
 .fg-bar-count {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--muted);
   letter-spacing: 0.04em;
+  font-weight: 500;
 }
+/* 对齐 sc-resonate-btn：暖胶囊按钮（扁平，无光辉） */
 .fg-new-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
-  border-radius: 100px;
-  background: rgba(255, 217, 138, 0.08);
-  border: 0.5px solid rgba(255, 217, 138, 0.22);
-  color: #ffe5a8;
-  font-family: inherit;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--accent-subtle) 0%, rgba(255, 217, 138, 0.14) 100%);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font);
   font-size: 11.5px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background .15s ease, transform .15s ease;
+  transition: transform var(--transition-fast), background var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
-.fg-new-btn:hover { background: rgba(255, 217, 138, 0.14); transform: translateY(-0.5px); }
+.fg-new-btn:hover {
+  transform: translateY(-0.5px);
+  box-shadow: 0 6px 20px rgba(255, 217, 138, 0.15);
+  border-color: rgba(255, 217, 138, 0.3);
+}
 .fg-new-btn:active { transform: scale(0.97); }
 
 /* ── 网格：3 种密度 ── */
 .fg-grid {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 .fg-grid-cozy    { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .fg-grid-compact { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .fg-grid-roomy   { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 
-/* ── 卡片 ── */
+/* ── 卡片：极简扁平（块面 + 轻阴影；无 1px 硬边、无左侧色条装饰）
+   背景层级：bg-elevated → hover surface-hover，靠颜色差与阴影区分，不画边。 */
 .fg-card {
+  --fg-c: var(--accent);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 14px 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 9px;
+  padding: 18px 18px 16px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.24);
   cursor: pointer;
-  transition: background .18s ease, border-color .18s ease, transform .18s ease;
-  animation: fgIn .25s ease-out both;
+  transition: transform var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
+  animation: fgIn .25s var(--ease-out) both;
   position: relative;
+  overflow: hidden;
+  color: var(--ink);
 }
 .fg-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 217, 138, 0.14);
   transform: translateY(-1px);
+  background: var(--surface-hover);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.34);
 }
 .fg-card.private {
-  border-color: rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.012);
+  background: var(--bg-overlay);
+  opacity: 0.85;
+  filter: saturate(0.6);
 }
-.fg-card.galaxy {
-  background:
-    linear-gradient(180deg, rgba(232, 184, 109, 0.06) 0%, rgba(255, 255, 255, 0.018) 55%);
-  border-color: rgba(232, 184, 109, 0.18);
-}
-.fg-card.anonymous {
-  background:
-    linear-gradient(180deg, rgba(169, 189, 255, 0.05) 0%, rgba(255, 255, 255, 0.018) 55%);
-  border-color: rgba(169, 189, 255, 0.14);
-}
+.fg-card.galaxy { background: linear-gradient(180deg, rgba(255, 217, 138, 0.07) 0%, var(--bg-elevated) 60%); }
+.fg-card.anonymous { background: linear-gradient(180deg, rgba(202, 167, 255, 0.07) 0%, var(--bg-elevated) 60%); }
 @keyframes fgIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -251,12 +256,13 @@ function formatDate(s: string | null | undefined): string {
   align-items: center;
   justify-content: space-between;
 }
+/* 色点：缩小为装饰性小点，不抢色条的戏 */
 .fg-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
-  opacity: 0.9;
+  opacity: 0.7;
+  display: none; /* 色条已承担色指示，隐藏 dot 去冗余 */
 }
 .fg-card-actions {
   display: flex;
@@ -264,27 +270,24 @@ function formatDate(s: string | null | undefined): string {
 }
 .fg-card-actions:not(.fg-actions-passive) {
   opacity: 0;
-  transition: opacity .15s ease;
+  transition: opacity var(--transition-fast);
 }
 .fg-card:hover .fg-card-actions:not(.fg-actions-passive) { opacity: 1; }
 .fg-act {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 0.5px solid rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.55);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--overlay-04);
+  color: var(--ink-secondary);
   cursor: pointer;
-  transition: background .15s ease, color .15s ease;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.fg-act:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.85); }
-.fg-act-danger:hover { background: rgba(255, 107, 138, 0.12); color: #ff6b8a; }
-.fg-actions-passive {
-  color: rgba(255, 255, 255, 0.28);
-}
+.fg-act:hover { background: var(--overlay-08); color: var(--ink); }
+.fg-act-danger:hover { background: var(--error-subtle); color: var(--error); }
+.fg-actions-passive { color: var(--muted); }
 
 .fg-card-head {
   display: flex;
@@ -293,66 +296,65 @@ function formatDate(s: string | null | undefined): string {
 }
 .fg-name {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--ink, #f4f4f8);
+  color: var(--ink);
   line-height: 1.3;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
+/* 可见性 chip：对齐 StoryDetailCard.sc-type-chip，但去 0.5px 边框改纯块面 */
 .fg-tag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 100px;
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
+  gap: 3.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
   flex-shrink: 0;
 }
 .fg-tag-private, .fg-private-tag {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.42);
-  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  background: var(--overlay-04);
+  color: var(--muted-light);
 }
 .fg-tag-public, .fg-public-tag {
-  background: rgba(149, 240, 192, 0.07);
-  color: var(--star-green, #95f0c0);
-  border: 0.5px solid rgba(149, 240, 192, 0.18);
+  background: rgba(149, 240, 192, 0.09);
+  color: var(--star-green);
 }
 .fg-tag-anonymous {
-  background: rgba(169, 189, 255, 0.08);
-  color: rgba(169, 189, 255, 0.92);
-  border: 0.5px solid rgba(169, 189, 255, 0.22);
+  background: rgba(202, 167, 255, 0.12);
+  color: var(--star-purple);
 }
 .fg-tag-galaxy {
-  background: rgba(232, 184, 109, 0.10);
-  color: rgba(255, 229, 168, 0.96);
-  border: 0.5px solid rgba(232, 184, 109, 0.28);
+  background: var(--accent-subtle);
+  color: var(--accent);
 }
 
-/* 作者信息行 */
+/* 作者信息行：对齐 sc-author，纯色块无边框 */
 .fg-owner {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: flex-start;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.035);
-  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  color: var(--ink-secondary);
+  background: var(--overlay-04);
   letter-spacing: 0.03em;
+  font-weight: 500;
   max-width: 100%;
   overflow: hidden;
 }
 .fg-owner.anonymous {
-  color: rgba(169, 189, 255, 0.92);
-  background: rgba(169, 189, 255, 0.05);
-  border-color: rgba(169, 189, 255, 0.14);
+  color: var(--star-purple);
+  background: rgba(202, 167, 255, 0.12);
 }
 .fg-owner span {
   white-space: nowrap;
@@ -361,28 +363,32 @@ function formatDate(s: string | null | undefined): string {
 }
 
 .fg-desc {
-  margin: 0;
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.55);
-  line-height: 1.5;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-secondary);
+  line-height: 1.6;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 2.4em;
+  min-height: 3.2em;
 }
-.fg-desc.is-empty { color: rgba(255, 255, 255, 0.26); font-style: italic; }
+.fg-desc.is-empty { color: var(--muted); opacity: 0.7; font-style: italic; }
 
+/* 底部 meta：纯块面（无边框），色阶做区分 */
 .fg-card-foot {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 0.5px dashed rgba(255, 255, 255, 0.06);
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.36);
+  margin-top: 2px;
+  padding: 10px 12px;
+  background: var(--overlay-04);
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .fg-foot-count {
   display: inline-flex;
@@ -392,47 +398,53 @@ function formatDate(s: string | null | undefined): string {
 .fg-foot-res {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  color: #ff8b7d;
-  font-variant-numeric: tabular-nums;
+  gap: 3.5px;
+  color: var(--star-red);
+  font-weight: 600;
 }
 .fg-foot-date {
   margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
-/* ── 空状态 ── */
+/* ── 空状态：纯块面，无1px硬边 ── */
 .fg-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 36px 20px;
+  padding: 40px 20px;
   text-align: center;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
 }
-.fg-empty-icon { color: rgba(255, 255, 255, 0.18); }
+.fg-empty-icon { color: var(--muted); opacity: 0.5; }
 .fg-empty-title {
-  margin: 4px 0 0;
-  font-size: 0.86rem;
-  color: rgba(255, 255, 255, 0.6);
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .fg-empty-sub {
   margin: 0;
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.34);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 420px;
 }
 
 /* ── 加载/错误 ── */
 .fg-loading, .fg-error {
   text-align: center;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  color: var(--muted);
   padding: 16px 0;
+  font-weight: 500;
 }
-.fg-error { color: #ff6b8a; }
+.fg-error { color: var(--error); }
 
-/* ── 响应式：移动端单列（cozy 自动 minmax 处理，这里只加强制 1 列） ── */
+/* ── 响应式：移动端单列 ── */
 @media (max-width: 640px) {
   .fg-grid-cozy, .fg-grid-compact, .fg-grid-roomy {
     grid-template-columns: 1fr;

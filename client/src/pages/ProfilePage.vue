@@ -1668,25 +1668,23 @@ onBeforeUnmount(() => {
 .pd-section-head-with-action .pd-section-head-main { text-align: center; flex: 1; min-width: 0; }
 .pd-goto-square {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 34px;
+  height: 32px;
   padding: 0 14px;
-  border-radius: 100px;
-  background: rgba(202, 167, 255, 0.08);
-  border: 0.5px solid rgba(202, 167, 255, 0.26);
-  color: rgba(234, 214, 255, 0.88);
-  font-family: inherit;
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  border-radius: var(--radius-full);
+  background: rgba(202, 167, 255, 0.12);
+  color: var(--star-purple);
+  font-family: var(--font);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  font-weight: 600;
   align-self: center;
   flex-shrink: 0;
 }
 .pd-goto-square:hover {
   color: #fff;
-  background: linear-gradient(135deg, rgba(202, 167, 255, 0.2), rgba(149, 224, 192, 0.08));
-  border-color: rgba(202, 167, 255, 0.52);
-  box-shadow: 0 0 18px rgba(202, 167, 255, 0.24);
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12));
 }
 @media (max-width: 640px) {
   .pd-section-head-with-action { flex-direction: column; align-items: center; gap: 12px; }
