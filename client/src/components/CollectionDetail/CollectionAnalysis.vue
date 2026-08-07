@@ -962,17 +962,22 @@ const collAnalysis = useCollectionAnalysis(collId)
 
 // ─── 三态开关（优先级：hasError > hasReal > tooFewStories > isLoading） ───
 // 1) hasError：API 请求失败 → 全局红色 error 条 + 每个 section 内部 v-else 显示错误
-// 2) hasReal：analysis.ready=true 且 nightscape 存在（合集核心） → 真实数据（persona 可空，有兜底）
+// 2) hasReal：ready=true 或 _stale=true → 显示真实数据（三模块任一有值用真实，全空走computed兜底）
+//    放宽：ready=true 不再死卡 nightscape，避免后端返回 ready=true 但某字段为 null 时三态死锁
 // 3) tooFewStories：后端 tooFew=true 或 props.storyCount<3 → 心事不够多
-// 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew） → 生成中骨架
+// 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew/非_stale） → 生成中骨架
 const hasError = computed(() => !!collAnalysis.error.value)
 
 const hasReal = computed(() => {
   const a = collAnalysis.analysis.value
   if (!a) return false
-  // ready=true 视为 AI 已生成结束；至少 nightscape（合集核心）存在即可；persona 为空不影响（computed 有兜底）
-  if (a.ready) return !!a.nightscape
-  return false
+  // 后端 ready=true → AI 明确说生成完了，不管字段全不全都显示（computed 会兜底）
+  if (a.ready) return true
+  // 前端轮询超时标记（_stale=true）：强制降级显示，避免永远骨架「加载完也不自动载入」
+  if (a._stale) return true
+  // 兜底：三大模块至少有 2 个非空 → 视为可用内容（哪怕 ready=false，避免卡骨架）
+  const nonNull = [a.persona, a.emotion, a.nightscape].filter(v => v != null).length
+  return nonNull >= 2
 })
 
 const tooFewStories = computed(() => {
@@ -980,16 +985,17 @@ const tooFewStories = computed(() => {
   const fromApi = collAnalysis.analysis.value?.tooFewStories
   if (fromApi === true) return true
   if (collAnalysis.analysis.value?.ready) return false // API 明确 ready → 不为 tooFew
+  if (collAnalysis.analysis.value?._stale) return false // 已降级显示 real → 不为 tooFew
   // API 未返回时用 props 兜底（可能是尚未请求到）
   return (props.storyCount ?? 0) < 3
 })
 
 const isLoading = computed(() => {
   if (hasError.value || tooFewStories.value || hasReal.value) return false
-  // loading=true（首次/轮询中） OR ready=false 且后端明确说故事数>=3 → 骨架
+  // loading=true（首次/轮询中） OR ready=false 且后端明确说故事数>=3 且未降级 → 骨架
   if (collAnalysis.loading.value) return true
   const a = collAnalysis.analysis.value
-  if (a && !a.ready && !a.tooFewStories) return true
+  if (a && !a.ready && !a.tooFewStories && !a._stale) return true
   // 兜底：尚未请求到 analysis（例如轮询间隙）且 故事>=3 → 仍视为生成中（避免三态都 false 卡死）
   if (!a && (props.storyCount ?? 0) >= 3) return true
   return false

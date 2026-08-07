@@ -9,7 +9,7 @@ import {
   deleteCollection,
   listPublicCollections,
 } from '../services/collectionService';
-import { readCollectionAnalysis, triggerAnalysisIfNeeded } from '../services/collectionAnalysis';
+import { readCollectionAnalysis, triggerAnalysisIfNeeded, invalidateCollectionAnalysisCache } from '../services/collectionAnalysis';
 
 const router = Router();
 
@@ -116,7 +116,8 @@ router.delete('/:id', authRequired, (req: Request, res: Response) => {
 // 合集级 AI 分析
 //  - storyCount < 3：返回 ready=false 但带 storyCount 提示（前端显示"心事不够多"空态，不轮询）
 //  - storyCount >= 3：首次触发会合成（Phase 1 立即完成，Phase 2 异步 agent），返回 { persona, emotion, nightscape, ready, generatedAt }
-//  - 前端轮询：ready=false 时每 3s 再拉一次，直到 ready=true 或超过 MAX_POLL 次
+//  - 前端轮询：ready=false 时每 800ms 再拉一次，直到 ready=true 或超过 MAX_POLL 次
+//  - Defensive 兜底：若已 DB 缓存但三大模块全 null（老数据/坏数据）→ invalid 缓存 + 立即重算一次，避免前端永久骨架
 router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -145,7 +146,17 @@ router.get('/:id/analysis', authOptional, (req: Request, res: Response) => {
 
     // storyCount >= 3：触发懒生成 + 读（Phase 1 同步合成完，ready=true；Phase 2 会先返回 ready=false 异步写）
     triggerAnalysisIfNeeded(id);
-    const analysis = readCollectionAnalysis(id);
+    let analysis = readCollectionAnalysis(id);
+
+    // Defensive：如果 ready=true 但三大模块全 null（DB 缓存里存了坏数据 / 老缓存字段缺失）
+    // → 主动 invalid 缓存 + 立即重算一次，保证前端拿到可展示的内容（hasReal=ready=true）
+    if (analysis.ready && !analysis.persona && !analysis.emotion && !analysis.nightscape) {
+      console.warn(`[analysis] 合集#${id} ready=true 但 3 大模块全空，invalid 缓存并重算…`);
+      invalidateCollectionAnalysisCache(id);
+      try { triggerAnalysisIfNeeded(id); } catch { /* ignore */ }
+      analysis = readCollectionAnalysis(id);
+    }
+
     return ok(res, 'success', { ...analysis, tooFewStories: false, storyCount });
   } catch (error) {
     console.error('GET /api/collections/:id/analysis error:', error);
