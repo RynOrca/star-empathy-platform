@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1226,6 +1226,8 @@ interface StoryData {
   locationLng: number | null; type: string; viewCount: number; origin: string | null
   username: string | null; tag: string | null; tags?: string[] | null; userId: number | null
   imageUrl: string | null
+  /** 用户星（catalogStarId==null）时，后端返回 pos_x/y/z → 前端 camelCase posX/Y/Z；星表星为 null */
+  posX?: number | null; posY?: number | null; posZ?: number | null
   collectionId?: number | null; collectionName?: string | null
   collectionCoverColor?: string | null; collectionVisibility?: string | null
   collectionStoryCount?: number | null
@@ -1279,6 +1281,7 @@ function mergeStoriesIntoMap(
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
       username: s.username ?? null, tag: s.tag ?? null, tags: normalizeStoryTags(s), userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
+      posX: s.posX ?? null, posY: s.posY ?? null, posZ: s.posZ ?? null,
       collectionId: s.collectionId ?? null, collectionName: s.collectionName ?? null,
       collectionCoverColor: s.collectionCoverColor ?? null, collectionVisibility: s.collectionVisibility ?? null,
       collectionStoryCount: s.collectionStoryCount ?? null,
@@ -1294,13 +1297,34 @@ function mergeStoriesIntoMap(
   }
 }
 
+/** 把 storiesByStarId 内所有 StoryData（或 fetchStories 里原始 items）聚合出
+ *  用户星的独立 3D 坐标集：key=story.id，value={x,y,z}（注意星表恒星 key=catalogStarId 不需要，starById 能直接查） */
+function collectUserStarPositions(
+  itemsOrStories: any[] | StoryData[]
+): Map<number, { x: number; y: number; z: number }> {
+  const userPos = new Map<number, { x: number; y: number; z: number }>()
+  for (const s of itemsOrStories) {
+    const hasPos = typeof s.posX === 'number' && typeof s.posY === 'number' && typeof s.posZ === 'number'
+    if (!hasPos) continue
+    // 用户星：catalogStarId == null / 空，且没有 catalogStarIds 对应星表 → 用 posX/Y/Z
+    const isUserStar =
+      (s.catalogStarId == null || s.catalogStarId === 0) &&
+      !(Array.isArray(s.catalogStarIds) && s.catalogStarIds.length > 0)
+    if (!isUserStar) continue
+    userPos.set(Number(s.id), { x: Number(s.posX), y: Number(s.posY), z: Number(s.posZ) })
+  }
+  return userPos
+}
+
 function publishStories(
   map: Map<number, StoryData[]>,
   statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+  items?: any[]
 ) {
   storiesByStarId.value = map
   pendingStatsMap.value = statsMap
-  skyRef.value?.sky?.setStarStatsCache(statsMap)
+  const userStarPos = collectUserStarPositions(items ?? Array.from(map.values()).flat())
+  skyRef.value?.sky?.setStarStatsCache(statsMap, userStarPos)
 }
 
 // 从 storiesByStarId 重建全量天空统计并同步到 sky（数据变更后调用）
@@ -1308,6 +1332,7 @@ function rebuildStatsFromMap() {
   const fullMap = storiesByStarId.value
   if (!fullMap) return
   const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  const allStories: StoryData[] = []
   for (const [cid, stories] of fullMap) {
     if (stories.length === 0) continue
     statsMap.set(cid, {
@@ -1316,9 +1341,11 @@ function rebuildStatsFromMap() {
       views: stories.reduce((sum, s) => sum + s.viewCount, 0),
       favorites: 0,
     })
+    allStories.push(...stories)
   }
   pendingStatsMap.value = statsMap
-  skyRef.value?.sky?.setStarStatsCache(statsMap)
+  const userStarPos = collectUserStarPositions(allStories)
+  skyRef.value?.sky?.setStarStatsCache(statsMap, userStarPos)
 }
 
 async function fetchStories() {
@@ -1338,7 +1365,7 @@ async function fetchStories() {
     const firstData = firstJson.data?.items ?? firstJson.data ?? []
     const totalPages = firstJson.data?.totalPages ?? 1
     mergeStoriesIntoMap(firstData, map, statsMap)
-    publishStories(map, statsMap)
+    publishStories(map, statsMap, firstData)
 
     // 后台继续加载剩余页
     for (let page = 2; page <= totalPages; page++) {
@@ -1347,7 +1374,7 @@ async function fetchStories() {
       const json = await res.json()
       const items = json.data?.items ?? json.data ?? []
       mergeStoriesIntoMap(items, map, statsMap)
-      publishStories(map, statsMap)
+      publishStories(map, statsMap, items)
     }
   } catch (e: any) {
     if (e.name !== 'AbortError') console.error('获取故事失败:', e)
@@ -1681,10 +1708,13 @@ function onStoryEnterClick() {
   }
 }
 
-// 当 SkyCanvas 渲染完成后，传入等待的统计数据
+// 当 SkyCanvas 渲染完成后，传入等待的统计数据 + 用户星坐标
 watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
   if (sRef?.sky && statsMap) {
-    sRef.sky.setStarStatsCache(statsMap)
+    const allStories: StoryData[] = []
+    for (const [, arr] of (storiesByStarId.value ?? new Map()).entries()) allStories.push(...arr)
+    const userStarPos = collectUserStarPositions(allStories)
+    sRef.sky.setStarStatsCache(statsMap, userStarPos)
   }
 })
 
