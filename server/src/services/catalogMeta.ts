@@ -142,3 +142,64 @@ export function listAllCatalogStars(): CatalogStarMeta[] {
     constellationCN: CON_NAMES[s.con] || s.con || '未分星座',
   }))
 }
+
+/**
+ * 便捷：拿全量有效 catalog 星 id（用于随机挂星 / 数据修复）。
+ * 注意：返回的 Set **只含星表恒星（正数 id）**，不包含太阳系行星负 id（行星故事一般从行星特写 UI 入口进入，不会坏）。
+ */
+export function listAllCatalogStarIds(): Set<number> {
+  ensureLoaded()
+  const set = new Set<number>()
+  for (const s of starsList) set.add(s.id)
+  return set
+}
+
+/**
+ * 校验某个 id 是否能作为「归属星」写入数据库。
+ * 合法范围：
+ *   · 正数：必须存在于 catalog 星表 stars.json 中（通过 getCatalogStar 能查到）
+ *   · 负数：必须是太阳系行星 id（isPlanetId 返回 true）
+ *   · 0 / NaN / Infinity / 不存在的正数 / 非行星负数 → 非法
+ */
+export function isValidCatalogId(id: string | number | null | undefined): boolean {
+  if (id == null) return false
+  const nid = typeof id === 'string' ? parseInt(id, 10) : id
+  if (!Number.isFinite(nid)) return false
+  if (nid === 0) return false
+  // 行星负 id 允许
+  if (nid < 0) return isPlanetId(nid)
+  // 正数 id 必须在 stars.json 里存在
+  ensureLoaded()
+  return starsById.has(nid)
+}
+
+/**
+ * 从 (catalogStarId, catalogStarIds) 两个入参里解析出「最终有效 ids 数组」+「首个有效主 id」，
+ * 没有任何有效 id 时返回 null，调用方应返回 400 BadRequest。
+ *
+ * 规则：
+ *   1) 优先用 catalogStarIds 数组（过滤掉非法值）
+ *   2) 否则 fallback 到 catalogStarId 单值（合法才加入）
+ *   3) 主 id = 数组第一个；空数组 → null
+ */
+export function resolveValidCatalogIds(
+  catalogStarId: unknown,
+  catalogStarIds: unknown | undefined
+): { ids: number[]; primaryId: number } | null {
+  const ids: number[] = []
+  if (Array.isArray(catalogStarIds)) {
+    for (const raw of catalogStarIds) {
+      if (isValidCatalogId(raw as string | number | null | undefined)) {
+        const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10)
+        if (!ids.includes(n)) ids.push(n)
+      }
+    }
+  }
+  const cid = catalogStarId as string | number | null | undefined
+  if (ids.length === 0 && isValidCatalogId(cid)) {
+    const n = typeof catalogStarId === 'number' ? (catalogStarId as number) : parseInt(String(catalogStarId), 10)
+    ids.push(n)
+  }
+  if (ids.length === 0) return null
+  return { ids, primaryId: ids[0] }
+}
