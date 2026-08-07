@@ -239,14 +239,16 @@
 
 
 
-    <!-- ═══ 1. 夜观手记（独立三态 panel） ═══ -->
+    <!-- ═══ 1. 夜观手记 / 钞本题记（按 tone 切换标题） ═══ -->
     <section class="panel-wrapper ca-night-notes">
       <div class="panel-head">
         <Sparkles :size="10" class="pw-icon pw-blue" />
-        <span class="pw-title">夜观手记</span>
+        <span class="pw-title">{{ isAncientTone ? '钞本题记' : '夜观手记' }}</span>
         <span class="pw-count">{{
           hasReal
-            ? `${nightSky.phase} · ${nightSky.term} · ${storyCount} 处光斑`
+            ? (isAncientTone
+                ? `${nightSky.phase} · ${nightSky.term} · 凡 ${storyCount} 首`
+                : `${nightSky.phase} · ${nightSky.term} · ${storyCount} 处光斑`)
             : tooFewStories ? '未生成' : '生成中'
         }}</span>
       </div>
@@ -321,25 +323,46 @@
           </div>
         </div>
 
-        <!-- 右：手记文字（不再是星座主人叙事，改成当夜"你"的视角：从子初坐到卯初，8处光斑散在夜里） -->
+        <!-- 右：手记文字 / 钞本叙录（按 tone 切换文案，古代版不出现“你坐到X时/心事灯火”等现代语境） -->
         <div class="ca-persona-text">
-          <!-- 观夜简介条：从星区→改为「当夜观览·开篇」 -->
+          <!-- 观夜简介条：古代版 → 「钞本叙录·凡例」；现代版 → 「当夜观览·开篇」 -->
           <div class="ca-pt-intro ca-pt-intro-night">
             <component :is="CloudSun" :size="10" />
-            <span>{{ nightSky.season }} · {{ nightSky.timeSpan }} · 共收 {{ storyCount }} 处光斑</span>
+            <span v-if="isAncientTone">
+              {{ nightSky.season }} · {{ nightSky.timeSpan }} · 都 {{ storyCount }} 首
+            </span>
+            <span v-else>
+              {{ nightSky.season }} · {{ nightSky.timeSpan }} · 共收 {{ storyCount }} 则心事
+            </span>
           </div>
-          <p class="ca-pt-para first">
-            这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——你从
-            <b style="color: #ffd98a">{{ nightSky.timeSpan.split(' ')[0] }}</b>
-            一直坐到
-            <b style="color: #86a8ff">{{ nightSky.timeSpan.split('~')[1] }}</b>，
-            8 处心事像灯火一样浮在夜里。
-            {{ persona.paragraphFirst }}
-          </p>
-          <p class="ca-pt-para">
-            {{ persona.paragraphSecond }}
-            月是一弯蛾眉，云是四分散卷；你说话的声音很轻，像江风掠过时带起的槐花。
-          </p>
+
+          <!-- ancient: 钞本叙录口吻（“右《xx》一编，都xx首...”） -->
+          <template v-if="isAncientTone">
+            <p class="ca-pt-para first">
+              <span class="ca-han-hl">{{ nightSky.name }}</span>
+              {{ persona.suggestIntro }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[0] }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[1] }}
+            </p>
+          </template>
+
+          <!-- modern: 原陪伴口吻，但把硬编码「8处心事」「月是一弯蛾眉...槐花」这些露馅点全部替换为动态 -->
+          <template v-else>
+            <p class="ca-pt-para first">
+              这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——
+              从 <b style="color: #ffd98a">{{ nightSky.timeSpan.split(' ')[0] }}</b>
+              到 <b style="color: #86a8ff">{{ nightSky.timeSpan.split('~')[1].substring(0, 8) }}</b>，
+              共 {{ storyCount }} 则心事，像星点一样浮在夜空里。
+              {{ persona.paragraphs[0] }}
+            </p>
+            <p class="ca-pt-para">
+              {{ persona.paragraphs[1] }}
+            </p>
+          </template>
 
           <!-- ===== 【那一夜·五大气象维度】一行5列紧凑小卡（原5行横条太高，改成扁平方块网格） ===== -->
           <div class="ca-pt-meteo-five ca-meteo-compact">
@@ -488,14 +511,14 @@
         </div>
       </section>
 
-      <!-- 右：心事投递时间轨迹（独立三态 panel，与左等高） -->
+      <!-- 右：心事投递时间轨迹 / 钞本年代·韵部分布（按 tone 切换标题） -->
       <section class="panel-wrapper ca-night-side-track">
         <div class="panel-head">
           <Clock3 :size="10" class="pw-icon pw-purple" />
-          <span class="pw-title">心事投递时间轨迹</span>
+          <span class="pw-title">{{ isAncientTone ? '钞本年代·气脉流转' : '心事投递时间轨迹' }}</span>
           <span class="pw-count">{{
             hasReal
-              ? `${heroStars.length} 段 · 连线=时间轨迹`
+              ? (isAncientTone ? `${heroStars.length} 篇 · 连线=钞次先后` : `${heroStars.length} 段 · 连线=时间轨迹`)
               : tooFewStories ? '未生成' : '生成中'
           }}</span>
         </div>
@@ -542,7 +565,7 @@
                   :opacity="s.opacity * 0.78" />
               </g>
 
-              <!-- 星点=心事（8 颗）+ 时间标签 -->
+              <!-- 星点=心事/钞本篇目（按时间/钞次排序）+ 标签 -->
               <g v-for="(p, i) in heroStars" :key="'hs2'+i">
                 <circle :cx="Math.round(p.x * 420 / 360)" :cy="Math.round(p.y * 280 / 220)" :r="p.r * 1.05"
                   :fill="'url(#hGlow' + p.gid + '2)'" opacity="0.82">
@@ -559,19 +582,31 @@
                 </text>
               </g>
 
-              <!-- 坐标轴（20:00 → 06:00；情绪 +/−） -->
+              <!-- 坐标轴 -->
               <g fill="rgba(220,220,240,0.38)" font-family="SF Mono, Menlo, monospace" font-size="8">
-                <text x="10"  y="270">20:00</text>
-                <text x="140" y="270">00:00</text>
-                <text x="268" y="270">04:00</text>
-                <text x="375" y="270">06:00</text>
-                <text x="6" y="18"   opacity="0.6">+ 情绪</text>
-                <text x="6" y="258"  opacity="0.6">− 情绪</text>
-                <text x="10" y="145"  opacity="0.28" font-size="7">情绪轴</text>
-                <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">时间轴 · 投递时刻</text>
+                <template v-if="isAncientTone">
+                  <text x="10"  y="270">戌初</text>
+                  <text x="140" y="270">子正</text>
+                  <text x="268" y="270">寅正</text>
+                  <text x="375" y="270">卯末</text>
+                  <text x="6" y="18"   opacity="0.6">气之扬</text>
+                  <text x="6" y="258"  opacity="0.6">气之沉</text>
+                  <text x="10" y="145"  opacity="0.28" font-size="7">气脉轴</text>
+                  <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">钞次先后</text>
+                </template>
+                <template v-else>
+                  <text x="10"  y="270">20:00</text>
+                  <text x="140" y="270">00:00</text>
+                  <text x="268" y="270">04:00</text>
+                  <text x="375" y="270">06:00</text>
+                  <text x="6" y="18"   opacity="0.6">+ 情绪</text>
+                  <text x="6" y="258"  opacity="0.6">− 情绪</text>
+                  <text x="10" y="145"  opacity="0.28" font-size="7">情绪轴</text>
+                  <text x="200" y="278" opacity="0.28" font-size="7" text-anchor="middle">时间轴 · 投递时刻</text>
+                </template>
               </g>
 
-              <!-- 星群轮廓线（按时间顺序连接 → 心事投递时间轨迹！） -->
+              <!-- 星群轮廓线（按时间/钞次顺序连接） -->
               <polyline
                 :points="heroStars.map(p => `${Math.round(p.x*420/360)},${Math.round(p.y*280/220)}`).join(' ')"
                 fill="none" stroke="rgba(255,217,138,0.25)" stroke-width="0.8"
@@ -579,41 +614,47 @@
                 style="filter: drop-shadow(0 0 2px rgba(255,217,138,0.2))" />
             </svg>
             <div class="ca-et-legend">
-              <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
-              <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
-              <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
-              <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
-              <span class="ca-h-legend-note">· 连线=时间轨迹</span>
+              <template v-if="isAncientTone">
+                <span><i style="background:#ffd98a"></i>金 · 雅正</span>
+                <span><i style="background:#caa7ff"></i>紫 · 幽忧</span>
+                <span><i style="background:#86a8ff"></i>蓝 · 清远</span>
+                <span><i style="background:#9ae6b4"></i>绿 · 冲淡</span>
+                <span class="ca-h-legend-note">· 连线=钞次先后</span>
+              </template>
+              <template v-else>
+                <span><i style="background:#ffd98a"></i>暖色 · 喜悦/思念</span>
+                <span><i style="background:#caa7ff"></i>紫 · 柔软/低落</span>
+                <span><i style="background:#86a8ff"></i>蓝 · 平静/释然</span>
+                <span><i style="background:#9ae6b4"></i>绿 · 释然/新生</span>
+                <span class="ca-h-legend-note">· 连线=时间轨迹</span>
+              </template>
             </div>
 
-            <!-- 心事投递统计：一行4小格（紧凑不高） -->
+            <!-- 4 小格统计：从后端动态 heroStats 拉（古代/现代两套文案在后端生成） -->
             <div class="ca-et-stats">
-              <div class="ca-et-stat ca-et-stat-gold">
-                <span class="ca-es-k">夜间投递</span>
-                <span class="ca-es-v">86<span>%</span></span>
-                <span class="ca-es-sub">20:00 ~ 06:00</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-purple">
-                <span class="ca-es-k">情绪波动</span>
-                <span class="ca-es-v">Δ 0.64</span>
-                <span class="ca-es-sub">高 → 低幅度</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-blue">
-                <span class="ca-es-k">最频时辰</span>
-                <span class="ca-es-v">子正</span>
-                <span class="ca-es-sub">23:41 ~ 00:28</span>
-              </div>
-              <div class="ca-et-stat ca-et-stat-green">
-                <span class="ca-es-k">最长间隔</span>
-                <span class="ca-es-v">2h 17<span>'</span></span>
-                <span class="ca-es-sub">独坐时没写</span>
+              <div v-for="(s, i) in heroStats.slice(0, 4)" :key="'etst'+i"
+                class="ca-et-stat"
+                :class="{
+                  'ca-et-stat-gold':   i % 4 === 0,
+                  'ca-et-stat-purple': i % 4 === 1,
+                  'ca-et-stat-blue':   i % 4 === 2,
+                  'ca-et-stat-green':  i % 4 === 3,
+                }">
+                <span class="ca-es-k">{{ s.k }}</span>
+                <span class="ca-es-v" v-html="s.v"></span>
+                <span class="ca-es-sub">{{ s.sub }}</span>
               </div>
             </div>
 
-            <!-- 底部一句话说明条 -->
+            <!-- 底部一句话说明条：按 tone 切 -->
             <p class="ca-et-note">
               <component :is="Sparkles" :size="9" class="ca-et-note-icon" />
-              从 20:31 的灯下第一笔，写到 05:42 天将亮 —— 连线是心事出现的顺序，越靠上=情绪越亮。
+              <template v-if="isAncientTone">
+                {{ nightSky.timeSpan.split('·')[0].trim() }} · 凡 {{ storyCount }} 首，以钞次为序，气脉由下而上，由沉而扬。
+              </template>
+              <template v-else>
+                从 20:00 到 06:00，共 {{ storyCount }} 则心事 —— 连线是心事出现的顺序，越靠上=情绪越亮。
+              </template>
             </p>
           </div>
         </div>
@@ -647,14 +688,16 @@
 
 
 
-    <!-- ═══ 4. 时辰热力 ═══ -->
+    <!-- ═══ 4. 时辰热力（按 tone 切换标题） ═══ -->
     <section class="panel-wrapper ca-hour">
       <div class="panel-head">
         <Clock3 :size="10" class="pw-icon pw-purple" />
-        <span class="pw-title">时辰热力</span>
+        <span class="pw-title">{{ isAncientTone ? '气脉十二时' : '时辰热力' }}</span>
         <span class="pw-count">{{
           hasReal
-            ? `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`
+            ? (isAncientTone
+                ? `盛时 ${DIZHI_PER_2H[peakHour] ?? '子'} · 衰时 ${DIZHI_PER_2H[lowHour] ?? '寅'}`
+                : `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`)
             : tooFewStories ? '未生成' : '生成中'
         }}</span>
       </div>
@@ -681,18 +724,34 @@
           <span>申</span><span>酉</span><span>戌</span><span>亥</span>
         </div>
         <div class="ca-hour-insights">
-          <div class="ca-hi ca-hi-peak">
-            <span class="ca-hi-prefix">高峰</span>
-            <span class="ca-hi-time">{{ hourRangeText(peakHour) }}</span>
-            <span class="ca-hi-count">{{ peakPct }}% 投递集中</span>
-            <p class="ca-hi-desc">{{ peakText }}</p>
-          </div>
-          <div class="ca-hi ca-hi-low">
-            <span class="ca-hi-prefix">低谷</span>
-            <span class="ca-hi-time">{{ hourRangeText(lowHour) }}</span>
-            <span class="ca-hi-count">仅 {{ lowPct }}% 故事</span>
-            <p class="ca-hi-desc">{{ lowText }}</p>
-          </div>
+          <template v-if="isAncientTone">
+            <div class="ca-hi ca-hi-peak">
+              <span class="ca-hi-prefix">盛时</span>
+              <span class="ca-hi-time">{{ DIZHI_PER_2H[peakHour] }}时 · {{ pad(peakHour) }}-{{ pad((peakHour+2)%24) }}</span>
+              <span class="ca-hi-count">集中 {{ peakPct }}%</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[peakHour] ?? '子'}时气聚，诸篇什多出于是；或月在梧桐，或灯明窗下，兴会所至，辄复成咏。` }}</p>
+            </div>
+            <div class="ca-hi ca-hi-low">
+              <span class="ca-hi-prefix">衰时</span>
+              <span class="ca-hi-time">{{ DIZHI_PER_2H[lowHour] }}时 · {{ pad(lowHour) }}-{{ pad((lowHour+2)%24) }}</span>
+              <span class="ca-hi-count">仅 {{ lowPct }}%</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[lowHour] ?? '寅'}时声希，卷轴阒然；意兴既阑，天机亦息，俟乎东方之既白。` }}</p>
+            </div>
+          </template>
+          <template v-else>
+            <div class="ca-hi ca-hi-peak">
+              <span class="ca-hi-prefix">高峰</span>
+              <span class="ca-hi-time">{{ hourRangeText(peakHour) }}</span>
+              <span class="ca-hi-count">{{ peakPct }}% 投递集中</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[peakHour] ?? '子'}时最盛——白天没说完的话，总在这一两个小时里，借着夜色写下来。` }}</p>
+            </div>
+            <div class="ca-hi ca-hi-low">
+              <span class="ca-hi-prefix">低谷</span>
+              <span class="ca-hi-time">{{ hourRangeText(lowHour) }}</span>
+              <span class="ca-hi-count">仅 {{ lowPct }}% 故事</span>
+              <p class="ca-hi-desc">{{ `${DIZHI_PER_2H[lowHour] ?? '卯'}时最静——人们多半已睡着，或已开始了新的一天；昨夜的心事，有的随晨光散了。` }}</p>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -744,7 +803,10 @@
           >
             <div class="ca-rank-no" :class="`ca-rank-no-${i + 1}`">{{ i + 1 }}</div>
             <div class="ca-rank-main">
-              <div class="ca-rank-title">{{ r.title }}</div>
+              <div class="ca-rank-title">
+                {{ r.title }}
+                <span v-if="r.author" class="ca-rank-author">{{ r.author }}</span>
+              </div>
               <div class="ca-rank-summary">{{ r.summary }}</div>
             </div>
             <div class="ca-rank-res">
@@ -881,6 +943,10 @@ const props = defineProps<{
     createdAt: string
     catalogStarId?: number | null
     catalogStarIds?: number[]
+    /** 作者名：历史故事=苏轼/李清照 等具体人名；用户故事可能为空或匿名 */
+    creator_name?: string | null
+    /** 故事类型：history=历史故事 / user=用户投稿 */
+    type?: 'history' | 'user'
   }>
   /** 可选：合集总共鸣数（不传则从 stories.reduce 计算，或 fallback 到 mock 237） */
   resonanceTotal?: number
@@ -935,6 +1001,15 @@ const displayStoryCount = computed(() => {
   return props.storyCount ?? 0
 })
 
+/** 合集语气：modern 现代陪伴 / ancient 古籍诗话（根据历史故事占比自动） */
+const isAncientTone = computed(() => {
+  const a = collAnalysis.analysis.value
+  if (!a) return false
+  if (a.tone === 'ancient') return true
+  if (a.nightscape?.tone === 'ancient') return true
+  return false
+})
+
 /** 全局重试按钮：重置状态 + 重新拉取 analysis */
 function onRetryAnalysis() {
   collAnalysis.reset()
@@ -954,6 +1029,10 @@ const persona = computed(() => ({
   suggestIntro: _p.value?.suggestIntro ?? '这卷星笺里收着夜半醒来的低语——雨声、灯影、与不肯寄出的思念。心事在子时最稠，在卯时散去，像一缕没说完的话。',
   paragraphFirst: _p.value?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
   paragraphSecond: _p.value?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
+  paragraphs: [
+    _p.value?.paragraphs?.[0] ?? '它们总在夜雨最盛时落下，字里行间带着潮湿的呼吸——有的写给远方的人，有的写给回不去的某个夜晚。每一则都是点亮又按灭的灯，独自亮了很久，才被收进这卷笺里。',
+    _p.value?.paragraphs?.[1] ?? '虽然底色是思念与独行，但并非完全沉寂——从字缝里仍能看见微光：雨后的风、清晨的第一缕阳光、陌生人留下的一句话。它们像卷轴上的金粉，被轻轻一拂，就亮了起来。',
+  ],
   dimensions: (_p.value?.dimensions?.length ?? 0) >= 5 ? _p.value!.dimensions : [
     { left: '内向',   right: '外向',   percent: 78, side: 'left'  as const },
     { left: '柔和',   right: '锋利',   percent: 34, side: 'left'  as const },
@@ -1475,19 +1554,40 @@ const deepSpaceStars = Array.from({ length: 22 }, (_, i) => {
 // 情感轨迹展开/收起状态：默认收起（限高滚动），展开后显示全部
 const trajExpanded = ref(false)
 
-/* hourly / peakHour / lowHour / peakText / lowText 已在上方用 computed 从 API/nightscape 映射，
-   这一组常量是旧 mock 版本，删除避免重复声明报错 */
-
-const trajectory = [
-  { emotion: '思念', color: '#ffd98a', date: '03/12', title: '雨夜寄北', snippet: '把没寄出的话折成纸船，放进窗外的雨里。' },
-  { emotion: '孤独', color: '#caa7ff', date: '03/18', title: '一个人的地铁', snippet: '末班车空荡荡，影子比人先到站。' },
-  { emotion: '思念', color: '#ffd98a', date: '03/25', title: '旧照片', snippet: '翻到那张合影，才发现你笑得比我记得的还要年轻。' },
-  { emotion: '释然', color: '#95f0c0', date: '04/02', title: '江边走走', snippet: '风把帽子吹进水里，我居然笑了出来。' },
-  { emotion: '孤独', color: '#caa7ff', date: '04/09', title: '凌晨四点', snippet: '整座城市都睡了，只有我和一盏台灯还醒着。' },
-  { emotion: '希望', color: '#86a8ff', date: '04/15', title: '阳台的种子', snippet: '埋下去第十天，今天早上冒了一点绿。' },
-  { emotion: '思念', color: '#ffd98a', date: '04/22', title: '故乡的槐花', snippet: '又到开花的季节，只是树下的人不在了。' },
-  { emotion: '释然', color: '#95f0c0', date: '04/30', title: '合上这一卷', snippet: '把散落的纸页收好，灯灭了，雨也停了。' },
-]
+/**
+ * 情感轨迹：用后端 storyQuotes（Top 5 精选）动态生成，不再是硬编码 mock。
+ * - emotion：取 tags[0] 或默认情绪词
+ * - color：直接用后端分配的故事色
+ * - date：古代版=钞本年代；现代版=故事记录日期
+ * - title：故事首句（已由后端裁剪）
+ * - snippet：tags 拼接
+ */
+const trajectory = computed(() => {
+  const quotes = _n.value?.storyQuotes
+  if (!quotes || quotes.length === 0) {
+    // 兜底：storyQuotes 缺失时给一个静态空状态，避免白屏
+    return [
+      { emotion: '思念', color: '#ffd98a', date: isAncientTone.value ? '钞次一' : '03/12', title: '节选·其一', snippet: '待故事更多，AI 会自动生成时间线。' },
+      { emotion: '释然', color: '#9ae6b4', date: isAncientTone.value ? '钞次二' : '04/02', title: '节选·其二', snippet: '—' },
+    ]
+  }
+  return quotes.map((q, i) => {
+    const emo = (q.tags && q.tags[0]) ?? (i % 3 === 0 ? '思念' : i % 3 === 1 ? '孤独' : '释然')
+    const snippetRaw = (q.tags && q.tags.length > 1)
+      ? q.tags.slice(0, 3).join(' · ')
+      : q.starName ?? ''
+    return {
+      emotion: emo,
+      color: q.color ?? (['#ffd98a', '#caa7ff', '#86a8ff', '#9ae6b4', '#d5b4ff'][i % 5]),
+      // ancient 版：显示钞次+钞本年代/钞者，modern 版：显示 date 字段
+      date: isAncientTone.value
+        ? (q.author && q.author !== '古人' ? `${q.author}` : q.date)
+        : q.date,
+      title: q.text.slice(0, 18) + (q.text.length > 18 ? '…' : ''),
+      snippet: snippetRaw,
+    }
+  })
+})
 
 /** AI 总叙结构化数据（【观星手记】星空绑定版本：星图总志 + 星轨四步 + 星座神话 + 观星者手记） */
 const narrative = {
@@ -1561,19 +1661,40 @@ const rankList = computed(() => {
     .slice()
     .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
     .slice(0, 3)
-    .map(s => ({
-      id: s.id,
-      title: s.title || '未命名故事',
-      summary: storySummary(s.content),
-      resonance: s.resonanceCount ?? 0,
-    }))
+    .map(s => {
+      // 作者名：有 creator_name 用它；否则古代版=佚名·钞，现代版=匿名
+      let author = s.creator_name || ''
+      if (!author) {
+        author = isAncientTone.value ? '佚名 · 钞' : '匿名'
+      }
+      // 古代版作者统一：如果不是具体人名则加"·钞"
+      if (isAncientTone.value && author && author !== '古人' && !author.endsWith('钞') && !author.includes('·')) {
+        author = `${author} · 钞`
+      }
+      if (author === '古人' && isAncientTone.value) {
+        author = '佚名 · 钞'
+      }
+      return {
+        id: s.id,
+        title: s.title || '未命名故事',
+        summary: storySummary(s.content),
+        resonance: s.resonanceCount ?? 0,
+        author,
+      }
+    })
   if (real.length >= 3) return real
-  // 不足 3 则用 mock 补足
-  const mock = [
-    { id: -1, title: '雨夜寄北', summary: '把没寄出的话折成纸船，放进窗外的雨里。', resonance: 42 },
-    { id: -2, title: '凌晨四点', summary: '整座城市都睡了，只有我和一盏台灯还醒着。', resonance: 35 },
-    { id: -3, title: '故乡的槐花', summary: '又到开花的季节，只是树下的人不在了。', resonance: 28 },
+  // 不足 3 则用 mock 补足（mock 也要带 author，按 tone 切）
+  const mockAncient = [
+    { id: -1, title: '夜雨寄北', summary: '何当共剪西窗烛，却话巴山夜雨时。', resonance: 42, author: '李商隐 · 钞' },
+    { id: -2, title: '水调歌头·明月几时有', summary: '但愿人长久，千里共婵娟。', resonance: 35, author: '苏轼 · 钞' },
+    { id: -3, title: '天净沙·秋思', summary: '夕阳西下，断肠人在天涯。', resonance: 28, author: '马致远 · 钞' },
   ]
+  const mockModern = [
+    { id: -1, title: '雨夜寄北', summary: '把没寄出的话折成纸船，放进窗外的雨里。', resonance: 42, author: '匿名' },
+    { id: -2, title: '凌晨四点', summary: '整座城市都睡了，只有我和一盏台灯还醒着。', resonance: 35, author: '匿名' },
+    { id: -3, title: '故乡的槐花', summary: '又到开花的季节，只是树下的人不在了。', resonance: 28, author: '匿名' },
+  ]
+  const mock = isAncientTone.value ? mockAncient : mockModern
   return [...real, ...mock.slice(real.length)].slice(0, 3)
 })
 
@@ -3433,6 +3554,20 @@ function tagStyle(tag: string): Record<string, string> {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ca-rank-author {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: #caa78c;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 217, 138, 0.08);
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .ca-rank-summary {
   font-size: 0.66rem;

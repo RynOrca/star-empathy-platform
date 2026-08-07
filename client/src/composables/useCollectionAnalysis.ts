@@ -38,6 +38,7 @@ export type NightscapePayload = {
   emotionInsights: Array<{
     title: string; pct: string; color: string; desc: string
   }>
+  tone: 'modern' | 'ancient'
 }
 
 export type CollectionAnalysis = {
@@ -50,6 +51,8 @@ export type CollectionAnalysis = {
   tooFewStories?: boolean
   /** 后端返回：实际故事数，前端可用来提示用户还差几条才生成 */
   storyCount?: number
+  /** 合集语气：modern 现代陪伴 / ancient 古籍诗话（根据历史故事占比自动） */
+  tone?: 'modern' | 'ancient'
 }
 
 /**
