@@ -261,11 +261,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   serverError(res);
 });
 
-// 启动服务（带端口被占自动 fallback 友好处理）
-const MAX_FALLBACK = 3;
-
 /**
- * 解析 Windows/Linux 下占用某 TCP 端口的 PID
+ * 解析 Windows/Linux 下占用某 TCP 端口的 PID（仅用于打印提示，绝不自动换端口）
  */
 function resolvePid(port: number): Promise<string | null> {
   return new Promise((resolve) => {
@@ -287,21 +284,20 @@ function resolvePid(port: number): Promise<string | null> {
   });
 }
 
-function startServer(port: number, fallbackCount = 0) {
+// 启动服务（端口被占 → 直接报错退出，绝不 fallback 到其他端口）
+// 为什么不允许自动换端口？
+//   · 前端 vite.config.ts /api 代理硬编码到 3000，换端口 = 前端全 502
+//   · 生产部署 nginx 反代 /api → 后端 3000，换端口 = 线上静默挂掉
+//   · 任何 PORT 变更都必须由运维通过环境变量明确指定（process.env.API_PORT），后端绝不替用户做决定
+function startServer(port: number) {
   const server = app.listen(port);
 
-  server.once('listening', async () => {
-    if (fallbackCount > 0) {
-      console.log(`⚠️  原始端口 ${PORT} 被占用，已自动 fallback → ${port}`);
-    }
+  server.once('listening', () => {
     console.log(`🌟 星语穹庭后端运行中: http://localhost:${port}`);
     console.log(`   GET  /api/stories               - 获取所有故事`);
     console.log(`   POST /api/stories               - 投递心事`);
     console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
     console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
-    if (port !== PORT) {
-      console.log(`💡 提示：前端 vite.config.ts /api 代理仍指向 ${PORT}，请手动 "taskkill /F /PID <占用者PID>" 释放 ${PORT} 后重试，或临时把前端代理改到 ${port}`);
-    }
 
     // 定时清理过期 token 黑名单（每 10 分钟）
     setInterval(() => {
@@ -317,20 +313,17 @@ function startServer(port: number, fallbackCount = 0) {
   server.on('error', async (err: any) => {
     if (err.code === 'EADDRINUSE') {
       const pid = await resolvePid(port);
-      console.error(`❌ 端口 ${port} 被占用 ${pid ? `(PID: ${pid})` : ''}`);
-      if (port === PORT && pid) {
-        console.log(`👉  建议执行：  taskkill /F /PID ${pid}    然后再 npm run dev`);
+      console.error(`\n❌❌❌ 端口 ${port} 已被占用，启动终止！`);
+      if (pid) {
+        console.error(`   占用者 PID: ${pid}`);
+        if (process.platform === 'win32') {
+          console.error(`   👉 Windows 释放命令:  taskkill /F /PID ${pid}`);
+        } else {
+          console.error(`   👉 Linux/macOS 释放:  kill -9 ${pid}`);
+        }
       }
-      if (fallbackCount < MAX_FALLBACK && port === PORT) {
-        // 仅在首次（使用默认 PORT 被占）时允许 fallback，避免用户迷惑
-        const nextPort = PORT + fallbackCount + 1;
-        console.log(`🔄  正在尝试 fallback 端口 ${nextPort} ...`);
-        server.close(() => {
-          setTimeout(() => startServer(nextPort, fallbackCount + 1), 300);
-        });
-        return;
-      }
-      console.error('💥 无法启动服务，所有候选端口均不可用。请执行上方 taskkill 命令后重试。');
+      console.error(`   👉 如果必须使用其他端口，请通过环境变量 API_PORT=${port + 1} 显式指定（同时修改前端 vite 代理 target，否则前端全 502）`);
+      console.error(`   ❌ 绝不自动换端口——防止"后端实际跑在 3001，但前端代理 3000"这种沉默故障上线。\n`);
       process.exit(1);
     }
     console.error('💥 服务启动异常：', err);
