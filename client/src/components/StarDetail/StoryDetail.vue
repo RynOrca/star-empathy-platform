@@ -48,35 +48,34 @@
           </template>
         </div>
 
-        <!-- ═══ 数据指标卡：字数 / 阅读时长 / 浏览量 / 共鸣率 ═══ -->
-        <div class="detail-stats">
-          <div class="ds-cell ds-cell-strong">
-            <span class="ds-label">字数</span>
-            <span class="ds-num tabular">{{ stats.wordCount }}</span>
-          </div>
-          <div class="ds-divider" />
-          <div class="ds-cell">
-            <span class="ds-label">阅读</span>
-            <span class="ds-num tabular">{{ stats.readingTime }}<small>分</small></span>
-          </div>
-          <div class="ds-divider" />
-          <div class="ds-cell">
-            <span class="ds-label">浏览</span>
-            <span class="ds-num tabular">{{ viewCount }}</span>
-          </div>
-          <div class="ds-divider" />
-          <div class="ds-cell ds-cell-strong">
-            <span class="ds-label">共鸣率</span>
-            <span class="ds-num tabular ds-rate" :style="{ color: stats.rateColor }">
-              {{ stats.resonanceRate }}<small>%</small>
-            </span>
-          </div>
-        </div>
-
         <div class="detail-body">
           <div class="detail-content" v-html="renderedContent"></div>
           <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
         </div>
+
+        <!-- 正文下方：数据信息以一行简洁文字形式展示（字数·阅读·浏览·共鸣率） -->
+        <div class="detail-meta-text">
+          <span class="dmt-item">
+            <PenLineIcon :size="11" />
+            <span>共 <em class="tabular">{{ stats.wordCount }}</em> 字</span>
+          </span>
+          <span class="dmt-sep">·</span>
+          <span class="dmt-item">
+            <ClockMiniIcon :size="11" />
+            <span>约 <em class="tabular">{{ stats.readingTime }}</em> 分钟阅读</span>
+          </span>
+          <span class="dmt-sep">·</span>
+          <span class="dmt-item">
+            <EyeIcon :size="11" />
+            <span><em class="tabular">{{ viewCount }}</em> 次浏览</span>
+          </span>
+          <span class="dmt-sep">·</span>
+          <span class="dmt-item">
+            <TrendingUpIcon :size="11" />
+            <span>共鸣率 <em class="tabular" :style="{ color: stats.rateColor }">{{ stats.resonanceRate }}%</em></span>
+          </span>
+        </div>
+
         <!-- 归属行：正文下方、标签行上方 -->
         <div v-if="(showStarBelonging && starBelonging) || story.collectionName" class="detail-collection-row">
           <!-- 星星归属（合集上下文：显示挂在哪颗星上） → 点击跳转 /sky?star=xxx -->
@@ -149,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Sparkles, Check, Trash2, Star, BookOpen, Eye } from 'lucide-vue-next'
+import { ArrowLeft, Sparkles, Check, Trash2, Star, BookOpen, Eye, PenLine, Clock, TrendingUp } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import CollectionBadge from '../CollectionBadge.vue'
@@ -162,6 +161,9 @@ const Trash2Icon = Trash2
 const StarIcon = Star
 const BookOpenIcon = BookOpen
 const EyeIcon = Eye
+const PenLineIcon = PenLine
+const ClockMiniIcon = Clock
+const TrendingUpIcon = TrendingUp
 const router = useRouter()
 const route = useRoute()
 
@@ -482,62 +484,34 @@ function tagStyle(tag: string): Record<string, string> {
 /* ─── tabular 数字字体（统计指标用） ─── */
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* ─── 数据指标卡：字数 / 阅读 / 浏览 / 共鸣率 ─── */
-.detail-stats {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-  align-items: center;
-  padding: 10px 4px;
-  margin: 10px 0 14px;
-  background: linear-gradient(180deg,
-    var(--overlay-02) 0%,
-    transparent 100%
-  );
-  border-top: 0.5px solid var(--rule);
-  border-bottom: 0.5px solid var(--rule);
-}
-.ds-cell {
+/* ─── 正文下方：简洁文字形式的 meta 行（字数·阅读·浏览·共鸣率） ─── */
+.detail-meta-text {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px 6px;
-  min-width: 0;
-}
-.ds-cell-strong .ds-num {
-  color: var(--ink);
-  font-weight: 700;
-}
-.ds-label {
-  font-size: 0.65rem;
+  gap: 5px 9px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  padding: 8px 12px;
+  font-size: 0.76rem;
   color: var(--muted-light);
-  letter-spacing: 0.08em;
-  opacity: 0.85;
+  line-height: 1.7;
+  background: var(--overlay-02);
+  border: 0.5px solid var(--rule);
+  border-radius: var(--radius-md);
 }
-.ds-num {
-  font-size: 0.95rem;
-  color: var(--ink-secondary);
+.dmt-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dmt-item em {
+  font-style: normal;
   font-weight: 600;
-  line-height: 1.1;
+  color: var(--ink-secondary);
 }
-.ds-num small {
-  font-size: 0.65rem;
-  font-weight: 500;
-  opacity: 0.6;
-  margin-left: 1px;
-  letter-spacing: 0.02em;
-}
-.ds-rate {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.ds-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--rule);
-  opacity: 0.7;
-  align-self: center;
+.dmt-sep {
+  opacity: 0.35;
 }
 
 /* ── 详情星星归属 · 星等（新增） ── */
