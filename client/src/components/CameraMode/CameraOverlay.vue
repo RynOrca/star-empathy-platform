@@ -12,10 +12,12 @@
       <ViewportInfo
         :stars-in-frame="starsInFrame"
         :story-count="frameStories.length"
+        :region="region"
       />
       <ZoomFilterControl
         :zoom-level="zoomLevel"
         :filters="filters"
+        :current-fov="currentFov"
         @set-zoom="onSetZoom"
         @set-mode="onSetMode"
       />

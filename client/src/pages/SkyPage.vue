@@ -1,4 +1,4 @@
-<template>
+﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1319,16 +1319,49 @@ const cameraMode = useCameraMode(sky, stars)
 
 const cameraCenterCelestial = ref({ ra: '', dec: '' })
 const cameraCurrentFov = ref(75)
-const cameraRegion = ref('夏季银河大三角区域')
+const cameraRegion = ref('繁星天区')
 const cameraOverlayRef = ref<InstanceType<typeof CameraOverlay> | null>(null)
 let cameraFrameUnsub: (() => void) | null = null
 
-// 订阅相机帧更新 HUD 数据
+/**
+ * 根据当前相机指向的赤经(RA)/赤纬(DEC)计算动态天区名。
+ * 不追求88星座精度，只做简洁的「XX天区」描述，保证随相机移动明显变化。
+ * - RA 按 6 段分：00~04h 东曦 / 04~08h 苍龙 / 08~12h 朱雀 / 12~16h 白虎 / 16~20h 玄武 / 20~24h 紫微
+ * - DEC 按 3 段分：>+30° 北辰区 / -30°~+30° 赤道区 / <-30° 南溟区
+ * 组合例子：「苍龙·北辰天区」「朱雀·赤道天区」「紫微·南溟天区」
+ */
+function raDecToRegion(raStr: string, decStr: string): string {
+  // RA 解析：格式如 "12h 30m" → 小时数（0~24）
+  let ra = 12
+  const raMatch = raStr.match(/(\d+(?:\.\d+)?)/)
+  if (raMatch) ra = parseFloat(raMatch[1])
+  if (Number.isNaN(ra)) ra = 12
+  ra = ((ra % 24) + 24) % 24
+
+  // DEC 解析：格式如 "+30° 15'" → 度数（-90 ~ +90）
+  let dec = 0
+  const decNumMatch = decStr.match(/([+-]?\d+(?:\.\d+)?)/)
+  if (decNumMatch) dec = parseFloat(decNumMatch[1])
+  if (Number.isNaN(dec)) dec = 0
+
+  const raNames = ['东曦', '苍龙', '朱雀', '白虎', '玄武', '紫微']
+  const raIdx = Math.min(5, Math.floor(ra / 4))  // 0~5
+  const raName = raNames[raIdx] ?? '繁星'
+
+  let decBand = '赤道'
+  if (dec > 30) decBand = '北辰'
+  else if (dec < -30) decBand = '南溟'
+
+  return `${raName}·${decBand}天区`
+}
+
+// 订阅相机帧更新 HUD 数据 + 动态天区名
 watch(() => cameraMode.cameraMode.value, (mode) => {
   if (mode === 'observe') {
     cameraFrameUnsub = sky.onCameraFrame((pose) => {
       cameraCenterCelestial.value = { ra: pose.centerRa, dec: pose.centerDec }
       cameraCurrentFov.value = pose.fov
+      cameraRegion.value = raDecToRegion(pose.centerRa, pose.centerDec)
     })
   } else if (cameraFrameUnsub) {
     cameraFrameUnsub()
@@ -1347,11 +1380,31 @@ function toggleCameraMode() {
 async function onCameraStoryClick(star: any) {
   const overlay = cameraOverlayRef.value
   const panel = (overlay as any)?.panelRef
-  await cameraMode.handleStoryClick(
-    star,
-    panel?.scrollToCardCenter,
-    panel?.isCardCentered,
-  )
+
+  // 步骤1：如果卡片未居中，先滚动居中让用户视觉聚焦
+  const centered = panel?.isCardCentered ? panel.isCardCentered(star.id) : true
+  if (!centered) panel?.scrollToCardCenter?.(star.id)
+
+  // 步骤2：镜头飞行到该星（用 zoomLevel=3 拉近）
+  sky.flyToStar3D(star, { zoomLevel: 3 })
+
+  // 步骤3：等待约 700ms 让用户看到飞行动画，然后退出相机模式 + 跳路由打开完整星星详情
+  await new Promise(r => setTimeout(r, 700))
+
+  // 退出相机模式（回到 normal 模式）
+  cameraMode.exit()
+
+  // 决定跳路由用哪个 starId
+  // 规则：有 catalogStarId（星表真实星）优先用 catalogStarId（与聚焦定位一致）；否则用故事星 id
+  const targetStarId = (star.catalogStarId != null && star.catalogStarId !== undefined)
+    ? String(star.catalogStarId)
+    : String(star.id)
+
+  // 用 router.replace 同路径下仅改 query，避免重复 history；StarDetail 的 watch route.query.star 会自动打开详情
+  router.replace({
+    path: '/sky',
+    query: { ...route.query, star: targetStarId },
+  })
 }
 
 function onCameraActiveChange(starId: number) {

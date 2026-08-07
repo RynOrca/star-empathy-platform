@@ -86,6 +86,8 @@ import type { CameraFilters, CameraFilterMode } from '../../composables/useCamer
 const props = defineProps<{
   zoomLevel: number
   filters: CameraFilters
+  /** 实时 FOV（滚轮缩放时会变化），优先用这个显示精确度数 */
+  currentFov?: number
 }>()
 
 defineEmits<{
@@ -94,7 +96,12 @@ defineEmits<{
 }>()
 
 const CAMERA_FOV_BY_STAGE_REF = CAMERA_FOV_BY_STAGE
-const currentFovDeg = computed(() => CAMERA_FOV_BY_STAGE_REF[props.zoomLevel] ?? 75)
+const currentFovDeg = computed(() => {
+  if (typeof props.currentFov === 'number') {
+    return Math.round(props.currentFov * 10) / 10  // 保留一位小数
+  }
+  return CAMERA_FOV_BY_STAGE_REF[props.zoomLevel] ?? 75
+})
 </script>
 
 <style scoped>
@@ -249,10 +256,11 @@ const currentFovDeg = computed(() => CAMERA_FOV_BY_STAGE_REF[props.zoomLevel] ??
   opacity: 0.8;
 }
 
-/* ═══ 模式切换（双按钮，卡片化） ═══ */
+/* ═══ 模式切换（上下排列，听语在上默认激活） ═══ */
 .zfc-mode-toggles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 .zfc-mode-btn {

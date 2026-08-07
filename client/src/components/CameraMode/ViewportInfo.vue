@@ -22,14 +22,18 @@ import type { StarInFrame } from '../../composables/useSky'
 const props = defineProps<{
   starsInFrame: StarInFrame[]
   storyCount: number
+  /** 动态天区名（由父组件根据 RA/DEC 计算） */
+  region?: string
 }>()
 
 const starCount = computed(() => props.starsInFrame.length)
 
 const title = computed(() => {
-  if (starCount.value === 0) return '深空区域'
-  if (starCount.value <= 3) return `${starCount.value} 颗亮星区域`
-  return '夏季银河大三角区域'
+  // 优先用父组件传入的动态天区名（随相机位置变化）
+  if (props.region) return props.region
+  if (starCount.value === 0) return '深空天区'
+  if (starCount.value <= 3) return `${starCount.value} 星小天区`
+  return '繁星天区'
 })
 </script>
 

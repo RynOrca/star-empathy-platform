@@ -93,29 +93,31 @@
 .vf-corner-bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
 .vf-corner-br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
 
-/* ═══ 相机十字准星：淡色、居中方框更精致 ═══ */
+/* ═══ 相机十字准星：更明显的金色调，加粗，让用户一眼看到相机模式 ═══ */
 .vf-crosshair-svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.3;
+  opacity: 0.78;
   animation: vf-crosshair-enter 0.5s var(--ease-in-out) both;
   animation-delay: 260ms;
 }
 .vf-ch-h, .vf-ch-v {
-  stroke: var(--vf-crosshair);
-  stroke-width: 0.5;
-  stroke-dasharray: 6 8;   /* 虚线更有"精密仪器"感 */
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 10 14;   /* 拉长虚线间距，更有"取景器"识别度 */
+  filter: drop-shadow(0 0 4px rgba(255, 217, 138, 0.25));
 }
 .vf-ch-center-group {
-  transform: translate(calc(50vw - 10px), calc(50vh - 10px));
+  transform: translate(calc(50vw - 14px), calc(50vh - 14px));
 }
 .vf-ch-center-line {
   stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke-width: 2;
   stroke-linecap: round;
-  opacity: 0.8;
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(255, 217, 138, 0.45));
 }
 
 /* ═══ 级联进入动画（更柔和、时间略拉长，避免"一下子全出来"） ═══ */
