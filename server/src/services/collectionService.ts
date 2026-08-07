@@ -1,5 +1,6 @@
 import db from '../db';
 import { getStoriesByCollectionId } from './starService';
+import { invalidateCollectionAnalysisCache } from './collectionAnalysis';
 
 export interface Collection {
   id: number;
@@ -129,6 +130,7 @@ export function deleteCollection(id: number, userId: number): { notFound?: boole
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
   if (existing.user_id !== userId) return { forbidden: true };
+  invalidateCollectionAnalysisCache(id);
   db.prepare('UPDATE stars SET collection_id = NULL WHERE collection_id = ?').run(id);
   db.prepare('DELETE FROM collections WHERE id = ?').run(id);
   return {};

@@ -60,6 +60,32 @@ export type CollectionAnalysisFull = {
 }
 
 // ──────────────────────── 5 光谱色（与前端保持一致，不随数据变） ────────────────────────
+
+// ═══════════════════════════════════════════════════════════════
+// 内存二级缓存（避免 100+ 故事时每次都 getStoriesLite + hashStories + DB JSON.parse×3）
+//  - 命中：<1ms 返回
+//  - 失效：合集故事变更时调用 invalidateCollectionAnalysisCache()
+// ═══════════════════════════════════════════════════════════════
+type MemCacheEntry = {
+  storyCount: number
+  storyHash: string
+  result: CollectionAnalysisFull
+  generatedAt: number
+}
+const memCache = new Map<string, MemCacheEntry>()
+
+/** 主动失效某个合集的分析缓存（合集增删故事后必须调用） */
+export function invalidateCollectionAnalysisCache(collectionId: number | string): void {
+  memCache.delete(String(collectionId))
+}
+
+/** 快速预检：仅拉故事总数（<1ms），不拿内容 */
+function quickStoryCount(collectionId: string): number {
+  const row = db
+    .prepare('SELECT COUNT(*) AS c FROM stars WHERE collection_id = ?')
+    .get(collectionId) as { c: number } | undefined
+  return row?.c ?? 0
+}
 const SPECTRUM_PALETTE = ['#ffd98a', '#caa7ff', '#86a8ff', '#9ae6b4', '#ff8b7d']
 const METEO_COLORS = { nightTemp: '#86a8ff', wind: '#caa7ff', moon: '#ffd98a', cloud: '#9ae6b4', feel: '#ff8b7d' }
 
@@ -608,7 +634,19 @@ function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient'): E
 export function readCollectionAnalysis(collectionId: number | string): CollectionAnalysisFull {
   const id = String(collectionId)
 
-  // 先拿故事 & 算 hash，无论缓存命中否都用来校验
+  // Step 0: 内存缓存 + 快速 COUNT 预检（省掉拉 143 条故事 + hash）
+  const memEntry = memCache.get(id)
+  if (memEntry) {
+    const currentCount = quickStoryCount(id)
+    if (currentCount === memEntry.storyCount) {
+      return memEntry.result  // <1ms 返回，无需任何计算
+    } else {
+      // 故事数量变了 → 失效内存缓存
+      memCache.delete(id)
+    }
+  }
+
+  // Step 1: 才需要拉完整故事 & 算 hash（冷启动/失效后才做）
   const rows = getStoriesLite(collectionId)
   const storyCount = rows.length
   const storyHash = hashStories(rows)
@@ -623,25 +661,30 @@ export function readCollectionAnalysis(collectionId: number | string): Collectio
     | { persona_json: string | null; emotion_json: string | null; nightscape_json: string | null; generated_at: number; sc: number; sh: string | null }
     | undefined
 
-  // 缓存命中且 hash/storyCount 一致 → 直接返回
+  // Step 2: DB 缓存命中且 hash/storyCount 一致 → 直接返回
   if (dbRow && dbRow.persona_json && dbRow.emotion_json && dbRow.nightscape_json
       && dbRow.sc === storyCount && dbRow.sh && dbRow.sh === storyHash) {
     try {
+      const pr = JSON.parse(dbRow.persona_json)
+      const er = JSON.parse(dbRow.emotion_json)
       const ns = JSON.parse(dbRow.nightscape_json)
-      return {
-        persona: JSON.parse(dbRow.persona_json),
-        emotion: JSON.parse(dbRow.emotion_json),
+      const result: CollectionAnalysisFull = {
+        persona: pr,
+        emotion: er,
         nightscape: ns,
         ready: true,
         generatedAt: dbRow.generated_at,
         tone: ns?.tone ?? tone,
       }
+      // 写入内存缓存（下次 Step 0 直接命中）
+      memCache.set(id, { storyCount, storyHash, result, generatedAt: dbRow.generated_at })
+      return result
     } catch {
       // parse 失败 → 往下走重新生成
     }
   }
 
-  // 没命中 / hash 变 → 合成 Phase 1 数据并写缓存（下次命中直接返回）
+  // Step 3: 没命中 / hash 变 → 合成 Phase 1 数据并写缓存（下次命中直接返回）
   const { hourly, peakHour, lowHour, themes } = computeHourlyAndThemes(rows)
   const persona    = buildPersona(rows, themes, tone)
   const emotion    = buildEmotion(rows, themes, tone)
@@ -674,7 +717,7 @@ export function readCollectionAnalysis(collectionId: number | string): Collectio
     console.warn('[collectionAnalysis] upsert cache failed:', (e as any)?.message)
   }
 
-  return {
+  const result: CollectionAnalysisFull = {
     persona,
     emotion,
     nightscape,
@@ -682,6 +725,9 @@ export function readCollectionAnalysis(collectionId: number | string): Collectio
     generatedAt,
     tone,
   }
+  // 冷生成后也要写入内存缓存
+  memCache.set(id, { storyCount, storyHash, result, generatedAt })
+  return result
 }
 
 /** 懒触发生成（Phase 2 预留：接真实 agent pipeline）

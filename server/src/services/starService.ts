@@ -1,5 +1,6 @@
 import db from '../db';
 import { generatePosition } from '../utils/position';
+import { invalidateCollectionAnalysisCache } from './collectionAnalysis';
 
 export interface Star {
   id: number;
@@ -250,6 +251,12 @@ export function createStar(
     WHERE s.id = ?
   `).get(storyId) as unknown as Star & { username: string | null; userId: number | null };
   const normalized = normalizeTagsForStories([row])[0];
+
+  // 新增故事到某合集 → 合集分析缓存失效（下次重算）
+  if (collectionId != null) {
+    try { invalidateCollectionAnalysisCache(collectionId); } catch { /* ignore */ }
+  }
+
   return { ...normalized, catalogStarIds: effectiveCatalogStarId != null ? [effectiveCatalogStarId] : [] };
 }
 

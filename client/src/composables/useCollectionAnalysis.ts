@@ -67,8 +67,9 @@ export function useCollectionAnalysis(collectionId: Ref<number | null>, options?
   pollIntervalMs?: number
   maxPolls?: number
 }) {
-  const POLL_INTERVAL = options?.pollIntervalMs ?? 3000
-  const MAX_POLLS = options?.maxPolls ?? 20
+  // 默认 800ms 轮询（之前 3s 太慢），最多 12 次 → 9.6s 超时（Phase 1 通常首次就 ready=true，不轮询）
+  const POLL_INTERVAL = options?.pollIntervalMs ?? 800
+  const MAX_POLLS = options?.maxPolls ?? 12
 
   const analysis = ref<CollectionAnalysis | null>(null)
   const loading = ref(false)
