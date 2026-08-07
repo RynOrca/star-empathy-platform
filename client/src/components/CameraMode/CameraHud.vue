@@ -124,18 +124,21 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* 通用胶囊：主 UI 的 panel 风格（背景、圆角、边框、阴影统一） */
+/* 通用胶囊：主 UI 的 panel 风格 —— 统一高度 36px，保证三个顶部元素垂直对齐 */
 .hud-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 0 14px;
+  height: 36px;
+  line-height: 36px;
   background: var(--hud-bg);
   border: 1px solid var(--hud-border);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(16px) saturate(1.2);
   pointer-events: auto;
+  box-sizing: border-box;
 }
 
 /* 左：退出按钮（点击放大 + 金色强调） */
@@ -203,7 +206,9 @@ onBeforeUnmount(() => {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
-  padding: 5px 11px 5px 13px;
+  justify-content: center;
+  padding: 0 11px 0 13px;
+  height: 36px;
   background: var(--hud-bg);
   border: 1px solid var(--hud-border);
   border-radius: var(--radius-md);
@@ -211,6 +216,7 @@ onBeforeUnmount(() => {
   min-width: 72px;
   box-shadow: var(--shadow-sm);
   transition: border-color var(--transition-fast);
+  box-sizing: border-box;
 }
 .hud-chip:hover { border-color: var(--rule-hover); }
 .hud-chip.chip-accent {

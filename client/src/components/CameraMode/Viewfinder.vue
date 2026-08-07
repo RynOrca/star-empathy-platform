@@ -12,18 +12,18 @@
     <div class="vf-corner vf-corner-tr" />
     <div class="vf-corner vf-corner-bl" />
     <div class="vf-corner vf-corner-br" />
-    <!-- 相机十字准星：用 SVG 绘制贯穿屏幕的十字线（单一合成层，避免大 div 卡顿） -->
-    <svg class="vf-crosshair-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-      <line class="vf-ch-h" x1="0" y1="50%" x2="100%" y2="50%" />
-      <line class="vf-ch-v" x1="50%" y1="0" x2="50%" y2="100%" />
-      <!-- 中心 16x16 方框：用 4 条短线段绘制，通过 CSS transform 居中 -->
-      <g class="vf-ch-center-group">
-        <line class="vf-ch-center-line" x1="0" y1="0" x2="16" y2="0" />
-        <line class="vf-ch-center-line" x1="0" y1="16" x2="16" y2="16" />
-        <line class="vf-ch-center-line" x1="0" y1="0" x2="0" y2="16" />
-        <line class="vf-ch-center-line" x1="16" y1="0" x2="16" y2="16" />
-      </g>
-    </svg>
+    <!-- 十字准星全部用独立 div 定位：避免 SVG viewBox 缺失 + 百分比/vw混用造成的对齐偏差 -->
+    <!-- 贯穿水平线：屏幕正中央 top:50% -->
+    <div class="vf-crosshair vf-ch-h-line" />
+    <!-- 贯穿垂直线：屏幕正中央 left:50% -->
+    <div class="vf-crosshair vf-ch-v-line" />
+    <!-- 中心方框：用一个定位容器包住 4 条边，统一 left:50%/top:50% translate(-50%,-50%) 精准居中 -->
+    <div class="vf-ch-center-wrap">
+      <span class="vf-ch-center-edge vf-ch-center-top" />
+      <span class="vf-ch-center-edge vf-ch-center-bottom" />
+      <span class="vf-ch-center-edge vf-ch-center-left" />
+      <span class="vf-ch-center-edge vf-ch-center-right" />
+    </div>
   </div>
 </template>
 
@@ -93,32 +93,74 @@
 .vf-corner-bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
 .vf-corner-br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
 
-/* ═══ 相机十字准星：更明显的金色调，加粗，让用户一眼看到相机模式 ═══ */
-.vf-crosshair-svg {
+/* ═══ 相机十字准星（DIV 实现，精确居中无 SVG viewBox 偏差问题） ═══ */
+.vf-crosshair {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  z-index: 3;
+  background: var(--accent);
+  box-shadow: 0 0 4px rgba(255, 217, 138, 0.35);
+  /* 虚线质感：用 repeating-linear-gradient 模拟，避免 border-style:dashed 端点对齐 */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--accent) 0 10px,
+    transparent 10px 24px
+  );
   opacity: 0.78;
   animation: vf-crosshair-enter 0.5s var(--ease-in-out) both;
   animation-delay: 260ms;
 }
-.vf-ch-h, .vf-ch-v {
-  stroke: var(--accent);
-  stroke-width: 1;
-  stroke-dasharray: 10 14;   /* 拉长虚线间距，更有"取景器"识别度 */
-  filter: drop-shadow(0 0 4px rgba(255, 217, 138, 0.25));
+.vf-ch-h-line {
+  /* 贯穿水平线：屏幕正中央（高度方向） */
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 1px;
+  /* 横向虚线 */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--accent) 0 10px,
+    transparent 10px 24px
+  );
+  transform: translateY(-50%);
 }
-.vf-ch-center-group {
-  transform: translate(calc(50vw - 14px), calc(50vh - 14px));
+.vf-ch-v-line {
+  /* 贯穿垂直线：屏幕正中央（宽度方向） */
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  /* 纵向虚线：把渐变方向改成 to bottom */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--accent) 0 10px,
+    transparent 10px 24px
+  );
+  transform: translateX(-50%);
 }
-.vf-ch-center-line {
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linecap: round;
+
+/* 中心方框容器：用 translate(-50%, -50%) 精准对齐十字交叉点 */
+.vf-ch-center-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  z-index: 4;
   opacity: 1;
-  filter: drop-shadow(0 0 3px rgba(255, 217, 138, 0.45));
+  animation: vf-crosshair-enter 0.5s var(--ease-in-out) both;
+  animation-delay: 280ms;
 }
+.vf-ch-center-edge {
+  position: absolute;
+  background: var(--accent);
+  box-shadow: 0 0 4px rgba(255, 217, 138, 0.5);
+  border-radius: 1px;
+}
+.vf-ch-center-top    { left: 0; top: 0;    width: 100%; height: 2px; }
+.vf-ch-center-bottom { left: 0; bottom: 0; width: 100%; height: 2px; }
+.vf-ch-center-left   { left: 0; top: 0;    width: 2px; height: 100%; }
+.vf-ch-center-right  { right: 0; top: 0;   width: 2px; height: 100%; }
 
 /* ═══ 级联进入动画（更柔和、时间略拉长，避免"一下子全出来"） ═══ */
 .vf-border { animation: vf-border-enter 0.7s var(--ease-in-out) both; }
