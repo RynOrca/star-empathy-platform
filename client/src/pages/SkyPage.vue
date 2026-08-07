@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -154,7 +154,6 @@
         :active-star-id="cameraMode.activeStarId.value"
         :active-card-star="cameraMode.activeCardStar.value"
         :filters="cameraMode.filters"
-        :zoom-level="cameraMode.cameraZoomLevel.value"
         :center-celestial="cameraCenterCelestial"
         :current-fov="cameraCurrentFov"
         :region="cameraRegion"
@@ -162,7 +161,6 @@
         @story-click="onCameraStoryClick"
         @active-change="onCameraActiveChange"
         @close-card="cameraMode.closeStoryCard()"
-        @set-zoom="onCameraSetZoom"
         @set-mode="onCameraSetMode"
       />
     </Transition>
@@ -592,7 +590,6 @@ import { useCameraMode, type CameraFilterMode } from '../composables/useCameraMo
 import { useStars } from '../composables/useStars'
 import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
 import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
-import { CAMERA_FOV_BY_STAGE } from '../utils/constants'
 
 const { isMobile } = useMediaQuery()
 
@@ -1511,14 +1508,6 @@ async function onCameraStoryClick(star: any) {
 function onCameraActiveChange(starId: number) {
   // 移动端单卡片切换时同步 activeStarId（不触发飞镜头，仅高亮）
   cameraMode.setActiveStar(starId)
-}
-
-function onCameraSetZoom(level: number) {
-  const targetFov = CAMERA_FOV_BY_STAGE[level]
-  if (targetFov) {
-    // 调用 useSky 的 setCameraFov：300ms 平滑过渡 fov + 立即更新 zoomLevel 触发 UI 动画
-    sky.setCameraFov(targetFov)
-  }
 }
 
 function onCameraSetMode(mode: CameraFilterMode) {

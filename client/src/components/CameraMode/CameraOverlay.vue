@@ -15,10 +15,7 @@
         :region="region"
       />
       <ZoomFilterControl
-        :zoom-level="zoomLevel"
         :filters="filters"
-        :current-fov="currentFov"
-        @set-zoom="onSetZoom"
         @set-mode="onSetMode"
       />
       <FrameStoriesPanel
@@ -79,7 +76,6 @@ const props = defineProps<{
   activeStarId: number | null
   activeCardStar: StarData | null
   filters: CameraFilters
-  zoomLevel: number
   centerCelestial: { ra: string; dec: string }
   currentFov: number
   region: string
@@ -90,7 +86,6 @@ const emit = defineEmits<{
   storyClick: [star: StarData]
   activeChange: [starId: number]
   closeCard: []
-  setZoom: [level: number]
   setMode: [mode: CameraFilterMode]
 }>()
 
@@ -112,10 +107,6 @@ function onActiveChange(starId: number) {
 
 function onCloseCard() {
   emit('closeCard')
-}
-
-function onSetZoom(level: number) {
-  emit('setZoom', level)
 }
 
 function onSetMode(mode: CameraFilterMode) {
