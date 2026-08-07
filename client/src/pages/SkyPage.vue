@@ -1,4 +1,4 @@
-﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -145,7 +145,7 @@
     <!-- 天镜览星 · 相机模式 overlay（PC 端取景框+HUD+列表 / 移动端气泡+拖拽） -->
     <Transition name="camera-fade">
       <CameraOverlay
-        v-if="cameraMode.cameraMode.value === 'observe'"
+        v-if="cameraMode.cameraMode.value === 'observe' && !cameraDetailOpen"
         ref="cameraOverlayRef"
         :is-mobile="isMobile"
         :is-guest="isGuest"
@@ -158,7 +158,7 @@
         :center-celestial="cameraCenterCelestial"
         :current-fov="cameraCurrentFov"
         :region="cameraRegion"
-        @exit="cameraMode.exit()"
+        @exit="onCameraModeExitRequested"
         @story-click="onCameraStoryClick"
         @active-change="onCameraActiveChange"
         @close-card="cameraMode.closeStoryCard()"
@@ -1322,6 +1322,9 @@ const cameraCurrentFov = ref(75)
 const cameraRegion = ref('繁星天区')
 const cameraOverlayRef = ref<InstanceType<typeof CameraOverlay> | null>(null)
 let cameraFrameUnsub: (() => void) | null = null
+// 相机模式下点击右下角条目 → 打开 StarDetail 详情时临时隐藏 overlay
+// true = 详情UI打开中，overlay隐藏；StarDetail关闭后回到false → 恢复相机取景UI（不退出相机模式）
+const cameraDetailOpen = ref(false)
 
 /**
  * 根据当前相机指向的赤经(RA)/赤纬(DEC)计算动态天区名。
@@ -1385,26 +1388,43 @@ async function onCameraStoryClick(star: any) {
   const centered = panel?.isCardCentered ? panel.isCardCentered(star.id) : true
   if (!centered) panel?.scrollToCardCenter?.(star.id)
 
-  // 步骤2：镜头飞行到该星（用 zoomLevel=3 拉近）
+  // 决定归属星表星 ID（星表恒星优先用自己的 id；用户故事星用其归属 catalogStarId）
+  const isCatalogStar = (star.catalogStarId == null || star.catalogStarId === undefined)
+  const catalogStarIdNum: number = isCatalogStar
+    ? Number(star.id)
+    : Number(star.catalogStarId)
+  const storyStarIdNum: number = Number(star.id)   // 用户故事星本身 id（用于找 activeIndex）
+
+  // 步骤2：镜头飞行到该星（zoomLevel=3 拉近）— 传原始 star 对象，避免 TS 类型冲突
   sky.flyToStar3D(star, { zoomLevel: 3 })
 
-  // 步骤3：等待约 700ms 让用户看到飞行动画，然后退出相机模式 + 跳路由打开完整星星详情
+  // 步骤3：等飞行 700ms，让用户看到飞行动画
   await new Promise(r => setTimeout(r, 700))
 
-  // 退出相机模式（回到 normal 模式）
-  cameraMode.exit()
+  // ═══════════════════════════════════════════════════════════
+  // 步骤4：不退出相机模式！直接打开 StarDetail + 隐藏 overlay
+  // ═══════════════════════════════════════════════════════════
+  // 4.1 先标记 cameraDetailOpen=true → CameraOverlay 被 v-if="!cameraDetailOpen" 隐藏
+  cameraDetailOpen.value = true
 
-  // 决定跳路由用哪个 starId
-  // 规则：有 catalogStarId（星表真实星）优先用 catalogStarId（与聚焦定位一致）；否则用故事星 id
-  const targetStarId = (star.catalogStarId != null && star.catalogStarId !== undefined)
-    ? String(star.catalogStarId)
-    : String(star.id)
-
-  // 用 router.replace 同路径下仅改 query，避免重复 history；StarDetail 的 watch route.query.star 会自动打开详情
+  // 4.2 路由同步写 ?star=xxx（便于 watch 聚焦 + 刷新后能恢复定位）
   router.replace({
     path: '/sky',
-    query: { ...route.query, star: targetStarId },
+    query: { ...route.query, star: String(catalogStarIdNum) },
   })
+
+  // 4.3 调用 onStarClick() 赋值 selectedStarInfo / selectedStories / catalogStats
+  //     — onStarClick 内部对相机模式的拦截已被改为 !cameraDetailOpen，因此会正常执行
+  onStarClick(catalogStarIdNum)
+
+  // 4.4 如果是「用户故事星」，找到该故事在 StarDetail 的 stories 数组中的位置，
+  //     把 activeStoryIndex 设置到那个故事，让用户第一眼就看到自己点的那一则
+  await nextTick()
+  if (!isCatalogStar && !Number.isNaN(storyStarIdNum)) {
+    const all = storiesByStarId.value.get(catalogStarIdNum) || []
+    const idx = all.findIndex((s: StoryData) => s.id === storyStarIdNum)
+    if (idx >= 0) activeStoryIndex.value = idx
+  }
 }
 
 function onCameraActiveChange(starId: number) {
@@ -1425,10 +1445,12 @@ function onCameraSetMode(mode: CameraFilterMode) {
 }
 
 // ═══ 天镜览星 · 边界处理 ═══
-// ESC 键退出相机模式：卡片打开时先关卡片，否则退出相机模式
+// ESC 键退出相机模式：优先级：StarDetail开 → 先关StarDetail → 再关相机故事卡片 → 最后退出相机模式
 function onCameraKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape' && cameraMode.cameraMode.value === 'observe') {
-    if (cameraMode.isCardOpen.value) {
+    if (cameraDetailOpen.value && selectedStarInfo.value) {
+      onCloseDetail()
+    } else if (cameraMode.isCardOpen.value) {
       cameraMode.closeStoryCard()
     } else {
       cameraMode.exit()
@@ -1436,10 +1458,19 @@ function onCameraKeyDown(e: KeyboardEvent) {
   }
 }
 
+// 用户从相机 HUD 的「退出」按钮或路由离开前触发：先关 StarDetail（如果开着）再真正退出相机模式
+function onCameraModeExitRequested() {
+  if (cameraDetailOpen.value && selectedStarInfo.value) {
+    // 先把 StarDetail 关掉（清理selectedStarInfo + cameraDetailOpen + 去掉路由star查询）
+    onCloseDetail()
+  }
+  cameraMode.exit()
+}
+
 // 路由离开时清理相机模式状态
 onBeforeRouteLeave(() => {
   if (cameraMode.cameraMode.value === 'observe') {
-    cameraMode.exit()
+    onCameraModeExitRequested()
   }
 })
 
@@ -1740,8 +1771,9 @@ function onRecordStorySubmitted(story: any) {
 }
 
 function onStarClick(starId: number) {
-  // 天镜览星模式下禁止点击星星弹出故事界面（相机模式有独立交互逻辑）
-  if (cameraMode.cameraMode.value === 'observe') return
+  // 天镜览星模式下：仅在详情未打开时禁止点击星星弹出界面
+  // cameraDetailOpen=true 时（从相机列表点进来），允许正常打开 StarDetail
+  if (cameraMode.cameraMode.value === 'observe' && !cameraDetailOpen.value) return
   // 负 id = 行星，转走 onPlanetClick 路径（防御性，从 fly-to-star CustomEvent 触发时也能正确处理）
   if (isPlanetId(starId)) {
     const bodyName = getPlanetBodyName(starId)
@@ -1837,7 +1869,31 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; locatedTarget.value = null; planetObserveMode.value = false; skyRef.value?.sky?.setObserveMode(false); skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup(); if (lastEnteredTarget.value && isMobile.value) { locatedTarget.value = lastEnteredTarget.value; lastEnteredTarget.value = null } }
+function onCloseDetail() {
+  // ── 如果是从相机模式打开的详情（cameraDetailOpen=true）：
+  //    ① 还原 cameraDetailOpen=false → 恢复 CameraOverlay 取景UI
+  //    ② 移除路由上的 ?star= 查询（否则 watch route.query.star 会再次调用 onStarClick 把详情重新打开）
+  //    ③ 不调用 cameraMode.exit()，保持相机模式不退出
+  if (cameraDetailOpen.value && cameraMode.cameraMode.value === 'observe') {
+    cameraDetailOpen.value = false
+    const nextQuery: Record<string, any> = { ...route.query }
+    delete nextQuery.star
+    router.replace({ path: '/sky', query: nextQuery })
+  }
+  // 通用清理：
+  selectedStories.value = []
+  selectedStarInfo.value = null
+  catalogStats.value = null
+  locatedTarget.value = null
+  planetObserveMode.value = false
+  skyRef.value?.sky?.setObserveMode(false)
+  skyRef.value?.sky?.setKernelLines([])
+  skyRef.value?.sky?.exitCloseup()
+  if (lastEnteredTarget.value && isMobile.value) {
+    locatedTarget.value = lastEnteredTarget.value
+    lastEnteredTarget.value = null
+  }
+}
 // PC 端行星特写 · 切换观察模式（issue #136）
 // true：隐藏故事面板露出行星，禁止 hover/点击，只允许拖动/缩放观察
 // false：回到故事界面，恢复正常交互
