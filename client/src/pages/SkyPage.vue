@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -63,19 +63,6 @@
         <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
-        <!-- 记录：AI 匹配星辰写故事（相机模式隐藏，不依赖定位，首帧就显示） -->
-        <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-record-btn" @click="openRecordForm" title="记录 · 寻找归属星辰">
-          <PenLine :size="18" />
-        </button>
-        <!-- 星笺广场：穹庭书局入口 -->
-        <button
-          v-if="cameraMode.cameraMode.value !== 'observe'"
-          class="nav-icon-btn nav-square-btn"
-          @click="goFolioSquare"
-          title="穹庭书局 · 星笺广场"
-        >
-          <BookMarked :size="18" />
-        </button>
         <!-- 星笺：打开我的合集（相机模式隐藏） -->
         <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
           <Library :size="18" />
@@ -83,10 +70,6 @@
         <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，首帧就显示） -->
         <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
-        </button>
-        <!-- 天镜览星：进入相机模式（相机模式期间通过 CameraOverlay 的返回按钮或 ESC 退出） -->
-        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-camera-btn" @click="toggleCameraMode" title="进入天镜览星" aria-label="进入天镜览星" aria-haspopup="dialog" :aria-expanded="false">
-          <ApertureIcon />
         </button>
         <!-- 用户/登录（相机模式隐藏） -->
         <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
@@ -266,42 +249,79 @@
 
     <!-- 三张叙事引导牌（相机模式隐藏） -->
     <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-cards">
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div class="guide-cards-row">
+        <div class="guide-card">
+          <div class="guide-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <p class="guide-title">历史里的星</p>
+          <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
         </div>
-        <p class="guide-title">历史里的星</p>
-        <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
+        <div class="guide-card">
+          <div class="guide-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+          <p class="guide-title">路过别人的星光</p>
+          <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
+        </div>
+        <div class="guide-card">
+          <div class="guide-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          </div>
+          <p class="guide-title">挂上我的故事</p>
+          <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
+        </div>
+        <div class="guide-card guide-action-card">
+          <div class="guide-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+          </div>
+          <p class="guide-title">点开一颗星</p>
+          <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
+        </div>
       </div>
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        </div>
-        <p class="guide-title">路过别人的星光</p>
-        <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
-      </div>
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-        </div>
-        <p class="guide-title">挂上我的故事</p>
-        <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
-      </div>
-      <div class="guide-card guide-action-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
-        </div>
-        <p class="guide-title">点开一颗星</p>
-        <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
+
+      <!-- ═══ 引导动作：三个主功能入口（替代右上角原彩色按钮） ═══ -->
+      <div class="guide-actions" aria-label="引导动作区">
+        <button
+          type="button"
+          class="guide-action guide-action-record"
+          @click="openRecordForm"
+        >
+          <span class="ga-icon"><PenLine :size="18" /></span>
+          <span class="ga-text-block">
+            <span class="ga-title">记录心事</span>
+            <span class="ga-sub">AI 为你寻归属星辰 →</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="guide-action guide-action-square"
+          @click="goFolioSquare"
+        >
+          <span class="ga-icon"><BookMarked :size="18" /></span>
+          <span class="ga-text-block">
+            <span class="ga-title">穹庭书局</span>
+            <span class="ga-sub">翻开星笺广场 →</span>
+          </span>
+        </button>
+        <button
+          v-if="locationReady"
+          type="button"
+          class="guide-action guide-action-camera"
+          @click="toggleCameraMode"
+        >
+          <span class="ga-icon"><ApertureIcon /></span>
+          <span class="ga-text-block">
+            <span class="ga-title">天镜览星</span>
+            <span class="ga-sub">今夜取景观星 →</span>
+          </span>
+        </button>
       </div>
     </div>
 
     <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
-    </div>
-    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="hint">
-      <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
     </div>
 
     <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
@@ -2710,8 +2730,18 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
   z-index: 15;
+  pointer-events: none;
+  width: min(1200px, calc(100vw - 40px));
+}
+.guide-cards > .guide-card { pointer-events: auto; }
+.guide-cards > .guide-cards-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
   pointer-events: none;
 }
 .guide-card {
@@ -2748,6 +2778,93 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   border-color: rgba(255, 217, 138, 0.35);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
+
+/* ─── 引导动作区（四导航框下方，三主按钮）：纯扁平 + 引导感 ─── */
+.guide-actions {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  pointer-events: auto; /* guide-cards 自身是 none，需显式开 */
+  grid-column: 1 / -1;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.guide-action {
+  flex: 1 1 0;
+  min-width: 180px;
+  max-width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  transition: background 0.18s, transform 0.18s;
+  background: var(--overlay-04);
+  color: var(--ink);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.guide-action:hover { transform: translateY(-2px); }
+.guide-action:active { transform: translateY(0); }
+
+.guide-action .ga-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.guide-action .ga-text-block {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.guide-action .ga-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.guide-action .ga-sub {
+  margin-top: 3px;
+  font-size: 0.7rem;
+  opacity: 0.72;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ① 记录心事：暖金调 */
+.guide-action-record {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.guide-action-record:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.guide-action-record .ga-icon { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+
+/* ② 穹庭书局：紫金调 */
+.guide-action-square {
+  background: rgba(202, 167, 255, 0.12);
+  color: #d9c4ff;
+}
+.guide-action-square:hover { background: color-mix(in srgb, #caa7ff 22%, transparent); }
+.guide-action-square .ga-icon { background: rgba(202, 167, 255, 0.1); color: var(--star-purple); }
+
+/* ③ 天镜览星：蓝紫调（相机） */
+.guide-action-camera {
+  background: rgba(158, 198, 255, 0.12);
+  color: #c5daff;
+}
+.guide-action-camera:hover { background: color-mix(in srgb, #9ec6ff 22%, transparent); }
+.guide-action-camera .ga-icon { background: rgba(158, 198, 255, 0.1); color: var(--star-blue); }
 
 .toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
