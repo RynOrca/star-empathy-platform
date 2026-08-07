@@ -70,7 +70,7 @@ function attachCollectionInfo(stories: any[]): any[] {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db.prepare(
     `SELECT c.id, c.name, c.cover_color, c.visibility,
-       (SELECT COUNT(*) FROM stars s2 WHERE s2.collection_id = c.id AND s2.type = 'user') as story_count
+       (SELECT COUNT(*) FROM stars s2 WHERE s2.collection_id = c.id) as story_count
      FROM collections c WHERE c.id IN (${placeholders})`
   ).all(...ids) as { id: number; name: string; cover_color: string | null; visibility: string; story_count: number }[];
   const map = new Map<number, { name: string; cover_color: string | null; visibility: string; story_count: number }>();

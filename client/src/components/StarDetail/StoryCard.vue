@@ -45,12 +45,12 @@
 
     <!-- 合集 / 星星归属 + 标签行：左侧归属、右侧标签，同一行；两者都空时隐藏 -->
     <div
-      v-if="(showStarBelonging && starBelonging) || story.collectionName || displayTags.length"
+      v-if="(effectiveShowStarBelonging && starBelonging) || story.collectionName || displayTags.length"
       class="story-tags-row"
     >
       <!-- 星星归属（合集上下文：显示挂在哪颗星上） → 点击跳转 /sky?star=xxx -->
       <span
-        v-if="showStarBelonging && starBelonging && mainStarCatalogId != null"
+        v-if="effectiveShowStarBelonging && starBelonging && mainStarCatalogId != null"
         class="story-star-belong ssb-clickable"
         :style="{ '--ssb-c': starBelonging.color } as Record<string, string>"
         :title="`前往该星星：${starBelonging.name}`"
@@ -70,7 +70,7 @@
         @click="collectionClickable && $emit('collection-click', story)"
       />
       <!-- 分隔点：归属/合集和标签同时存在时 -->
-      <span v-if="(showStarBelonging ? !!starBelonging : !!story.collectionName) && displayTags.length" class="story-tag-sep"></span>
+      <span v-if="(effectiveShowStarBelonging ? !!starBelonging : !!story.collectionName) && displayTags.length" class="story-tag-sep"></span>
       <!-- 标签（右侧） -->
       <span
         v-for="t in displayTags"
@@ -121,6 +121,7 @@ const route = useRoute()
 const props = defineProps<{
   story: {
     id: number
+    type?: 'history' | 'user' | string | null
     title: string | null
     imageUrl: string | null
     origin: string | null
@@ -168,6 +169,16 @@ const starBelonging = computed(() => {
   const id = mainStarCatalogId.value
   if (id == null) return null
   return getStarNameInfo(id) ?? null
+})
+
+/**
+ * 「星星归属 vs 合集徽章」决策：
+ * - 历史故事(type==='history')且有有效合集名 → 不显示星星归属，优先显示合集徽章
+ * - 其他情况：遵循 props.showStarBelonging 传参（默认 false 显示合集徽章；合集上下文传 true 显示星星归属）
+ */
+const effectiveShowStarBelonging = computed<boolean>(() => {
+  if (props.story.type === 'history' && props.story.collectionName) return false
+  return !!props.showStarBelonging
 })
 
 /** 跳转星空页面并打开该星星详情（防止冒泡触发卡片 click）
