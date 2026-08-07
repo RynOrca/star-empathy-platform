@@ -192,7 +192,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="true"
+              :showStarBelonging="shouldShowStarBelonging(detailStory)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -212,8 +212,11 @@
               :displayResonance="(s: any) => getDisplayResonance(s)"
               :displayViews="(s: any) => getStoryViewCount(s.id)"
               :isResonated="(s: any) => justResonatedId === s.id"
+              :collectionClickable="true"
+              :showStarBelonging="true"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -235,7 +238,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="true"
+              :showStarBelonging="shouldShowStarBelonging(detailStory)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -259,10 +262,13 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="true"
               @update:searchQuery="searchQuery = $event"
               @update:sortKey="onSortKeyChange"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -289,7 +295,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="true"
+              :showStarBelonging="shouldShowStarBelonging(detailStory)"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -311,8 +317,11 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="true"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -916,7 +925,7 @@
                 :origin="detailStory.origin ?? null"
                 :createdAtIso="detailStory.createdAt"
                 :siblingStories="siblingStoriesFor(detailStory)"
-                :showStarBelonging="true"
+                :showStarBelonging="shouldShowStarBelonging(detailStory)"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
@@ -1144,7 +1153,7 @@ const emit = defineEmits<{
   /** PC 端行星特写：点击 overlay 空白切换观察模式（隐藏故事面板露出行星） */
   toggleObserve: []
   /** 合集徽章点击：透传合集信息给父组件，由父组件决定如何展示合集内所有故事 */
-  'collection-click': [data: { collectionId: number; collectionName: string | null }]
+  'collection-click': [data: { collectionId: number; collectionName: string | null; userId: number | null }]
   /** 配合 props.targetStoryId 做 v-model 双向绑定：消费完 targetStoryId 后 emit 给父级清零 */
   'update:targetStoryId': [id: number | null]
 }>()
@@ -1619,15 +1628,27 @@ function openStoryDetail(input: { id: number } | number) {
 
 /**
  * 合集徽章点击：透传合集信息给父组件（SkyPage）。
- * 具体的合集详情视图（展示合集内所有故事）暂未实现，由父组件后续接入。
+ * 具体的合集详情视图由父组件决定如何展示（弹窗/路由跳转）
  */
 function onCollectionClick(story: any) {
   if (story?.collectionId != null) {
     emit('collection-click', {
       collectionId: story.collectionId,
       collectionName: story.collectionName ?? null,
+      userId: story.userId ?? null,
     })
   }
+}
+
+/**
+ * 故事详情页左侧显示「星星归属胶囊」还是「合集徽章」：
+ * - 历史故事（type==='history'）且有有效合集名 → 优先显示合集徽章（把星星链接隐藏）
+ * - 用户故事 type==='user' / 历史故事但无合集 → 显示星星归属胶囊
+ */
+function shouldShowStarBelonging(story: any): boolean {
+  if (!story) return true
+  if (story.type === 'history' && story.collectionName) return false
+  return true
 }
 
 // ─── 时间格式化 ───
