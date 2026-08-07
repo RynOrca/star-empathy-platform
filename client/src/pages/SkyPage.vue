@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -337,12 +337,11 @@
           class="guide-action guide-action-collapse"
           @click="toggleGuideCards"
           :aria-expanded="guideCardsOpen"
-          :title="guideCardsOpen ? '收起四个引导框' : '展开四个引导框'"
+          :title="guideCardsOpen ? '收起上面四张引导卡，让星空更纯净' : '唤回四张引导卡'"
         >
-          <span class="ga-icon">
-            <ChevronUp v-if="guideCardsOpen" :size="20" />
-            <ChevronDown v-else :size="20" />
-          </span>
+          <ChevronUp v-if="guideCardsOpen" :size="22" stroke-width="2" class="gac-icon" />
+          <ChevronDown v-else :size="22" stroke-width="2" class="gac-icon" />
+          <span class="gac-label">{{ guideCardsOpen ? '收起引导' : '唤回引导' }}</span>
         </button>
       </div>
     </div>
@@ -2831,12 +2830,12 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-cards-row-enter-from { opacity: 0; transform: translateY(10px) scale(0.98); }
 .guide-cards-row-leave-to   { opacity: 0; transform: translateY(14px) scale(0.96); }
 
-/* ═══ 第二行：4 引导动作按钮：用 subgrid 与上面 4 张卡 1:1 列对齐 ═══ */
+/* ═══ 第二行：4 引导动作按钮：独立列宽 (1fr 1fr 1fr auto)，与上方 4 卡列宽明显错位 ═══ */
 .guide-actions {
   grid-column: 1 / -1;
   grid-row: 2;
   display: grid;
-  grid-template-columns: subgrid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto; /* 第4列自适应正方形，不跟随卡宽 */
   column-gap: 0.75rem;
   width: 100%;
   pointer-events: auto;
@@ -2918,20 +2917,36 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-action-square:hover:not(:disabled) { background: color-mix(in srgb, #caa7ff 22%, transparent); }
 .guide-action-square .ga-icon { background: rgba(202, 167, 255, 0.1); color: var(--star-purple); }
 
-/* ④ 折叠按钮：纯图标 + 中性暗色块（最右对齐第 4 卡） */
+/* ④ 引导折叠：正方形（宽=高），与上方第四张宽卡明显错位，避免误以为列一一对应 */
 .guide-action-collapse {
+  /* 取 guide-action 高度 ≈ 其他三按钮总高度 */
+  width: auto;
+  min-width: 82px;
+  aspect-ratio: 1 / 1;
+  padding: 8px 10px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted-light);
-  border: 1px dashed rgba(255, 255, 255, 0.08);
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d9e0ee;
 }
 .guide-action-collapse:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--accent);
-  border-color: rgba(255, 217, 138, 0.25);
+  background: color-mix(in srgb, #e5e8ef 14%, transparent);
+  color: #eef2ff;
 }
-.guide-action-collapse .ga-icon { width: 38px; height: 38px; }
+.guide-action-collapse .gac-icon {
+  color: var(--muted-light);
+}
+.guide-action-collapse:hover:not(:disabled) .gac-icon { color: var(--accent); }
+.guide-action-collapse .gac-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.82;
+  white-space: nowrap;
+}
 
 /* 引导卡收起后：整个 guide-cards 不改变 bottom 位置（只改行高更紧凑） */
 .guide-cards.collapsed { row-gap: 0; }
