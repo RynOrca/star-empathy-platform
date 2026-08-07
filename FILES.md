@@ -90,6 +90,9 @@
 | `generateAllAnalyses.ts` | **单星分析批量生成**。调用 starAnalysisAgent.runAll()：themehour SQL 聚合 + AI 三段文 / persona 画像 / emotion 情感故事摘录；支持 --ids/--limit/--only/--force/--throttle；对应脚本名 `npm run agent:analyze`；内核脚本为 `npm run agent:kernels` |
 | `migrate-origin.ts` | 数据迁移脚本（旧 origin 字段迁移） |
 | `seed_user_stories.ts` | 用户故事种子数据（type='user'，30 颗星 × 2 条 = 60 条）。resonance_count 手写固定值；view_count 按标题+内容稳定哈希 × 2.0~3.0x 比例算出，保证多次 seed 稳定无随机。 |
+| `migrate-default-collections.ts` | 为所有用户创建「公开星笺 + 私密星笺」双默认合集；把以前没有归属合集的用户故事（type='user', collection_id NULL）归入「公开星笺」。幂等：重复执行安全，已有合集的故事不动。命令：`npm run migrate:default-collections`。 |
+| `seed-history-collections.ts` | **为 477 条历史故事创建 8 个主题合集并自动归类**。合集 owner 是用户表自动创建的「星穹守护」系统用户，全部 public。8 个合集按 origin + 标题关键词匹配，优先级从高到低：①月韵·唐诗中的星空（10 首唐诗）②星官故实（143 篇·中国星官/星宿/`·由来` 标题）③奥林匹斯星河（63 条·古希腊/希腊语/拉丁语/罗马语）④阿拉伯星名考（95 条·阿拉伯语/苏美尔/巴比伦/古埃及）⑤近代星名志（82 条·近代/现代命名）⑥星界编年史（72 条·天文学+跨文化）⑦天汉神话（7 条·中国天文神话：夸父/嫦娥/启明/彗星等）⑧星友之声（5 条·社区 origin=NULL 原创心声）。幂等：合集按 name 精确复用；仅补写 collection_id 为 NULL 的历史故事。命令：`npm run seed:history-collections`。 |
+| `fix-invalid-catalog-star-ids.ts` | 修复 stars 表中坏故事的归属星：catalog_star_id 为 NULL、负数非行星、正数不在 catalog 范围的故事，随机挂到有效 catalog 星上，并补写 `story_catalog_stars` 连接表。命令：`npm run fix:catalog`。 |
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
 | **`AGENT_CONTROL.md`** | **Agent 控制手册**。Key 配置、冷启动、agent:kernels、agent:analyze 参数、幂等&安全、常见 401/429 排查、自动再生闭环、部署自检清单（**部署必读**） |
 | `fix-cids.mjs` | 修复 catalog_star_id 脏数据（历史迁移，异常场景才用） |
