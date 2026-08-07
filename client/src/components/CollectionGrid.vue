@@ -22,7 +22,7 @@
         v-for="c in collections"
         :key="c.id"
         class="cg-card"
-        :class="{ private: c.visibility === 'private' }"
+        :class="{ private: c.visibility === 'private', anonymous: c.visibility === 'anonymous', galaxy: c.visibility === 'galaxy' }"
         @click="$emit('open', c)"
       >
         <!-- 顶部色带 + 操作 -->
@@ -41,11 +41,19 @@
         <!-- 标题 + 可见性 -->
         <div class="cg-card-head">
           <h4 class="cg-name">{{ c.name }}</h4>
-          <span v-if="c.visibility === 'private'" class="cg-private-tag">
+          <span v-if="c.visibility === 'private'" class="cg-tag cg-tag-private">
             <Lock :size="9" />
             <span>私有</span>
           </span>
-          <span v-else class="cg-public-tag">
+          <span v-else-if="c.visibility === 'anonymous'" class="cg-tag cg-tag-anonymous">
+            <Ghost :size="9" />
+            <span>匿名</span>
+          </span>
+          <span v-else-if="c.visibility === 'galaxy'" class="cg-tag cg-tag-galaxy">
+            <Galaxy :size="9" />
+            <span>星河</span>
+          </span>
+          <span v-else class="cg-tag cg-tag-public">
             <Globe :size="9" />
             <span>公开</span>
           </span>
@@ -73,7 +81,8 @@
 </template>
 
 <script setup lang="ts">
-import { Plus, Library, Lock, Globe, Pencil, Trash2 } from 'lucide-vue-next'
+import { Plus, Library, Lock, Globe, Pencil, Trash2, Ghost, Sparkles } from 'lucide-vue-next'
+const Galaxy = Sparkles
 import type { Collection } from '../composables/useCollections'
 
 defineProps<{
@@ -220,7 +229,7 @@ function formatDate(s: string | null | undefined): string {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cg-private-tag, .cg-public-tag {
+.cg-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -230,15 +239,25 @@ function formatDate(s: string | null | undefined): string {
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
-.cg-private-tag {
+.cg-tag-private, .cg-private-tag {
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.42);
   border: 0.5px solid rgba(255, 255, 255, 0.07);
 }
-.cg-public-tag {
+.cg-tag-public, .cg-public-tag {
   background: rgba(149, 240, 192, 0.07);
   color: var(--star-green, #95f0c0);
   border: 0.5px solid rgba(149, 240, 192, 0.18);
+}
+.cg-tag-anonymous {
+  background: rgba(169, 189, 255, 0.08);
+  color: rgba(169, 189, 255, 0.92);
+  border: 0.5px solid rgba(169, 189, 255, 0.22);
+}
+.cg-tag-galaxy {
+  background: rgba(232, 184, 109, 0.10);
+  color: rgba(255, 229, 168, 0.96);
+  border: 0.5px solid rgba(232, 184, 109, 0.28);
 }
 
 .cg-desc {

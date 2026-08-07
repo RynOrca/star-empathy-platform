@@ -2,13 +2,16 @@ import db from '../db';
 import { getStoriesByCollectionId } from './starService';
 import { invalidateCollectionAnalysisCache } from './collectionAnalysis';
 
+export type CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy';
+export const PUBLIC_VISIBILITIES: CollectionVisibility[] = ['public', 'anonymous', 'galaxy']; // 匿名/星河也公开展示
+
 export interface Collection {
   id: number;
   user_id: number;
   name: string;
   description: string | null;
   cover_color: string | null;
-  visibility: 'public' | 'private';
+  visibility: CollectionVisibility;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -18,12 +21,16 @@ export interface CollectionInput {
   name: string;
   description?: string | null;
   coverColor?: string | null;
-  visibility?: 'public' | 'private';
+  visibility?: CollectionVisibility;
 }
 
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
-// 校验合集输入，返回错误信息或 null
+/**
+ * 校验合集输入：
+ * - 星河合集仅由后台/DB 管理，普通 API 一律拒绝创建或切换到 galaxy
+ * - anonymous：公开展示，对外隐藏故事作者名
+ */
 export function validateCollectionInput(input: CollectionInput): string | null {
   const name = (input.name || '').trim();
   if (!name) return '合集名称不能为空';
@@ -34,10 +41,31 @@ export function validateCollectionInput(input: CollectionInput): string | null {
   if (input.coverColor != null && input.coverColor !== '' && !HEX_RE.test(input.coverColor)) {
     return '主题色需为 #RRGGBB 格式';
   }
-  if (input.visibility != null && !['public', 'private'].includes(input.visibility)) {
-    return '可见性仅支持 public/private';
+  if (input.visibility != null && !['public', 'private', 'anonymous', 'galaxy'].includes(input.visibility)) {
+    return '可见性仅支持 public/private/anonymous/galaxy';
+  }
+  if (input.visibility === 'galaxy') {
+    return '星河合集仅由官方后台统一维护，不开放自建';
   }
   return null;
+}
+
+/**
+ * 故事用户名/作者名隐藏规则：
+ *   - anonymous 合集：对外隐藏作者（仅合集创建者自己可见）
+ *   - 故事单篇 is_anonymous=1：对外隐藏（保留老机制）
+ */
+export function shouldHideAuthor(params: {
+  collectionVisibility?: CollectionVisibility | string | null;
+  collectionUserId?: number;
+  storyIsAnonymous?: number | boolean;
+  currentUserId?: number;
+}): boolean {
+  const { collectionVisibility, collectionUserId, storyIsAnonymous, currentUserId } = params;
+  const isOwner = currentUserId === collectionUserId;
+  if (Number(storyIsAnonymous) === 1 && !isOwner) return true;
+  if (collectionVisibility === 'anonymous' && !isOwner) return true;
+  return false;
 }
 
 // 给合集行附加 storyCount（聚合 stars.collection_id）
@@ -53,8 +81,8 @@ function attachStoryCount(rows: any[]): any[] {
   return rows.map((r) => ({ ...r, story_count: map.get(r.id) ?? 0 }));
 }
 
-// 我的合集列表（可选按可见性过滤）
-export function listCollections(userId: number, visibility?: 'public' | 'private'): any[] {
+// 我的合集列表（可选按可见性过滤，支持 anonymous/galaxy 过滤）
+export function listCollections(userId: number, visibility?: CollectionVisibility): any[] {
   const rows = visibility
     ? db.prepare('SELECT * FROM collections WHERE user_id = ? AND visibility = ? ORDER BY sort_order ASC, created_at DESC').all(userId, visibility)
     : db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at DESC').all(userId);
@@ -76,12 +104,28 @@ export function createCollection(userId: number, input: CollectionInput): { erro
   return { collection: attachStoryCount([row as any])[0] };
 }
 
-// 合集详情（含故事列表）。可见性：private 仅 owner 可见，否则返回 null（404，不暴露存在性）
+// 合集详情（含故事列表）。可见性：
+//   - private：仅 owner 可见，否则 404
+//   - public / anonymous / galaxy：对所有人可见
+// 故事作者名：anonymous 合集对外隐藏，owner 可看到
 export function getCollectionDetail(id: number, currentUserId?: number): any | null {
   const row = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!row) return null;
-  if (row.visibility === 'private' && row.user_id !== currentUserId) return null;
+  const isOwner = currentUserId === row.user_id;
+  if (row.visibility === 'private' && !isOwner) return null;
   const stories = getStoriesByCollectionId(id);
+  // 匿名合集对外隐藏故事作者名
+  const storiesSanitized = stories.map((s: any) => {
+    if (shouldHideAuthor({
+      collectionVisibility: row.visibility,
+      collectionUserId: row.user_id,
+      storyIsAnonymous: s.is_anonymous,
+      currentUserId,
+    })) {
+      return { ...s, username: null, authorHidden: true };
+    }
+    return s;
+  });
   // 收藏数：合集故事所属 catalog star 被收藏的总次数（含 story_catalog_stars 多对多绑定）
   const favRow = db.prepare(`
     SELECT COUNT(*) as cnt FROM favorites
@@ -92,13 +136,13 @@ export function getCollectionDetail(id: number, currentUserId?: number): any | n
       JOIN stars s ON s.id = scs.story_id WHERE s.collection_id = ?
     )
   `).get(id, id) as { cnt: number };
-  const enriched = { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories };
+  const enriched = { ...attachStoryCount([row])[0], favorite_count: favRow.cnt, stories: storiesSanitized };
   // 双写：同时返回 snake_case (story_count) 和 camelCase (storyCount)，兼容前端/路由不同命名
-  enriched.storyCount = enriched.story_count ?? stories.length;
+  enriched.storyCount = enriched.story_count ?? storiesSanitized.length;
   return enriched;
 }
 
-// 编辑合集（owner 校验）
+// 编辑合集（仅 owner 可编辑；星河合集仅后台/DB 管理，普通 API 直接拒绝创建/更新 visibility=galaxy）
 export function updateCollection(
   id: number,
   userId: number,
@@ -106,12 +150,17 @@ export function updateCollection(
 ): { error?: string; collection?: any; notFound?: boolean; forbidden?: boolean } {
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
-  if (existing.user_id !== userId) return { forbidden: true };
+  // 星河合集：仅后台/DB 管理，普通前端接口不允许改
+  if (existing.visibility === 'galaxy') return { forbidden: true };
+  if (userId !== existing.user_id) return { forbidden: true };
+  // 切换到 galaxy：不开放（后台管理）
+  const nextVisibility = patch.visibility ?? existing.visibility;
+  if (nextVisibility === 'galaxy') return { error: '星河合集仅由官方后台统一维护，不开放自建' };
   const input: CollectionInput = {
     name: patch.name ?? existing.name,
     description: patch.description !== undefined ? patch.description : existing.description,
     coverColor: patch.coverColor !== undefined ? patch.coverColor : existing.cover_color,
-    visibility: patch.visibility ?? existing.visibility,
+    visibility: nextVisibility,
   };
   const err = validateCollectionInput(input);
   if (err) return { error: err };
@@ -125,11 +174,12 @@ export function updateCollection(
   return { collection: attachStoryCount([row as any])[0] };
 }
 
-// 删除合集（owner 校验；故事 collection_id 置 NULL，故事保留）
+// 删除合集（仅 owner 可删；星河合集仅后台/DB 管理，接口层面不允许删）
 export function deleteCollection(id: number, userId: number): { notFound?: boolean; forbidden?: boolean } {
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
-  if (existing.user_id !== userId) return { forbidden: true };
+  if (existing.visibility === 'galaxy') return { forbidden: true };
+  if (userId !== existing.user_id) return { forbidden: true };
   invalidateCollectionAnalysisCache(id);
   db.prepare('UPDATE stars SET collection_id = NULL WHERE collection_id = ?').run(id);
   db.prepare('DELETE FROM collections WHERE id = ?').run(id);
@@ -137,6 +187,7 @@ export function deleteCollection(id: number, userId: number): { notFound?: boole
 }
 
 // 公开合集列表（分页，可按 userId 过滤某作者）
+// 公开 = visibility IN ('public', 'anonymous', 'galaxy')，星河/匿名合集也对外展示
 export function listPublicCollections(
   userId?: number,
   page = 1,
@@ -145,9 +196,12 @@ export function listPublicCollections(
   const p = Math.max(1, Math.floor(page));
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
-  const where = userId ? 'visibility = ? AND user_id = ?' : 'visibility = ?';
-  const countParams = userId ? (['public', userId] as any[]) : (['public'] as any[]);
-  const listParams = userId ? (['public', userId, l, offset] as any[]) : (['public', l, offset] as any[]);
+  const publicValues = PUBLIC_VISIBILITIES.map(() => '?').join(','); // ?,?,?
+  const where = userId
+    ? `visibility IN (${publicValues}) AND user_id = ?`
+    : `visibility IN (${publicValues})`;
+  const countParams: any[] = userId ? [...PUBLIC_VISIBILITIES, userId] : [...PUBLIC_VISIBILITIES];
+  const listParams: any[] = userId ? [...PUBLIC_VISIBILITIES, userId, l, offset] : [...PUBLIC_VISIBILITIES, l, offset];
 
   const totalRow = db.prepare(`SELECT COUNT(*) as cnt FROM collections WHERE ${where}`).get(...countParams) as { cnt: number };
   const total = totalRow.cnt;

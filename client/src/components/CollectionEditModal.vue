@@ -73,6 +73,18 @@
               <button
                 type="button"
                 class="cem-visi-btn"
+                :class="{ on: form.visibility === 'anonymous' }"
+                @click="form.visibility = 'anonymous'"
+              >
+                <Ghost :size="12" />
+                <div class="cem-visi-text">
+                  <span class="cem-visi-name">匿名</span>
+                  <span class="cem-visi-desc">公开展示，对外隐藏作者名</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                class="cem-visi-btn"
                 :class="{ on: form.visibility === 'private' }"
                 @click="form.visibility = 'private'"
               >
@@ -111,8 +123,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed, nextTick } from 'vue'
-import { X, Globe, Lock, AlertCircle } from 'lucide-vue-next'
+import { X, Globe, Lock, AlertCircle, Ghost } from 'lucide-vue-next'
 import type { Collection, CreateCollectionInput, UpdateCollectionInput } from '../composables/useCollections'
+import { useAuth } from '../stores/auth'
+
+const { user } = useAuth()
 
 const props = defineProps<{
   show: boolean
@@ -146,21 +161,21 @@ const form = reactive({
   name: '',
   description: '',
   coverColor: DEFAULT_COLOR as string | null,
-  visibility: 'public' as 'public' | 'private',
+  visibility: 'public' as 'public' | 'private' | 'anonymous' | 'galaxy',
 })
 
 const isEdit = computed(() => !!props.collection)
 
 const canSubmit = computed(() => form.name.trim().length > 0 && form.name.trim().length <= 40)
 
-/** 打开时同步表单：编辑模式回填，新建模式重置 */
+/** 打开时同步表单：编辑模式回填，新建模式重置。星河合集不开放前端编辑，被强推回 public。 */
 watch(() => props.show, async (v) => {
   if (!v) return
   if (props.collection) {
     form.name = props.collection.name
     form.description = props.collection.description || ''
     form.coverColor = props.collection.coverColor || DEFAULT_COLOR
-    form.visibility = props.collection.visibility
+    form.visibility = props.collection.visibility === 'galaxy' ? 'public' : props.collection.visibility
   } else {
     form.name = ''
     form.description = ''

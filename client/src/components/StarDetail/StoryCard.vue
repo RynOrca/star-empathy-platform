@@ -13,6 +13,7 @@
       <!-- 所有故事：发送者 + 共鸣按钮 -->
       <template v-if="variant === 'all'">
         <span v-if="story.type === 'history'" class="story-sender">古人</span>
+        <span v-else-if="story.authorHidden" class="story-sender is-anon">匿名观星者</span>
         <span v-else-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
         <button
@@ -137,6 +138,8 @@ const props = defineProps<{
     imageUrl: string | null
     origin: string | null
     username: string | null
+    /** 合集级匿名 or 单篇 is_anonymous：对外隐藏作者，作者本人/管理员可见 true 时不显示真实作者名 */
+    authorHidden?: boolean
     tag: string | null
     tags?: string[] | null
     collectionId?: number | null

@@ -33,6 +33,8 @@
             <Library :size="11" class="cp-icon" />
             <span class="cp-opt-name">{{ c.name }}</span>
             <Lock v-if="c.visibility === 'private'" :size="9" class="cp-opt-lock" />
+            <Ghost v-else-if="c.visibility === 'anonymous'" :size="9" class="cp-opt-lock cp-opt-anon" />
+            <Galaxy v-else-if="c.visibility === 'galaxy'" :size="9" class="cp-opt-lock cp-opt-galaxy" />
             <span class="cp-opt-count">{{ c.storyCount }}</span>
           </button>
         </div>
@@ -70,6 +72,15 @@
                 <button
                   type="button"
                   class="cp-visi-btn"
+                  :class="{ on: newVisibility === 'anonymous' }"
+                  @click="newVisibility = 'anonymous'"
+                >
+                  <Ghost :size="10" />
+                  <span>匿名</span>
+                </button>
+                <button
+                  type="button"
+                  class="cp-visi-btn"
                   :class="{ on: newVisibility === 'private' }"
                   @click="newVisibility = 'private'"
                 >
@@ -87,15 +98,16 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { Library, Lock, Plus, ChevronDown, Globe } from 'lucide-vue-next'
-import { useCollections, type Collection } from '../composables/useCollections'
+import { Library, Lock, Plus, ChevronDown, Globe, Ghost, Sparkles } from 'lucide-vue-next'
+const Galaxy = Sparkles
+import { useCollections, type Collection, type CollectionVisibility } from '../composables/useCollections'
 
 type Mode = 'none' | 'existing' | 'new'
 
 const props = defineProps<{
-  modelValue: { collectionId?: number; collectionName?: string; visibility?: 'public' | 'private' } | null
+  modelValue: { collectionId?: number; collectionName?: string; visibility?: CollectionVisibility } | null
 }>()
-const emit = defineEmits<{ 'update:modelValue': [v: { collectionId?: number; collectionName?: string; visibility?: 'public' | 'private' } | null] }>()
+const emit = defineEmits<{ 'update:modelValue': [v: { collectionId?: number; collectionName?: string; visibility?: CollectionVisibility } | null] }>()
 
 const { list, fetchList } = useCollections()
 const collections = computed<Collection[]>(() => list.value)
@@ -104,7 +116,7 @@ const open = ref(false)
 const mode = ref<Mode>('none')
 const selectedId = ref<number | null>(null)
 const newName = ref('')
-const newVisibility = ref<'public' | 'private'>('public')
+const newVisibility = ref<CollectionVisibility>('public')
 
 onMounted(() => { fetchList().catch(() => {}) })
 
@@ -226,6 +238,8 @@ watch(() => props.modelValue, (v) => {
 .cp-opt-empty { color: rgba(255, 255, 255, 0.5); }
 .cp-opt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-opt-lock { color: rgba(255, 255, 255, 0.3); }
+.cp-opt-lock.cp-opt-anon    { color: rgba(169, 189, 255, 0.74); }   /* 匿名：灰蓝面具 */
+.cp-opt-lock.cp-opt-galaxy  { color: rgba(232, 184, 109, 0.86); }   /* 星河：星穹金 */
 .cp-opt-count {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.3);

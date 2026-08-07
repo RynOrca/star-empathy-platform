@@ -1,13 +1,15 @@
 import { ref } from 'vue'
 import { authFetch, authHeaders } from '../stores/auth'
 
+export type CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'
+
 export interface Collection {
   id: number
   userId: number
   name: string
   description: string | null
   coverColor: string | null
-  visibility: 'public' | 'private'
+  visibility: CollectionVisibility
   sortOrder: number
   storyCount: number
   createdAt: string
@@ -15,7 +17,7 @@ export interface Collection {
 }
 
 export interface CollectionDetail extends Collection {
-  stories: any[]
+  stories: Array<any>
   /** 合集故事所属 catalog star 被收藏的总次数 */
   favoriteCount: number
 }
@@ -24,7 +26,7 @@ export interface CreateCollectionInput {
   name: string
   description?: string | null
   coverColor?: string | null
-  visibility?: 'public' | 'private'
+  visibility?: CollectionVisibility
 }
 
 export type UpdateCollectionInput = Partial<CreateCollectionInput> & { sortOrder?: number }
@@ -34,7 +36,7 @@ export function useCollections() {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchList(visibility?: 'public' | 'private') {
+  async function fetchList(visibility?: CollectionVisibility) {
     loading.value = true
     error.value = null
     try {

@@ -93,6 +93,8 @@ const props = defineProps<{
     imageUrl: string | null
     origin: string | null
     username: string | null
+    /** 合集级匿名 or 单篇 is_anonymous：对外隐藏作者 */
+    authorHidden?: boolean
     tag: string | null
     tags?: string[] | null
     collectionId?: number | null

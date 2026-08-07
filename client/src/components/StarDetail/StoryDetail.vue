@@ -46,6 +46,10 @@
             <span v-if="origin" class="meta-sep">·</span>
             <span class="detail-sender is-ancient">古人</span>
           </template>
+          <template v-else-if="story.authorHidden">
+            <span class="meta-sep">·</span>
+            <span class="detail-sender is-anon">匿名观星者</span>
+          </template>
           <template v-else-if="story.username">
             <span class="meta-sep">·</span>
             <span class="detail-sender">by {{ story.username }}</span>
@@ -192,6 +196,8 @@ const props = defineProps<{
     imageUrl: string | null
     userId: number | null
     username: string | null
+    /** 合集级匿名 or 单篇 is_anonymous：对外隐藏作者，作者本人/管理员可见 true 时不显示真实作者名 */
+    authorHidden?: boolean
     tag: string | null
     tags?: string[] | null
     collectionId?: number | null

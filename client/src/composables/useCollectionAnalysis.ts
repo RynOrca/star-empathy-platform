@@ -27,6 +27,7 @@ export type NightscapePayload = {
   storyQuotes: Array<{
     rank: string; text: string; tags: string[]; author: string; date: string
     illus: 'moon' | 'house' | 'plant'; starName: string; color: string
+    reason?: string
   }>
   hourly: number[]
   peakHour: number

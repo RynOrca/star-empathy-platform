@@ -10,6 +10,12 @@
               <span v-if="detail?.visibility === 'private'" class="cdm-tag cdm-tag-private">
                 <Lock :size="9" /><span>私有</span>
               </span>
+              <span v-else-if="detail?.visibility === 'anonymous'" class="cdm-tag cdm-tag-anonymous">
+                <Ghost :size="9" /><span>匿名</span>
+              </span>
+              <span v-else-if="detail?.visibility === 'galaxy'" class="cdm-tag cdm-tag-galaxy">
+                <Galaxy :size="9" /><span>星河</span>
+              </span>
               <span v-else-if="detail" class="cdm-tag cdm-tag-public">
                 <Globe :size="9" /><span>公开</span>
               </span>
@@ -50,7 +56,8 @@
               </div>
               <p class="cdm-story-excerpt">{{ s.content }}</p>
               <div class="cdm-story-foot">
-                <span v-if="s.username" class="cdm-story-sender">by {{ s.username }}</span>
+                <span v-if="(s as any).authorHidden" class="cdm-story-sender is-anon">匿名观星者</span>
+                <span v-else-if="s.username" class="cdm-story-sender">by {{ s.username }}</span>
                 <span v-else class="cdm-story-sender is-anon">匿名星语</span>
                 <span class="cdm-story-sep">·</span>
                 <Sparkles :size="11" />
@@ -79,7 +86,8 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { X, Lock, Globe, Library, Sparkles, Pencil, AlertCircle } from 'lucide-vue-next'
+import { X, Lock, Globe, Library, Sparkles, Pencil, AlertCircle, Ghost } from 'lucide-vue-next'
+const Galaxy = Sparkles
 import { useAuth } from '../stores/auth'
 import { useCollections, type CollectionDetail } from '../composables/useCollections'
 
@@ -235,6 +243,16 @@ watch(() => [props.isOwner, detail.value, user.value], () => {
   background: rgba(149, 240, 192, 0.07);
   color: #95f0c0;
   border: 0.5px solid rgba(149, 240, 192, 0.18);
+}
+.cdm-tag-anonymous {
+  background: rgba(169, 189, 255, 0.08);
+  color: rgba(169, 189, 255, 0.94);
+  border: 0.5px solid rgba(169, 189, 255, 0.22);
+}
+.cdm-tag-galaxy {
+  background: rgba(232, 184, 109, 0.10);
+  color: rgba(255, 229, 168, 0.96);
+  border: 0.5px solid rgba(232, 184, 109, 0.28);
 }
 .cdm-desc {
   margin: 6px 0 0;

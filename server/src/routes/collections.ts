@@ -8,6 +8,7 @@ import {
   updateCollection,
   deleteCollection,
   listPublicCollections,
+  CollectionVisibility,
 } from '../services/collectionService';
 import { readCollectionAnalysis, triggerAnalysisIfNeeded, invalidateCollectionAnalysisCache } from '../services/collectionAnalysis';
 
@@ -15,11 +16,11 @@ const router = Router();
 
 type AuthedReq = Request & { user: { id: number } };
 
-// 我的合集列表（?visibility=public|private 可选过滤）
+// 我的合集列表（?visibility=public|private|anonymous|galaxy 可选过滤）
 router.get('/', authRequired, (req: Request, res: Response) => {
   try {
     const user = (req as AuthedReq).user;
-    const visibility = req.query.visibility as 'public' | 'private' | undefined;
+    const visibility = req.query.visibility as CollectionVisibility | undefined;
     const list = listCollections(user.id, visibility);
     ok(res, 'success', list);
   } catch (error) {
@@ -58,7 +59,7 @@ router.get('/public', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 合集详情（含故事列表）。authOptional：未登录或非 owner 时仅 public 可见，private 返回 404
+// 合集详情（含故事列表）。authOptional：未登录或非 owner 时 public/anonymous/galaxy 可见，private 返回 404
 router.get('/:id', authOptional, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -73,14 +74,17 @@ router.get('/:id', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 编辑合集（仅 owner）
+// 编辑合集（仅 owner / 管理员；星河合集仅管理员）
 router.patch('/:id', authRequired, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return badRequest(res, '无效的合集 id');
     const user = (req as AuthedReq).user;
     const { name, description, coverColor, visibility, sortOrder } = req.body || {};
-    const patch: { name?: string; description?: string | null; coverColor?: string | null; visibility?: 'public' | 'private'; sortOrder?: number } = {};
+    const patch: {
+      name?: string; description?: string | null; coverColor?: string | null;
+      visibility?: CollectionVisibility; sortOrder?: number;
+    } = {};
     if (name !== undefined) patch.name = name;
     if (description !== undefined) patch.description = description;
     if (coverColor !== undefined) patch.coverColor = coverColor;
@@ -88,7 +92,7 @@ router.patch('/:id', authRequired, (req: Request, res: Response) => {
     if (sortOrder !== undefined) patch.sortOrder = sortOrder;
     const result = updateCollection(id, user.id, patch);
     if (result.notFound) return notFound(res, '合集不存在');
-    if (result.forbidden) return forbidden(res, '只能编辑自己的合集');
+    if (result.forbidden) return forbidden(res, '无权限编辑该合集');
     if (result.error) return badRequest(res, result.error);
     ok(res, '合集已更新', result.collection);
   } catch (error) {
@@ -97,7 +101,7 @@ router.patch('/:id', authRequired, (req: Request, res: Response) => {
   }
 });
 
-// 删除合集（仅 owner；故事 collection_id 置 NULL，故事保留）
+// 删除合集（仅 owner / 管理员；星河合集仅管理员；故事 collection_id 置 NULL，故事保留）
 router.delete('/:id', authRequired, (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -105,7 +109,7 @@ router.delete('/:id', authRequired, (req: Request, res: Response) => {
     const user = (req as AuthedReq).user;
     const result = deleteCollection(id, user.id);
     if (result.notFound) return notFound(res, '合集不存在');
-    if (result.forbidden) return forbidden(res, '只能删除自己的合集');
+    if (result.forbidden) return forbidden(res, '无权限删除该合集');
     ok(res, '合集已删除');
   } catch (error) {
     console.error('DELETE /api/collections/:id error:', error);

@@ -15,10 +15,8 @@
  * 匹配顺序：按上述优先级从高到低；命中即停止，不会重复归属。
  *
  * 合集归属原则：
- *   - 合集所有者为 user_id=0 的「星穹守护」系统虚拟用户；但 collections.user_id 有
- *     REFERENCES users(id) 外键，所以我们先在 users 表里创建/复用一个系统用户
- *     （username='star穹' 或类似，保证存在）。
- *   - 所有合集 visibility='public'，sort_order 按 1..8 排列
+ *   - 合集所有者为「星穹守护」系统用户（系统虚拟用户，存在 users 表里供外键引用）
+ *   - 所有合集 visibility='galaxy'，sort_order 按 1..8 排列；星河合集仅由官方后台/seed 脚本维护，不开放用户自建或编辑
  *
  * 使用方法：
  *   cd server && npx ts-node scripts/seed-history-collections.ts
@@ -135,10 +133,14 @@ function ensureSystemUser(): number {
 function upsertCollection(userId: number, spec: CollSpec): number {
   const found = db.prepare('SELECT * FROM collections WHERE name = ?').get(spec.name) as
     | { id: number } | undefined;
-  if (found) return found.id;
+  if (found) {
+    // 已存在的历史合集：确保 visibility=galaxy（老数据升级）
+    db.prepare('UPDATE collections SET visibility = \'galaxy\' WHERE id = ?').run(found.id);
+    return found.id;
+  }
   const r = db.prepare(
     `INSERT INTO collections (user_id, name, description, cover_color, visibility, sort_order)
-     VALUES (?, ?, ?, ?, 'public', ?)`
+     VALUES (?, ?, ?, ?, 'galaxy', ?)`
   ).run(userId, spec.name, spec.desc, spec.color, spec.order);
   return r.lastInsertRowid as number;
 }

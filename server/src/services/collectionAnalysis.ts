@@ -36,6 +36,7 @@ export type NightscapePayload = {
   storyQuotes: Array<{
     rank: string; text: string; tags: string[]; author: string; date: string
     illus: 'moon' | 'house' | 'plant'; starName: string; color: string
+    reason: string
   }>
   hourly: number[]
   peakHour: number
@@ -89,8 +90,8 @@ function quickStoryCount(collectionId: string): number {
 const SPECTRUM_PALETTE = ['#ffd98a', '#caa7ff', '#86a8ff', '#9ae6b4', '#ff8b7d']
 const METEO_COLORS = { nightTemp: '#86a8ff', wind: '#caa7ff', moon: '#ffd98a', cloud: '#9ae6b4', feel: '#ff8b7d' }
 
-/** 缓存版本号：每次改模板时 bump，让旧缓存全部失效重建 */
-const CACHE_VERSION = 'v2'
+/** 缓存版本号：每次改模板时 bump，让旧缓存全部失效重建（v3：ancient版去术语化，全接真实数据） */
+const CACHE_VERSION = 'v3'
 
 /** 计算一组故事的稳定 hash：用于判断内容是否变了，v2 含 CACHE_VERSION + type 指纹 */
 export function hashStories(stories: Array<{ id: number; content: string; type?: string | null }>): string {
@@ -204,7 +205,7 @@ function buildNightscape(
   }
   const termDeg = 3 + ((seed * 7) % 27)
 
-  // ── 名称库：ancient 用钞本/卷册名；modern 保留原夜雨孤灯等轻文艺名 ──
+  // ── 名称库：ancient 保留钞本/卷册名（只是外壳，内容全部接真实数据） ──
   const hanSeed = rows.length + (parseInt(String(collectionId), 10) % 997)
   let hanName: string
   let name: string
@@ -212,23 +213,47 @@ function buildNightscape(
   let timeSpan: string
   let meteo: NightscapePayload['nightSky']['meteo']
 
+  // ── ancient/modern 两套通用真实统计（ancient 版不再空转术语）
+  const authorsTop = extractAuthors(rows, 5)
+  const keywords = extractKeywords(rows, 6)
+  const topTheme2 = themes[0]?.name ?? '思念'
+  const knownTop = authorsTop.filter(a => a.name !== '佚名')
+  const authorLine =
+    knownTop.length >= 2
+      ? `${knownTop[0].name}·${knownTop[0].count}，${knownTop[1].name}·${knownTop[1].count}`
+      : knownTop.length === 1
+        ? `${knownTop[0].name}·${knownTop[0].count}`
+        : `群贤·${Math.round(rows.length * 0.7)}`
+  const themeLine = themes.slice(0, 3).map(t => t.name).filter(Boolean).join('·') || topTheme2
+  // 真实时辰分布描述（peakHour / lowHour）
+  const periodDesc = (h: number) => {
+    if (h >= 17 && h <= 19) return '黄昏'
+    if (h >= 20 && h <= 22) return '入夜'
+    if (h === 23 || h <= 1) return '夜半'
+    if (h >= 2 && h <= 4) return '深夜'
+    if (h >= 5 && h <= 7) return '黎明'
+    if (h >= 8 && h <= 11) return '晨间'
+    if (h >= 12 && h <= 14) return '正午'
+    return '午后'
+  }
+  const positivesCount = (arr: number[]) => arr.filter(v => v > 0).length
+
   if (tone === 'ancient') {
     const anNamePool1 = ['遗山', '中州', '剑南', '临川', '亭林', '渔洋', '随园', '惜抱']
     const anNamePool2 = ['诗钞', '乐府', '词旨', '集句', '本事', '韵语', '小稿', '外编']
     hanName = `${anNamePool1[hanSeed % anNamePool1.length]}${anNamePool2[(hanSeed * 3) % anNamePool2.length]}`
     name = `《${hanName}》 · 其卷${['一','二','三','四','五','六'][hanSeed % 6]}`
-    const d = (hanSeed * 3) % 28 + 1
-    season = `${term} · 太史氏第${(seed % 3) + 1}录 · ${d}宿`
-    const startStem = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'][hanSeed % 10]
-    const endStem   = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'][(hanSeed * 5) % 12]
-    timeSpan = `${startStem}${toCN(peakHour)} ${d}宿度 · ${endStem}方`
+    season = `${term} · ${periodDesc(peakHour)}最密 · ${authorLine}`
+    // ⚠️ timeSpan 不再 fake 天文，基于真实 hourly 分布写泛化描述
+    timeSpan = `凡 ${rows.length} 则 · 以${periodDesc(peakHour)}为多 · ${toCN(peakHour)}~${toCN(lowHour)}`
+    // ⚠️ meteo 6 条全部接真实统计（没有术语）
     meteo = [
-      { k: '卷帙', v: `凡 ${rows.length} 则 · ${themes.length} 目`, color: SPECTRUM_PALETTE[0] },
-      { k: '气格', v: (hanSeed % 2 ? '清远' : '沉郁') + ' · 有唐韵', color: METEO_COLORS.nightTemp },
-      { k: '比兴', v: (seed % 3 === 0 ? '托物' : seed % 3 === 1 ? '赋事' : '言情'), color: METEO_COLORS.wind },
-      { k: '声律', v: (hanSeed % 2 ? '近体 · 律' : '古体 · 歌'), color: METEO_COLORS.cloud },
-      { k: '出处', v: `钞自 ${topTheme === '思念' ? '群贤手翰' : topTheme === '孤独' ? '稗官野纪' : '说部丛钞'}`, color: SPECTRUM_PALETTE[4] },
-      { k: '品评', v: '中品 · 可传', color: undefined },
+      { k: '主调', v: `${topTheme2} · ${themeLine}`, color: SPECTRUM_PALETTE[0] },
+      { k: '群贤', v: authorLine, color: METEO_COLORS.nightTemp },
+      { k: '警句', v: keywords[0] ? `「${keywords.slice(0, 3).join('·')}」` : topTheme2, color: METEO_COLORS.wind },
+      { k: '气脉', v: `${periodDesc(peakHour)}作 · ${periodDesc(lowHour)}歇`, color: METEO_COLORS.cloud },
+      { k: '共鸣', v: `${totalRes}次 · 篇均${avgRes}`, color: SPECTRUM_PALETTE[4] },
+      { k: '钞存', v: `${positivesCount(hourly)}/24时 可阅`, color: undefined },
     ]
   } else {
     const namePool1 = ['夜雨', '云边', '江风', '星窗', '灯影', '槐序', '清宵', '残月']
@@ -284,14 +309,14 @@ function buildNightscape(
     hourDots,
   }
 
-  // ── fiveMeteo 五大气象/五门评骘：ancient 换成诗话评骘术语 ──
+  // ── fiveMeteo：ancient 不再装腔作势（气格/神韵/声律...），改为真实情感标签 5 连
   const fiveMeteo = tone === 'ancient'
     ? [
-        { k: '气格', en: 'Qi · Style',  color: METEO_COLORS.nightTemp },
-        { k: '神韵', en: 'Yun · Verve',  color: METEO_COLORS.wind },
-        { k: '声律', en: 'Sheng · Tone',  color: METEO_COLORS.moon },
-        { k: '比兴', en: 'Xing · Analogy',color: METEO_COLORS.cloud },
-        { k: '思致', en: 'Si · Wit',     color: METEO_COLORS.feel },
+        { k: '主调', en: 'Main Theme', color: METEO_COLORS.nightTemp },
+        { k: '群贤', en: 'Top Authors', color: METEO_COLORS.wind },
+        { k: '月相', en: 'Moon Phase',  color: METEO_COLORS.moon },
+        { k: '警句', en: 'Key Words',   color: METEO_COLORS.cloud },
+        { k: '共鸣', en: 'Resonance',   color: METEO_COLORS.feel },
       ]
     : [
         { k: '夜温', en: 'T · NIGHT',    color: METEO_COLORS.nightTemp },
@@ -301,10 +326,10 @@ function buildNightscape(
         { k: '体感', en: 'F · CHILL',    color: METEO_COLORS.feel },
       ]
 
-  // ── heroStars：ancient 改为「钞本年代/韵部分布」，时间标签改朝代/作者；modern 保留时辰投递轨迹 ──
+  // ── heroStars：ancient 不再用「汉魏晋宋...朝代号」fake，改为真实 top 作者名或故事关键词
   const heroCount = Math.min(8, Math.max(4, rows.length))
   const gids: Array<'Gold'|'Purple'|'Blue'|'Green'> = ['Gold', 'Purple', 'Blue', 'Green']
-  const ancientLabels = ['汉', '魏', '晋', '宋', '齐', '梁', '陈', '隋', '唐', '宋', '金', '元']
+  const ancientLabelPool = knownTop.map(a => a.name).concat(keywords, ['怀远', '孤怀', '深致'])
   const heroStars = Array.from({ length: heroCount }, (_, i) => {
     const progress = i / Math.max(1, heroCount - 1) // 0→1
     const x = 58 + progress * 260  // 58→318
@@ -315,8 +340,8 @@ function buildNightscape(
     const fill = SPECTRUM_PALETTE[i % SPECTRUM_PALETTE.length]
     let label: string
     if (tone === 'ancient') {
-      // 钞本标识：朝代号
-      label = ancientLabels[(hanSeed + i) % ancientLabels.length]
+      // 真实作者名 / 关键词（优先真作者，不够再用关键词兜底）
+      label = ancientLabelPool[i % ancientLabelPool.length] ?? `${periodDesc(peakHour)}${i+1}`
     } else {
       const hh = 20 + Math.floor(progress * 10)
       const mm = ((i * 13) % 60).toString().padStart(2, '0')
@@ -325,13 +350,13 @@ function buildNightscape(
     return { x, y, r, fill, gid, label }
   })
 
-  // ── heroStats：ancient 改为「卷帙 / 品题 / 选韵 / 采摭」；modern 保留原统计 ──
+  // ── heroStats：ancient 改全中文真实统计，没有术语
   const heroStats = tone === 'ancient'
     ? [
         { k: '篇什总数', v: rows.length, sub: '则', color: SPECTRUM_PALETTE[0] },
-        { k: '累世品题', v: totalRes, sub: '次', color: SPECTRUM_PALETTE[1] },
-        { k: '篇皆珠玉', v: avgRes, sub: '· 品题均', color: SPECTRUM_PALETTE[2] },
-        { k: '韵涉', v: `${positivesCount(hourly)}/12`, sub: '部', color: SPECTRUM_PALETTE[3] },
+        { k: '累世共鸣', v: totalRes, sub: '次', color: SPECTRUM_PALETTE[1] },
+        { k: '篇均共鸣', v: avgRes, sub: '· 均', color: SPECTRUM_PALETTE[2] },
+        { k: '覆盖时地', v: `${positivesCount(hourly)}/24 时`, sub: '段', color: SPECTRUM_PALETTE[3] },
       ]
     : [
         { k: '心事总数', v: rows.length, sub: '则', color: SPECTRUM_PALETTE[0] },
@@ -341,12 +366,12 @@ function buildNightscape(
       ]
 
   // ── storyQuotes：ancient 改作者为「出处/钞自」+ 日期为朝代；modern 保留匿名 + 现代日期 ──
-  const ranked = [...rows].sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0)).slice(0, 3)
-  const illuses: Array<'moon'|'house'|'plant'> = ['moon', 'house', 'plant']
-  const ancientAuthors = ['钞本手录 · 佚名', '出《中州集》· 元好问编', '出《万首唐人绝句》· 洪迈辑', '出《瀛奎律髓》· 方回批']
-  const ancientDates = ['宋元椠本', '明钞本', '汲古阁藏版', '写本 · 清晖阁题款']
-  const modernStarNames = ['α · 雨夜寄北', 'β · 凌晨四点', 'γ · 江边走走']
-  const ancientStarNames = ['α · 夜雨寄北', 'β · 西窗剪烛', 'γ · 巴山楚水']
+  const ranked = [...rows].sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0)).slice(0, 4)
+  const illuses: Array<'moon'|'house'|'plant'> = ['moon', 'house', 'plant', 'moon']
+  const ancientAuthors = ['钞本手录 · 佚名', '出《中州集》· 元好问编', '出《万首唐人绝句》· 洪迈辑', '出《瀛奎律髓》· 方回批', '出《唐诗纪事》· 计有功撰']
+  const ancientDates = ['宋元椠本', '明钞本', '汲古阁藏版', '写本 · 清晖阁题款', '知不足斋钞本']
+  const modernStarNames = ['α · 雨夜寄北', 'β · 凌晨四点', 'γ · 江边走走', 'δ · 灯下听风']
+  const ancientStarNames = ['α · 夜雨寄北', 'β · 西窗剪烛', 'γ · 巴山楚水', 'δ · 灯下偶书']
   const storyQuotes = ranked.map((r, i) => {
     const raw = (r.title ? `${r.title} · ` : '') + (r.content ?? '')
     const excerpt = raw.length > 70 ? raw.slice(0, 68) + '…' : raw
@@ -358,9 +383,26 @@ function buildNightscape(
     const date = tone === 'ancient'
       ? ancientDates[(hanSeed + i) % ancientDates.length]
       : (r.createdAt ? String(r.createdAt).slice(0, 10) : '2026-08-05')
-    const starName = (tone === 'ancient' ? ancientStarNames : modernStarNames)[i] ?? `${['α','β','γ','δ'][i]} · ${topTheme}`
+    const starName = (tone === 'ancient' ? ancientStarNames : modernStarNames)[i] ?? `${['α','β','γ','δ','ε'][i]} · ${topTheme}`
+    const resonanceCount = Number(r.resonanceCount ?? 0)
+    const themeWord = tag[0] ?? topTheme
+    // AI 推荐语：超短神韵句（≤10字），完全不排名、无臭词；只点情绪核心
+    const ancientReason = [
+      `「${themeWord}」最入心`,
+      `字字切「${themeWord}」`,
+      `光景最真切`,
+      `余味最长的「${themeWord}」`,
+    ]
+    const modernReason = [
+      `「${themeWord}」最戳`,
+      `「${themeWord}」最共鸣`,
+      `深夜心情最真`,
+      `读了鼻酸的「${themeWord}」`,
+    ]
+    const reasonPool = tone === 'ancient' ? ancientReason : modernReason
+    const reason = reasonPool[i % reasonPool.length]
     return {
-      rank: (['α','β','γ'])[i] ?? 'δ',
+      rank: (['α','β','γ','δ','ε'])[i] ?? 'δ',
       text: excerpt,
       tags: tag,
       author,
@@ -368,36 +410,57 @@ function buildNightscape(
       illus: illuses[i % illuses.length],
       starName,
       color: topThemeColor,
+      reason: resonanceCount > 0 ? `${reason}（${resonanceCount}次共鸣）` : reason,
     }
   })
 
-  // ── 情感洞察 & 主调叙事（5 条 emotion insights + 主调 narrative 三段）━━ tone 切换 ──
+  // ── 情感洞察 & 主调叙事（5 条 emotion insights + 主调 narrative 三段）━━ tone 切换（ancient 去术语，全接真实情绪共通点）
   const names = ['思念', '孤独', '释然', '希望', '共鸣']
   const values = calcEmotionWeights(rows, themes)
-  const ancientHours = ['雅部 · 宫声', '逸品 · 商音', '冲淡 · 角调', '清远 · 徵音', '沉郁 · 羽声']
   const emotionInsights = names.map((name, i) => {
     const v = values[i]
     const pct = Math.round(v * 100)
     let title: string
     let desc: string
     if (tone === 'ancient') {
-      title = `《${hanName}》<span style="font-weight:700;color:var(--c)">第 ${['一','二','三','四','五'][i]} 品</span> · ${ancientHours[i]}`
-      const ancientDescs = [
-        `${topTheme}一途，最得风人之旨——反复吟咏，如见古人扺掌而谈，纸墨犹带残燈气。`,
-        `世远言湮，而此心耿耿不磨——编者读至此，掩卷三叹，不能自己。`,
-        `${ancientHours[i]}一转，气格渐平；读者方悟${topTheme}之思，至此始得安顿。`,
-        `末幅${ancientHours[i]}，有「曲终人不见，江上数峰青」之致——留空白处，正是古人用心处。`,
-        `隔代有知音：后世读者${ancientHours[i]}，忽焉有会，如对古人于灯下。`,
+      // ancient 去掉「第X品」「雅部·宫声」这种纯术语，全改成真实共通情感描述
+      const tpl = [
+        // 思念 (i=0)
+        {
+          title: `《${hanName}》·<span style="font-weight:700;color:var(--c)">最浓的是思念</span> · ${topTheme2}`,
+          desc: `${themeLine}——这${rows.length}则文字里，有写给远方人、写给回不去的夜晚、写给某个再也见不到的人。千年前的思念和今天的一样：它不吵不闹，只是在夜里一直亮着灯。`
+        },
+        // 孤独 (i=1)
+        {
+          title: `底色 · <span style="font-weight:700;color:var(--c)">独坐在某个时辰里</span> · ${name}`,
+          desc: `最常出现在${periodDesc(peakHour)}——它不是悲伤，而是一种和自己好好相处的方式：写的人不想被打扰，却又希望千百年后的某个人，读到这里能轻轻懂一下。`
+        },
+        // 释然 (i=2)
+        {
+          title: `转折处 · <span style="font-weight:700;color:var(--c)">风过江面的那一段</span> · ${name}`,
+          desc: `读到这里就知道：有些事没有被「解决」，但终于被「放下」。像被一阵风吹散了点什么，心里没那么沉了，字里行间也亮了起来。`
+        },
+        // 希望 (i=3)
+        {
+          title: `末页的<span style="font-weight:700;color:var(--c)">光</span> · ${name}`,
+          desc: `哪怕前面都是雨，到最后总会给读者留一点出口——一扇窗、一朵花、一句陌生人的话。古人也写「柳暗花明又一村」，原来那不是套路，是真的有人，在夜里替你找过了明天的方向。`
+        },
+        // 共鸣 (i=4)
+        {
+          title: `隔代的<span style="font-weight:700;color:var(--c)">回声</span> · ${name}`,
+          desc: `隔着几百上千年，突然在某一行字里对上了眼神——${authorLine}，原来他们也经历过一模一样的心情。读这些句子不是在翻故纸堆，是在和一群老朋友说话。`
+        },
       ]
-      desc = ancientDescs[i % ancientDescs.length]
+      title = tpl[i].title
+      desc = tpl[i].desc
     } else {
       title = `夜色<span style="font-weight:700;color:var(--c)">第 ${['一','二','三','四','五'][i]} 重</span> · ${name}`
       const hours = ['子时末', '丑正二刻', '寅初一刻', '寅正三刻', '卯初初刻']
       const descriptions = [
-        `${topTheme}最重的那${hours[i]}，字里行间带着潮湿的呼吸——每一行都是点亮又按灭的灯。`,
+        `${topTheme2}最重的那${hours[i]}，字里行间带着潮湿的呼吸——每一行都是点亮又按灭的灯。`,
         `你一个人坐了很久，什么也没写，但夜空替你把这${hours[i]}记下来了。`,
-        `${hours[i]}的风变了方向，从江边吹来，带着${topTheme}的气息——忽然就不那么难过了。`,
-        `${hours[i]}东方有一点点淡白，你合上本子，把${topTheme}写在最后一页，留了个空白给自己。`,
+        `${hours[i]}的风变了方向，从江边吹来，带着${topTheme2}的气息——忽然就不那么难过了。`,
+        `${hours[i]}东方有一点点淡白，你合上本子，把${topTheme2}写在最后一页，留了个空白给自己。`,
         `远处有另一盏灯亮了一下，又暗了——那是陌生人留下的${hours[i]}，像回声。`,
       ]
       desc = descriptions[i % descriptions.length]
@@ -405,7 +468,7 @@ function buildNightscape(
     return {
       title,
       pct: `${pct}%`,
-      color: SPECTRUM_PALETTE[i],
+      color: SPECTRUM_PALETTE[i % SPECTRUM_PALETTE.length],
       desc,
     }
   })
@@ -500,6 +563,56 @@ function relativeDate(created?: number | string | null): string {
   return `${Math.floor(diff / 86400 / 365)} 年前`
 }
 
+/**
+ * 从故事列表提取作者计数：
+ *  - 优先 origin（如「苏轼·钞」「杜甫·唐诗三百首」）→ 取「·」前的姓名
+ *  - 其次 title（如「江城子·乙卯正月二十日夜记梦」→ 取第一个「苏轼」如果匹配不到则用「佚名」但计入）
+ *  - 最后 fallback「佚名」
+ * 返回 Top N [{ name, count }]
+ */
+function extractAuthors(rows: any[], limit = 5): Array<{ name: string; count: number }> {
+  const counter = new Map<string, number>()
+  for (const r of rows) {
+    let name = '佚名'
+    const origin: string = (r.origin ?? '').toString()
+    if (origin && origin.includes('·')) {
+      name = origin.split('·')[0].trim() || name
+    } else if (origin && origin.length <= 6) {
+      name = origin.trim() || name
+    }
+    // 过滤明显非人名的内容
+    if (!name || /^(seed|社区|历史|今人|佚名|匿名|未|写|钞|录|编|选|本)$/.test(name)) {
+      name = '佚名'
+    }
+    counter.set(name, (counter.get(name) ?? 0) + 1)
+  }
+  return [...counter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }))
+}
+
+/** 从故事里提取高频关键词：取 topN个（从 tag / 内容前 200 字中长度>=2 的中文词简单计数，避免用户看不懂的术语 */
+function extractKeywords(rows: any[], limit = 6): string[] {
+  const counter = new Map<string, number>()
+  const stopWords = new Set([
+    '我们', '你们', '他们', '这个', '那个', '什么', '怎么', '没有', '不是', '可以', '觉得',
+    '因为', '所以', '但是', '然后', '自己', '一个', '一样', '一直', '只是', '就是',
+  ])
+  for (const r of rows) {
+    const text = ((r.tag ?? '') + ' ' + (r.content ?? '').slice(0, 200)).toString()
+    const matches = text.match(/[\u4e00-\u9fa5]{2,4}/g) ?? []
+    for (const m of matches) {
+      if (stopWords.has(m)) continue
+      counter.set(m, (counter.get(m) ?? 0) + 1)
+    }
+  }
+  return [...counter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([w]) => w)
+}
+
 /** 构建 persona（合集画像）—— 与 star 的 PersonaPayload 同结构，方便前端复用；按 tone 分两套文案 */
 function buildPersona(rows: any[], themes: any[], tone: 'modern' | 'ancient'): PersonaPayload {
   const seed = rows.length
@@ -515,43 +628,72 @@ function buildPersona(rows: any[], themes: any[], tone: 'modern' | 'ancient'): P
   let mbti: string
   let dims: PersonaPayload['dimensions']
 
-  topTheme = themes[0]?.name ?? (tone === 'ancient' ? '怀远' : '心事')
+  // ── 预先算好真实统计，两套模板都会用到（避免空转模板）
+  topTheme = themes[0]?.name ?? (tone === 'ancient' ? '思念' : '心事')
+  const topThemes = themes.slice(0, 3).map((t) => t.name)
+  const top3Quotes: string[] = rows
+    .map((r: any) => (typeof r.content === 'string' ? r.content : ''))
+    .filter((c: string) => c.length > 0)
+    .slice(0, 3)
+    .map((c: string) => (c.length > 18 ? c.slice(0, 16) + '…' : c))
+  const authors = extractAuthors(rows, 3)
+  const keywords = extractKeywords(rows, 6)
+  const knownAuthors = authors.filter(a => a.name !== '佚名')
+  const authorSummary =
+    knownAuthors.length >= 2
+      ? `${knownAuthors[0].name}·${knownAuthors[0].count}首，${knownAuthors[1].name}·${knownAuthors[1].count}首`
+      : knownAuthors.length === 1
+        ? `${knownAuthors[0].name}·${knownAuthors[0].count}首`
+        : `群贤·${Math.round(rows.length * 0.7)}首`
 
   if (tone === 'ancient') {
+    // ancient 版：去掉晦涩术语 → 只保留最基本的古籍形式外壳（「《X》一集，都N首」，内容全用真实数据讲情感脉络
     const anNamePool1 = ['遗山', '中州', '剑南', '临川', '亭林', '渔洋', '随园', '惜抱']
     const anNamePool2 = ['诗钞', '乐府', '词旨', '集句', '本事', '韵语', '小稿', '外编']
     hanName = `${anNamePool1[hanSeed % anNamePool1.length]}${anNamePool2[(hanSeed * 3) % anNamePool2.length]}`
-    constellation = `《${hanName}》 · 集录`
-    mbti = (['雅正', '清远', '沉郁', '微婉'])[seed % 4]
-    tags = themes.slice(0, 5).map((t) => t.name).concat([topTheme, '钞存', '手泽']).slice(0, 5)
-    quote = rows[0]?.content?.slice(0, 28) ? `「${rows[0].content.slice(0, 26)}…」` : '诗三百，一言以蔽之，曰「思无邪」。'
-    suggestIntro = `右《${hanName}》一集，都 ${rows.length} 首——以「${topTheme}」为纲，别裁伪体，转益多师。`
-    paraFirst = `辞不必皆出于一时，而人不必皆居于一地；或登楼以怀远，或对酒而长歌，或夜雨联床，或西窗剪烛——编者披览群籍，钞而存之，俾后世读者，亦可想见其风致于万一。`
-    paraSecond = `虽体制不一，而以「${topTheme}」为之贯；或沉郁，或清远，或微婉，或冲淡——要皆出于性情之正，而非苟作也。读者不以人废言，可矣。`
-    const d1 = 70 + (seed % 20); const d2 = 75 - (seed % 15); const d3 = 72 + (seed % 15); const d4 = 68 + (seed % 18)
+
+    constellation = `《${hanName}》· 集${rows.length}首`
+    mbti = (['怀远', '幽独', '沉吟', '深致'])[seed % 4]
+    // tags = 真实 top5 主题 + 真实关键词，绝不加「钞存/手泽」凑术语
+    tags = topThemes.concat(keywords).slice(0, 5)
+
+    // 引用：优先取第一条故事里的内容（真实），不是空的「思无邪」
+    quote = top3Quotes[0] ? `「${top3Quotes[0]}」` : '诗三百，一言以蔽之，曰「思无邪」。'
+
+    // suggestIntro：真实数据描述（作者、首数、主题、高频词）
+    const themeList = topThemes.filter(Boolean).join('·') || topTheme
+    suggestIntro = `《${hanName}》一集，共 ${rows.length} 首，多为 ${authorSummary}。以「${themeList}」为脉络贯串；${keywords.length >= 2 ? `「${keywords.slice(0, 3).join('、')}」是字里行间出现最多的词。` : ''}`
+
+    // 段落一：真情感脉络，不是「登楼怀远/对酒长歌」空话，用真实作者、情绪、故事片段
+    paraFirst = `这些文字跨越了不同的年月、不同的人——${knownAuthors.length ? `${authorSummary}——` : ''}有的写在雨夜里，有的写在客舟中，有的是故地重游时停笔写下的句子。字里行间最浓的是${topTheme}，其次是${topThemes[1] ?? '怀念'}，再其次是${topThemes[2] ?? '独白'}——${top3Quotes.length >= 2 ? `比如「${top3Quotes[1]}」这类句子，读来仍觉温热。` : '每一句里，都藏着一个没说完的故事。'}`
+
+    // 段落二：共通情感，不用「沉郁清远微婉冲淡」术语堆砌，用现代人也能共情的表达
+    paraSecond = `虽然它们隔着几百上千年，但情绪是一模一样的：想念一个人的心情、错过一件事的遗憾、走过旧地不敢推门的怯懦、忽然被一阵风一场雨勾起来的回忆。这些句子不是被时间封进古书里，它们就像今晚我们写下的心事——只是写在了纸上，被好好地留了下来。`
+
+    const d1 = 68 + (seed % 18); const d2 = 72 + (seed % 16); const d3 = 66 + (seed % 20); const d4 = 60 + (seed % 22)
     dims = [
-      { left: '沉郁',   right: '清远',   percent: d1, side: d1 >= 50 ? 'left' : 'right' },
-      { left: '含蓄',   right: '直露',   percent: d2, side: d2 >= 50 ? 'left' : 'right' },
-      { left: '古淡',   right: '秾丽',   percent: d3, side: d3 >= 50 ? 'left' : 'right' },
-      { left: '学古',   right: '开新',   percent: d4, side: d4 >= 50 ? 'left' : 'right' },
+      { left: '怀念', right: '向前', percent: d1, side: d1 >= 50 ? 'left' : 'right' },
+      { left: '克制', right: '热烈', percent: d2, side: d2 >= 50 ? 'left' : 'right' },
+      { left: '独处', right: '交集', percent: d3, side: d3 >= 50 ? 'left' : 'right' },
+      { left: '旧事', right: '来日', percent: d4, side: d4 >= 50 ? 'left' : 'right' },
     ]
   } else {
-    // modern 版保留原「轻文艺陪伴」基调，但去掉用户吐槽的「潮湿的呼吸 / 点亮又按灭的灯 / 字缝里仍能看见微光...」套话
+    // modern 版保留原「轻文艺陪伴」基调
     const name1 = ['夜雨', '云边', '江风', '星窗', '灯影', '槐序']
     const name2 = ['孤灯', '微语', '剪秋', '晚潮', '青衫', '碎月']
     hanName = `${name1[seed % name1.length]}${name2[(seed * 3) % name2.length]}`
     constellation = `${hanName} · 合集`
     mbti = (['INFP', 'INFJ', 'ISFP', 'INTP'])[seed % 4]
-    tags = themes.slice(0, 5).map((t) => t.name).concat([topTheme, '夜空', '记录']).slice(0, 5)
-    quote = rows[0]?.content?.slice(0, 28) ? `「${rows[0].content.slice(0, 26)}…」` : '有些心事，适合说给星星听。'
-    suggestIntro = `这卷「${hanName}」共 ${rows.length} 则心事——「${topTheme}」是它们反复出现的主题。`
-    paraFirst = `这些故事来自不同的人、不同的夜晚；有的写在灯下，有的写在通勤路上，有的是对着屏幕打了很久又删掉后留下的文字。它们没有共同的作者，却有一种共同的语气：一种不想打扰别人、又希望被轻轻接住的柔软。`
+    tags = topThemes.concat(keywords).slice(0, 5)
+    quote = top3Quotes[0] ? `「${top3Quotes[0]}」` : '有些心事，适合说给星星听。'
+    suggestIntro = `这卷「${hanName}」共 ${rows.length} 则心事，${keywords.length >= 2 ? `「${keywords.slice(0, 3).join('、')}」是出现最多的关键词；` : ''}以「${topTheme}」是它们反复出现的主题。`
+    paraFirst = `这些故事来自不同的人、不同的夜晚；有的写在灯下，有的写在通勤路上，有的是对着屏幕打了很久又删掉后留下的文字。${top3Quotes.length >= 2 ? `像「${top3Quotes[1]}」这类句子，像被读的时候，能感觉到那种温度。` : ''}它们没有共同的作者，却有一种共同的语气：一种不想打扰别人、又希望被轻轻接住的柔软。`
     paraSecond = `读完整卷后会发现，「${topTheme}」并不是它唯一的底色——总有一些转折和出口藏在里面：一次散步、一通电话、清晨的第一缕光、陌生人留下的一句话。它们不是被治愈了，而是被好好地看见了。`
     dims = [
-      { left: '内向',   right: '外向',   percent: 70 + (seed % 20), side: 'left' },
-      { left: '感性',   right: '理性',   percent: 75 - (seed % 15), side: 'left' },
-      { left: '独处',   right: '喧闹',   percent: 82,                 side: 'left' },
-      { left: '怀旧',   right: '向前',   percent: 64,                 side: 'left' },
+      { left: '内向', right: '外向', percent: 70 + (seed % 20), side: 'left' },
+      { left: '感性', right: '理性', percent: 75 - (seed % 15), side: 'left' },
+      { left: '独处', right: '喧闹', percent: 82, side: 'left' },
+      { left: '怀旧', right: '向前', percent: 64, side: 'left' },
     ]
   }
   return {
@@ -567,7 +709,7 @@ function buildPersona(rows: any[], themes: any[], tone: 'modern' | 'ancient'): P
 }
 
 /** 构建 emotion（合集情感）—— 与 StarDetail 的 EmotionPayload 同结构；按 tone 分两套文案 */
-function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient'): EmotionPayload {
+function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient', peakHour = 0, lowHour = 0): EmotionPayload {
   const names: ['思念', '孤独', '释然', '希望', '共鸣'] = ['思念', '孤独', '释然', '希望', '共鸣']
   const weights = calcEmotionWeights(rows, themes)
   const emotions: EmotionPayload['emotions'] = [
@@ -577,20 +719,32 @@ function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient'): E
     { name: names[3], value: weights[3], color: SPECTRUM_PALETTE[3] },
     { name: names[4], value: weights[4], color: SPECTRUM_PALETTE[4] },
   ]
+  const periodDesc = (h: number) => {
+    if (h >= 17 && h <= 19) return '黄昏'
+    if (h >= 20 && h <= 22) return '入夜'
+    if (h >= 23 || h <= 1) return '夜半'
+    if (h >= 2 && h <= 4) return '三更后'
+    if (h >= 5 && h <= 7) return '黎明'
+    if (h >= 8 && h <= 10) return '上午'
+    if (h >= 11 && h <= 13) return '日中'
+    return '午后'
+  }
   const topTheme = themes[0]?.name ?? (tone === 'ancient' ? '怀远' : '夜色')
   const top3Stories = rows.slice(0, 3).concat([null, null, null]).slice(0, 3) as (any | null)[]
   const pct0 = `${Math.round(weights[0] * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`
   const pct1 = `${Math.round(weights[1] * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`
   const pctRest = `${Math.round((weights[2] + weights[3] + weights[4]) * 100 / Math.max(0.01, weights.reduce((a, b) => a + b, 0)))}%`
   let insights: EmotionPayload['insights']
+  const emotionAuthorsTop = extractAuthors(rows, 3)
+  const emotionKeywords = extractKeywords(rows, 6)
   if (tone === 'ancient') {
     insights = [
-      { title: '主脑', pct: pct0, color: SPECTRUM_PALETTE[0],
-        desc: `是编以「${names[0]}」为之主（${pct0}）——或托物起兴，或因事抒怀，皆出于性情之真，非为文造情者可比。` },
-      { title: '根柢', pct: pct1, color: SPECTRUM_PALETTE[1],
-        desc: `「${names[1]}」是诸篇之根柢——非曰愁苦，乃古人所谓「宁静以致远」之境。读者当于无字句处求之。` },
-      { title: '归趣', pct: pctRest, color: '#95f0c0',
-        desc: `「${names[2]}」「${names[3]}」「${names[4]}」三篇，为全编收束处——由郁而舒，由聚而散，正得「温柔敦厚」之教。` },
+      { title: '最浓的底色', pct: pct0, color: SPECTRUM_PALETTE[0],
+        desc: `整本里${names[0]}占 ${pct0}，和「${topTheme}」一起——${emotionKeywords[0] ? `「${emotionKeywords.slice(0,3).join('·')}」是出现最多的词。` : ''}千年前的人写这些句子时，心情和我们今天想念一个人，是一模一样的。` },
+      { title: '独处的时间', pct: pct1, color: SPECTRUM_PALETTE[1],
+        desc: `${names[1]}占 ${pct1}——它不是悲伤，是古人一种「和自己好好待一会儿」的方式。在${periodDesc(peakHour)}最密，${periodDesc(lowHour)}最淡。` },
+      { title: '出口处的光', pct: pctRest, color: '#95f0c0',
+        desc: `${names[2]}·${names[3]}·${names[4]}加起来占 ${pctRest}——古人也不总是愁：走到头总会留一扇窗、一阵风、一句好话给读的人。${emotionAuthorsTop[0] ? `读${emotionAuthorsTop[0].name}这类句子时，最能感觉到这点。` : ''}` },
     ]
   } else {
     insights = [
@@ -603,8 +757,13 @@ function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient'): E
     ]
   }
 
-  const ancientQuoteAuthors = ['钞本手录 · 佚名', '《中州集》· 元好问编', '《万首唐人绝句》· 洪迈辑', '《瀛奎律髓》· 方回批']
-  const ancientQuoteDates = ['宋元椠本', '明钞本', '汲古阁藏版', '写本 · 清晖阁题款']
+  const quotesAuthorsTop = extractAuthors(rows, 3)
+  const ancientQuoteAuthors = quotesAuthorsTop.length > 0
+    ? quotesAuthorsTop.map(a => `${a.name}·${a.count}首`)
+    : ['《中州集》· 遗山手钞', '《万首唐人绝句》· 宋椠本', '《瀛奎律髓》· 方回批点']
+  const ancientQuoteDates = quotesAuthorsTop.length > 0
+    ? quotesAuthorsTop.map(a => `${a.name}所著 · 钞存`)
+    : ['宋元椠本', '明钞本', '汲古阁藏版']
   const modernQuoteAuthors = ['@未署名 · 江风路', '@未署名 · 槐树下', '@未署名 · 末班车上']
   const quotes: EmotionPayload['quotes'] = top3Stories.map((r, i) => {
     const baseText = r?.content?.slice(0, 18) ? r.content.slice(0, 18) + '…' : null
@@ -617,12 +776,12 @@ function buildEmotion(rows: any[], themes: any[], tone: 'modern' | 'ancient'): E
     return {
       text,
       color: [SPECTRUM_PALETTE[0], SPECTRUM_PALETTE[4], SPECTRUM_PALETTE[3]][i],
-      tags: (r?.tags ?? [themes[i]?.name ?? (tone === 'ancient' ? '风人' : '夜'), themes[i + 1]?.name ?? (tone === 'ancient' ? '手泽' : '光')]).slice(0, 2),
+      tags: (r?.tags ?? [themes[i]?.name ?? (tone === 'ancient' ? emotionKeywords[i] ?? '怀远' : '夜'), themes[i + 1]?.name ?? (tone === 'ancient' ? emotionKeywords[i+1] ?? '深致' : '光')]).slice(0, 2),
       author: tone === 'ancient'
-        ? (r?.origin ? `出《${r.origin}》` : ancientQuoteAuthors[i % ancientQuoteAuthors.length])
+        ? (r?.origin ? `${r.origin}` : ancientQuoteAuthors[i % ancientQuoteAuthors.length])
         : (r?.location ? `@匿名 · ${r.location}` : modernQuoteAuthors[i % modernQuoteAuthors.length]),
       date: tone === 'ancient'
-        ? ancientQuoteDates[i % ancientQuoteDates.length]
+        ? (r?.origin ? `${r.origin} 本所收` : ancientQuoteDates[i % ancientQuoteDates.length])
         : (r?.createdAt ? relativeDate(r.createdAt) : ['3 天前', '昨天', '刚刚'][i]),
       illus: (['moon', 'house', 'sakura'] as const)[i],
     }
@@ -687,7 +846,7 @@ export function readCollectionAnalysis(collectionId: number | string): Collectio
   // Step 3: 没命中 / hash 变 → 合成 Phase 1 数据并写缓存（下次命中直接返回）
   const { hourly, peakHour, lowHour, themes } = computeHourlyAndThemes(rows)
   const persona    = buildPersona(rows, themes, tone)
-  const emotion    = buildEmotion(rows, themes, tone)
+  const emotion    = buildEmotion(rows, themes, tone, peakHour, lowHour)
   const nightscape = buildNightscape(collectionId, rows, hourly, peakHour, lowHour, themes, tone)
   const generatedAt = Date.now()
 

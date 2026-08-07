@@ -113,8 +113,8 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
       }
       finalCollectionId = collectionId;
     } else if (typeof collectionName === 'string' && collectionName.trim()) {
-      const visi = typeof collectionVisibility === 'string' && ['public', 'private'].includes(collectionVisibility)
-        ? collectionVisibility as 'public' | 'private'
+      const visi = typeof collectionVisibility === 'string' && ['public', 'private', 'anonymous'].includes(collectionVisibility)
+        ? collectionVisibility as 'public' | 'private' | 'anonymous'
         : undefined;
       const created = createCollection(user.id, { name: collectionName.trim(), visibility: visi });
       if (created.error) return badRequest(res, created.error);

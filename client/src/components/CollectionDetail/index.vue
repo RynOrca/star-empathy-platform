@@ -116,6 +116,12 @@
                           <span v-if="c.visibility === 'private'" class="collection-row-private">
                             <Lock :size="9" />
                           </span>
+                          <span v-else-if="c.visibility === 'anonymous'" class="collection-row-private row-anon">
+                            <Ghost :size="9" />
+                          </span>
+                          <span v-else-if="c.visibility === 'galaxy'" class="collection-row-private row-galaxy">
+                            <Galaxy :size="9" />
+                          </span>
                         </div>
                         <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则故事 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
                       </div>
@@ -137,6 +143,12 @@
               <h3 class="info-title">{{ detail?.name || '加载中…' }}</h3>
               <span v-if="detail?.visibility === 'private'" class="visi-tag visi-private">
                 <Lock :size="9" /><span>私有</span>
+              </span>
+              <span v-else-if="detail?.visibility === 'anonymous'" class="visi-tag visi-anonymous">
+                <Ghost :size="9" /><span>匿名</span>
+              </span>
+              <span v-else-if="detail?.visibility === 'galaxy'" class="visi-tag visi-galaxy">
+                <Galaxy :size="9" /><span>星河</span>
               </span>
               <span v-else-if="detail" class="visi-tag visi-public">
                 <Globe :size="9" /><span>公开</span>
@@ -186,8 +198,8 @@
               </div>
             </div>
 
-            <!-- 活跃时辰热力（真实数据派生） -->
-            <div v-if="detail && detail.storyCount > 0" class="info-section">
+            <!-- 活跃时辰热力（真实数据派生；星河不显示） -->
+            <div v-if="detail && detail.storyCount > 0 && !isGalaxy" class="info-section">
               <div class="info-label">
                 <Activity :size="11" class="info-label-icon" />
                 <span>活跃时辰</span>
@@ -208,8 +220,36 @@
               </div>
             </div>
 
-            <!-- 故事时间轴（真实数据派生） -->
-            <div v-if="detail && storyTimeline.length > 0" class="info-section">
+            <!-- 星河：文明源流分布（替代活跃时辰） -->
+            <div v-else-if="detail && civilizationStats.length > 0" class="info-section">
+              <div class="info-label">
+                <Landmark :size="11" class="info-label-icon" />
+                <span>文明源流</span>
+                <span class="info-label-sub">{{ civilizationsCount }} 支</span>
+              </div>
+              <div class="civil-list">
+                <div
+                  v-for="c in civilizationStats"
+                  :key="c.origin"
+                  class="civil-row"
+                >
+                  <span class="civil-icon" :style="{ color: c.color, borderColor: c.color + '55' }">
+                    <component :is="c.icon" :size="10" />
+                  </span>
+                  <span class="civil-name">{{ c.label }}</span>
+                  <div class="civil-bar">
+                    <span
+                      class="civil-bar-fill"
+                      :style="{ width: (c.count / maxCivilCount * 100) + '%', background: c.color }"
+                    ></span>
+                  </div>
+                  <span class="civil-count">{{ c.count }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 故事时间轴（真实数据派生；星河不显示） -->
+            <div v-if="!isGalaxy && storyTimeline.length > 0" class="info-section">
               <div class="info-label">
                 <Clock :size="11" class="info-label-icon" />
                 <span>故事时间轴</span>
@@ -230,6 +270,40 @@
                 </div>
                 <div v-if="storyTimeline.length > 12" class="tl-more">
                   +{{ storyTimeline.length - 12 }} 则…
+                </div>
+              </div>
+            </div>
+
+            <!-- 星河：典藏谱系（按文明源流分组索引，替代时间轴） -->
+            <div v-else-if="isGalaxy && galaxyIndex.length > 0" class="info-section">
+              <div class="info-label">
+                <Orbit :size="11" class="info-label-icon" />
+                <span>典藏谱系</span>
+                <span class="info-label-sub">{{ galaxyIndex.length }} 卷</span>
+              </div>
+              <div class="galaxy-index">
+                <div
+                  v-for="g in galaxyIndex"
+                  :key="g.key"
+                  class="gi-group"
+                >
+                  <div class="gi-head" :style="{ borderColor: g.color + '44' }">
+                    <span class="gi-dot" :style="{ background: g.color }"></span>
+                    <span class="gi-name">{{ g.label }}</span>
+                    <span class="gi-count">{{ g.items.length }} 则</span>
+                  </div>
+                  <ul class="gi-items">
+                    <li
+                      v-for="it in g.items.slice(0, 8)"
+                      :key="it.id"
+                      class="gi-item"
+                      @click="onStoryClick({ id: it.id } as any)"
+                    >
+                      <span class="gi-item-title">{{ it.title }}</span>
+                      <span v-if="it.resonance > 0" class="gi-item-res">{{ it.resonance }}</span>
+                    </li>
+                    <li v-if="g.items.length > 8" class="gi-item gi-more">+{{ g.items.length - 8 }} 则…</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -327,6 +401,12 @@
                   <span v-if="detail.visibility === 'private'" class="visi-tag visi-private">
                     <Lock :size="9" /><span>私有</span>
                   </span>
+                  <span v-else-if="detail.visibility === 'anonymous'" class="visi-tag visi-anonymous">
+                    <Ghost :size="9" /><span>匿名</span>
+                  </span>
+                  <span v-else-if="detail.visibility === 'galaxy'" class="visi-tag visi-galaxy">
+                    <Galaxy :size="9" /><span>星河</span>
+                  </span>
                   <span v-else class="visi-tag visi-public">
                     <Globe :size="9" /><span>公开</span>
                   </span>
@@ -369,7 +449,7 @@
                 </div>
 
                 <!-- 活跃时辰热力 -->
-                <div v-if="detail.storyCount > 0" class="info-section">
+                <div v-if="detail.storyCount > 0 && !isGalaxy" class="info-section">
                   <div class="info-label">
                     <Activity :size="11" class="info-label-icon" />
                     <span>活跃时辰</span>
@@ -390,8 +470,36 @@
                   </div>
                 </div>
 
+                <!-- 星河：文明源流分布 -->
+                <div v-else-if="civilizationStats.length > 0" class="info-section">
+                  <div class="info-label">
+                    <Landmark :size="11" class="info-label-icon" />
+                    <span>文明源流</span>
+                    <span class="info-label-sub">{{ civilizationsCount }} 支</span>
+                  </div>
+                  <div class="civil-list">
+                    <div
+                      v-for="c in civilizationStats"
+                      :key="c.origin"
+                      class="civil-row"
+                    >
+                      <span class="civil-icon" :style="{ color: c.color, borderColor: c.color + '55' }">
+                        <component :is="c.icon" :size="10" />
+                      </span>
+                      <span class="civil-name">{{ c.label }}</span>
+                      <div class="civil-bar">
+                        <span
+                          class="civil-bar-fill"
+                          :style="{ width: (c.count / maxCivilCount * 100) + '%', background: c.color }"
+                        ></span>
+                      </div>
+                      <span class="civil-count">{{ c.count }}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- 故事时间轴 -->
-                <div v-if="storyTimeline.length > 0" class="info-section">
+                <div v-if="!isGalaxy && storyTimeline.length > 0" class="info-section">
                   <div class="info-label">
                     <Clock :size="11" class="info-label-icon" />
                     <span>故事时间轴</span>
@@ -412,6 +520,40 @@
                     </div>
                     <div v-if="storyTimeline.length > 12" class="tl-more">
                       +{{ storyTimeline.length - 12 }} 则…
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 星河：典藏谱系（按文明源流分组） -->
+                <div v-else-if="isGalaxy && galaxyIndex.length > 0" class="info-section">
+                  <div class="info-label">
+                    <Orbit :size="11" class="info-label-icon" />
+                    <span>典藏谱系</span>
+                    <span class="info-label-sub">{{ galaxyIndex.length }} 卷</span>
+                  </div>
+                  <div class="galaxy-index">
+                    <div
+                      v-for="g in galaxyIndex"
+                      :key="g.key"
+                      class="gi-group"
+                    >
+                      <div class="gi-head" :style="{ borderColor: g.color + '44' }">
+                        <span class="gi-dot" :style="{ background: g.color }"></span>
+                        <span class="gi-name">{{ g.label }}</span>
+                        <span class="gi-count">{{ g.items.length }} 则</span>
+                      </div>
+                      <ul class="gi-items">
+                        <li
+                          v-for="it in g.items.slice(0, 8)"
+                          :key="it.id"
+                          class="gi-item"
+                          @click="onStoryClick({ id: it.id } as any)"
+                        >
+                          <span class="gi-item-title">{{ it.title }}</span>
+                          <span v-if="it.resonance > 0" class="gi-item-res">{{ it.resonance }}</span>
+                        </li>
+                        <li v-if="g.items.length > 8" class="gi-item gi-more">+{{ g.items.length - 8 }} 则…</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -497,6 +639,12 @@
                         <span v-if="c.visibility === 'private'" class="collection-row-private">
                           <Lock :size="9" />
                         </span>
+                        <span v-else-if="c.visibility === 'anonymous'" class="collection-row-private row-anon">
+                          <Ghost :size="9" />
+                        </span>
+                        <span v-else-if="c.visibility === 'galaxy'" class="collection-row-private row-galaxy">
+                          <Galaxy :size="9" />
+                        </span>
                       </div>
                       <div class="collection-row-meta">{{ c.storyCount ?? 0 }} 则 · {{ formatDate(c.updatedAt || c.createdAt) }}</div>
                     </div>
@@ -568,8 +716,10 @@ import { useRoute } from 'vue-router'
 import {
   X, Lock, Globe, BookOpen, BookMarked, Heart, Eye, Clock, Pencil, Trash2,
   ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Activity, Tag, Hash,
-  BarChart3, Star,
+  BarChart3, Star, Ghost, Landmark, Orbit, Scroll, Compass, Users,
 } from 'lucide-vue-next'
+/* 星河图标：用 Sparkles（多颗闪亮星簇=星河）别名，与模板中 Galaxy 变量使用一致 */
+const Galaxy = Sparkles
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import StoryList from '../StarDetail/StoryList.vue'
@@ -760,7 +910,69 @@ const displayStories = computed(() => {
    右侧信息面板：从真实故事派生的统计（活跃时辰 / 时间轴 / 标签）
    ═══════════════════════════════════════════════════════════ */
 
-/** 24 小时活跃分布（基于故事 createdAt 的小时） */
+const isGalaxy = computed(() => detail.value?.visibility === 'galaxy')
+
+/* ── 星河合集专用 1：文明源流（origin 分布替代活跃时辰）── */
+type OriginMeta = { label: string; color: string; icon: Component }
+const ORIGIN_META: Record<string, OriginMeta> = {
+  '中国':     { label: '华夏',   color: '#C97A5E', icon: Landmark as Component },
+  '古希腊':   { label: '希腊',   color: '#8A7FCE', icon: Orbit    as Component },
+  '希腊语':   { label: '希腊',   color: '#8A7FCE', icon: Orbit    as Component },
+  '拉丁语':   { label: '罗马',   color: '#7FB5D1', icon: Scroll   as Component },
+  '罗马语':   { label: '罗马',   color: '#7FB5D1', icon: Scroll   as Component },
+  '阿拉伯语': { label: '阿拉伯', color: '#C09969', icon: Compass  as Component },
+  '苏美尔':   { label: '美索',   color: '#B58C5A', icon: Compass  as Component },
+  '巴比伦':   { label: '美索',   color: '#B58C5A', icon: Compass  as Component },
+  '古埃及':   { label: '埃及',   color: '#D6B867', icon: Landmark as Component },
+  '近代命名': { label: '大航海', color: '#6FA3B8', icon: Compass  as Component },
+  '近代综合': { label: '大航海', color: '#6FA3B8', icon: Compass  as Component },
+  '现代命名': { label: '近代',   color: '#5DA1B8', icon: Orbit    as Component },
+  '南岛语':   { label: '南岛',   color: '#7AB89C', icon: Globe    as Component },
+  '天文学':   { label: '史实',   color: '#6FA17A', icon: Scroll   as Component },
+  '跨文化':   { label: '跨文明', color: '#9B7DC0', icon: Globe    as Component },
+}
+const FALLBACK_META: OriginMeta = { label: '星友', color: '#A580C5', icon: Users as Component }
+
+type CivilStat = { origin: string; label: string; count: number; color: string; icon: Component }
+const civilizationStats = computed<CivilStat[]>(() => {
+  const map = new Map<string, number>()
+  for (const s of detail.value?.stories ?? []) {
+    const key = s.origin || '星友'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  return Array.from(map.entries())
+    .map(([origin, count]) => {
+      const meta = ORIGIN_META[origin] ?? FALLBACK_META
+      return { origin, label: meta.label, count, color: meta.color, icon: meta.icon }
+    })
+    .sort((a, b) => b.count - a.count)
+})
+const maxCivilCount = computed(() => Math.max(1, ...civilizationStats.value.map(s => s.count)))
+const civilizationsCount = computed(() => civilizationStats.value.length)
+
+/* ── 星河合集专用 2：典藏谱系（按文明源流分组故事索引，替代故事时间轴）── */
+type GalaxyGroup = { key: string; label: string; color: string; items: { id: number; title: string; resonance: number }[] }
+const galaxyIndex = computed<GalaxyGroup[]>(() => {
+  const groups = new Map<string, GalaxyGroup>()
+  for (const s of detail.value?.stories ?? []) {
+    const origin = s.origin || '星友'
+    const meta = ORIGIN_META[origin] ?? FALLBACK_META
+    const key = meta.label
+    if (!groups.has(key)) {
+      groups.set(key, { key, label: key, color: meta.color, items: [] })
+    }
+    groups.get(key)!.items.push({
+      id: s.id,
+      title: s.title || '未命名故事',
+      resonance: s.resonanceCount ?? 0,
+    })
+  }
+  return Array.from(groups.values())
+    .sort((a, b) => b.items.length - a.items.length)
+    .map(g => ({ ...g, items: g.items.slice(0, 12) }))
+})
+
+/** 24 小时活跃分布（基于故事 createdAt 的小时）——仅非星河使用 */
 const hourlyActivity = computed<number[]>(() => {
   const arr = new Array(24).fill(0)
   for (const s of detail.value?.stories ?? []) {
@@ -1211,6 +1423,16 @@ function infoTagStyle(tag: string): Record<string, string> {
   color: #95f0c0;
   border: 0.5px solid rgba(149, 240, 192, 0.18);
 }
+.visi-anonymous {
+  background: rgba(169, 189, 255, 0.08);
+  color: rgba(169, 189, 255, 0.94);
+  border: 0.5px solid rgba(169, 189, 255, 0.22);
+}
+.visi-galaxy {
+  background: rgba(232, 184, 109, 0.10);
+  color: rgba(255, 229, 168, 0.96);
+  border: 0.5px solid rgba(232, 184, 109, 0.28);
+}
 
 /* ─── Info Section ─── */
 .info-section {
@@ -1391,6 +1613,147 @@ function infoTagStyle(tag: string): Record<string, string> {
   font-style: italic;
 }
 
+/* ─── 星河：文明源流分布 ─── */
+.civil-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 2px;
+}
+.civil-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.civil-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+}
+.civil-name {
+  width: 42px;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--ink-secondary);
+  letter-spacing: 0.03em;
+}
+.civil-bar {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.civil-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.civil-count {
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 0.64rem;
+  color: var(--muted-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 星河：典藏谱系（按文明分组索引）─── */
+.galaxy-index {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  padding-right: 2px;
+}
+.galaxy-index::-webkit-scrollbar { width: 3px; }
+.galaxy-index::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+.gi-group {}
+.gi-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border-left: 2px solid;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 0 4px 4px 0;
+}
+.gi-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gi-name {
+  flex: 1;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  letter-spacing: 0.04em;
+}
+.gi-count {
+  font-size: 0.58rem;
+  color: var(--muted-light);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+.gi-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 14px;
+}
+.gi-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.gi-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--accent); }
+.gi-item-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-secondary);
+  opacity: 0.85;
+}
+.gi-item:hover .gi-item-title { color: var(--accent); opacity: 1; }
+.gi-item-res {
+  flex-shrink: 0;
+  font-size: 0.56rem;
+  color: #ff8b7d;
+  font-variant-numeric: tabular-nums;
+}
+.gi-item.gi-more {
+  cursor: default;
+  color: var(--muted-light);
+  font-style: italic;
+  padding-left: 6px;
+  opacity: 0.7;
+}
+.gi-item.gi-more:hover { background: transparent; color: var(--muted-light); }
+
 /* ─── 高频标签 ─── */
 .info-tags {
   display: flex;
@@ -1514,6 +1877,8 @@ function infoTagStyle(tag: string): Record<string, string> {
   white-space: nowrap;
 }
 .collection-row-private { color: var(--muted); display: inline-flex; }
+.collection-row-private.row-anon { color: rgba(169, 189, 255, 0.82); }
+.collection-row-private.row-galaxy { color: rgba(232, 184, 109, 0.88); }
 .collection-row-meta {
   font-size: 0.72rem;
   color: var(--muted);
