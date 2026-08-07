@@ -203,3 +203,27 @@ export const GalleryIcon = defineComponent({
     ])
   },
 })
+
+/** User — 用户心声 */
+export const UserIcon = defineComponent({
+  name: 'UserIcon',
+  setup(_, { attrs }) {
+    return () => h('svg', { ...svgProps, width: 12, height: 12, ...attrs }, [
+      h('path', { d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' }),
+      h('circle', { cx: 12, cy: 7, r: 4 }),
+    ])
+  },
+})
+
+/** Zoom — 视场控制（放大镜） */
+export const ZoomIcon = defineComponent({
+  name: 'ZoomIcon',
+  setup(_, { attrs }) {
+    return () => h('svg', { ...svgProps, width: 14, height: 14, ...attrs }, [
+      h('circle', { cx: 11, cy: 11, r: 7 }),
+      h('line', { x1: 21, y1: 21, x2: '16.65', y2: '16.65' }),
+      h('line', { x1: 11, y1: 8, x2: 11, y2: 14 }),
+      h('line', { x1: 8, y1: 11, x2: 14, y2: 11 }),
+    ])
+  },
+})

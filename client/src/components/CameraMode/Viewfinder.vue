@@ -37,88 +37,100 @@
   pointer-events: none;
   z-index: 10;
 }
-/* 暗角：贴近视口边缘，包含 HUD 区域 */
+/* 暗角：柔和自然的边缘晕染，不再像黑框，更像"景深" */
 .vf-vignette {
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 200px 60px var(--vf-vignette);
+  box-shadow: inset 0 0 180px 40px var(--vf-vignette);
+  border-radius: 0;
 }
-/* 九宫格网格 */
+/* 九宫格网格：更淡、更细腻，仅作构图参考 */
 .vf-grid {
   position: absolute;
-  inset: 0;
+  inset: 16px;  /* 缩进，避免贴死边角 */
 }
 .vf-grid-line {
   position: absolute;
   background: var(--vf-grid);
+  backdrop-filter: blur(1px);
 }
 .vf-grid-h1, .vf-grid-h2 {
   left: 0; right: 0; height: 1px;
+  border-radius: 1px;
 }
 .vf-grid-h1 { top: 33.33%; }
 .vf-grid-h2 { top: 66.66%; }
 .vf-grid-v1, .vf-grid-v2 {
   top: 0; bottom: 0; width: 1px;
+  border-radius: 1px;
 }
 .vf-grid-v1 { left: 33.33%; }
 .vf-grid-v2 { left: 66.66%; }
-/* 紫色边框：贴近视口边缘，包含顶部 HUD 和底部参数栏 */
+/* 外边框：极淡、圆角，和主 panel 一致的 10px 圆角语义 */
 .vf-border {
   position: absolute;
-  inset: 0;
-  border: 2px solid var(--vf-border);
+  inset: 10px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--radius-lg);
   box-sizing: border-box;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.015) inset,
+    0 0 30px rgba(202, 167, 255, 0.04);
 }
-/* 四角标记 */
+/* 四角标记：更精致、L 形短边、渐变柔和色 */
 .vf-corner {
   position: absolute;
-  width: 36px;
-  height: 36px;
-  border-color: var(--vf-border);
+  width: 28px;
+  height: 28px;
+  border-color: var(--accent);
   border-style: solid;
   border-width: 0;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 3px rgba(255, 217, 138, 0.15));
 }
-.vf-corner-tl { top: 4px; left: 4px; border-top-width: 3px; border-left-width: 3px; }
-.vf-corner-tr { top: 4px; right: 4px; border-top-width: 3px; border-right-width: 3px; }
-.vf-corner-bl { bottom: 4px; left: 4px; border-bottom-width: 3px; border-left-width: 3px; }
-.vf-corner-br { bottom: 4px; right: 4px; border-bottom-width: 3px; border-right-width: 3px; }
+.vf-corner-tl { top: 18px; left: 18px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 6px; }
+.vf-corner-tr { top: 18px; right: 18px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 6px; }
+.vf-corner-bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
+.vf-corner-br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
 
-/* ═══ 相机十字准星：SVG 单一合成层，避免大 div 每帧重绘卡顿 ═══ */
+/* ═══ 相机十字准星：淡色、居中方框更精致 ═══ */
 .vf-crosshair-svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.35;
-  animation: vf-crosshair-enter 0.4s var(--ease-in-out) both;
-  animation-delay: 240ms;
+  opacity: 0.3;
+  animation: vf-crosshair-enter 0.5s var(--ease-in-out) both;
+  animation-delay: 260ms;
 }
 .vf-ch-h, .vf-ch-v {
   stroke: var(--vf-crosshair);
-  stroke-width: 1;
+  stroke-width: 0.5;
+  stroke-dasharray: 6 8;   /* 虚线更有"精密仪器"感 */
 }
 .vf-ch-center-group {
-  transform: translate(calc(50vw - 8px), calc(50vh - 8px));
+  transform: translate(calc(50vw - 10px), calc(50vh - 10px));
 }
 .vf-ch-center-line {
-  stroke: var(--vf-crosshair);
-  stroke-width: 1;
-  opacity: 2.57; /* 0.35 容器 × 2.57 ≈ 0.9，中心十字更醒目 */
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.8;
 }
 
-/* ═══ 级联进入动画 ═══ */
-.vf-border { animation: vf-border-enter 0.5s var(--ease-in-out) both; }
-.vf-vignette { animation: vf-vignette-enter 0.6s var(--ease-in-out) both; animation-delay: 40ms; }
+/* ═══ 级联进入动画（更柔和、时间略拉长，避免"一下子全出来"） ═══ */
+.vf-border { animation: vf-border-enter 0.7s var(--ease-in-out) both; }
+.vf-vignette { animation: vf-vignette-enter 0.9s var(--ease-in-out) both; animation-delay: 60ms; }
 .vf-corner-tl, .vf-corner-tr, .vf-corner-bl, .vf-corner-br {
-  animation: vf-corner-enter 0.4s var(--ease-in-out) both;
+  animation: vf-corner-enter 0.55s var(--ease-out) both;
 }
-.vf-corner-tl { animation-delay: 80ms; }
-.vf-corner-tr { animation-delay: 120ms; }
-.vf-corner-bl { animation-delay: 160ms; }
-.vf-corner-br { animation-delay: 200ms; }
+.vf-corner-tl { animation-delay: 100ms; }
+.vf-corner-tr { animation-delay: 180ms; }
+.vf-corner-bl { animation-delay: 260ms; }
+.vf-corner-br { animation-delay: 340ms; }
 
-@keyframes vf-border-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vf-border-enter { from { opacity: 0; transform: scale(1.008); } to { opacity: 1; transform: scale(1); } }
 @keyframes vf-vignette-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vf-corner-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 0.35; } }
+@keyframes vf-corner-enter { from { opacity: 0; transform: scale(0.6); } to { opacity: 0.55; transform: scale(1); } }
+@keyframes vf-crosshair-enter { from { opacity: 0; transform: scale(1.02); } to { opacity: 0.3; transform: scale(1); } }
 </style>
