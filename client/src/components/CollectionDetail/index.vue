@@ -84,6 +84,7 @@
                 <CollectionAnalysis
                   :collection-id="props.collectionId"
                   :collection-name="detail.name"
+                  :visibility="detail.visibility"
                   :story-count="detail.storyCount"
                   :stories="detail.stories"
                   :resonance-total="totalResonance"
@@ -607,6 +608,7 @@
               <CollectionAnalysis
                 :collection-id="props.collectionId"
                 :collection-name="detail.name"
+                :visibility="detail.visibility"
                 :story-count="detail.storyCount"
                 :stories="detail.stories"
                 :resonance-total="totalResonance"

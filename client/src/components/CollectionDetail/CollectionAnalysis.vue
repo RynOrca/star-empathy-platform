@@ -682,22 +682,34 @@
 
 
 
-    <!-- ═══ 4. 时辰热力（按 tone 切换标题） ═══ -->
+    <!-- ═══ 4. 时辰热力 / 气脉十二时 → 星河下改为「卷目疏」 ═══ -->
     <section class="panel-wrapper ca-hour">
       <div class="panel-head">
-        <Clock3 :size="10" class="pw-icon pw-purple" />
-        <span class="pw-title">{{ isAncientTone ? '气脉十二时' : '时辰热力' }}</span>
-        <span class="pw-count">{{
-          hasReal
-            ? (isAncientTone
-                ? `盛时 ${DIZHI_PER_2H[peakHour] ?? '子'} · 衰时 ${DIZHI_PER_2H[lowHour] ?? '寅'}`
-                : `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`)
-            : tooFewStories ? '未生成' : '生成中'
-        }}</span>
+        <template v-if="!isGalaxy">
+          <Clock3 :size="10" class="pw-icon pw-purple" />
+          <span class="pw-title">{{ isAncientTone ? '气脉十二时' : '时辰热力' }}</span>
+          <span class="pw-count">{{
+            hasReal
+              ? (isAncientTone
+                  ? `盛时 ${DIZHI_PER_2H[peakHour] ?? '子'} · 衰时 ${DIZHI_PER_2H[lowHour] ?? '寅'}`
+                  : `高峰 ${pad(peakHour)}:00 · 低谷 ${pad(lowHour)}:00`)
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
+        </template>
+        <template v-else>
+          <BookText :size="10" class="pw-icon" style="color: #E8B86D" />
+          <span class="pw-title">卷目疏</span>
+          <span class="pw-count">{{
+            hasReal || scrollBooks.length
+              ? `共 ${scrollBooks.length} 卷 · ${scrollBooks.reduce((s, b) => s + b.count, 0)} 则`
+              : tooFewStories ? '未生成' : '生成中'
+          }}</span>
+        </template>
       </div>
 
+      <!-- ═════════════════════ 非星河：气脉十二时/时辰热力（原结构保留） ═════════════════════ -->
       <!-- 真实态：珠子热力图 + 十二地支轴 + 高峰低谷洞察 -->
-      <div v-if="hasReal" class="ca-hour-body">
+      <div v-if="!isGalaxy && hasReal" class="ca-hour-body">
         <div class="ca-hour-beads">
           <span
             v-for="(v, h) in hourly"
@@ -749,8 +761,8 @@
         </div>
       </div>
 
-      <!-- tooFew：空态（所有框都要显示，只是内部提示不够） -->
-      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+      <!-- tooFew：空态（非星河） -->
+      <div v-else-if="!isGalaxy && tooFewStories" class="persona-empty empty-scant">
         <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
         <div class="pe-text">
           <div class="pe-title">心事还不够多</div>
@@ -758,12 +770,94 @@
         </div>
       </div>
 
-      <!-- loading：骨架屏 -->
-      <div v-else class="persona-empty empty-loading">
+      <!-- loading：骨架屏（非星河） -->
+      <div v-else-if="!isGalaxy" class="persona-empty empty-loading">
         <div class="pe-icon-wrap pe-loading"><Sparkle :size="14" class="spin-slow" /></div>
         <div class="pe-text">
           <div class="pe-title">时辰热力生成中…</div>
           <div class="pe-sub">正在从 {{ displayStoryCount }} 则心事中聚合 24 时辰投递高峰</div>
+        </div>
+        <div class="skeleton-lines">
+          <span class="sk-line sk-1"></span>
+          <span class="sk-line sk-2"></span>
+          <span class="sk-line sk-3"></span>
+        </div>
+      </div>
+
+      <!-- ═════════════════════ 星河合集：卷目疏（真实/loading/tooFew） ═════════════════════ -->
+      <!-- 真实态：主卷 2 大卡片预览 + 次卷条目条柱 -->
+      <div v-else-if="hasReal || scrollBooks.length > 0" class="scroll-body">
+        <!-- 主卷：两列大卡片 -->
+        <div class="scroll-head-cards">
+          <div
+            v-for="b in scrollBooksTop2"
+            :key="b.name"
+            class="scroll-card"
+            :style="{ '--sc': b.color }"
+          >
+            <div class="sc-banner">
+              <component :is="b.icon" :size="14" class="sc-icon" />
+              <div class="sc-head-text">
+                <span class="sc-name">{{ b.name }}</span>
+                <span class="sc-tag">{{ b.tag }}</span>
+              </div>
+              <span class="sc-count">{{ b.count }} 则</span>
+            </div>
+            <ul class="sc-tops">
+              <li
+                v-for="t in b.topStories"
+                :key="t.id"
+                class="sc-top-item"
+                @click="$emit('story-click', { id: t.id })"
+              >
+                <span class="sc-top-title">{{ t.title }}</span>
+                <span class="sc-top-sub">
+                  <span v-if="t.author" class="sc-top-author">{{ t.author }}</span>
+                  <span v-if="t.resonance > 0" class="sc-top-res">{{ t.resonance }} 共鸣</span>
+                </span>
+              </li>
+              <li v-if="!b.topStories.length" class="sc-top-item sc-top-empty">本卷卷首篇目待补。</li>
+            </ul>
+          </div>
+        </div>
+        <!-- 次卷：横向条柱列表（>2 的其余卷） -->
+        <div v-if="scrollBooks.length > 2" class="scroll-other">
+          <div class="so-title">
+            <BookMarked :size="9" />
+            <span>其余 {{ scrollBooks.length - 2 }} 卷</span>
+          </div>
+          <div class="so-list">
+            <div
+              v-for="b in scrollBooks.slice(2)"
+              :key="b.name"
+              class="so-row"
+              :style="{ '--sc': b.color }"
+            >
+              <component :is="b.icon" :size="9" class="so-icon" />
+              <span class="so-name">{{ b.name }}</span>
+              <span class="so-tag">{{ b.tag }}</span>
+              <div class="so-bar"><span class="so-fill"></span></div>
+              <span class="so-count">{{ b.count }} 则</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 星河：tooFew 空态 -->
+      <div v-else-if="tooFewStories" class="persona-empty empty-scant">
+        <div class="pe-icon-wrap pe-scant"><BookText :size="14" /></div>
+        <div class="pe-text">
+          <div class="pe-title">卷轴尚未展开</div>
+          <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 则故事，累计 3 则后按体裁与源流拆卷，编排为《卷目疏》</div>
+        </div>
+      </div>
+
+      <!-- 星河：loading 骨架 -->
+      <div v-else class="persona-empty empty-loading">
+        <div class="pe-icon-wrap pe-loading"><Scroll :size="14" class="spin-slow" /></div>
+        <div class="pe-text">
+          <div class="pe-title">卷目疏缮写中…</div>
+          <div class="pe-sub">正按体裁与文化源流为 {{ displayStoryCount }} 则故事拆卷归类</div>
         </div>
         <div class="skeleton-lines">
           <span class="sk-line sk-1"></span>
@@ -910,11 +1004,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, type Component } from 'vue'
 import {
   Sparkles, MoonStar, HeartPulse, Orbit, Clock3, Route, Flame, Heart,
   Feather, Info, Quote, CloudSun, Sparkle, BookDashed, AlertTriangle, RotateCcw,
-  BookOpen, UserSquare2, CalendarClock,
+  BookOpen, UserSquare2, CalendarClock, Scroll, BookText, BookMarked,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -929,6 +1023,8 @@ const props = defineProps<{
   collectionId: number | null
   collectionName: string
   storyCount: number
+  /** 合集可见性：public/private/anonymous/galaxy；星河会替换时辰/气脉相关面板为官方卷目样式 */
+  visibility?: 'public' | 'private' | 'anonymous' | 'galaxy'
   /** 真实故事列表，用于共鸣榜与星辰归属（若为空则用 mock） */
   stories?: Array<{
     id: number
@@ -942,6 +1038,9 @@ const props = defineProps<{
     creator_name?: string | null
     /** 故事类型：history=历史故事 / user=用户投稿 */
     type?: 'history' | 'user'
+    /** 文化源流：中国/古希腊/阿拉伯语/近代命名/跨文化…（星河卷目分组用） */
+    origin?: string | null
+    tags?: string[]
   }>
   /** 可选：合集总共鸣数（不传则从 stories.reduce 计算，或 fallback 到 mock 237） */
   resonanceTotal?: number
@@ -1403,6 +1502,110 @@ const heroStats = computed(() => _n.value?.heroStats ?? [
   { k: '平均共鸣', v: Math.round((props.resonanceTotal ?? 237) / Math.max(1, displayStoryCount.value)), sub: '则心事', color: '#86a8ff' },
   { k: '覆盖时辰', v: `${positivesCountFn(hourly.value)}/24`, sub: '段', color: '#9ae6b4' },
 ])
+
+const isGalaxy = computed(() => props.visibility === 'galaxy')
+
+/* ── 星河合集专用：卷目疏（替代气脉十二时） ──
+   把合集中故事按作者/出处/首字/卷名拆成「诗卷 / 词卷 / 曲卷 / 史卷 / 星官卷 / 神话卷 / 笔记卷 / 语录卷 / 杂钞卷」等卷目 */
+type BookMeta = { name: string; order: number; color: string; icon: Component; tag: string }
+const BOOK_RULES: Array<{ test: (s: any) => boolean; meta: BookMeta }> = [
+  {
+    test: s => /诗|唐诗|绝句|律诗|韵|子规|巴山|夜雨寄北|登高|月下|江村|江雪/.test(s.title ?? '')
+      || /李白|杜甫|王维|白居易|孟浩然|苏轼(?![文])|王安石|柳宗元|贺知章|李清照(?![词])|辛弃疾(?![词])|陆游(?![词])/.test(s.creator_name ?? '')
+      || /五言|七言|《诗》/.test(s.content.slice(0, 60)),
+    meta: { name: '诗卷', order: 1, color: '#E8B86D', icon: Scroll as Component, tag: '韵文·吟物' }
+  },
+  {
+    test: s => /词|宋词|长短句|江城子|水调歌头|念奴娇|声声慢|青玉案|满江红|虞美人|蝶恋花|浣溪沙|如梦令|一剪梅/.test(s.title ?? '')
+      || /苏轼(?=\s*[词《])|李清照|辛弃疾|柳永|秦观|周邦彦|晏殊|晏几道|欧阳修(?=\s*[词《])|陆游|姜夔|吴文英/.test(s.creator_name ?? ''),
+    meta: { name: '词卷', order: 2, color: '#CAA7FF', icon: BookText as Component, tag: '倚声·填阕' }
+  },
+  {
+    test: s => /曲|杂剧|传奇|戏曲|西厢|牡丹亭|桃花扇|窦娥冤|汉宫秋|梧桐雨|赵氏孤儿/.test(s.title ?? '')
+      || /关汉卿|王实甫|汤显祖|孔尚任|洪昇|马致远|白朴|纪君祥/.test(s.creator_name ?? ''),
+    meta: { name: '曲卷', order: 3, color: '#F4A8B8', icon: BookMarked as Component, tag: '梨园·院本' }
+  },
+  {
+    test: s => /星官|天官|步天歌|史记·天官|晋书·天文|灵台|观星|星经|甘石|三家星|紫微垣|太微垣|天市垣|二十八宿|星宿|星野/.test(s.title ?? s.content.slice(0, 120))
+      || /石申|甘德|落下闳|张衡|祖冲之|一行|郭守敬|梅文鼎|李善兰/.test(s.creator_name ?? ''),
+    meta: { name: '星官卷', order: 4, color: '#7AB8F0', icon: Orbit as Component, tag: '观星·步天' }
+  },
+  {
+    test: s => /神话|神话考|创世|补天|射日|奔月|治水|移山|填海|奥林匹斯|宙斯|阿波罗|赫拉|雅典娜|波塞冬|阿瑞斯|赫尔墨斯|狄俄倪索斯|珀耳塞福涅|太阳神|月神/.test(s.title ?? s.content.slice(0, 120))
+      || /赫西俄德|荷马|奥维德|阿波罗多洛斯|埃斯库罗斯|索福克勒斯|欧里庇得斯/.test(s.creator_name ?? ''),
+    meta: { name: '神话卷', order: 5, color: '#95E0C0', icon: MoonStar as Component, tag: '创世·神祇' }
+  },
+  {
+    test: s => /史|史记|汉书|后汉书|三国志|资治通鉴|通鉴|纪事本末|编年史|本纪|列传|世家|书|志|表/.test(s.title ?? '')
+      || /司马迁|班固|陈寿|司马光|范晔|裴松之|刘知几|章学诚/.test(s.creator_name ?? ''),
+    meta: { name: '史卷', order: 6, color: '#FFD98A', icon: BookOpen as Component, tag: '简册·载笔' }
+  },
+  {
+    test: s => /笔记|录异|志怪|志异|搜神|幽明|酉阳杂俎|容斋|梦溪笔谈|东京梦华|武林旧事|陶庵梦忆|阅微草堂|聊斋|子不语|世说新语|拾遗记|述异记|太平广记/.test(s.title ?? s.content.slice(0, 120))
+      || /干宝|刘义庆|段成式|沈括|孟元老|周密|张岱|纪晓岚|蒲松龄|袁枚|洪迈|吴淑/.test(s.creator_name ?? ''),
+    meta: { name: '笔记卷', order: 7, color: '#A8E89C', icon: Feather as Component, tag: '志怪·琐记' }
+  },
+  {
+    test: s => /语录|论语|孟子|朱子语类|传习录|坛经|大学|中庸|近思录|菜根谭|围炉夜话|小窗幽记|幽梦影/.test(s.title ?? s.content.slice(0, 80))
+      || /孔子|孟子|朱熹|王阳明|释慧能|六祖|老子|庄子|列子|荀子|韩非子|墨子|陈继儒|张潮|洪应明/.test(s.creator_name ?? ''),
+    meta: { name: '语录卷', order: 8, color: '#FFB48A', icon: Quote as Component, tag: '微言·理致' }
+  },
+  {
+    test: s => /阿拉伯|伊斯兰|阿尔·|al-|苏菲|可兰|天方|一千零一夜|卡布斯|巴努|库赛|乌姆鲁勒|穆太奈比|麦阿里/.test((s.title ?? '') + s.content.slice(0, 100) + ' ' + (s.creator_name ?? ''))
+      || /大食|撒马尔罕|巴格达|大马士革|开罗|科尔多瓦|托莱多/.test(s.title ?? s.content.slice(0, 120)),
+    meta: { name: '海外卷', order: 9, color: '#C09969', icon: Route as Component, tag: '天方·异闻' }
+  },
+]
+const FALLBACK_BOOK: BookMeta = { name: '杂钞卷', order: 99, color: '#B59FD4', icon: Sparkles as Component, tag: '无类·汇存' }
+
+function matchBook(s: any): BookMeta {
+  for (const r of BOOK_RULES) if (r.test(s)) return r.meta
+  return FALLBACK_BOOK
+}
+
+type ScrollBook = {
+  name: string; order: number; color: string; icon: Component; tag: string;
+  count: number;
+  total: number;
+  /** 卷内共鸣最盛 3 条故事预览 */
+  topStories: { id: number; title: string; resonance: number; author?: string }[]
+}
+const scrollBooks = computed<ScrollBook[]>(() => {
+  const real = props.stories ?? []
+  if (!real.length) {
+    // mock 兜底：配合 mock heroStats 的 18-24 则故事量，出一个典型卷目结构
+    return [
+      { name: '诗卷',   order: 1, color: '#E8B86D', icon: Scroll as Component,   tag: '韵文·吟物', count: 8,  total: 8,
+        topStories: [{ id: 1, title: '夜雨寄北', resonance: 9, author: '李商隐' }, { id: 2, title: '水调歌头·明月几时有', resonance: 6, author: '苏轼' }] },
+      { name: '星官卷', order: 4, color: '#7AB8F0', icon: Orbit as Component,    tag: '观星·步天', count: 5,  total: 5,
+        topStories: [{ id: 3, title: '步天歌·紫微垣', resonance: 4, author: '丹元子' }, { id: 4, title: '天官书', resonance: 2, author: '司马迁' }] },
+      { name: '史卷',   order: 6, color: '#FFD98A', icon: BookOpen as Component, tag: '简册·载笔', count: 4,  total: 4,
+        topStories: [{ id: 5, title: '太史公自序', resonance: 3, author: '司马迁' }] },
+      { name: '笔记卷', order: 7, color: '#A8E89C', icon: Feather as Component,  tag: '志怪·琐记', count: 3,  total: 3,
+        topStories: [{ id: 6, title: '幽明录·夜星', resonance: 2 }] },
+    ]
+  }
+  const groups = new Map<string, ScrollBook>()
+  for (const s of real) {
+    const meta = matchBook(s)
+    if (!groups.has(meta.name)) groups.set(meta.name, {
+      name: meta.name, order: meta.order, color: meta.color, icon: meta.icon, tag: meta.tag,
+      count: 0, total: real.length, topStories: [],
+    })
+    const g = groups.get(meta.name)!
+    g.count++
+    g.topStories.push({
+      id: s.id,
+      title: s.title || s.content.slice(0, 16) + (s.content.length > 16 ? '…' : ''),
+      resonance: s.resonanceCount ?? 0,
+      author: s.creator_name || undefined,
+    })
+  }
+  return Array.from(groups.values())
+    .map(g => ({ ...g, topStories: [...g.topStories].sort((a, b) => b.resonance - a.resonance).slice(0, 3) }))
+    .sort((a, b) => a.order - b.order)
+})
+const scrollBooksTop2 = computed(() => scrollBooks.value.slice(0, 2)) // 预览 2 大卷
 
 const hourly = computed<number[]>(() => _n.value?.hourly ?? [2,1,1,0,0,1,3,5,4,3,2,2,4,3,2,1,2,3,4,6,9,12,8,5])
 const peakHour = computed<number>(() => _n.value?.peakHour ?? 21)
@@ -3596,6 +3799,218 @@ function tagStyle(tag: string): Record<string, string> {
   font-size: 0.72rem;
   line-height: 1.8;
   color: rgba(255, 255, 255, 0.48);
+}
+
+/* ═══ 星河合集：卷目疏 样式（替代气脉十二时） ═══ */
+.scroll-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scroll-head-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.scroll-card {
+  --sc: #E8B86D;
+  position: relative;
+  border: 0.5px solid color-mix(in srgb, var(--sc) 22%, transparent);
+  border-radius: 10px;
+  padding: 10px 10px 9px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sc) 6%, transparent) 0%, rgba(255,255,255,0.01) 100%);
+  overflow: hidden;
+  cursor: default;
+}
+.scroll-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--sc) 55%, transparent), transparent);
+  opacity: 0.6;
+}
+.sc-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 0.5px dashed color-mix(in srgb, var(--sc) 22%, transparent);
+}
+.sc-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sc) 18%, transparent);
+  color: var(--sc);
+}
+.sc-head-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sc-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.82);
+}
+.sc-tag {
+  font-size: 0.54rem;
+  color: color-mix(in srgb, var(--sc) 75%, rgba(255,255,255,0.5));
+  letter-spacing: 0.08em;
+}
+.sc-count {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.sc-tops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-top-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.sc-top-item:hover { background: color-mix(in srgb, var(--sc) 10%, transparent); }
+.sc-top-title {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sc-top-item:hover .sc-top-title { color: var(--sc); }
+.sc-top-sub {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-top-author {
+  font-size: 0.56rem;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.03em;
+}
+.sc-top-res {
+  font-size: 0.54rem;
+  color: #ff8b7d;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.sc-top-empty {
+  cursor: default;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+  grid-column: 1 / -1;
+  padding: 4px 6px 3px;
+}
+
+.scroll-other {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.so-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.so-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.so-row {
+  --sc: #E8B86D;
+  display: grid;
+  grid-template-columns: 18px 42px auto 1fr 36px;
+  align-items: center;
+  column-gap: 7px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 0.5px solid color-mix(in srgb, var(--sc) 14%, transparent);
+  background: color-mix(in srgb, var(--sc) 4%, transparent);
+}
+.so-icon {
+  color: var(--sc);
+  opacity: 0.8;
+  justify-self: center;
+}
+.so-name {
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.so-tag {
+  font-size: 0.52rem;
+  color: color-mix(in srgb, var(--sc) 65%, rgba(255,255,255,0.5));
+  letter-spacing: 0.06em;
+}
+.so-bar {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  min-width: 0;
+}
+.so-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sc) 60%, transparent), var(--sc));
+  border-radius: 999px;
+}
+.so-count {
+  justify-self: end;
+  font-size: 0.54rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .scroll-head-cards { grid-template-columns: 1fr; }
+  .so-row { grid-template-columns: 18px 42px 1fr 32px; }
+  .so-tag { display: none; }
 }
 
 /* ═══ 5. Trajectory（限高滚动+渐隐+展开） ═══ */
