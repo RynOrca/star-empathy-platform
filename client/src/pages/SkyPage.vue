@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -288,65 +288,87 @@
       -->
       <!-- end: 四张引导卡（TBD 恢复时移除前后注释） -->
 
-      <!-- ② 引导动作条：窄版、为信息服务（不追求占满 4 卡宽度）
-           顺序：1.记录 2.天镜 3.书局 4.折叠(正方形) -->
-      <div class="guide-actions-bar" aria-label="引导动作区">
+      <!-- ② 三个引导功能卡 · 信息感 + 引导感：左图标 + 中序标/标题/引导句 + 右箭头 -->
+      <div class="guide-actions-bar" aria-label="星空三大入口">
+        <!-- 卡 ①：记录心事 -->
         <button
           type="button"
-          class="guide-action guide-action-record"
+          class="gac gac-record"
           @click="openRecordForm"
         >
-          <span class="ga-icon"><PenLine :size="18" /></span>
-          <span class="ga-text-block">
-            <span class="ga-title">记录心事</span>
-            <span class="ga-sub">AI 寻归属星辰 →</span>
+          <span class="gac-icon-wrap"><PenLine :size="22" /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">壹</span>
+              <span class="gac-tag">写一段心事</span>
+            </span>
+            <span class="gac-title">记录心事</span>
+            <span class="gac-desc">把今晚的心情交给星穹 AI，为你寻一颗最契合的归属星辰。</span>
+          </span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
           </span>
         </button>
+
+        <!-- 卡 ②：天镜览星（定位就绪点亮） -->
         <button
           v-if="locationReady"
           type="button"
-          class="guide-action guide-action-camera"
+          class="gac gac-camera"
           @click="toggleCameraMode"
         >
-          <span class="ga-icon"><ApertureIcon /></span>
-          <span class="ga-text-block">
-            <span class="ga-title">天镜览星</span>
-            <span class="ga-sub">今夜观景 →</span>
+          <span class="gac-icon-wrap"><ApertureIcon /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">贰</span>
+              <span class="gac-tag">今夜取景器</span>
+            </span>
+            <span class="gac-title">天镜览星</span>
+            <span class="gac-desc">进入观星模式，真实星空取框，把此刻的夜空收进画里。</span>
+          </span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
           </span>
         </button>
         <button
           v-else
           type="button"
-          class="guide-action guide-action-camera"
+          class="gac gac-camera"
           disabled
+          title="等待定位就绪"
         >
-          <span class="ga-icon"><ApertureIcon /></span>
-          <span class="ga-text-block">
-            <span class="ga-title">天镜览星</span>
-            <span class="ga-sub">等待定位</span>
+          <span class="gac-icon-wrap"><ApertureIcon /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">贰</span>
+              <span class="gac-tag gac-tag-wait">等待定位</span>
+            </span>
+            <span class="gac-title">天镜览星</span>
+            <span class="gac-desc">正在校准你此刻的经纬，夜空取景框稍后就位…</span>
+          </span>
+          <span class="gac-arrow is-wait">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v6l4 2"/></svg>
           </span>
         </button>
+
+        <!-- 卡 ③：穹庭书局 -->
         <button
           type="button"
-          class="guide-action guide-action-square"
+          class="gac gac-square"
           @click="goFolioSquare"
         >
-          <span class="ga-icon"><BookMarked :size="18" /></span>
-          <span class="ga-text-block">
-            <span class="ga-title">穹庭书局</span>
-            <span class="ga-sub">星笺广场 →</span>
+          <span class="gac-icon-wrap"><BookMarked :size="22" /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">叁</span>
+              <span class="gac-tag">翻开星笺</span>
+            </span>
+            <span class="gac-title">穹庭书局</span>
+            <span class="gac-desc">走进星笺广场，今晚谁在同一册星河卷里，与你共读一段。</span>
           </span>
-        </button>
-        <button
-          type="button"
-          class="guide-action guide-action-collapse"
-          @click="toggleGuideCards"
-          :aria-expanded="guideCardsOpen"
-          :title="guideCardsOpen ? '收起上面四张引导卡，让星空更纯净' : '唤回四张引导卡'"
-        >
-          <ChevronUp v-if="guideCardsOpen" :size="22" stroke-width="2" class="gac-icon" />
-          <ChevronDown v-else :size="22" stroke-width="2" class="gac-icon" />
-          <span class="gac-label">{{ guideCardsOpen ? '收起引导' : '唤回引导' }}</span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+          </span>
         </button>
       </div>
     </div>
@@ -630,7 +652,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit, BookMarked, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit, BookMarked } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
@@ -706,12 +728,6 @@ const userLat = ref<number | undefined>(undefined)
 const userLng = ref<number | undefined>(undefined)
 const locationReady = ref(false)
 const locationFailed = ref(false)
-
-/* ─── 引导卡展开/收起：默认开启（每次刷新都开启） ─── */
-const guideCardsOpen = ref(true)
-function toggleGuideCards() {
-  guideCardsOpen.value = !guideCardsOpen.value
-}
 
 // 双向同步：useLocation → 本地ref
 watch([() => location.lat.value, () => location.lng.value, () => location.ready.value, () => location.failed.value],
@@ -2838,132 +2854,183 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 .guide-cards-row-enter-from { opacity: 0; transform: translateY(10px) scale(0.98); }
 .guide-cards-row-leave-to   { opacity: 0; transform: translateY(14px) scale(0.96); }
 
-/* ═══ 引导动作条：更窄、独立、为信息服务（不追 4 卡宽度） ═══ */
+/* ═══ 引导三大入口卡（3 张横版信息卡，信息感 + 引导感） ═══ */
 .guide-actions-bar {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 14px;
+  row-gap: 10px;
+  width: min(900px, 100%);
+  pointer-events: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ─── 卡片基础：横向三段 左图标 / 中信息 / 右箭头 ─── */
+.gac {
+  position: relative;
+  display: flex;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 10px;
-  width: auto;
-  max-width: 100%;
-  pointer-events: auto;
-  padding: 6px;
-  border-radius: var(--radius-md);
-  background: rgba(15, 13, 32, 0.22);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-.guide-action {
-  width: auto;          /* 内容驱动宽度，不再占满父容器 */
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: none;
-  border-radius: var(--radius-sm);
+  gap: 14px;
+  min-height: 96px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 14px;
   cursor: pointer;
   text-align: left;
   font-family: var(--font);
-  transition: background 0.18s, transform 0.18s, opacity 0.18s;
-  background: var(--overlay-04);
   color: var(--ink);
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  flex-shrink: 1;
+  background: var(--overlay-04);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.2s, transform 0.18s, box-shadow 0.2s, border-color 0.2s;
 }
-.guide-action:hover:not(:disabled) { transform: translateY(-1.5px); }
-.guide-action:active:not(:disabled) { transform: translateY(0); }
-.guide-action:disabled { cursor: not-allowed; opacity: 0.55; }
+.gac:hover:not(:disabled) {
+  transform: translateY(-2.5px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+}
+.gac:active:not(:disabled) { transform: translateY(0); }
+.gac:disabled { cursor: not-allowed; opacity: 0.72; }
 
-.guide-action .ga-icon {
-  width: 34px; height: 34px;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* 左：48×48 图标圆块 */
+.gac-icon-wrap {
+  width: 48px; height: 48px;
   flex-shrink: 0;
-}
-.guide-action .ga-text-block {
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1.15;
-  min-width: 0;
-}
-.guide-action .ga-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.guide-action .ga-sub {
   margin-top: 2px;
-  font-size: 0.67rem;
-  opacity: 0.72;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-
-/* ① 记录心事：暖金调 */
-.guide-action-record {
-  background: var(--accent-subtle);
-  color: var(--accent);
-}
-.guide-action-record:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.guide-action-record .ga-icon { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-
-/* ② 天镜览星：蓝紫调 */
-.guide-action-camera {
-  background: rgba(158, 198, 255, 0.12);
-  color: #c5daff;
-}
-.guide-action-camera:hover:not(:disabled) { background: color-mix(in srgb, #9ec6ff 22%, transparent); }
-.guide-action-camera .ga-icon { background: rgba(158, 198, 255, 0.1); color: var(--star-blue); }
-
-/* ③ 穹庭书局：紫金调 */
-.guide-action-square {
-  background: rgba(202, 167, 255, 0.12);
-  color: #d9c4ff;
-}
-.guide-action-square:hover:not(:disabled) { background: color-mix(in srgb, #caa7ff 22%, transparent); }
-.guide-action-square .ga-icon { background: rgba(202, 167, 255, 0.1); color: var(--star-purple); }
-
-/* ④ 引导折叠：正方形（宽=高），最后一个跟随行高  */
-.guide-action-collapse {
-  align-self: stretch;
-  width: auto;
-  min-width: 72px;
-  aspect-ratio: 1 / 1;
-  padding: 6px 8px;
+  border-radius: 12px;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+/* 中：信息主体（序标+标签 → 标题 → 引导句） */
+.gac-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1 1 0;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #d9e0ee;
 }
-.guide-action-collapse:hover:not(:disabled) {
-  background: color-mix(in srgb, #e5e8ef 14%, transparent);
-  color: #eef2ff;
+.gac-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-.guide-action-collapse .gac-icon {
-  color: var(--muted-light);
+.gac-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
 }
-.guide-action-collapse:hover:not(:disabled) .gac-icon { color: var(--accent); }
-.guide-action-collapse .gac-label {
+.gac-tag {
   font-size: 0.66rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
   opacity: 0.82;
-  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.gac-tag-wait { opacity: 0.6; }
+.gac-title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+.gac-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  opacity: 0.74;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding-right: 4px;
 }
 
-/* 引导卡收起时：整个 guide-shell 底部 gap 归零，让动作条紧贴原来位置（减少跳空） */
-.guide-shell:has(.guide-cards.collapsed) { gap: 4px; }
+/* 右：行动箭头（hover 时 + 位移） */
+.gac-arrow {
+  align-self: center;
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  opacity: 0.82;
+  transition: transform 0.18s, background 0.18s, opacity 0.18s;
+}
+.gac:hover:not(:disabled) .gac-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+.gac-arrow.is-wait { opacity: 0.6; }
+
+/* ① 记录心事 · 暖金 */
+.gac-record {
+  background: rgba(52, 40, 12, 0.48);
+  border-color: rgba(255, 217, 138, 0.22);
+  color: #fff3d8;
+}
+.gac-record:hover:not(:disabled) {
+  background: rgba(68, 52, 14, 0.6);
+  border-color: rgba(255, 217, 138, 0.4);
+}
+.gac-record .gac-icon-wrap { background: rgba(255, 217, 138, 0.12); color: var(--accent); }
+.gac-record .gac-index { background: rgba(255, 217, 138, 0.18); color: var(--accent); }
+.gac-record .gac-tag { color: #ffd98a; }
+.gac-record .gac-title { color: #ffe6a8; }
+.gac-record .gac-arrow { color: var(--accent); background: rgba(255, 217, 138, 0.08); }
+.gac-record:hover:not(:disabled) .gac-arrow { background: rgba(255, 217, 138, 0.18); }
+
+/* ② 天镜览星 · 蓝紫 */
+.gac-camera {
+  background: rgba(25, 34, 58, 0.52);
+  border-color: rgba(158, 198, 255, 0.2);
+  color: #e0ecff;
+}
+.gac-camera:hover:not(:disabled) {
+  background: rgba(30, 44, 74, 0.62);
+  border-color: rgba(158, 198, 255, 0.42);
+}
+.gac-camera .gac-icon-wrap { background: rgba(158, 198, 255, 0.1); color: #9ec6ff; }
+.gac-camera .gac-index { background: rgba(158, 198, 255, 0.16); color: #c5daff; }
+.gac-camera .gac-tag { color: #b8d2ff; }
+.gac-camera .gac-title { color: #e3efff; }
+.gac-camera .gac-arrow { color: #9ec6ff; background: rgba(158, 198, 255, 0.08); }
+.gac-camera:hover:not(:disabled) .gac-arrow { background: rgba(158, 198, 255, 0.2); }
+
+/* ③ 穹庭书局 · 紫金 */
+.gac-square {
+  background: rgba(40, 28, 62, 0.5);
+  border-color: rgba(202, 167, 255, 0.22);
+  color: #efe4ff;
+}
+.gac-square:hover:not(:disabled) {
+  background: rgba(52, 36, 84, 0.62);
+  border-color: rgba(202, 167, 255, 0.42);
+}
+.gac-square .gac-icon-wrap { background: rgba(202, 167, 255, 0.1); color: #caa7ff; }
+.gac-square .gac-index { background: rgba(202, 167, 255, 0.16); color: #e4d4ff; }
+.gac-square .gac-tag { color: #d9c4ff; }
+.gac-square .gac-title { color: #f3e8ff; }
+.gac-square .gac-arrow { color: #caa7ff; background: rgba(202, 167, 255, 0.08); }
+.gac-square:hover:not(:disabled) .gac-arrow { background: rgba(202, 167, 255, 0.2); }
+
+/* 收起态不再触发 shell gap：移除废弃 collapsed 样式 */
 
 .toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
