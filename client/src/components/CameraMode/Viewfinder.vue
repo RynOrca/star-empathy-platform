@@ -89,21 +89,25 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.35;
+  opacity: 0.7;
   animation: vf-crosshair-enter 0.4s var(--ease-in-out) both;
   animation-delay: 240ms;
 }
 .vf-ch-h, .vf-ch-v {
-  stroke: var(--vf-crosshair);
-  stroke-width: 1;
+  /* 改金色 + 略粗，让相机十字线一眼就能看到 */
+  stroke: var(--accent);
+  stroke-width: 1.3;
+  filter: drop-shadow(0 0 3px rgba(255, 217, 138, 0.35));
 }
 .vf-ch-center-group {
   transform: translate(calc(50vw - 8px), calc(50vh - 8px));
 }
 .vf-ch-center-line {
-  stroke: var(--vf-crosshair);
-  stroke-width: 1;
-  opacity: 2.57; /* 0.35 容器 × 2.57 ≈ 0.9，中心十字更醒目 */
+  /* 方框同步改金色 + 更粗 + 辉光，中心高亮辨识度 */
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 3px rgba(255, 217, 138, 0.55));
+  opacity: 1;
 }
 
 /* ═══ 级联进入动画 ═══ */
@@ -120,5 +124,5 @@
 @keyframes vf-border-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vf-vignette-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vf-corner-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 0.35; } }
+@keyframes vf-crosshair-enter { from { opacity: 0; } to { opacity: 0.7; } }
 </style>
