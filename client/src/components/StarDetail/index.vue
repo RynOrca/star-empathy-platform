@@ -1088,6 +1088,16 @@ const props = defineProps<{
   isPlanetCloseup?: boolean
   /** 观察模式：隐藏故事面板和模糊背景，露出 3D 行星特写供用户观察 */
   observeMode?: boolean
+  /**
+   * 外部强制打开某则故事的详情页（v-model:targetStoryId）。
+   * - 父级设置为某 story.id → 本组件自动：
+   *   ① 在 realStories 中找到该 story；
+   *   ② 根据 type 切换到对应 Tab（history→history，其余→all）；
+   *   ③ 切 Tab 完成后打开 StoryDetail 页面（等价于用户点击该故事卡片）；
+   *   ④ 完成后 emit('update:targetStoryId', null) 让父级清零，避免下次同值不触发 watch。
+   * - 找不到或传 null 时不会产生任何动作。
+   */
+  targetStoryId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -1111,6 +1121,8 @@ const emit = defineEmits<{
   toggleObserve: []
   /** 合集徽章点击：透传合集信息给父组件，由父组件决定如何展示合集内所有故事 */
   'collection-click': [data: { collectionId: number; collectionName: string | null }]
+  /** 配合 props.targetStoryId 做 v-model 双向绑定：消费完 targetStoryId 后 emit 给父级清零 */
+  'update:targetStoryId': [id: number | null]
 }>()
 
 const router = useRouter()
@@ -1307,6 +1319,35 @@ watch(() => props.catalogStarId, (id) => {
 watch(activeTab, () => {
   detailStoryId.value = null
 })
+
+// ─── 外部驱动：打开指定 storyId 的详情页（支持父级 v-model:targetStoryId）───
+/**
+ * 执行顺序（关键：必须等 activeTab 切换的 watch 把 detailStoryId=null 跑完之后再赋值）：
+ *  1. 定位到 targetStoryId 对应的 story；
+ *  2. 切 Tab：history 类 → activeTab='history'，其他（用户故事）→ activeTab='all'；
+ *  3. nextTick 等 activeTab 的 watch 清空 detailStoryId 后；
+ *  4. 设置 detailStoryId.value = targetStoryId → StoryDetail 页面展示；
+ *  5. emit('update:targetStoryId', null) 让父级清零，避免下次传同样 id watch 不触发。
+ */
+watch(
+  () => props.targetStoryId,
+  async (id) => {
+    if (id == null) return
+    const target = realStories.value.find(s => s.id === id)
+    if (!target) {
+      emit('update:targetStoryId', null)
+      return
+    }
+    const needTab: TabId = target.type === 'history' ? 'history' : 'all'
+    if (activeTab.value !== needTab) {
+      activeTab.value = needTab
+    }
+    await nextTick()
+    detailStoryId.value = id
+    emit('update:targetStoryId', null)
+  },
+  { flush: 'post' }
+)
 
 // ─── AI 内核标签 ───
 const kernel = useKernel()

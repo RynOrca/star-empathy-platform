@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -327,6 +327,7 @@
         :is-guest="isGuest"
         :is-planet-closeup="isPlanetCloseup"
         :observe-mode="planetObserveMode"
+        v-model:targetStoryId="detailTargetStoryId"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -1326,6 +1327,11 @@ let cameraFrameUnsub: (() => void) | null = null
 // true = 详情UI打开中，overlay隐藏；StarDetail关闭后回到false → 恢复相机取景UI（不退出相机模式）
 const cameraDetailOpen = ref(false)
 
+// 相机模式"听语"下点具体故事卡 → 精确跳到该故事的 StoryDetail 页面：
+//   父级设值（故事id）→ StarDetail v-model:targetStoryId 收到后自动：切Tab(history/all) + 打开StoryDetail → emit回null完成消费
+// 关闭详情/退出相机模式时手动清空，避免下次进入残留
+const detailTargetStoryId = ref<number | null>(null)
+
 /**
  * 根据当前相机指向的赤经(RA)/赤纬(DEC)计算动态天区名。
  * 不追求88星座精度，只做简洁的「XX天区」描述，保证随相机移动明显变化。
@@ -1417,13 +1423,23 @@ async function onCameraStoryClick(star: any) {
   //     — onStarClick 内部对相机模式的拦截已被改为 !cameraDetailOpen，因此会正常执行
   onStarClick(catalogStarIdNum)
 
-  // 4.4 如果是「用户故事星」，找到该故事在 StarDetail 的 stories 数组中的位置，
-  //     把 activeStoryIndex 设置到那个故事，让用户第一眼就看到自己点的那一则
-  await nextTick()
-  if (!isCatalogStar && !Number.isNaN(storyStarIdNum)) {
-    const all = storiesByStarId.value.get(catalogStarIdNum) || []
-    const idx = all.findIndex((s: StoryData) => s.id === storyStarIdNum)
-    if (idx >= 0) activeStoryIndex.value = idx
+  // 4.4 只有「听语」模式下的具体故事（不是单纯的星表星介绍）才需要精确打开 StoryDetail 页面：
+  //       - isCatalogStar=false（右下角故事卡片来自听语列表，而非观星星星列表）
+  //       - storyStarIdNum 是一个合法的故事 id，并且不等于归属星 catalogStarId（排除占位）
+  //     → 触发 detailTargetStoryId.value = storyStarIdNum，StarDetail 内部 v-model:targetStoryId watcher 会：
+  //        ① 自动切 Tab 到 history（历史故事）或 all（用户故事）
+  //        ② nextTick 后打开对应 StoryDetail 详情页面
+  //        ③ emit('update:targetStoryId', null) 自动清除父级，避免同值 watch 不触发
+  //     额外加两次 nextTick + setTimeout(0) 确保：
+  //        - StarDetail 已经被 v-if="selectedStarInfo" 挂载完毕
+  //        - onStarClick 内部 selectedStories 赋值已完成
+  //        - StarDetail 内部 props.stories realStories computed 计算完成
+  if (!isCatalogStar && !Number.isNaN(storyStarIdNum) && storyStarIdNum !== catalogStarIdNum && storyStarIdNum > 0) {
+    await nextTick()
+    await nextTick()
+    setTimeout(() => {
+      detailTargetStoryId.value = storyStarIdNum
+    }, 0)
   }
 }
 
@@ -1889,6 +1905,7 @@ function onCloseDetail() {
   skyRef.value?.sky?.setObserveMode(false)
   skyRef.value?.sky?.setKernelLines([])
   skyRef.value?.sky?.exitCloseup()
+  detailTargetStoryId.value = null
   if (lastEnteredTarget.value && isMobile.value) {
     locatedTarget.value = lastEnteredTarget.value
     lastEnteredTarget.value = null
