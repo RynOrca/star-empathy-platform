@@ -20,6 +20,11 @@ export interface StarData {
   tags?: string[]
   locationLat: number | null
   locationLng: number | null
+  collectionId?: number | null
+  collectionName?: string | null
+  collectionCoverColor?: string | null
+  collectionVisibility?: string | null
+  collectionStoryCount?: number | null
 
   // ═══ 天镜览星派生字段（运行时计算，不入库） ═══
   /** 24h 内发布 */

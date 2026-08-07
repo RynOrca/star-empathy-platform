@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -162,6 +162,7 @@
         @active-change="onCameraActiveChange"
         @close-card="cameraMode.closeStoryCard()"
         @set-mode="onCameraSetMode"
+        @collection-click="onCameraCollectionClick"
       />
     </Transition>
 
@@ -1512,6 +1513,11 @@ function onCameraActiveChange(starId: number) {
 
 function onCameraSetMode(mode: CameraFilterMode) {
   cameraMode.setMode(mode)
+}
+
+/** 相机模式 StoryDetailCard 合集徽章点击 → 打开 CollectionDetail overlay */
+function onCameraCollectionClick(collectionId: number) {
+  onCollectionClick({ collectionId, collectionName: null })
 }
 
 // ═══ 天镜览星 · 边界处理 ═══

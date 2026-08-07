@@ -192,7 +192,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="shouldShowStarBelonging(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -213,7 +213,7 @@
               :displayViews="(s: any) => getStoryViewCount(s.id)"
               :isResonated="(s: any) => justResonatedId === s.id"
               :collectionClickable="true"
-              :showStarBelonging="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
               @collection-click="onCollectionClick"
@@ -238,7 +238,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="shouldShowStarBelonging(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -263,7 +263,7 @@
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
               :collectionClickable="true"
-              :showStarBelonging="true"
+              :showStarBelonging="false"
               @update:searchQuery="searchQuery = $event"
               @update:sortKey="onSortKeyChange"
               @story-click="openStoryDetail"
@@ -295,7 +295,7 @@
               :origin="detailStory.origin ?? null"
               :createdAtIso="detailStory.createdAt"
               :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="shouldShowStarBelonging(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
@@ -318,7 +318,7 @@
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
               :collectionClickable="true"
-              :showStarBelonging="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
               @collection-click="onCollectionClick"
@@ -925,7 +925,7 @@
                 :origin="detailStory.origin ?? null"
                 :createdAtIso="detailStory.createdAt"
                 :siblingStories="siblingStoriesFor(detailStory)"
-                :showStarBelonging="shouldShowStarBelonging(detailStory)"
+                :showStarBelonging="false"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
@@ -1638,17 +1638,6 @@ function onCollectionClick(story: any) {
       userId: story.userId ?? null,
     })
   }
-}
-
-/**
- * 故事详情页左侧显示「星星归属胶囊」还是「合集徽章」：
- * - 历史故事（type==='history'）且有有效合集名 → 优先显示合集徽章（把星星链接隐藏）
- * - 用户故事 type==='user' / 历史故事但无合集 → 显示星星归属胶囊
- */
-function shouldShowStarBelonging(story: any): boolean {
-  if (!story) return true
-  if (story.type === 'history' && story.collectionName) return false
-  return true
 }
 
 // ─── 时间格式化 ───

@@ -50,6 +50,7 @@
       :is-mobile="isMobile"
       :is-guest="isGuest"
       @close="onCloseCard"
+      @collection-click="onCollectionClick"
     />
   </div>
 </template>
@@ -87,6 +88,7 @@ const emit = defineEmits<{
   activeChange: [starId: number]
   closeCard: []
   setMode: [mode: CameraFilterMode]
+  collectionClick: [collectionId: number]
 }>()
 
 const panelRef = ref<InstanceType<typeof FrameStoriesPanel> | null>(null)
@@ -111,6 +113,10 @@ function onCloseCard() {
 
 function onSetMode(mode: CameraFilterMode) {
   emit('setMode', mode)
+}
+
+function onCollectionClick(collectionId: number) {
+  emit('collectionClick', collectionId)
 }
 
 defineExpose({ panelRef })

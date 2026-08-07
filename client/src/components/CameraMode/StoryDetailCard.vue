@@ -103,9 +103,24 @@
             </span>
           </div>
 
-          <!-- 归属星胶囊（仅当有 catalogStarId 时） -->
-          <div v-if="belongingStar" class="sc-belong-row">
-            <span class="sc-belong-chip dsb-clickable" :style="{ '--scb-c': belongingStar.color } as Record<string, string>" @click.stop="goToBelongingStar">
+          <!-- 归属行：星星界面上下文=优先显示合集徽章；无合集名时fallback显示归属星胶囊 -->
+          <div v-if="star.collectionName || belongingStar" class="sc-belong-row">
+            <!-- 合集徽章（星星界面上下文优先） -->
+            <CollectionBadge
+              v-if="star.collectionName"
+              :collection-name="star.collectionName"
+              :cover-color="star.collectionCoverColor ?? null"
+              :collection-visibility="star.collectionVisibility ?? null"
+              clickable
+              @click.stop="onCollectionBadgeClick"
+            />
+            <!-- Fallback：无合集时显示归属星胶囊（星星链接） -->
+            <span
+              v-else-if="belongingStar"
+              class="sc-belong-chip dsb-clickable"
+              :style="{ '--scb-c': belongingStar.color } as Record<string, string>"
+              @click.stop="goToBelongingStar"
+            >
               <StarMiniIcon />
               <span class="scb-name">{{ belongingStar.name }}</span>
               <span v-if="belongingStar.con" class="scb-con">· {{ belongingStar.con }}</span>
@@ -163,6 +178,7 @@ import {
 } from './icons/CameraIcons'
 import { useResonate } from '../../composables/useResonate'
 import { getStarDisplayName, getStarNameInfo } from '../../utils/starName'
+import CollectionBadge from '../CollectionBadge.vue'
 import type { StarData } from '../../composables/useStars'
 
 const props = defineProps<{
@@ -177,8 +193,6 @@ const props = defineProps<{
 
 const router = useRouter()
 const guestHint = ref('')
-
-defineEmits<{ close: [] }>()
 
 const { resonate, resonatingId } = useResonate()
 const localResonanceAdded = ref(false)
@@ -272,6 +286,11 @@ function goToBelongingStar() {
   const sid = props.star?.catalogStarId
   if (sid == null) return
   router.push({ path: '/sky', query: { star: String(sid) } })
+}
+const emit = defineEmits<{ close: []; 'collection-click': [collectionId: number] }>()
+function onCollectionBadgeClick() {
+  const cid = props.star?.collectionId
+  if (cid != null) emit('collection-click', cid)
 }
 
 /* 迷你图标：直接用 SVG 函数式组件 */
