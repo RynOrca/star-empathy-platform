@@ -306,15 +306,15 @@
           <div class="sc-astro sc-astro-night">
             <div class="sc-astro-row">
               <span class="sc-astro-k">时</span>
-              <span class="sc-astro-v sc-astro-v-vg">{{ nightSky.timeSpan.split(' ')[0] }} ~{{ nightSky.timeSpan.split('~')[1].trim().substring(0,5) }}</span>
+              <span class="sc-astro-v sc-astro-v-vg">{{ nightSky.timeSpanStart }} ~{{ nightSky.timeSpanEnd }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">温</span>
-              <span class="sc-astro-v" style="color: #86a8ff">{{ nightSky.meteo[1].v.split(' ')[0] }}</span>
+              <span class="sc-astro-v" style="color: #86a8ff">{{ nightSky.meteoAt(1).v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">风</span>
-              <span class="sc-astro-v" style="color: #caa7ff">{{ nightSky.meteo[2].v.split(' ')[0] }}</span>
+              <span class="sc-astro-v" style="color: #caa7ff">{{ nightSky.meteoAt(2).v.split(' ')[0] }}</span>
             </div>
             <div class="sc-astro-row">
               <span class="sc-astro-k">月</span>
@@ -354,8 +354,8 @@
           <template v-else>
             <p class="ca-pt-para first">
               这一夜叫<span class="ca-han-hl">「{{ persona.hanName }}」</span>——
-              从 <b style="color: #ffd98a">{{ nightSky.timeSpan.split(' ')[0] }}</b>
-              到 <b style="color: #86a8ff">{{ nightSky.timeSpan.split('~')[1].substring(0, 8) }}</b>，
+              从 <b style="color: #ffd98a">{{ nightSky.timeSpanStart }}</b>
+              到 <b style="color: #86a8ff">{{ nightSky.timeSpanEndLong || nightSky.timeSpanEnd }}</b>，
               共 {{ storyCount }} 则心事，像星点一样浮在夜空里。
               {{ persona.paragraphs[0] }}
             </p>
@@ -381,9 +381,9 @@
                 <span class="ca-mc-dot"></span>
                 <div class="ca-mc-text">
                   <span class="ca-mc-k">{{ m.k }}</span>
-                  <!-- 具体数值：按 i 对应 nightSky.meteo 或月相 -->
+                  <!-- 具体数值：按 i 对应 nightSky.meteo 或月相（越界安全封装） -->
                   <span class="ca-mc-v">
-                    {{ i===0 ? nightSky.meteo[1].v : i===1 ? nightSky.meteo[2].v : i===2 ? nightSky.phase+'·'+nightSky.moonIllum : i===3 ? nightSky.meteo[4].v : nightSky.meteo[5].v }}
+                    {{ nightSky.weatherValueAt(i as 0|1|2|3|4) }}
                   </span>
                   <span class="ca-mc-en">{{ m.en }}</span>
                 </div>
@@ -1056,6 +1056,52 @@ const fiveMeteo = computed(() => _n.value?.fiveMeteo ?? [
   { k: '体感',   en: 'F · CHILL',    color: '#ff8b7d' },
 ])
 
+/**
+ * 防御性封装 nightSky，避免模板里直接 .split('~')[1].trim() 等链式调用崩溃
+ * - timeSpan 格式「21:14 ~ 05:42」→ 自动拆 start / end（取前5字符）
+ * - 若格式里不含「~」，end 兜底为空字符串，绝不调用 undefined.trim()
+ * - meteo 数组越界（i >= 5）兜底返回空字符串，绝不 undefined.v
+ */
+const nightSky = computed(() => {
+  const n = _n.value?.nightSky
+  const ts = n?.timeSpan ?? '21:00 ~ 05:00'
+  // 用 ~ 拆，注意兼容中文「～」（全角波浪）
+  const parts = ts.split(/[~～]/)
+  const startRaw = (parts[0] ?? '').trim()
+  const endRaw   = (parts[1] ?? '').trim()
+  const start    = startRaw.split(' ')[0] ?? startRaw
+  const endShort = endRaw.substring(0, 5)
+  const meteoAt = (i: number) => ({ k: '', v: '', color: undefined as string | undefined, ...(n?.meteo?.[i] ?? {}) })
+  return {
+    name: n?.name ?? '《夜雨秋灯》 · 其一卷',
+    season: n?.season ?? '孟秋 · 八月',
+    timeSpan: ts,
+    timeSpanStart: start,
+    timeSpanEnd: endShort,         // 取前 5 字符给模板用
+    timeSpanEndLong: endRaw.substring(0, 8),
+    phase: n?.phase ?? '下弦残月',
+    moonAge: n?.moonAge ?? '21 日',
+    moonIllum: n?.moonIllum ?? '26% 残光',
+    term: n?.term ?? '立秋',
+    ecliptic: n?.ecliptic ?? '翼宿 · 鹑尾',
+    termDeg: n?.termDeg ?? 135,
+    meteo: n?.meteo ?? [],
+    meteoAt,                       // 函数式取，越界安全
+    /** 模板里 386 行要的那 5 个长 value 串 */
+    weatherValueAt(i: 0 | 1 | 2 | 3 | 4): string {
+      switch (i) {
+        case 0: return meteoAt(1).v || '凉 16℃  体感 14℃'
+        case 1: return meteoAt(2).v || '东北风 3 级'
+        case 2: return `${n?.phase ?? '下弦残月'}·${n?.moonIllum ?? '26% 残光'}`
+        case 3: return meteoAt(3).v || '四分散卷'
+        case 4: return meteoAt(4).v || '5.2  可见 3842'
+        default: return ''
+      }
+    },
+    hourDots: n?.hourDots ?? [],
+  }
+})
+
 const emotions = computed(() => {
   if (_e.value?.emotions && _e.value.emotions.length >= 5) return _e.value.emotions
   return [
@@ -1159,35 +1205,6 @@ const peakHour = computed<number>(() => _n.value?.peakHour ?? 21)
 const lowHour  = computed<number>(() => _n.value?.lowHour  ?? 4)
 const peakText = computed<string>(() => '子时雨最盛，心事也最稠。你总在别人入睡后才点亮自己那盏灯，把白天没说完的话留给夜雨。')
 const lowText  = computed<string>(() => '卯时天将明，是这卷星笺最安静的时辰。或许醒来之后，有些情绪就随晨光散了。')
-
-const nightSky = computed(() => _n.value?.nightSky ?? {
-  name: `${persona.value.hanName} · 那一夜`,
-  season: '甲辰年 · 春分后第三夜',
-  timeSpan: '子初 22:47 ~ 卯初 05:21',
-  phase: '残月 · 蛾眉',
-  moonIllum: '22%',
-  moonAge: '26.4 日龄',
-  term: '春分后三',
-  ecliptic: 'λ 3°12′',
-  termDeg: 3 + 12 / 60 * 15,
-  meteo: [
-    { k: '时跨', v: '子~卯 · 4 时', color: '#ffd98a' },
-    { k: '夜温', v: '11.6℃ · 凉润', color: '#86a8ff' },
-    { k: '风向', v: '西北风 二级', color: '#caa7ff' },
-    { k: '能见度', v: '薄云 · 7.2km', color: '#9ae6b4' },
-    { k: '云量', v: '散云 · 4/8 量', color: '#ff8b7d' },
-    { k: '体感', v: '夜寒 · 衣稍薄', color: undefined },
-  ],
-  hourDots: [
-    { pos: 10,  size: 12, color: '#ffd98a' },
-    { pos: 22,  size: 8,  color: '#ffd98a' },
-    { pos: 38,  size: 10, color: '#caa7ff' },
-    { pos: 52,  size: 5,  color: '#95f0c0' },
-    { pos: 66,  size: 7,  color: '#caa7ff' },
-    { pos: 78,  size: 6,  color: '#95f0c0' },
-    { pos: 88,  size: 4,  color: '#86a8ff' },
-  ],
-})
 
 function positivesCountFn(arr: number[]) { return arr.filter(v => v > 0).length }
 
