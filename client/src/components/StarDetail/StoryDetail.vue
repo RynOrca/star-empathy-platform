@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="story-detail-root">
     <div class="detail-toolbar">
       <button class="back-btn" @click="$emit('back')">
         <ArrowLeftIcon :size="15" />
@@ -48,12 +48,7 @@
           </template>
         </div>
 
-        <div class="detail-body">
-          <div class="detail-content" v-html="renderedContent"></div>
-          <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
-        </div>
-
-        <!-- 正文下方：数据信息以一行简洁文字形式展示（字数·阅读·浏览·共鸣率） -->
+        <!-- 标题与正文之间：一行简洁的文字meta（字数·阅读·浏览·共鸣数） -->
         <div class="detail-meta-text">
           <span class="dmt-item">
             <PenLineIcon :size="11" />
@@ -71,9 +66,14 @@
           </span>
           <span class="dmt-sep">·</span>
           <span class="dmt-item">
-            <TrendingUpIcon :size="11" />
-            <span>共鸣率 <em class="tabular" :style="{ color: stats.rateColor }">{{ stats.resonanceRate }}%</em></span>
+            <SparklesIcon :size="11" />
+            <span><em class="tabular">{{ displayResonance }}</em> 次共鸣</span>
           </span>
+        </div>
+
+        <div class="detail-body">
+          <div class="detail-content" v-html="renderedContent"></div>
+          <img v-if="story.imageUrl" :src="story.imageUrl" class="detail-image" @click.stop />
         </div>
 
         <!-- 归属行：正文下方、标签行上方 -->
@@ -148,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Sparkles, Check, Trash2, Star, BookOpen, Eye, PenLine, Clock, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeft, Sparkles, Check, Trash2, Star, BookOpen, Eye, PenLine, Clock } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import CollectionBadge from '../CollectionBadge.vue'
@@ -163,7 +163,6 @@ const BookOpenIcon = BookOpen
 const EyeIcon = Eye
 const PenLineIcon = PenLine
 const ClockMiniIcon = Clock
-const TrendingUpIcon = TrendingUp
 const router = useRouter()
 const route = useRoute()
 
@@ -316,6 +315,15 @@ function tagStyle(tag: string): Record<string, string> {
 </script>
 
 <style scoped>
+/* ─── 根容器：填满父级 tab-content 的 flex 空间，内部再分 toolbar + 滚动区 ─── */
+.story-detail-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ─── Detail Toolbar ─── */
 .detail-toolbar {
   flex-shrink: 0;
@@ -416,6 +424,7 @@ function tagStyle(tag: string): Record<string, string> {
 /* ─── Detail View ─── */
 .detail-view {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 24px 28px;

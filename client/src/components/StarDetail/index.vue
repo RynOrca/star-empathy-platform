@@ -2961,9 +2961,11 @@ watch(() => props.catalogStarId, () => {
 
 .mobile-story-detail-body {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 16px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
 }
 
 /* ─── Mobile Transitions ─── */
