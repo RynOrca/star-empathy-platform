@@ -55,12 +55,16 @@ router.get('/public', authOptional, (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string, 10) || 20;
     const sort = (req.query.sort as PublicCollectionsSort | undefined) ?? 'new';
     const visibility = req.query.visibility as ('public' | 'anonymous' | 'galaxy') | undefined;
+    // 搜索关键字：search / keyword 两个 query 名都兼容
+    const keywordRaw = (req.query.search ?? req.query.keyword) as string | undefined;
+    const keyword = typeof keywordRaw === 'string' ? keywordRaw : '';
     const validSorts: PublicCollectionsSort[] = ['hot', 'new', 'resonance', 'name_asc', 'stories_desc'];
     const validSort = validSorts.includes(sort) ? sort : 'new';
     const validVis = visibility === 'public' || visibility === 'anonymous' || visibility === 'galaxy' ? visibility : undefined;
     const result = listPublicCollections({
       userId: !isNaN(userIdParsed) ? userIdParsed : undefined,
       page, limit, sort: validSort, visibility: validVis,
+      keyword: keyword || undefined,
     });
     ok(res, 'success', result);
   } catch (error) {

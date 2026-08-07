@@ -27,8 +27,8 @@
             v-model="searchQuery"
             class="fs-search-input"
             type="search"
-            placeholder="搜索星笺 / 故事 / 作者…（P2 启用）"
-            disabled
+            placeholder="搜索星笺 / 故事正文 / 标签…"
+            aria-label="搜索星笺或故事"
           />
         </div>
       </div>
@@ -49,22 +49,8 @@
     </header>
 
     <main class="fs-main">
-      <!-- ═══════ 卷目筛选条（sticky 第二排） ═══════ -->
+      <!-- ═══════ 卷目二级筛选（sticky 第二排，仅排序；卷目 Tab 移到「全部卷」书架标题下方） ═══════ -->
       <section class="fs-filters" aria-label="星笺筛选">
-        <div class="fs-volumes" role="tablist">
-          <button
-            v-for="v in VOLUME_TABS"
-            :key="v.key"
-            type="button"
-            class="fs-volume-btn"
-            :class="{ active: activeVolume === v.key }"
-            @click="setVolume(v.key)"
-          >
-            <component :is="v.icon" :size="11" />
-            <span>{{ v.label }}</span>
-            <span v-if="v.count != null" class="fs-volume-count">{{ v.count }}</span>
-          </button>
-        </div>
         <div class="fs-sorts">
           <label class="fs-sort-label">
             <ArrowUpDown :size="10" />
@@ -84,23 +70,37 @@
             <h2 class="fs-head-title">官方星河·八卷轴</h2>
             <span class="fs-head-sub">官方整理·历朝历代的星语心事</span>
           </div>
-          <button type="button" class="fs-head-link" @click="setVolume('galaxy')">
-            查看全部星河卷 →
-          </button>
+          <!-- 翻页按钮放 section-head 右侧（不盖卡片，操作集中） + 查看全部链接 -->
+          <div class="fs-head-actions">
+            <div class="fs-reels-nav-group" role="group" aria-label="翻卷">
+              <button
+                type="button"
+                class="fs-reels-nav"
+                :disabled="!canScrollLeft"
+                @click="scrollReels(-1)"
+                aria-label="向左翻卷"
+              >
+                <ChevronLeft :size="16" />
+              </button>
+              <button
+                type="button"
+                class="fs-reels-nav"
+                :disabled="!canScrollRight"
+                @click="scrollReels(1)"
+                aria-label="向右翻卷"
+              >
+                <ChevronRight :size="16" />
+              </button>
+            </div>
+            <button type="button" class="fs-head-link" @click="setVolume('galaxy')">
+              查看全部星河卷 →
+            </button>
+          </div>
         </header>
         <div v-if="galaxyLoading" class="fs-reels fs-reels-loading">
           <div v-for="i in 6" :key="i" class="fs-reel fs-reel-skel"></div>
         </div>
         <div v-else class="fs-reels" ref="reelsScrollerRef">
-          <button
-            type="button"
-            class="fs-reels-nav fs-reels-nav-left"
-            :disabled="!canScrollLeft"
-            @click="scrollReels(-1)"
-            aria-label="向左翻卷"
-          >
-            <ChevronLeft :size="16" />
-          </button>
           <div class="fs-reels-track">
             <article
               v-for="g in galaxyReels"
@@ -132,15 +132,6 @@
               </div>
             </article>
           </div>
-          <button
-            type="button"
-            class="fs-reels-nav fs-reels-nav-right"
-            :disabled="!canScrollRight"
-            @click="scrollReels(1)"
-            aria-label="向右翻卷"
-          >
-            <ChevronRight :size="16" />
-          </button>
         </div>
       </section>
 
@@ -217,6 +208,22 @@
           <span class="fs-head-hint">{{ shelfList.length }} 册已加载</span>
         </header>
 
+        <!-- 卷目 Tab：全部卷 / 官方星河 / 星友新作 / 匿名手记，移到「全部卷」下方；筛选只针对书架生效 -->
+        <div class="fs-shelf-volumes" role="tablist" aria-label="卷目分类">
+          <button
+            v-for="v in VOLUME_TABS"
+            :key="v.key"
+            type="button"
+            class="fs-volume-btn"
+            :class="{ active: activeVolume === v.key }"
+            @click="setVolume(v.key)"
+          >
+            <component :is="v.icon" :size="11" />
+            <span>{{ v.label }}</span>
+            <span v-if="v.count != null" class="fs-volume-count">{{ v.count }}</span>
+          </button>
+        </div>
+
         <FolioGrid
           :collections="shelfListWithOwner"
           :loading="shelfLoading && shelfList.length === 0"
@@ -274,7 +281,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit,
@@ -336,8 +343,25 @@ const volumeTotalLabel = computed(() => {
   return `共 ${totalFolios.value} 册公开星笺 · ${totalStories.value} 则故事`
 })
 
-/* ─── 搜索（P2 预留） ─── */
+/* ─── 搜索：P2 正式启用；防抖 250ms 触发书架重新拉取 ─── */
 const searchQuery = ref('')
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+function debounceReloadShelf(reason: 'search' | 'sort' = 'search') {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null
+    resetShelf()
+    fetchShelfPage(1)
+  }, reason === 'sort' ? 0 : 250)
+}
+watch(searchQuery, () => {
+  // 防抖 250ms；空搜索词也重拉（回到当前卷默认结果）
+  debounceReloadShelf('search')
+})
+/* 排序切换：立即刷新书架列表 */
+watch(activeSort, () => {
+  debounceReloadShelf('sort')
+})
 
 /* ─── 权限：登录且非访客才能新建 ─── */
 const canCreate = computed(() => authUser.value && authUser.value.username !== '星穹访客')
@@ -445,6 +469,8 @@ async function fetchShelfPage(page: number) {
     params.set('limit', String(shelfPageSize))
     params.set('sort', activeSort.value)
     if (activeVolume.value !== 'all') params.set('visibility', activeVolume.value)
+    const kw = searchQuery.value.trim()
+    if (kw) params.set('search', kw)
     const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
     const json = await res.json()
     if (!res.ok) throw new Error(json.message || '加载失败')
@@ -455,8 +481,8 @@ async function fetchShelfPage(page: number) {
     if (page === 1) {
       shelfList.value = items
       totalFolios.value = d.total ?? items.length
-      // 全部卷时累计一下故事数（其他卷就不重复加了，避免重复 double count）
-      if (activeVolume.value === 'all' && galaxyReels.value.length === 0) {
+      // 全部卷无搜索词时累计一下故事数（其他卷或搜索态就不重复加了，避免 double count）
+      if (activeVolume.value === 'all' && !kw && galaxyReels.value.length === 0) {
         totalStories.value = items.reduce((s, x) => s + (x.storyCount ?? 0), 0)
       }
     } else {
@@ -724,24 +750,29 @@ updateVolumeCountsQuick()
 }
 .fs-btn-warm:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
-/* ═══ 卷目筛选条（第 2 段 sticky）：纯背景色块，无玻璃模糊/硬边框 ═══ */
+/* ═══ 卷目筛选条（第 2 段 sticky）：纯背景色块右对齐，只保留排序；卷 Tab 移到书架下方 ═══ */
 .fs-filters {
   position: sticky;
   top: 54px;
   z-index: 40;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   margin: 0 0 18px;
   border-radius: var(--radius-md);
   background: var(--overlay-04);
 }
-.fs-volumes {
-  display: inline-flex; align-items: center; gap: 6px;
+/* 书架下的卷目 Tab（全部卷 / 官方星河 / 星友新作 / 匿名手记） */
+.fs-shelf-volumes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
+  margin: 0 2px 14px;
 }
+.fs-volumes { display: none; } /* 旧位置（filters 内）已弃用，留空避免样式冲突 */
 .fs-volume-btn {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 12px;
@@ -837,15 +868,45 @@ updateVolumeCountsQuick()
 .fs-head-link:hover { filter: brightness(1.1); }
 .fs-head-hint { cursor: default; color: var(--muted); font-weight: 500; }
 
+/* section-head 右侧操作区（按钮组 + 链接）：横向排列 */
+.fs-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+/* 八卷轴翻页按钮：放在标题行右侧，不悬浮卡片之上；accent-subtle 明显金色块背景，扁平无绝对定位 */
+.fs-reels-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fs-reels-nav {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background var(--transition-normal), color var(--transition-normal), opacity var(--transition-normal);
+  padding: 0;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+.fs-reels-nav:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.fs-reels-nav:disabled { opacity: 0.3; cursor: default; }
+
 /* ═══ ① 官方星河·八卷轴（横滑）═══════════════════════════════
    · 容器左右 padding=0，卷轴卡最左/最右与下方本周推荐边界对齐（一致）
-   · 左右翻页按钮 absolute 悬浮，不占文档流宽度
+   · 翻页按钮已上移到 section-head 右侧，不再悬浮在卡片区内
    · 全程扁平：无玻璃模糊、无渐变、无光辉投影 ═══════════════ */
 .fs-reels-section { position: relative; }
 .fs-reels {
   position: relative;
   padding: 10px 0;
-  overflow: visible;
+  overflow: hidden;
 }
 .fs-reels-track {
   display: flex;
@@ -863,27 +924,6 @@ updateVolumeCountsQuick()
   background: var(--rule);
   border-radius: 4px;
 }
-/* 翻页按钮：absolute 悬浮在卷轴容器左右边缘之上，不占宽，扁平无玻璃 */
-.fs-reels-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 30px; height: 30px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink-secondary);
-  cursor: pointer;
-  z-index: 3;
-  transition: background var(--transition-normal), color var(--transition-normal);
-  padding: 0;
-  border: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
-}
-.fs-reels-nav:hover:not(:disabled) { background: var(--accent-subtle); color: var(--accent); }
-.fs-reels-nav:disabled { opacity: 0.25; cursor: default; }
-.fs-reels-nav-left { left: -15px; }
-.fs-reels-nav-right { right: -15px; }
 
 /* 单卷轴 card：极简扁平，纯 surface + 极轻阴影，无硬边框、无左色条、无浮起光辉 */
 .fs-reel {

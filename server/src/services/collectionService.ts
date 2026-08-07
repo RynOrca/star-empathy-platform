@@ -270,7 +270,7 @@ export type PublicCollectionsSort =
   | 'name_asc'  // 合集名拼音排序（SQLite 默认 utf-8 字节序就行）
   | 'stories_desc'; // 故事数 DESC
 
-// 公开合集列表（分页，可按 userId/sort/visibility 过滤）
+// 公开合集列表（分页，可按 userId/sort/visibility/keyword 过滤）
 // 公开 = visibility IN ('public', 'anonymous', 'galaxy')，星河/匿名合集也对外展示
 export function listPublicCollections(params: {
   userId?: number;
@@ -279,6 +279,8 @@ export function listPublicCollections(params: {
   sort?: PublicCollectionsSort;
   /** 只返回指定 visibility 的公开子集：'public' 纯公开 / 'anonymous' 匿名 / 'galaxy' 星河 / 默认=全部 */
   visibility?: 'public' | 'anonymous' | 'galaxy';
+  /** 关键字模糊搜索：合集 name / description / 合集中故事 title / content / tags */
+  keyword?: string;
 }): { items: any[]; total: number; page: number; limit: number; totalPages: number } {
   const p = Math.max(1, Math.floor(params.page ?? 1));
   const l = Math.max(1, Math.min(100, Math.floor(params.limit ?? 20)));
@@ -298,6 +300,24 @@ export function listPublicCollections(params: {
     where += ' AND user_id = ?';
     countParams.push(params.userId);
     listParams.push(params.userId);
+  }
+
+  // 关键字搜索：合集名/描述 或 合集中任一故事的标题/正文/tags 命中（LIKE 模糊匹配，大小写不敏感）
+  const kwRaw = (params.keyword ?? '').trim();
+  if (kwRaw) {
+    // LIKE 通配符 % 包裹；SQLite 默认 LIKE 已对 ASCII 大小写不敏感，中文按字节匹配无影响
+    const likeKw = `%${kwRaw}%`;
+    where += ` AND (
+      c.name LIKE ?
+      OR c.description LIKE ?
+      OR EXISTS (
+        SELECT 1 FROM stars s
+        WHERE s.collection_id = c.id
+          AND (s.title LIKE ? OR s.content LIKE ? OR COALESCE(s.tags, '') LIKE ?)
+      )
+    )`;
+    countParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
+    listParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
   }
 
   // ORDER 构造
