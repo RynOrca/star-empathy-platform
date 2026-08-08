@@ -1636,7 +1636,6 @@ for (const s of stars) starById.set(s.id, s)
     const ud = found.mesh.userData as { planetNameCN?: string; planetId?: number }
     const nameCN = ud.planetNameCN || bodyName
     const planetId = ud.planetId || 0
-    console.log('[snapToPlanet] snapping to', bodyName, 'nameCN=', nameCN, 'planetId=', planetId)
     // 清恒星吸附态（互斥）
     snappedStarId = -1
     snappedPlanet = { name: found.bodyName, nameCN, planetId }
