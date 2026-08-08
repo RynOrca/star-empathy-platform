@@ -248,7 +248,8 @@
     </Transition>
 
     <!-- 叙事引导牌（相机模式隐藏）：上方 4 卡是信息层（宽 ~900px），下方动作条是独立窄条（为信息服务） -->
-    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-shell">
+    <!-- 移动端瞄准星体时 story-btn-active 驱动三大入口卡上移避让「凝听星语」按钮 -->
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-shell" :class="{ 'story-btn-active': storyBtnVisible }">
       <!-- ① 四张引导卡：暂时隐藏（用户要求只要下方按钮），后续恢复解开下面这段 HTML 注释即可 -->
       <!--
       <div class="guide-cards" :class="{ collapsed: !guideCardsOpen }">
@@ -374,8 +375,8 @@
     </div>
 
     <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="zoom-controls">
-      <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
+      <button class="zoom-btn" @click="zoomIn">+</button>
     </div>
 
     <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
@@ -1224,16 +1225,29 @@ interface KernelHintState {
 const kernelHint = reactive<KernelHintState>({
   show: false, count: 0, sourceName: '', sharedThemes: [], sharedEmotions: [],
 })
-// ✨ 不再用 kernelHintHideTimer：引导框 + 连线**常驻**，
-//    仅在以下 2 种情况消失：
+// ✨ PC 端引导框 + 连线**常驻**，仅在以下情况消失：
 //    ① 用户手动点 ✕ 关闭  ② 切到另一颗星（hover/详情打开新星 → 自然替换）
+// ✨ 移动端屏幕空间紧张：展示 3 秒后自动关闭（同时清空连线），避免遮挡星空
+let kernelHintHideTimer: ReturnType<typeof setTimeout> | null = null
 function showKernelHint(params: { count: number; sourceName: string; sharedThemes: string[]; sharedEmotions: string[] }) {
   Object.assign(kernelHint, params, { show: true })
+  // 移动端 3 秒后自动关闭（手动关闭时 hideKernelHint 内会 clearTimeout）
+  if (isMobile.value) {
+    if (kernelHintHideTimer) clearTimeout(kernelHintHideTimer)
+    kernelHintHideTimer = setTimeout(() => {
+      hideKernelHint()
+      kernelHintHideTimer = null
+    }, 3000)
+  }
 }
-// ✨ hideKernelHint：用户手动点关闭按钮触发 = 同时隐藏提示框 + 清空内核连线（同步消失）
+// ✨ hideKernelHint：手动点关闭 或 移动端 3 秒自动关闭 触发 = 同时隐藏提示框 + 清空内核连线（同步消失）
 function hideKernelHint() {
   kernelHint.show = false
   skyRef.value?.sky?.setKernelLines([])
+  if (kernelHintHideTimer) {
+    clearTimeout(kernelHintHideTimer)
+    kernelHintHideTimer = null
+  }
 }
 
 // ─── 长悬浮显示内核连线 ───
@@ -1908,6 +1922,14 @@ const planetObserveMode = ref(false)
 // 是否处于 PC 端行星特写模式（行星 id < 0 且非移动端）；决定 StarDetail overlay 空白点击行为
 const isPlanetCloseup = computed(() => !isMobile.value && selectedCatalogStarId.value < 0)
 
+// 移动端「凝听星语」按钮是否正在显示（驱动底部三大入口卡上移避让，与按钮滑入/滑出动画同步）
+const storyBtnVisible = computed(() =>
+  isMobile.value &&
+  cameraMode.cameraMode.value !== 'observe' &&
+  (locatedTarget.value !== null || snappedTarget.value !== null) &&
+  !selectedStarInfo.value
+)
+
 // ─── 记录 · AI 归属星辰匹配 ───
 const showRecordForm = ref(false)
 const recordFormRef = ref<InstanceType<typeof StoryForm> | null>(null)
@@ -2532,17 +2554,41 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 @media (max-width: 768px) {
   .kernel-hint-pill {
     top: calc(var(--topbar-h, 64px) + 8px);
-    padding: 8px 12px 8px 10px;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    border-radius: 18px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px 38px 12px 14px;   /* 右侧留 38px 给绝对定位的 ✕ */
+    border-radius: 16px;
     max-width: calc(100vw - 24px);
   }
-  .khp-right { gap: 4px; }
-  .khp-tag { font-size: 0.68rem; padding: 4px 8px; }
-  .khp-source { font-size: 0.75rem; }
-  .khp-count { display: none; }
+  /* 左侧信息块：图标 + 标题 + 数量 一行；来源单独换行 */
+  .khp-left {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    flex-shrink: 1;
+  }
+  /* 来源独占一行（视觉次级信息） */
+  .khp-source {
+    flex-basis: 100%;
+    font-size: 0.72rem;
+    opacity: 0.72;
+    margin: 0;
+  }
+  .khp-sep { display: none; }     /* 移动端隐藏分隔符，靠换行区分 */
+  /* 标签行：自动换行 */
+  .khp-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .khp-tag { font-size: 0.68rem; padding: 4px 9px; }
+  /* 关闭按钮：右上角绝对定位 */
+  .khp-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .sky-page {
@@ -3569,28 +3615,43 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     display: none;
   }
 
-  /* 三大入口卡：移动端改为纵向单列堆叠，避免三列挤压溢出 */
+  /* 三大入口卡：移动端改为横向三列紧凑布局（仅图标 + 标题，标题位于图标下方） */
   .guide-shell {
     bottom: 1.5rem;
     width: calc(100vw - 32px);
     gap: 8px;
+    /* 下移（按钮消失）用 0.25s 匹配「凝听星语」滑出动画 */
+    transition: bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* 瞄准星体时三大入口卡上移避让「凝听星语」按钮（按钮高度 ~88px + safe-area） */
+  .guide-shell.story-btn-active {
+    bottom: calc(1.5rem + 88px + env(safe-area-inset-bottom, 0px));
+    /* 上移（按钮出现）用 0.4s 匹配「凝听星语」滑入动画 */
+    transition: bottom 0.4s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .guide-actions-bar {
-    grid-template-columns: 1fr;
-    row-gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 0;
   }
 
   .gac {
-    min-height: 60px;
-    padding: 10px 12px;
-    gap: 10px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 64px;
+    padding: 10px 6px 8px;
     border-radius: 12px;
+    text-align: center;
   }
 
   .gac-icon-wrap {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
+    margin-top: 0;
     border-radius: 10px;
   }
 
@@ -3600,51 +3661,68 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   }
 
   .gac-body {
-    gap: 2px;
+    align-items: center;
+    gap: 0;
   }
 
-  .gac-index {
-    height: 18px;
-    min-width: 18px;
-    padding: 0 5px;
-    font-size: 0.6rem;
-  }
-
-  .gac-tag {
-    font-size: 0.62rem;
+  /* 紧凑模式：隐藏序标/标签行、引导句、右侧箭头，只保留图标 + 标题 */
+  .gac-meta,
+  .gac-desc,
+  .gac-arrow {
+    display: none;
   }
 
   .gac-title {
-    font-size: 0.88rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
   }
 
-  .gac-desc {
-    -webkit-line-clamp: 1;
-    line-clamp: 1;
-    font-size: 0.68rem;
-  }
-
-  .gac-arrow {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-  }
-
-  .gac-arrow svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  /* Zoom controls */
+  /* Zoom controls：移动端移到左上角横向排列，样式对齐 nav-icon-btn */
   .zoom-controls {
-    right: 0.85rem;
-    bottom: 6rem;
+    right: auto;
+    bottom: auto;
+    left: 0.85rem;
+    top: max(0.6rem, env(safe-area-inset-top, 0.6rem));   /* 与 .sky-nav padding-top 对齐 */
+    flex-direction: row;
+    gap: 0.45rem;                                          /* 与 .nav-right gap 一致 */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: 25;                                           /* 高于 .sky-nav(z-index:20)，避免被透明导航栏拦截点击 */
   }
 
+  /* 按钮样式完全复刻 .nav-icon-btn（移动端） */
   .zoom-btn {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.06);
+    color: #b8b2cc;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     font-size: 1.2rem;
+    transition: all 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .zoom-btn:hover {
+    color: #ffd98a;
+    border-color: rgba(255, 217, 138, 0.3);
+    background: rgba(255, 217, 138, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 217, 138, 0.1);
+  }
+
+  .zoom-btn:active {
+    transform: scale(0.94) translateY(0);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   }
 
   /* Hint text */
@@ -3761,9 +3839,17 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     border-radius: 10px;
   }
 
+  /* Zoom controls 同步缩小，与 nav-icon-btn 对齐 */
   .zoom-controls {
-    right: 0.5rem;
-    bottom: 5rem;
+    left: 0.5rem;
+    top: 0.4rem;                /* 与 .sky-nav padding-top 一致 */
+    gap: 0.3rem;                /* 与 .nav-right gap 一致 */
+  }
+
+  .zoom-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
   }
 }
 
