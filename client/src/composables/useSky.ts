@@ -389,6 +389,8 @@ export interface SkyAPI {
   getCenterCelestial: () => { ra: string; dec: string }
   /** 天镜览星：取景框（视锥）内的故事星列表 */
   getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
+  /** 天镜览星：刷新「当前取景框内被提到的星」— animate 内给这些星额外辉光 boost（无论有故事/仅观星提到） */
+  setFrameBoostStars: (inFrame: StarInFrame[]) => void
   /** 天镜览星：进入/退出相机模式 overlay（隐藏 hover 光晕/星名标签等） */
   setCameraModeOverlay: (enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => void
   /** 天镜览星：退出相机模式时 tween 回到进入时的相机快照 */
@@ -514,6 +516,13 @@ export function useSky(
     hasStory: boolean
   }
   const cameraModeStoryStars = new Map<number, CameraModeGlowMeta>()
+  // 天镜览星：取景框内「被提到的星」ID（catalogStarId 或用户星 storyId）集合
+  // 每 400ms 由 useCameraMode 的 refreshStarsInFrame 回调 setFrameBoostStars 刷新
+  // 在 animate interactiveGlows 中给这些星**额外**加一层辉光（不论原本有没有 stories）
+  const frameBoostStarIds: Set<number> = new Set()
+  // 帧内 boost 用的霓虹品红 #ff4bd9 / 原色 #ffffff（模块级单例，避免每帧 new Color GC）
+  const _frameBoostMagenta = new Color(0xff4bd9)
+  const _whiteDefault = new Color(0xffffff)
   // 复用的 frustum / 投影矩阵（避免每帧 new，防止 GC 抖动）
   const _frustum = new Frustum()
   const _projScreenMatrix = new Matrix4()
@@ -945,6 +954,7 @@ for (const s of stars) starById.set(s.id, s)
   //   - 覆盖范围：星表所有星表恒星（从 CAT.stars 自动注入） + 用户星（SkyPage 通过 statsCache 传入 posX/Y/Z）
   //   - mag 来源：星表恒星读 CatStar.mag；用户星（无 catalogStarId）默认按 3.2 等（T3/T4 交界，中亮度低调不抢镜）
   interface InteractiveGlow {
+    starId: number          // 恒星 ID（星表恒星 = catalogStarId；用户星 = 故事 ID），用于帧内 boost 查表
     sprite: Sprite
     phase: number
     period: number
@@ -1036,6 +1046,7 @@ for (const s of stars) starById.set(s.id, s)
       sp.position.set(cat.x, cat.y, cat.z)
       skyGroup.add(sp)
       interactiveGlows.push({
+        starId,
         sprite: sp,
         phase: Math.random() * Math.PI * 2,
         period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
@@ -1070,6 +1081,7 @@ for (const s of stars) starById.set(s.id, s)
         sp.position.set(pos.x, pos.y, pos.z)
         skyGroup.add(sp)
         interactiveGlows.push({
+          starId,
           sprite: sp,
           phase: Math.random() * Math.PI * 2,
           period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
@@ -3494,15 +3506,33 @@ for (const s of stars) starById.set(s.id, s)
     }
     // 有故事的星：呼吸辉光动画（普通/相机 双模式通用，interactiveGlows 两套并存时一致）
     // ✅ 相机模式下不隐藏 interactiveGlows，保证镜头进入取景框后看到的辉光 = 普通模式逐像素一致
+    // ✅ 帧内提到的星（frameBoostStarIds）：三重叠加突出
+    //    ① opacity +0.14  ② scale ×1.22  ③ 颜色整体偏霓虹品红（#ff4bd9 亮洋红），深蓝背景下一眼可辨
+    //    两种来源都生效：有心事的故事星 / 仅取景框方向内提到的星表恒星（无论 stories 是否为 0）
+    const FRAME_BOOST_OPACITY = 0.14
+    const FRAME_BOOST_SCALE = 1.22
+    const FRAME_COLOR_LERP = 0.18  // 颜色切换 5~8 帧柔化到位（~200ms），避免 400ms 节流刷新时跳色
+    // 缓存 Color 实例（每帧 lerp 复用，避免 180 星 × 60fps × 2 new Color → 2w+/s GC 抖动）
+    const COLOR_FRAME_BOOSTED = _frameBoostMagenta
+    const COLOR_NORMAL = _whiteDefault
     for (const ig of interactiveGlows) {
       const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
       const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
       const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
-      ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + ig.storyBoostOpacity)
+      const frameBoosted = frameBoostStarIds.has(ig.starId)
+      ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(
+        1.0,
+        baseOpacity + ig.storyBoostOpacity + (frameBoosted ? FRAME_BOOST_OPACITY : 0),
+      )
       const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
       const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
       const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
-      ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
+      const finalScale = base * scalePulse * (frameBoosted ? FRAME_BOOST_SCALE : 1)
+      ig.sprite.scale.set(finalScale, finalScale, 1)
+      // 颜色：帧内提到 → 霓虹品红（亮洋红 #ff4bd9）高亮；否则 lerp 回 #ffffff = 保留各星原 tier.tint
+      // 注：SpriteMaterial.color × 纹理颜色 = 最终颜色；默认 #ffffff = 完全保留 getBloomTexCached 的 tier.tint
+      const target = frameBoosted ? COLOR_FRAME_BOOSTED : COLOR_NORMAL
+      ;(ig.sprite.material as SpriteMaterial).color.lerp(target, FRAME_COLOR_LERP)
     }
     // 天镜览星：所有交互星呼吸 glow（只渲染取景框内可见，但无论在不在视锥都持续更新呼吸相位 — 避免切视角时辉光「暂停/突跳」）
     // ✅ 算法与普通浏览模式（L3495-L3507）完全一致：
@@ -3932,6 +3962,17 @@ for (const s of stars) starById.set(s.id, s)
     getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
       return getStarsInFrame(storyStars)
     },
+    /** 天镜览星：刷新「取景框内被提到的星」集合 → 下一个 animate 帧立即给它们加额外辉光 boost（×1.22 / +0.14 opacity） */
+    setFrameBoostStars(inFrame: StarInFrame[]): void {
+      frameBoostStarIds.clear()
+      for (const f of inFrame) {
+        // 与 interactiveGlows 的 key 口径一致：
+        //  - catalogStarId 存在 → 以 catalogStarId 为 key（星表恒星段 set）
+        //  - catalogStarId 不存在 → 以 starId（故事 ID）为 key（用户星段 set）
+        const key = (f.catalogStarId !== null && f.catalogStarId !== undefined) ? f.catalogStarId : f.starId
+        frameBoostStarIds.add(Number(key))
+      }
+    },
     setCameraModeOverlay(this: SkyAPI, enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) {
       cameraOverlayEnabled = enabled
       if (enabled) {
@@ -4077,6 +4118,9 @@ for (const s of stars) starById.set(s.id, s)
         starNameLabels.forEach((label) => { label.element.style.display = '' })
 
         // interactiveGlows 从未 hide，进入/退出相机模式辉光无缝一致
+
+        // 清理取景框 boost（避免回到普通模式后帧内提到的星还保持 ×1.22 亮）
+        frameBoostStarIds.clear()
 
         // 清理故事星 glow
         cameraModeStoryStars.forEach((meta) => {

@@ -184,6 +184,8 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
       throttleTimer = null
     }
     starsInFrame.value = []
+    // 同步清辉光 boost（useSky 的 setCameraModeOverlay(false) 里也会做，这里双保险）
+    sky.setFrameBoostStars([])
     activeStarId.value = null
     activeCardStar.value = null
     isAnimating.value = false
@@ -195,6 +197,8 @@ export function useCameraMode(sky: ReturnType<typeof useSky>, stars: ReturnType<
     // 直接传 filteredStars 引用，避免每 400ms 创建 200+ 对象的数组导致 GC 卡顿
     // getStarsInFrame 只读取 id/catalogStarId/posX/posY/posZ，StarData 具备这些字段
     starsInFrame.value = sky.getStarsInFrame(stars.filteredStars.value as unknown as Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>)
+    // ✅ 通知 useSky：取景框内「被提到的星」（有故事 / 仅观星方向提到）统一加额外辉光 boost
+    sky.setFrameBoostStars(starsInFrame.value)
   }
 
   /** 等待 ms */
