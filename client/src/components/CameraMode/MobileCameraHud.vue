@@ -1,10 +1,14 @@
 <template>
   <div class="mobile-camera-hud">
     <div class="mch-row mch-row-top">
+      <!-- 左：明确的退出按钮（与 PC 端语义一致） -->
       <button class="mch-exit" @click="$emit('exit')">
         <ChevronLeftIcon />
-        <span>天镜览星</span>
+        <span>退出</span>
       </button>
+      <!-- 中：居中「天镜览星」标题 -->
+      <span class="mch-title">天镜览星</span>
+      <!-- 右：区域信息 -->
       <span class="mch-region">{{ region }}</span>
     </div>
     <div class="mch-row mch-row-bottom">
@@ -75,27 +79,62 @@ defineEmits<{
   padding: 0 16px;
 }
 .mch-row-top {
-  height: 38px;
+  height: 44px;
   font-size: 0.8rem;
+  position: relative;
 }
 .mch-row-bottom {
   height: 36px;
   justify-content: flex-end;
 }
+/* 左：退出按钮 */
 .mch-exit {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: none;
-  color: var(--hud-text);
+  gap: 3px;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  color: #ff6b6b;
   cursor: pointer;
   font-family: var(--font-display);
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  transition: all 0.25s var(--ease-in-out);
+  z-index: 2;
 }
+.mch-exit:active {
+  transform: scale(0.96);
+  background: rgba(255, 107, 107, 0.16);
+}
+.mch-exit svg { color: #ff6b6b; }
+/* 中：居中标题（绝对定位保证真正居中，不被左右挤压） */
+.mch-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  background: linear-gradient(90deg, #86a8ff, #caa7ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  z-index: 1;
+  white-space: nowrap;
+}
+/* 右：区域信息 */
 .mch-region {
   font-size: 0.7rem;
   opacity: 0.7;
   letter-spacing: 0.05em;
+  z-index: 2;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 .mch-mode-toggles {
   display: flex;

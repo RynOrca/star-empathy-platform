@@ -94,11 +94,10 @@
   animation-delay: 240ms;
 }
 .vf-ch-h, .vf-ch-v {
-  /* 金色保持 + 略细（1.3 → 1.1），虚线间距拉开一点（视觉"稀"一点） */
+  /* ⭐ 改为实线：去掉 stroke-dasharray，略调粗细保持现代精致感 */
   stroke: var(--accent);
-  stroke-width: 1.1;
-  stroke-dasharray: 8 18;     /* 原默认 ~6 8  → 实线段8 + 空段18，更稀疏更精致 */
-  filter: drop-shadow(0 0 2px rgba(255, 217, 138, 0.3));
+  stroke-width: 1;
+  filter: drop-shadow(0 0 2px rgba(255, 217, 138, 0.25));
 }
 .vf-ch-center-group {
   transform: translate(calc(50vw - 8px), calc(50vh - 8px));

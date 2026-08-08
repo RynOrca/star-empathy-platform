@@ -21,9 +21,17 @@
 
         <!-- Tab 内容区 -->
         <div class="tab-content">
-          <!-- Tab: AI 叙事 -->
+          <!-- Tab: AI 叙事（星语AI） -->
           <template v-if="activeTab === 'narrative'">
             <div class="narrative-layout">
+              <!-- Tab 引导条：星语AI（仿 ca-hero-strip 风格） -->
+              <div class="tab-intro tab-intro-narrative">
+                <div class="ti-left">
+                  <SparklesIcon :size="13" class="ti-icon" />
+                  <span class="ti-label">星语AI</span>
+                  <span class="ti-sub">· 正在聆听这颗星的心事，解读星格画像与情感脉络</span>
+                </div>
+              </div>
               <div class="narrative-top">
                 <!-- 🧠 AI 分析模块（1）星格画像 -->
                 <AIPersonaCard
@@ -174,8 +182,16 @@
             </div>
           </template>
 
-          <!-- Tab: 历史故事 -->
+          <!-- Tab: 历史故事（星史长卷） -->
           <template v-else-if="activeTab === 'history'">
+            <!-- Tab 引导条：星史长卷（仿 ca-hero-strip 风格） -->
+            <div v-if="!detailStory" class="tab-intro tab-intro-history">
+              <div class="ti-left">
+                <BookOpen :size="13" class="ti-icon" />
+                <span class="ti-label">星史长卷</span>
+                <span class="ti-sub">· 穿越时空的星河史卷，品读古人留下的诗与传说</span>
+              </div>
+            </div>
             <StoryDetail
               v-if="detailStory"
               :story="detailStory"
@@ -220,8 +236,16 @@
             />
           </template>
 
-          <!-- Tab: 所有故事 -->
+          <!-- Tab: 所有故事（故事广场） -->
           <template v-else-if="activeTab === 'all'">
+            <!-- Tab 引导条：故事广场（仿 ca-hero-strip 风格） -->
+            <div v-if="!detailStory" class="tab-intro tab-intro-all">
+              <div class="ti-left">
+                <List :size="13" class="ti-icon" />
+                <span class="ti-label">故事广场</span>
+                <span class="ti-sub">· 星友们的心事在此汇聚，漫步广场，寻找共鸣的故事</span>
+              </div>
+            </div>
             <StoryDetail
               v-if="detailStory"
               :story="detailStory"
@@ -272,57 +296,67 @@
             />
           </template>
 
-          <!-- Tab: 我的故事 -->
+          <!-- Tab: 我的故事（我的星语） -->
           <template v-else-if="activeTab === 'mine'">
             <div v-if="props.currentUserId == null" class="empty-state">
               <User :size="20" class="empty-icon" />
               <p>请先登录后查看我的故事</p>
               <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
             </div>
-            <StoryDetail
-              v-else-if="detailStory"
-              :story="detailStory"
-              :backLabel="detailBackLabel"
-              :renderedContent="renderMarkdown(detailStory.content)"
-              :displayResonance="getDisplayResonance(detailStory)"
-              :isResonated="justResonatedId === detailStory.id"
-              :resonating="resonating"
-              :deleting="deleting"
-              :currentUserId="currentUserId"
-              :formattedTime="formatTime(detailStory.createdAt)"
-              :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
-              :viewCount="getStoryViewCount(detailStory.id)"
-              :origin="detailStory.origin ?? null"
-              :createdAtIso="detailStory.createdAt"
-              :siblingStories="siblingStoriesFor(detailStory)"
-              :showStarBelonging="false"
-              @back="detailStoryId = null"
-              @resonate="onResonate(detailStory)"
-              @delete="confirmDelete(detailStory.id)"
-              :collection-clickable="true"
-              @collection-click="onCollectionClick"
-              @open-story="openStoryDetail"
-            />
-            <StoryList
-              v-else
-              :stories="myStories"
-              variant="mine"
-              :resonating="resonating"
-              :showToolbar="false"
-              :emptyIcon="PenSquare"
-              emptyMessage="你还没有在这颗星上写过故事"
-              :renderedContent="(s: any) => renderMarkdown(s.content)"
-              :displayResonance="(s: any) => getDisplayResonance(s)"
-              :displayViews="(s: any) => getStoryViewCount(s.id)"
-              :isResonated="(s: any) => justResonatedId === s.id"
-              :formattedTime="(s: any) => formatTime(s.createdAt)"
-              :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
-              :collectionClickable="true"
-              :showStarBelonging="false"
-              @story-click="openStoryDetail"
-              @resonate="onResonate"
-              @collection-click="onCollectionClick"
-            />
+            <template v-else>
+              <!-- Tab 引导条：我的星语（仿 ca-hero-strip 风格） -->
+              <div v-if="!detailStory" class="tab-intro tab-intro-mine">
+                <div class="ti-left">
+                  <User :size="13" class="ti-icon" />
+                  <span class="ti-label">我的星语</span>
+                  <span class="ti-sub">· 你挂在这颗星上的专属心事，安放在为你闪烁的星辰下</span>
+                </div>
+              </div>
+              <StoryDetail
+                v-if="detailStory"
+                :story="detailStory"
+                :backLabel="detailBackLabel"
+                :renderedContent="renderMarkdown(detailStory.content)"
+                :displayResonance="getDisplayResonance(detailStory)"
+                :isResonated="justResonatedId === detailStory.id"
+                :resonating="resonating"
+                :deleting="deleting"
+                :currentUserId="currentUserId"
+                :formattedTime="formatTime(detailStory.createdAt)"
+                :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+                :viewCount="getStoryViewCount(detailStory.id)"
+                :origin="detailStory.origin ?? null"
+                :createdAtIso="detailStory.createdAt"
+                :siblingStories="siblingStoriesFor(detailStory)"
+                :showStarBelonging="false"
+                @back="detailStoryId = null"
+                @resonate="onResonate(detailStory)"
+                @delete="confirmDelete(detailStory.id)"
+                :collection-clickable="true"
+                @collection-click="onCollectionClick"
+                @open-story="openStoryDetail"
+              />
+              <StoryList
+                v-else
+                :stories="myStories"
+                variant="mine"
+                :resonating="resonating"
+                :showToolbar="false"
+                :emptyIcon="PenSquare"
+                emptyMessage="你还没有在这颗星上写过故事"
+                :renderedContent="(s: any) => renderMarkdown(s.content)"
+                :displayResonance="(s: any) => getDisplayResonance(s)"
+                :displayViews="(s: any) => getStoryViewCount(s.id)"
+                :isResonated="(s: any) => justResonatedId === s.id"
+                :formattedTime="(s: any) => formatTime(s.createdAt)"
+                :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+                :collectionClickable="true"
+                :showStarBelonging="false"
+                @story-click="openStoryDetail"
+                @resonate="onResonate"
+                @collection-click="onCollectionClick"
+              />
+            </template>
           </template>
 
           <!-- fallback：未知 Tab -->
@@ -527,8 +561,16 @@
 
             <!-- Tab 内容：下拉框切换 -->
             <template v-else>
-              <!-- 星信息 -->
+              <!-- 星信息（星辰档案） -->
               <template v-if="activeTab === 'info'">
+                <!-- Tab 引导条：星辰档案（仿 ca-hero-strip 风格） -->
+                <div class="tab-intro tab-intro-info mobile-ti">
+                  <div class="ti-left">
+                    <Star :size="13" class="ti-icon" />
+                    <span class="ti-label">星辰档案</span>
+                    <span class="ti-sub">· 这颗星的宇宙名片，查阅它的坐标、亮度与运行轨迹</span>
+                  </div>
+                </div>
                 <StarHeader :starInfo="starInfo" />
 
                 <StarInfoPanel
@@ -643,6 +685,14 @@
               <!-- AI 叙事（移动端）：只保留星语AI 往下的内容，旧 Markdown 叙事整块移除 -->
               <template v-else-if="activeTab === 'narrative'">
                 <div class="narrative-layout mobile-narrative-layout">
+                  <!-- Tab 引导条：星语AI（移动端 · 仿 ca-hero-strip 风格） -->
+                  <div class="tab-intro tab-intro-narrative mobile-ti">
+                    <div class="ti-left">
+                      <SparklesIcon :size="13" class="ti-icon" />
+                      <span class="ti-label">星语AI</span>
+                      <span class="ti-sub">· 正在聆听这颗星的心事，解读星格画像与情感脉络</span>
+                    </div>
+                  </div>
                   <div class="narrative-top">
                     <!-- A. 星语数据条 -->
                     <div v-if="catalogStats" class="story-stats-bar">
@@ -811,8 +861,16 @@
                 </div>
               </template>
 
-              <!-- 历史故事 -->
+              <!-- 历史故事（星史长卷） -->
               <template v-else-if="activeTab === 'history'">
+                <!-- Tab 引导条：星史长卷（移动端 · 仿 ca-hero-strip 风格） -->
+                <div class="tab-intro tab-intro-history mobile-ti">
+                  <div class="ti-left">
+                    <BookOpen :size="13" class="ti-icon" />
+                    <span class="ti-label">星史长卷</span>
+                    <span class="ti-sub">· 穿越时空的星河史卷，品读古人留下的诗与传说</span>
+                  </div>
+                </div>
                 <StoryList
                   :stories="historyStories"
                   variant="history"
@@ -829,8 +887,16 @@
                 />
               </template>
 
-              <!-- 所有故事 -->
+              <!-- 所有故事（故事广场） -->
               <template v-else-if="activeTab === 'all'">
+                <!-- Tab 引导条：故事广场（移动端 · 仿 ca-hero-strip 风格） -->
+                <div class="tab-intro tab-intro-all mobile-ti">
+                  <div class="ti-left">
+                    <List :size="13" class="ti-icon" />
+                    <span class="ti-label">故事广场</span>
+                    <span class="ti-sub">· 星友们的心事在此汇聚，漫步广场，寻找共鸣的故事</span>
+                  </div>
+                </div>
                 <StoryList
                   :stories="displayedStories"
                   variant="all"
@@ -853,30 +919,39 @@
                 />
               </template>
 
-              <!-- 我的故事 -->
+              <!-- 我的故事（我的星语） -->
               <template v-else-if="activeTab === 'mine'">
                 <div v-if="props.currentUserId == null" class="empty-state">
                   <User :size="20" class="empty-icon" />
                   <p>请先登录后查看我的故事</p>
                   <button class="empty-login-btn" @click="$router.push('/')">去登录</button>
                 </div>
-                <StoryList
-                  v-else
-                  :stories="myStories"
-                  variant="mine"
-                  :resonating="resonating"
-                  :showToolbar="false"
-                  :emptyIcon="PenSquare"
-                  emptyMessage="你还没有在这颗星上写过故事"
-                  :renderedContent="(s: any) => renderMarkdown(s.content)"
-                  :displayResonance="(s: any) => getDisplayResonance(s)"
-                  :displayViews="(s: any) => getStoryViewCount(s.id)"
-                  :isResonated="(s: any) => justResonatedId === s.id"
-                  :formattedTime="(s: any) => formatTime(s.createdAt)"
-                  :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
-                  @story-click="openStoryDetail"
-                  @resonate="onResonate"
-                />
+                <template v-else>
+                  <!-- Tab 引导条：我的星语（移动端 · 仿 ca-hero-strip 风格） -->
+                  <div class="tab-intro tab-intro-mine mobile-ti">
+                    <div class="ti-left">
+                      <User :size="13" class="ti-icon" />
+                      <span class="ti-label">我的星语</span>
+                      <span class="ti-sub">· 你挂在这颗星上的专属心事，安放在为你闪烁的星辰下</span>
+                    </div>
+                  </div>
+                  <StoryList
+                    :stories="myStories"
+                    variant="mine"
+                    :resonating="resonating"
+                    :showToolbar="false"
+                    :emptyIcon="PenSquare"
+                    emptyMessage="你还没有在这颗星上写过故事"
+                    :renderedContent="(s: any) => renderMarkdown(s.content)"
+                    :displayResonance="(s: any) => getDisplayResonance(s)"
+                    :displayViews="(s: any) => getStoryViewCount(s.id)"
+                    :isResonated="(s: any) => justResonatedId === s.id"
+                    :formattedTime="(s: any) => formatTime(s.createdAt)"
+                    :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+                    @story-click="openStoryDetail"
+                    @resonate="onResonate"
+                  />
+                </template>
               </template>
 
               <template v-else>
@@ -1317,18 +1392,18 @@ const justResonatedId = ref<number | null>(null)
 type TabId = 'info' | 'narrative' | 'history' | 'all' | 'mine'
 // PC 端：不含「星信息」（与右栏重复）
 const pcTabs: { id: TabId; label: string; icon: Component }[] = [
-  { id: 'narrative', label: 'AI 叙事', icon: Sparkles },
-  { id: 'history', label: '历史故事', icon: BookOpen },
-  { id: 'all', label: '用户故事', icon: List },
-  { id: 'mine', label: '我的故事', icon: User },
+  { id: 'narrative', label: '星语AI', icon: Sparkles },
+  { id: 'history', label: '星史长卷', icon: BookOpen },
+  { id: 'all', label: '故事广场', icon: List },
+  { id: 'mine', label: '我的星语', icon: User },
 ]
 // 移动端：包含「星信息」，下拉框使用罗马数字前缀（与设置弹窗风格一致）
 const mobileTabs: { id: TabId; label: string; roman: string; icon: Component }[] = [
-  { id: 'info', label: '星信息', roman: 'Ⅰ', icon: Star },
-  { id: 'narrative', label: 'AI 叙事', roman: 'Ⅱ', icon: Sparkles },
-  { id: 'history', label: '历史故事', roman: 'Ⅲ', icon: BookOpen },
-  { id: 'all', label: '用户故事', roman: 'Ⅳ', icon: List },
-  { id: 'mine', label: '我的故事', roman: 'Ⅴ', icon: User },
+  { id: 'info', label: '星辰档案', roman: 'Ⅰ', icon: Star },
+  { id: 'narrative', label: '星语AI', roman: 'Ⅱ', icon: Sparkles },
+  { id: 'history', label: '星史长卷', roman: 'Ⅲ', icon: BookOpen },
+  { id: 'all', label: '故事广场', roman: 'Ⅳ', icon: List },
+  { id: 'mine', label: '我的星语', roman: 'Ⅴ', icon: User },
 ]
 // 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
 const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
@@ -1336,9 +1411,9 @@ const activeTab = ref<TabId>(isMobileInit ? 'info' : 'narrative')
 
 const detailBackLabel = computed(() => {
   switch (activeTab.value) {
-    case 'history': return '历史故事'
-    case 'all': return '用户故事'
-    case 'mine': return '我的故事'
+    case 'history': return '星史长卷'
+    case 'all': return '故事广场'
+    case 'mine': return '我的星语'
     default: return '返回'
   }
 })
@@ -2038,7 +2113,6 @@ watch(() => props.catalogStarId, () => {
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   display: flex;
   flex-direction: column;
-  padding-top: 20px;
   box-sizing: border-box;
 }
 .narrative-top::-webkit-scrollbar { width: 5px; }
@@ -3037,5 +3111,103 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-story-slide-leave-to {
   transform: translateX(100%);
+}
+
+/* ═══════════════════ Tab 引导条（仿 ca-hero-strip 风格） ═══════════════════ */
+.tab-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  margin: 14px 28px 16px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  /* 默认金紫渐变（星语AI），其他 Tab 下方覆盖 */
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.06), rgba(202, 167, 255, 0.04));
+  border: 1px solid rgba(255, 217, 138, 0.12);
+}
+.ti-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+/* 图标：统一 opacity，颜色按 Tab 主题色覆盖 */
+.ti-icon { flex-shrink: 0; opacity: 0.9; }
+/* 主标签（Tab 名）：仿 ca-hero-label 风格 */
+.ti-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+/* 副标签（引导说明）：仿 ca-hero-sub 风格 */
+.ti-sub {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ─── Tab 专属渐变 & 边框 & 图标配色 ─── */
+/* ① 星语AI：金紫斜向渐变（即默认，再显式声明一次确保） */
+.tab-intro-narrative {
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.07), rgba(202, 167, 255, 0.035));
+  border-color: rgba(255, 217, 138, 0.14);
+}
+.tab-intro-narrative .ti-icon { color: #ffd98a; }
+/* ② 星史长卷：紫青斜向渐变 */
+.tab-intro-history {
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.07), rgba(127, 212, 224, 0.03));
+  border-color: rgba(202, 167, 255, 0.15);
+}
+.tab-intro-history .ti-icon { color: #caa7ff; }
+/* ③ 故事广场：蓝青斜向渐变 */
+.tab-intro-all {
+  background: linear-gradient(135deg, rgba(134, 168, 255, 0.07), rgba(127, 212, 224, 0.03));
+  border-color: rgba(134, 168, 255, 0.15);
+}
+.tab-intro-all .ti-icon { color: #86a8ff; }
+/* ④ 我的星语：玫瑰橙斜向渐变 */
+.tab-intro-mine {
+  background: linear-gradient(135deg, rgba(255, 163, 180, 0.07), rgba(255, 184, 119, 0.03));
+  border-color: rgba(255, 163, 180, 0.15);
+}
+.tab-intro-mine .ti-icon { color: #ffa3b4; }
+/* ⑤ 星辰档案：银蓝斜向渐变 */
+.tab-intro-info {
+  background: linear-gradient(135deg, rgba(198, 208, 228, 0.065), rgba(134, 168, 255, 0.03));
+  border-color: rgba(198, 208, 228, 0.14);
+}
+.tab-intro-info .ti-icon { color: #c6d0e4; }
+
+/* ─── 移动端 Tab 引导条 ─── */
+@media (max-width: 768px) {
+  .tab-intro.mobile-ti {
+    margin: 12px 18px 14px;
+    padding: 7px 12px;
+  }
+  .tab-intro.mobile-ti .ti-left {
+    gap: 6px;
+  }
+  .tab-intro.mobile-ti .ti-label {
+    font-size: 0.74rem;
+  }
+  .tab-intro.mobile-ti .ti-sub {
+    font-size: 0.64rem;
+  }
+  /* 移动端星语AI：在 narrative-layout 内去圆角/侧边框做无缝衔接 */
+  .mobile-narrative-layout > .tab-intro {
+    margin: 0 0 10px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+  }
 }
 </style>

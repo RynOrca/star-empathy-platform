@@ -516,7 +516,7 @@ function tagStyle(tag: string): Record<string, string> {
   align-items: center;
   gap: 5px 9px;
   margin-top: 14px;
-  margin-bottom: 6px;
+  margin-bottom: 20px;
   padding: 8px 12px;
   font-size: 0.76rem;
   color: var(--muted-light);
