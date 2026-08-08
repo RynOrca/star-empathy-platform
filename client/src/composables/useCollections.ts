@@ -14,6 +14,8 @@ export interface Collection {
   storyCount: number
   /** 合辑内故事总共鸣数（列表接口已计算，详情也可从 stories 自行汇总） */
   resonanceTotal?: number | null
+  /** 系统级默认合集（true 时不可删除、不可改可见性、不可改名称、不可改排序） */
+  isDefault: boolean
   createdAt: string
   updatedAt: string
 }
@@ -120,6 +122,8 @@ export function normalizeCollection(row: any, opts?: { withStories?: boolean }):
     userId: Number(row.user_id ?? row.userId) || 0,
     coverColor: row.cover_color ?? row.coverColor ?? null,
     sortOrder: Number(row.sort_order ?? row.sortOrder) || 0,
+    /** is_default=1 (DB INTEGER) / row.isDefault → boolean，接口缺时兜底 false */
+    isDefault: !!(row.is_default ?? row.isDefault ?? false),
     createdAt: row.created_at ?? row.createdAt,
     updatedAt: row.updated_at ?? row.updatedAt,
     storyCount,

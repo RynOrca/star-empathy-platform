@@ -10,6 +10,7 @@
     "seed": "ts-node scripts/seed.ts",
     "seed:history-collections": "ts-node scripts/seed-history-collections.ts",
     "migrate:default-collections": "ts-node scripts/migrate-default-collections.ts",
+    "default-collections": "ts-node scripts/default-collections.ts",
     "agent:kernels": "ts-node scripts/generateKernels.ts",
     "agent:analyze": "ts-node scripts/generateAllAnalyses.ts",
     "fix:catalog": "ts-node scripts/fix-invalid-catalog-star-ids.ts"
