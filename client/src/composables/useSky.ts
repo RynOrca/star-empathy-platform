@@ -2,7 +2,7 @@ import {
   Scene, PerspectiveCamera, WebGLRenderer,
   Points, BufferGeometry, BufferAttribute, PointsMaterial, CanvasTexture,
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
-  AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshPhongMaterial,
+  AdditiveBlending, Color, Material, Mesh, MeshBasicMaterial, MeshPhongMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide, RepeatWrapping,
   Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Frustum,
   TextureLoader, PointLight, ShaderMaterial, LoadingManager,
@@ -3869,13 +3869,21 @@ for (const s of stars) starById.set(s.id, s)
     if (sunSurfaceMat) {
       (sunSurfaceMat.uniforms.uTime.value as number) = simTimeMs / 1000
     }
-    // 内核连线呼吸动画
+    // ✨ 内核连线：淡入 + 呼吸（更暗更细，但闪烁幅度明显，一直闪）
+    //  ① 初始 opacity = 0，每帧 lerp 到 targetBaseOpacity（约 450ms 稳定 80%）
+    //  ② 呼吸幅度 ±25%（原来 ±12% → 用户要求"保持一直闪"，让闪烁更可感知）
     if (kernelLinesGroup.visible) {
-      const kernelBreath = (Math.sin(_now * 0.002) + 1) * 0.5
+      const kernelBreath = 0.75 + (Math.sin(_now * 0.002) + 1) * 0.5 * 0.50   // 0.75 ~ 1.25（±25%）
       for (const child of kernelLinesGroup.children) {
         if (child instanceof LineSegments) {
-          const mat = child.material as LineBasicMaterial
-          mat.opacity = 0.35 + kernelBreath * 0.45
+          const mat = child.material as LineBasicMaterial & {
+            userData?: { targetBaseOpacity: number; layer?: string }
+          }
+          if (!mat.userData?.targetBaseOpacity) continue
+          // 淡入 lerp 到目标
+          mat.opacity += (mat.userData.targetBaseOpacity - mat.opacity) * 0.14
+          // 呼吸：main 层和 glow 层都乘同样 kernelBreath；glow 层 base 只有 0.16/0.10/0.05，不会耀眼
+          mat.opacity = Math.min(1, mat.opacity * kernelBreath)
         }
       }
     }
@@ -4437,45 +4445,32 @@ for (const s of stars) starById.set(s.id, s)
     setKernelLines(lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) {
       // 清除旧连线
       while (kernelLinesGroup.children.length > 0) {
-        kernelLinesGroup.remove(kernelLinesGroup.children[0])
+        const child = kernelLinesGroup.children[0] as LineSegments
+        kernelLinesGroup.remove(child)
+        if (child.geometry) child.geometry.dispose()
+        if (child.material && !Array.isArray(child.material)) (child.material as Material).dispose()
       }
       if (lines.length === 0) {
         kernelLinesGroup.visible = false
         return
       }
-      // 主连线（淡金虚线）
+      // 一条普通细实线（无任何 glow/加色混合 → 不刺眼）
       const v: number[] = []
       for (const line of lines) {
         v.push(line.from.x, line.from.y, line.from.z, line.to.x, line.to.y, line.to.z)
       }
       const geom = new BufferGeometry()
       geom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      const mat = new LineDashedMaterial({
-        color: 0xffcc66,
-        dashSize: 2,
-        gapSize: 1.5,
+      const mat = new LineBasicMaterial({
+        color: 0xd9b778,    // 淡雅暖金（不饱和）
         transparent: true,
-        opacity: 0.55,
+        opacity: 0,         // 初始 0，animate 内淡入
+        depthWrite: false,
         depthTest: true,
-        depthWrite: false,
       })
+      ;(mat as any).userData = { targetBaseOpacity: 0.28, layer: 'plain' }  // 峰值 0.28 × 1.25 = 0.35
       const segs = new LineSegments(geom, mat)
-      segs.computeLineDistances()
       kernelLinesGroup.add(segs)
-      // 发光层
-      const glowMat = new LineBasicMaterial({
-        color: 0xffd98a,
-        transparent: true,
-        opacity: 0.25,
-        blending: AdditiveBlending,
-        depthWrite: false,
-        depthTest: false,
-      })
-      const glowGeom = new BufferGeometry()
-      glowGeom.setAttribute('position', new BufferAttribute(new Float32Array(v), 3))
-      const glowSegs = new LineSegments(glowGeom, glowMat)
-      glowSegs.scale.setScalar(1.005)
-      kernelLinesGroup.add(glowSegs)
       kernelLinesGroup.visible = true
     },
     focusOnStar(x: number, y: number, z: number) {

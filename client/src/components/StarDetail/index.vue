@@ -1051,7 +1051,7 @@ import AIRadarWordcloud from './AIRadarWordcloud.vue'
 import AIHeatmapThemes from './AIHeatmapThemes.vue'
 import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
-import { useSimilarStars } from '../../composables/useSimilarStars'
+import { useSimilarStars, type SimilarStar } from '../../composables/useSimilarStars'
 import { useAreaHighlights } from '../../composables/useAreaHighlights'
 import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
@@ -1219,7 +1219,7 @@ const emit = defineEmits<{
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
-  updateSimilarStars: [ids: number[]]
+  updateSimilarStars: [stars: SimilarStar[]]
   deleteStory: [storyId: number]
   /** 故事集合或权重发生了实质变动 → 父级可用于通知 SkyPage 做跨星同步
    *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
@@ -1501,7 +1501,7 @@ watch(() => props.catalogStarId, (id) => {
 // ─── 相似星星 ───
 const similarStars = useSimilarStars(() => props.catalogStarId)
 watch(() => similarStars.similarStars.value, (stars) => {
-  emit('updateSimilarStars', stars.map(s => s.catalogStarId))
+  emit('updateSimilarStars', stars || [])
 })
 
 // ─── 天区故事精选 ───
