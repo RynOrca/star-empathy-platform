@@ -24,7 +24,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
-import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR } from '../utils/constants'
+import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR, CLICK_THRESHOLD } from '../utils/constants'
 import { CAMERA_FOV_BY_STAGE, CAMERA_FLY_DURATION_MS, CAMERA_FRAME_THROTTLE_MS, CAMERA_LIST_MAX_ITEMS } from '../utils/constants'
 import { ref, type Ref } from 'vue'
 import { STAR_DISPLAY_CONFIG, type StarDisplayConfig } from '../utils/starDisplayConfig'
@@ -2047,8 +2047,10 @@ for (const s of stars) starById.set(s.id, s)
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
 
       // 用屏幕投影检测点击位置最近的恒星（与 hover 同一套逻辑，不依赖 hoveredStarId）
+      // issue #154：点击用更严格的 CLICK_THRESHOLD（≈25px），与 hover 的宽松阈值解耦。
+      // 复用 hoverThreshold 会在定位后因背景星距离过近而抢占命中，误打开背景星的故事。
       const { id: clickStarId, dist: clickStarDist } = detectStarByProjection(mouse.x, mouse.y)
-      const starHit = clickStarId !== -1 && clickStarDist < cfg.hoverThreshold
+      const starHit = clickStarId !== -1 && clickStarDist < CLICK_THRESHOLD
 
       // 行星检测仍用 Raycaster（行星有 Mesh hitbox，投影法不适用）
       skyGroup.updateMatrixWorld()
