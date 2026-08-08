@@ -215,7 +215,7 @@
           <BookDashed :size="14" />
         </div>
         <div class="pe-text">
-          <div class="pe-title">心事还不够多</div>
+          <div class="pe-title">星笺故事不足</div>
           <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 将为这卷星笺生成「星辰归属 · 星图」</div>
         </div>
       </div>
@@ -402,7 +402,7 @@
       <div v-else-if="tooFewStories" class="persona-empty empty-scant">
         <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
         <div class="pe-text">
-          <div class="pe-title">心事还不够多</div>
+          <div class="pe-title">星笺故事不足</div>
           <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 生成「夜观手记 · 月色与气象」</div>
         </div>
       </div>
@@ -486,7 +486,7 @@
         <div v-else-if="tooFewStories" class="persona-empty empty-scant">
           <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
           <div class="pe-text">
-            <div class="pe-title">心事还不够多</div>
+            <div class="pe-title">星笺故事不足</div>
             <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 为你挑选{{ isAncientTone ? '代表篇什' : '代表故事' }}</div>
           </div>
         </div>
@@ -657,7 +657,7 @@
         <div v-else-if="tooFewStories" class="persona-empty empty-scant">
           <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
           <div class="pe-text">
-            <div class="pe-title">心事还不够多</div>
+            <div class="pe-title">星笺故事不足</div>
             <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 画出「投递时刻 × 情绪」的时间轨迹</div>
           </div>
         </div>
@@ -765,7 +765,7 @@
       <div v-else-if="!isGalaxy && tooFewStories" class="persona-empty empty-scant">
         <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
         <div class="pe-text">
-          <div class="pe-title">心事还不够多</div>
+          <div class="pe-title">星笺故事不足</div>
           <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 画出「子丑寅卯…」十二时辰热力珠</div>
         </div>
       </div>
@@ -908,7 +908,7 @@
         <div v-else-if="tooFewStories" class="persona-empty empty-scant">
           <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
           <div class="pe-text">
-            <div class="pe-title">心事还不够多</div>
+            <div class="pe-title">星笺故事不足</div>
             <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 排出 Top3 共鸣榜</div>
           </div>
         </div>
@@ -972,7 +972,7 @@
         <div v-else-if="tooFewStories" class="persona-empty empty-scant">
           <div class="pe-icon-wrap pe-scant"><BookDashed :size="14" /></div>
           <div class="pe-text">
-            <div class="pe-title">心事还不够多</div>
+            <div class="pe-title">星笺故事不足</div>
             <div class="pe-sub">当前 <b>{{ displayStoryCount }}</b> 条故事，累计 3 条后 AI 串联情感时间线</div>
           </div>
         </div>
@@ -1058,7 +1058,7 @@ const collAnalysis = useCollectionAnalysis(collId)
 // 1) hasError：API 请求失败 → 全局红色 error 条 + 每个 section 内部 v-else 显示错误
 // 2) hasReal：ready=true 或 _stale=true → 显示真实数据（三模块任一有值用真实，全空走computed兜底）
 //    放宽：ready=true 不再死卡 nightscape，避免后端返回 ready=true 但某字段为 null 时三态死锁
-// 3) tooFewStories：后端 tooFew=true 或 props.storyCount<3 → 心事不够多
+// 3) tooFewStories：后端 tooFew=true 或 props.storyCount<3 → 星笺故事不足
 // 4) isLoading：其余（loading=true 或 ready=false 且非 tooFew/非_stale） → 生成中骨架
 const hasError = computed(() => !!collAnalysis.error.value)
 

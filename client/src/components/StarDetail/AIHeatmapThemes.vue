@@ -68,7 +68,7 @@
       <!-- 空态 1：故事数太少 -->
       <div v-else-if="tooFewStories" class="mini-empty mini-scant">
         <BookDashed :size="13" />
-        <div class="me-title">心事不够多</div>
+        <div class="me-title">星星故事不足</div>
         <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后生长主题林</div>
       </div>
 
@@ -133,7 +133,7 @@
       <!-- 空态 1：故事数太少 -->
       <div v-else-if="tooFewStories" class="mini-empty mini-scant">
         <BookDashed :size="13" />
-        <div class="me-title">心事不够多</div>
+        <div class="me-title">星星故事不足</div>
         <div class="me-sub">当前 <b>{{ storyCount }}</b> 条故事，达 5 条后观察时辰</div>
       </div>
 
