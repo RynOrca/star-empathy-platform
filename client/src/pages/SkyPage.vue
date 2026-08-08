@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -1133,7 +1133,13 @@ async function flyToStar(starId: number) {
   }
   const star = catalogStarLookup.get(starId)
   if (!star) return
-  // 模拟点击该星
+  // issue #154：搜索主区域点击同时「定位 + 打开」——先 focusOnStar 移动相机到目标星，
+  // 否则相机原地不动、只弹面板，而背景星反而抢占点击命中（定位不灵敏）
+  if (skyRef.value?.sky) {
+    skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+    setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
+  }
+  // 打开目标星故事面板
   onStarClick(starId)
 }
 
