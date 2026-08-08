@@ -138,6 +138,12 @@
               <span v-if="detail?.visibility === 'private'" class="visi-tag visi-private">
                 <Lock :size="9" /><span>私有</span>
               </span>
+              <span v-else-if="detail?.visibility === 'galaxy'" class="visi-tag visi-galaxy">
+                <Galaxy :size="9" /><span>星河</span>
+              </span>
+              <span v-else-if="detail?.visibility === 'anonymous'" class="visi-tag visi-anonymous">
+                <Ghost :size="9" /><span>匿名</span>
+              </span>
               <span v-else-if="detail" class="visi-tag visi-public">
                 <Globe :size="9" /><span>公开</span>
               </span>
@@ -326,6 +332,12 @@
                   <h3 class="info-title">{{ detail.name }}</h3>
                   <span v-if="detail.visibility === 'private'" class="visi-tag visi-private">
                     <Lock :size="9" /><span>私有</span>
+                  </span>
+                  <span v-else-if="detail.visibility === 'galaxy'" class="visi-tag visi-galaxy">
+                    <Galaxy :size="9" /><span>星河</span>
+                  </span>
+                  <span v-else-if="detail.visibility === 'anonymous'" class="visi-tag visi-anonymous">
+                    <Ghost :size="9" /><span>匿名</span>
                   </span>
                   <span v-else class="visi-tag visi-public">
                     <Globe :size="9" /><span>公开</span>
@@ -567,7 +579,7 @@ import { computed, ref, reactive, onMounted, onBeforeUnmount, watch, nextTick, t
 import { useRoute } from 'vue-router'
 import {
   X, Lock, Globe, BookOpen, BookMarked, Heart, Eye, Clock, Pencil, Trash2,
-  ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Activity, Tag, Hash,
+  ChevronRight, ChevronDown, AlertCircle, Library, List, Sparkles, Sparkles as Galaxy, Ghost, Activity, Tag, Hash,
   BarChart3, Star,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
@@ -1210,6 +1222,16 @@ function infoTagStyle(tag: string): Record<string, string> {
   background: rgba(149, 240, 192, 0.07);
   color: #95f0c0;
   border: 0.5px solid rgba(149, 240, 192, 0.18);
+}
+.visi-anonymous {
+  background: rgba(169, 189, 255, 0.08);
+  color: rgba(169, 189, 255, 0.94);
+  border: 0.5px solid rgba(169, 189, 255, 0.22);
+}
+.visi-galaxy {
+  background: rgba(232, 184, 109, 0.10);
+  color: rgba(255, 229, 168, 0.96);
+  border: 0.5px solid rgba(232, 184, 109, 0.25);
 }
 
 /* ─── Info Section ─── */
