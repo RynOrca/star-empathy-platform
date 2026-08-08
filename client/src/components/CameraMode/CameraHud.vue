@@ -27,6 +27,22 @@
         </div>
       </div>
     </div>
+    <!-- 中下方：品红色星图例 + 引导说明 -->
+    <div class="hud-guide">
+      <svg class="hg-dot" viewBox="0 0 16 16" aria-hidden="true">
+        <defs>
+          <radialGradient id="hgGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff4d8a" stop-opacity="0.95"/>
+            <stop offset="55%" stop-color="#ff4d8a" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#ff4d8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="8" cy="8" r="7.2" fill="url(#hgGlow)"/>
+        <circle cx="8" cy="8" r="3.2" fill="#ff6aa1" stroke="#ff96bb" stroke-width="0.6"/>
+      </svg>
+      <span class="hg-label">品红之星</span>
+      <span class="hg-sub">· 承载心事的星辰，点击可共鸣或聆听背后故事</span>
+    </div>
     <div class="hud-bottom">
       <div class="hud-params">
         <span>ISO 800</span>
@@ -263,6 +279,53 @@ onBeforeUnmount(() => {
   transition: opacity 0.2s;
 }
 .hud-chip:last-child .hud-chip-value { color: var(--hud-accent); }
+
+/* ═══════════════════ 中下方：品红之星图例 + 引导说明 ═══════════════════ */
+.hud-guide {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 72px;              /* 避开底部 hud-bottom (16px+32px=48) + 24px 呼吸间距 */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 16px;
+  background: var(--surface);
+  border: 1px solid rgba(255, 77, 138, 0.28);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(255, 77, 138, 0.08) inset;
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-sizing: border-box;
+  line-height: 1;
+  background-image: linear-gradient(135deg, rgba(255, 77, 138, 0.06), rgba(255, 154, 188, 0.02));
+  pointer-events: none;
+  animation: hud-guide-in 0.45s var(--ease-out) both;
+  animation-delay: 280ms;
+}
+.hg-dot {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(255, 77, 138, 0.5));
+}
+.hg-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ff7aaf;
+}
+.hg-sub {
+  font-size: 0.72rem;
+  color: var(--ink-secondary);
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+}
+@keyframes hud-guide-in {
+  /* ⭐ 注意：translate 必须包含 X 轴 -50%（和基础定位一致），否则横向会跳 */
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
 
 /* 底部参数 / 元数据：胶囊小面板 */
 .hud-params, .hud-meta {

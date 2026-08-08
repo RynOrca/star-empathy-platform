@@ -77,38 +77,39 @@ function glowTierForMag(mag: number): GlowTier {
     texSize: 128, peakOpacity: 0.72, scale: 7.0,
     periodMin: 5000, periodMax: 8000,
     tint: '#ffe5a0',
-    storyBoostOpacity: 0.22, storyBoostScale: 1.32,
+    // ✨ 有故事星 boost：opacity 叠得更高、scale 范围更大
+    storyBoostOpacity: 0.32, storyBoostScale: 1.50,
   }
   if (mag <= 0.5) return {   // T1: 0 等星
     texSize: 118, peakOpacity: 0.62, scale: 6.3,
     periodMin: 4300, periodMax: 6800,
     tint: '#ffd98a',
-    storyBoostOpacity: 0.20, storyBoostScale: 1.26,
+    storyBoostOpacity: 0.30, storyBoostScale: 1.44,
   }
   if (mag <= 1.8) return {   // T2: 1 等星
     texSize: 108, peakOpacity: 0.54, scale: 5.4,
     periodMin: 3700, periodMax: 6000,
     tint: '#f4ecd2',
-    storyBoostOpacity: 0.18, storyBoostScale: 1.22,
+    storyBoostOpacity: 0.27, storyBoostScale: 1.38,
   }
   if (mag <= 3.0) return {   // T3: 2 等星
     texSize: 98, peakOpacity: 0.46, scale: 4.6,
     periodMin: 3100, periodMax: 5200,
     tint: '#eaeaf2',
-    storyBoostOpacity: 0.16, storyBoostScale: 1.18,
+    storyBoostOpacity: 0.24, storyBoostScale: 1.32,
   }
   if (mag <= 4.5) return {   // T4: 3~4 等星（用户星默认档）
     texSize: 90, peakOpacity: 0.40, scale: 3.8,
     periodMin: 2600, periodMax: 4400,
     tint: '#c7d2e9',
-    storyBoostOpacity: 0.14, storyBoostScale: 1.14,
+    storyBoostOpacity: 0.22, storyBoostScale: 1.26,
   }
   // T5: 5 等以下（暗星，最小档 → 基础 scale = 3.0，符合用户 3~7 区间）
   return {
     texSize: 80, peakOpacity: 0.32, scale: 3.0,
     periodMin: 2200, periodMax: 3600,
     tint: '#a8b8d4',
-    storyBoostOpacity: 0.12, storyBoostScale: 1.10,
+    storyBoostOpacity: 0.20, storyBoostScale: 1.22,
   }
 }
 const bloomTexCache = new Map<string, CanvasTexture>()
@@ -520,9 +521,11 @@ export function useSky(
   // 每 400ms 由 useCameraMode 的 refreshStarsInFrame 回调 setFrameBoostStars 刷新
   // 在 animate interactiveGlows 中给这些星**额外**加一层辉光（不论原本有没有 stories）
   const frameBoostStarIds: Set<number> = new Set()
-  // 帧内 boost 用的霓虹品红 #ff4bd9 / 原色 #ffffff（模块级单例，避免每帧 new Color GC）
-  const _frameBoostMagenta = new Color(0xff4bd9)
-  const _whiteDefault = new Color(0xffffff)
+  // 帧内 boost / 故事星品红 / 原色 / 临时 Color（模块级单例，避免每帧 new Color GC）
+  const _frameBoostMagenta = new Color(0xff4bd9)   // 取景框提到：浓洋红
+  const _storyBaseMagenta  = new Color(0xff73b8)   // 有故事星：柔品红（比 frameBoost 淡，保留原 tint）
+  const _whiteDefault      = new Color(0xffffff)
+  const _storyTmpColor     = new Color(0xffffff)   // 每帧复用的临时颜色，防 GC 抖动
   // 复用的 frustum / 投影矩阵（避免每帧 new，防止 GC 抖动）
   const _frustum = new Frustum()
   const _projScreenMatrix = new Matrix4()
@@ -3504,35 +3507,65 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画（普通/相机 双模式通用，interactiveGlows 两套并存时一致）
-    // ✅ 相机模式下不隐藏 interactiveGlows，保证镜头进入取景框后看到的辉光 = 普通模式逐像素一致
-    // ✅ 帧内提到的星（frameBoostStarIds）：三重叠加突出
-    //    ① opacity +0.14  ② scale ×1.22  ③ 颜色整体偏霓虹品红（#ff4bd9 亮洋红），深蓝背景下一眼可辨
-    //    两种来源都生效：有心事的故事星 / 仅取景框方向内提到的星表恒星（无论 stories 是否为 0）
+    // ══════════════════════════════════════════════════════════════════
+    //  有故事的星：呼吸辉光动画（✨ 品红星加强版）
+    //  - 普通星：opacity 呼吸 55%~100%，scale 呼吸 ±3.5%/±6%，颜色 = 各 tier 原 tint
+    //  - ✨ 有故事星（storiesCount > 0）：三重增强
+    //      ① 闪烁更强：opacity 谷值拉低到 32%（对比更明显），双频叠加（慢呼吸 + 快 2.7x 颤动）
+    //      ② 范围更大：storyBoostScale ×1.22~1.50，额外 storyRangeBoost ×1.18，pulse ±10%/±14%
+    //      ③ 颜色脉动：基础向品红（#ff73b8）18%~38% 脉动 lerp，不单调死品红
+    //  - 取景框提到（frameBoosted）：在此之上再叠霓虹浓洋红 #ff4bd9 + opacity +0.14 + scale ×1.22
+    // ══════════════════════════════════════════════════════════════════
     const FRAME_BOOST_OPACITY = 0.14
     const FRAME_BOOST_SCALE = 1.22
-    const FRAME_COLOR_LERP = 0.18  // 颜色切换 5~8 帧柔化到位（~200ms），避免 400ms 节流刷新时跳色
-    // 缓存 Color 实例（每帧 lerp 复用，避免 180 星 × 60fps × 2 new Color → 2w+/s GC 抖动）
+    const FRAME_COLOR_LERP = 0.18  // 颜色柔化 5~8 帧到位（~200ms），避免节流刷新跳色
+    const STORY_RANGE_BOOST = 1.18 // 故事星额外整体放大 18%（辉光范围）
     const COLOR_FRAME_BOOSTED = _frameBoostMagenta
-    const COLOR_NORMAL = _whiteDefault
+    const COLOR_STORY_BASE  = _storyBaseMagenta
+    const COLOR_NORMAL      = _whiteDefault
+    // 每帧复用的临时 Color（避免 180 星 × 60fps → 1w+ new Color/秒 GC 抖动）
+    const _tmpCol = _storyTmpColor
     for (const ig of interactiveGlows) {
-      const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
-      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-      const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
+      const hasStory = ig.storiesCount > 0
       const frameBoosted = frameBoostStarIds.has(ig.starId)
+      /* ─── 归一化时间：基础慢呼吸 + 快频颤动（仅故事星启用） ─── */
+      const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
+      const slowBreath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5  // 0~1 主呼吸（半周期 sin）
+      // 快频颤动：2.7× 基础周期，幅度小用于制造"星颤"
+      const fastFlicker = hasStory
+        ? Math.sin(t * Math.PI * 2 * 2.7 + ig.phase) * 0.12   // ±12%
+        : 0
+      /* ─── opacity：故事星谷值更低 → 对比度更强 ─── */
+      const opacityFloor = hasStory ? 0.32 : 0.55
+      const opacityAmplitude = 1 - opacityFloor // 故事星 0.68（更大），普通星 0.45
+      const baseOpacity = ig.peakOpacity * (opacityFloor + opacityAmplitude * slowBreath)
+        + (hasStory ? fastFlicker * 0.06 : 0)   // 快频微调 opacity 6%
       ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(
         1.0,
         baseOpacity + ig.storyBoostOpacity + (frameBoosted ? FRAME_BOOST_OPACITY : 0),
       )
-      const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
-      const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
-      const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+      /* ─── scale：故事星 pulse 更猛 + 额外范围 boost ─── */
+      const pulseAmt = hasStory
+        ? (ig.peakOpacity < 0.4 ? 0.14 : 0.10)   // 故事星：暗 ±14% / 亮 ±10%（原来 ±6% / ±3.5%）
+        : (ig.peakOpacity < 0.4 ? 0.06 : 0.035)
+      const scalePulse = 1 + Math.sin(t * Math.PI * 2 - Math.PI / 2) * pulseAmt
+        + (hasStory ? fastFlicker * 0.04 : 0)
+      const base = (hasStory ? ig.baseScale * ig.storyBoostScale * STORY_RANGE_BOOST : ig.baseScale)
       const finalScale = base * scalePulse * (frameBoosted ? FRAME_BOOST_SCALE : 1)
       ig.sprite.scale.set(finalScale, finalScale, 1)
-      // 颜色：帧内提到 → 霓虹品红（亮洋红 #ff4bd9）高亮；否则 lerp 回 #ffffff = 保留各星原 tier.tint
-      // 注：SpriteMaterial.color × 纹理颜色 = 最终颜色；默认 #ffffff = 完全保留 getBloomTexCached 的 tier.tint
-      const target = frameBoosted ? COLOR_FRAME_BOOSTED : COLOR_NORMAL
-      ;(ig.sprite.material as SpriteMaterial).color.lerp(target, FRAME_COLOR_LERP)
+      /* ─── 颜色：故事星基础品红脉动 + frameBoosted 直接浓洋红 ─── */
+      let targetCol
+      if (frameBoosted) {
+        targetCol = COLOR_FRAME_BOOSTED   // 取景框提到：浓洋红 #ff4bd9
+      } else if (hasStory) {
+        // 故事星：柔品红比例随呼吸 18% → 38% 脉动（不是一成不变的品红）
+        const lerpAmt = 0.18 + slowBreath * 0.20 + fastFlicker * 0.3
+        _tmpCol.copy(COLOR_NORMAL).lerp(COLOR_STORY_BASE, Math.max(0, Math.min(0.55, lerpAmt)))
+        targetCol = _tmpCol
+      } else {
+        targetCol = COLOR_NORMAL   // 普通星：#ffffff = 完全保留 tier.tint
+      }
+      ;(ig.sprite.material as SpriteMaterial).color.lerp(targetCol, FRAME_COLOR_LERP)
     }
     // 天镜览星：所有交互星呼吸 glow（只渲染取景框内可见，但无论在不在视锥都持续更新呼吸相位 — 避免切视角时辉光「暂停/突跳」）
     // ✅ 算法与普通浏览模式（L3495-L3507）完全一致：
@@ -3545,16 +3578,36 @@ for (const s of stars) starById.set(s.id, s)
     if (cameraOverlayEnabled) {
       const _nowMs = _now
       _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+      // ✅ 故事星加强逻辑与 interactiveGlows（L3509+）完全一致，避免未来启用 cameraMode 渲染时行为差异
+      const STORY_RANGE_BOOST_CAM = 1.18
       cameraModeStoryStars.forEach((meta) => {
         if (!meta.glowSprite) return
+        const hasStory = meta.hasStory
         const t = ((_nowMs + meta.phase * 1000) % meta.period) / meta.period
-        const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-        const baseOpacity = meta.peakOpacity * (0.55 + 0.45 * breath)
+        const slowBreath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+        const fastFlicker = hasStory
+          ? Math.sin(t * Math.PI * 2 * 2.7 + meta.phase) * 0.12
+          : 0
+        // opacity：故事星谷值 32% + 双频叠
+        const opacityFloor = hasStory ? 0.32 : 0.55
+        const opacityAmplitude = 1 - opacityFloor
+        const baseOpacity = meta.peakOpacity * (opacityFloor + opacityAmplitude * slowBreath)
+          + (hasStory ? fastFlicker * 0.06 : 0)
         ;(meta.glowSprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + meta.storyBoostOpacity)
-        const pulseAmt = meta.peakOpacity < 0.4 ? 0.06 : 0.035
-        const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
-        const base = meta.hasStory ? meta.baseScale * meta.storyBoostScale : meta.baseScale
+        // scale：故事星 pulse ±10%/±14% + 额外 ×1.18
+        const pulseAmt = hasStory
+          ? (meta.peakOpacity < 0.4 ? 0.14 : 0.10)
+          : (meta.peakOpacity < 0.4 ? 0.06 : 0.035)
+        const scalePulse = 1 + Math.sin(t * Math.PI * 2 - Math.PI / 2) * pulseAmt
+          + (hasStory ? fastFlicker * 0.04 : 0)
+        const base = hasStory ? meta.baseScale * meta.storyBoostScale * STORY_RANGE_BOOST_CAM : meta.baseScale
         meta.glowSprite.scale.set(base * scalePulse, base * scalePulse, 1)
+        // 颜色：故事星 → 柔品红脉动（与 interactiveGlows 同逻辑，直接用模块级单例避免跨作用域引用错误）
+        if (hasStory) {
+          const lerpAmt = 0.18 + slowBreath * 0.20 + fastFlicker * 0.3
+          _storyTmpColor.copy(_whiteDefault).lerp(_storyBaseMagenta, Math.max(0, Math.min(0.55, lerpAmt)))
+          ;(meta.glowSprite.material as SpriteMaterial).color.lerp(_storyTmpColor, 0.18)
+        }
         // sprite 可见性由 interactiveGlows 独占（cameraMode 这套保持 invisible，结构保留）
         meta.glowSprite.visible = false
       })
