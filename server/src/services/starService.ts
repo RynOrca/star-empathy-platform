@@ -156,9 +156,26 @@ function buildCollectionMap(rows: any[]): Map<number, { visibility: CollectionVi
   return map;
 }
 
-// 获取所有星星（含用户名、用户 ID 和标签）
+/**
+ * 批量注入 resonated 字段：当前登录用户在 resonance_log 里共鸣过的 story_id，
+ * 给每条故事挂一个 `resonated: true` 标志，前端直接消费渲染「已共鸣」按钮。
+ */
+function attachResonatedFlag<T extends { id: number }>(rows: T[], currentUserId?: number): (T & { resonated: boolean })[] {
+  if (!currentUserId || rows.length === 0) {
+    return rows.map((r) => ({ ...r, resonated: false }))
+  }
+  const ids = rows.map((r) => r.id)
+  const placeholders = ids.map(() => '?').join(',')
+  const resonatedRows = db.prepare(
+    `SELECT story_id FROM resonance_log WHERE user_id = ? AND story_id IN (${placeholders})`
+  ).all(currentUserId, ...ids) as { story_id: number }[]
+  const resonatedSet = new Set(resonatedRows.map((r) => r.story_id))
+  return rows.map((r) => ({ ...r, resonated: resonatedSet.has(r.id) }))
+}
+
+// 获取所有星星（含用户名、用户 ID、标签 + resonated 是否已共鸣标志）
 // 注：字段名由 response.ts 的 convertKeys 统一转为 camelCase，SQL 中无需重复别名
-export function getAllStars(currentUserId?: number): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean })[] {
+export function getAllStars(currentUserId?: number): (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean; resonated: boolean })[] {
   const { sql: filterSql, params: filterParams } = buildVisibilityFilter(currentUserId);
   const rows = db.prepare(`
     SELECT s.*, u.username as username
@@ -170,12 +187,13 @@ export function getAllStars(currentUserId?: number): (Star & { username: string 
   `).all(...filterParams) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
   const collMap = buildCollectionMap(rows as any[]);
   const hidden = hideAuthorForRows(rows as any[], collMap, currentUserId);
-  return attachCatalogStarIds(hidden);
+  const withIds = attachCatalogStarIds(hidden);
+  return attachResonatedFlag(withIds, currentUserId);
 }
 
 // 分页获取所有星星
 export function getAllStarsPaged(page: number, limit: number, currentUserId?: number): {
-  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean })[];
+  items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean; resonated: boolean })[];
   total: number;
   page: number;
   limit: number;
@@ -207,7 +225,8 @@ export function getAllStarsPaged(page: number, limit: number, currentUserId?: nu
 
   const collMap = buildCollectionMap(items as any[]);
   const hidden = hideAuthorForRows(items as any[], collMap, currentUserId);
-  return { items: attachCatalogStarIds(hidden), total, page: p, limit: l, totalPages };
+  const withIds = attachCatalogStarIds(hidden);
+  return { items: attachResonatedFlag(withIds, currentUserId), total, page: p, limit: l, totalPages };
 }
 
 // 创建星星
@@ -305,14 +324,14 @@ export function createStar(
 }
 
 /** 单条 getStoryById 专用包装：保持和 attachCatalogStarIds 相同的 tags 规范化语义 */
-function normalizeRowSingle(row: any): any {
+function normalizeRowSingle(row: any, currentUserId?: number): any {
   if (!row) return row;
   const list = normalizeTagsForStories([row]);
   const withIds = attachCatalogStarIds(list);
-  return withIds[0];
+  return attachResonatedFlag(withIds, currentUserId)[0];
 }
 
-export function getStoryById(id: number): any | null {
+export function getStoryById(id: number, currentUserId?: number): any | null {
   const row = db.prepare(`
     SELECT s.*,
       CASE WHEN s.is_anonymous = 1 THEN NULL ELSE u.username END as username
@@ -321,7 +340,7 @@ export function getStoryById(id: number): any | null {
     WHERE s.id = ?
   `).get(id);
   if (!row) return null;
-  return normalizeRowSingle(row);
+  return normalizeRowSingle(row, currentUserId);
 }
 
 // 共鸣 +1（支持去重）
@@ -451,7 +470,7 @@ export function getGlobalStats(): { starCount: number; userCount: number; totalR
 }
 
 // 单星下的所有故事（通过连接表多对多查询）
-export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[]; authorHidden?: boolean })[] {
+export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[]; authorHidden?: boolean; resonated: boolean })[] {
   const { sql: filterSql, params: filterParams } = buildVisibilityFilter(currentUserId);
   const rows = db.prepare(`
     SELECT s.*,
@@ -465,7 +484,8 @@ export function getStoriesByCatalogStarId(catalogStarId: number, currentUserId?:
   `).all(catalogStarId, ...filterParams);
   const collMap = buildCollectionMap(rows as any[]);
   const hidden = hideAuthorForRows(rows as any[], collMap, currentUserId);
-  return attachCatalogStarIds(hidden);
+  const withIds = attachCatalogStarIds(hidden);
+  return attachResonatedFlag(withIds, currentUserId);
 }
 
 // 某合集下的所有故事（合集详情用；可见性由调用方 collectionService 校验）
@@ -481,18 +501,19 @@ export function getStoriesByCollectionId(collectionId: number): (Star & { userna
   return attachCatalogStarIds(rows);
 }
 
-// 我的故事
-export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[] {
+// 我的故事（resonated 字段：本人对自己的故事是否共鸣过，也能真实反映，理论上一般 false）
+export function getUserStories(userId: number): (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[]; resonated: boolean })[] {
   const rows = db.prepare(`
     SELECT s.*, u.username
     FROM stars s LEFT JOIN users u ON s.user_id = u.id
     WHERE s.user_id = ? ORDER BY s.created_at DESC
   `).all(userId);
-  return attachCatalogStarIds(rows);
+  const withIds = attachCatalogStarIds(rows);
+  return attachResonatedFlag(withIds, userId);
 }
 
 export function getUserStoriesPaged(userId: number, page: number, limit: number): {
-  items: (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[] })[];
+  items: (Star & { username: string | null; tag: string | null; tags: string[]; catalogStarIds?: number[]; resonated: boolean })[];
   total: number;
   page: number;
   limit: number;
@@ -513,7 +534,8 @@ export function getUserStoriesPaged(userId: number, page: number, limit: number)
     LIMIT ? OFFSET ?
   `).all(userId, l, offset);
 
-  return { items: attachCatalogStarIds(items), total, page: p, limit: l, totalPages };
+  const withIds = attachCatalogStarIds(items);
+  return { items: attachResonatedFlag(withIds, userId), total, page: p, limit: l, totalPages };
 }
 
 // 我的收藏（返回该用户收藏的 catalog_star_id 列表）

@@ -27,12 +27,13 @@ router.get('/', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 单条故事详情（旧路由兼容）
-router.get('/story/:storyId', (req: Request, res: Response) => {
+// 单条故事详情（旧路由兼容 · authOptional：登录时附带 resonated 是否已共鸣标志）
+router.get('/story/:storyId', authOptional, (req: Request, res: Response) => {
   try {
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
-    const story = getStoryById(storyId);
+    const currentUserId = (req as Request & { user?: { id: number } }).user?.id;
+    const story = getStoryById(storyId, currentUserId);
     if (!story) return notFound(res, '故事不存在');
     ok(res, 'success', story);
   } catch (error) {
