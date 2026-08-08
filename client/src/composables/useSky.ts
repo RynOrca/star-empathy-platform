@@ -3492,33 +3492,31 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画（相机模式下跳过，interactiveGlows 统一隐藏，避免 400+ sprite 无效更新）
-    if (!cameraOverlayEnabled) {
-      for (const ig of interactiveGlows) {
-        const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
-        const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-        // ✅ 恒定下限：保证"没故事"的星辉光永远存在（不会呼吸到 opacity=0 隐没）
-        //    基础呼吸：opacity ∈ [0.55 * peak, 1.0 * peak]，再额外加故事 boost
-        const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
-        ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + ig.storyBoostOpacity)
-        // scale 呼吸：暗星幅度稍大，亮星幅度沉稳（下限 1 - pulseAmt，也不会缩到看不见）
-        const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
-        const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
-        const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
-        ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
-      }
+    // 有故事的星：呼吸辉光动画（普通/相机 双模式通用，interactiveGlows 两套并存时一致）
+    // ✅ 相机模式下不隐藏 interactiveGlows，保证镜头进入取景框后看到的辉光 = 普通模式逐像素一致
+    for (const ig of interactiveGlows) {
+      const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
+      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+      const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
+      ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + ig.storyBoostOpacity)
+      const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
+      const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
+      const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+      ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
     }
     // 天镜览星：所有交互星呼吸 glow（只渲染取景框内可见，但无论在不在视锥都持续更新呼吸相位 — 避免切视角时辉光「暂停/突跳」）
     // ✅ 算法与普通浏览模式（L3495-L3507）完全一致：
     //    - opacity 下限 = 0.55 × peakOpacity（呼吸谷值不会到 0）
     //    - scale 呼吸：暗星 ±6% / 亮星 ±3.5%
     //    - period/phase 与普通模式同口径（每颗星独立 period 不抢节奏）
+    // 天镜览星：相机模式独立 cameraModeStoryStars 仍推进时间相位（两套并存，不删减）
+    // ✅ 可见性统一由 interactiveGlows 提供（进入模式时不再 hide 它们），cameraMode 这套保留结构但不负责渲染
+    //    避免 AdditiveBlending 两套同位置 sprite 叠加过曝；两套代码并存未删除
     if (cameraOverlayEnabled) {
       const _nowMs = _now
       _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
       cameraModeStoryStars.forEach((meta) => {
         if (!meta.glowSprite) return
-        // 先算呼吸相位（无论在不在视锥里都要推进时间，避免「停住」感）
         const t = ((_nowMs + meta.phase * 1000) % meta.period) / meta.period
         const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
         const baseOpacity = meta.peakOpacity * (0.55 + 0.45 * breath)
@@ -3527,8 +3525,8 @@ for (const s of stars) starById.set(s.id, s)
         const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
         const base = meta.hasStory ? meta.baseScale * meta.storyBoostScale : meta.baseScale
         meta.glowSprite.scale.set(base * scalePulse, base * scalePulse, 1)
-        // 视锥判断只控制可见性（不渲染视锥外的节省 draw call，但时间相位不中断）
-        meta.glowSprite.visible = _frustum.containsPoint(meta.glowSprite.position)
+        // sprite 可见性由 interactiveGlows 独占（cameraMode 这套保持 invisible，结构保留）
+        meta.glowSprite.visible = false
       })
     }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
@@ -3966,8 +3964,8 @@ for (const s of stars) starById.set(s.id, s)
         // 隐藏普通模式星名标签
         starNameLabels.forEach((label) => { label.element.style.display = 'none' })
 
-        // 隐藏普通模式 interactiveGlows（相机模式有独立的 cameraModeStoryStars glow，避免重复渲染）
-        for (const ig of interactiveGlows) ig.sprite.visible = false
+        // ✅ 相机模式与普通模式共用同一套辉光显示源（interactiveGlows），不再 hide
+        //    cameraModeStoryStars 保留结构/更新链路但保持 invisible，避免 Additive 叠加过曝
 
         // ════════════════════════════════════════════════════════════════════
         // 相机模式辉光初始化 — 严格对齐用户要求的普通模式 4 步标准：
@@ -4025,6 +4023,7 @@ for (const s of stars) starById.set(s.id, s)
             sprite.renderOrder = 49
             sprite.userData.starId = starId
             sprite.position.set(pos.x, pos.y, pos.z)
+            sprite.visible = false  // ✅ 两套并存：cameraMode 这套保持 invisible（显示源统一由 interactiveGlows 负责）
             skyGroup.add(sprite)
             cameraModeStoryStars.set(starId, {
               glowSprite: sprite,
@@ -4060,6 +4059,7 @@ for (const s of stars) starById.set(s.id, s)
           sprite.renderOrder = 48
           sprite.userData.starId = starId
           sprite.position.set(cat.x, cat.y, cat.z)
+          sprite.visible = false  // ✅ 两套并存：cameraMode 这套保持 invisible（显示源统一由 interactiveGlows 负责）
           skyGroup.add(sprite)
           cameraModeStoryStars.set(starId, {
             glowSprite: sprite,
@@ -4076,8 +4076,7 @@ for (const s of stars) starById.set(s.id, s)
         // 退出相机模式，恢复
         starNameLabels.forEach((label) => { label.element.style.display = '' })
 
-        // 恢复普通模式 interactiveGlows 可见性
-        for (const ig of interactiveGlows) ig.sprite.visible = true
+        // interactiveGlows 从未 hide，进入/退出相机模式辉光无缝一致
 
         // 清理故事星 glow
         cameraModeStoryStars.forEach((meta) => {
