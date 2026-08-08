@@ -1,5 +1,5 @@
 <template>
-  <div class="folio-detail-page">
+  <div class="folio-detail-page" :class="{ entered: isEntered, leaving: isLeaving }">
     <!-- 背景（同 FolioSquare 夜色银河） -->
     <div class="fdp-bg" aria-hidden="true">
       <div class="fdp-bg-milky"></div>
@@ -9,10 +9,15 @@
     <!-- 顶部导航栏（sticky） -->
     <header class="fdp-top">
       <div class="fdp-top-left">
+        <!-- 左上角：醒目退出按钮（直接回天际 · 取代原右上"回天际"功能） -->
+        <button type="button" class="fdp-exit" @click="exitToSky" aria-label="退出 · 回天际">
+          <X :size="14" />
+          <span>退出</span>
+        </button>
         <button type="button" class="fdp-back" @click="goBack" aria-label="返回书局">
           <ChevronLeft :size="16" />
         </button>
-        <button type="button" class="fdp-pill fdp-pill-link" @click="goSquare">
+        <button type="button" class="fdp-pill fdp-pill-link" @click="backToSquare">
           <BookMarked :size="11" />
           <span>穹庭书局</span>
         </button>
@@ -23,7 +28,7 @@
         <button
           type="button"
           class="fdp-pill fdp-pill-warm"
-          @click="goSquare"
+          @click="backToSquare"
           v-if="detail?.visibility !== 'galaxy' || true"
         >
           <Sparkles :size="11" />
@@ -32,11 +37,17 @@
         <button type="button" class="fdp-icon-btn" @click="reloadDetail" aria-label="刷新">
           <RotateCcw :size="12" />
         </button>
-        <button type="button" class="fdp-icon-btn" @click="goSky" aria-label="回天际">
-          <Orbit :size="12" />
-        </button>
       </div>
     </header>
+
+    <!-- 引导条（ca-hero-strip 同款风格） -->
+    <div class="fdp-hero-strip">
+      <div class="fdp-hs-left">
+        <BookOpen class="fdp-hs-icon" :size="14" />
+        <span class="fdp-hs-label">卷目详情</span>
+        <span class="fdp-hs-sub">· 正在查看此星笺的内容与收录的故事，点击故事可跳转天际聆听</span>
+      </div>
+    </div>
 
     <main class="fdp-main">
       <!-- 加载中 -->
@@ -52,7 +63,7 @@
         <BookDashed :size="30" />
         <h2>这册星笺不在卷目之中</h2>
         <p>它可能已被作者改为私密，或从未存在。</p>
-        <button type="button" class="fs-btn fs-btn-warm" style="margin-top: 12px" @click="goSquare">← 回到穹庭书局</button>
+        <button type="button" class="fs-btn fs-btn-warm" style="margin-top: 12px" @click="backToSquare">← 回到穹庭书局</button>
       </div>
 
       <!-- 详情：直接嵌入 CollectionDetail 组件
@@ -64,7 +75,7 @@
           :current-user-id="userId"
           :is-owner="isOwner"
           :refresh-nonce="refreshNonce"
-          @close="goSquare"
+          @close="backToSquare"
           @story-click="onStoryClick"
           @edit="onWantEditDenied"
           @delete="onWantEditDenied"
@@ -76,10 +87,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ChevronLeft, Sparkles, RotateCcw, Orbit, BookMarked, BookDashed, X, AlertTriangle,
+  ChevronLeft, Sparkles, RotateCcw, Orbit, BookMarked, BookOpen, BookDashed, X, AlertTriangle,
 } from 'lucide-vue-next'
 import CollectionDetail from '../components/CollectionDetail/index.vue'
 import type { Collection } from '../composables/useCollections'
@@ -143,12 +154,32 @@ function reloadDetail() {
   loadDetailMeta()
 }
 
+/* ─── 页面进出动画状态 ⭐ 全用 transition 控制，禁止 animation+forwards 抢优先级 ─── */
+const isEntered = ref(false)
+const isLeaving = ref(false)
+// 进入动画：挂载后双 rAF 触发（确保浏览器先渲染 opacity=0 初始态，再切到 1 才能正确过渡）
+onMounted(() => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { isEntered.value = true })
+  })
+})
+
 function goBack() {
-  if (window.history.length > 1) router.back()
-  else router.push('/folios')
+  // 返回书局（先淡出再跳，延时匹配 CSS transition 0.3s）
+  isLeaving.value = true
+  setTimeout(() => {
+    if (window.history.length > 1) router.back()
+    else router.push('/folios')
+  }, 300)
 }
-function goSquare() { router.push('/folios') }
-function goSky() { router.push('/sky') }
+// 返回书局（与 goBack 效果相同，不同入口共用退出动画）
+function backToSquare() { goBack() }
+// 退出到天际：先淡出再跳转
+function exitToSky() {
+  isLeaving.value = true
+  setTimeout(() => { router.push('/sky') }, 320)
+}
+function goSky() { exitToSky() }
 
 /**
  * 详情页内点击故事：
@@ -158,7 +189,7 @@ function goSky() { router.push('/sky') }
  *    SkyPage 自己用 overlay 开 StoryDetailModal，这里我们就不让 modal 再弹，
  *    直接跳天际，保留预期。
  */
-function onStoryClick(_s: any) { goSky() }
+function onStoryClick(_s: any) { exitToSky() }
 
 /** 广场详情页，不允许就地从该页编辑（入口在个人主页），闪个提示即可 */
 function onWantEditDenied(_c: any) {
@@ -189,6 +220,27 @@ watch(idFromRoute, () => {
   color: var(--ink);
   font-family: var(--font);
   overflow-x: hidden;
+  /* ⭐ 初始态：未进入前 opacity:0 / 下浮 10px */
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.32s ease-out, transform 0.32s ease-out;
+  will-change: opacity, transform;
+}
+/* ⭐ 进入态：onMounted 双 rAF 后触发 entered class，transition 平滑过渡 */
+.folio-detail-page.entered {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* ⭐ 退出态：脱离文档流在顶层覆盖式淡出（写在 entered 之后，同级优先级自然覆盖） */
+.folio-detail-page.leaving {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
 }
 
 /* ── 背景：复用 FolioSquare 风格，减少动画量保证详情阅读不抖 ── */
@@ -237,6 +289,31 @@ watch(idFromRoute, () => {
   padding: 0;
 }
 .fdp-back:hover { background: var(--accent-subtle); color: var(--accent); transform: translateX(-1px); }
+
+/* 左上角：醒目退出按钮（红橙渐变 · 同 CameraHud 退出风格） */
+.fdp-exit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 107, 107, 0.28);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.12), rgba(255, 168, 96, 0.05));
+  color: #ff6b6b;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  transition: all 0.2s ease;
+}
+.fdp-exit:hover {
+  border-color: rgba(255, 107, 107, 0.45);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.18), rgba(255, 168, 96, 0.08));
+  transform: translateY(-1px);
+}
 
 /* 胶囊：高度统一 30px（对齐 FolioSquare.fs-btn），纯背景块无硬边框 */
 .fdp-pill {
@@ -291,13 +368,52 @@ watch(idFromRoute, () => {
   text-overflow: ellipsis;
 }
 
+/* ═══════ 引导条（ca-hero-strip 同款风格） ═══════ */
+.fdp-hero-strip {
+  position: relative;
+  z-index: 2;
+  width: min(1260px, calc(100% - 32px));
+  margin: 62px auto 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(202, 167, 255, 0.14);
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.07), rgba(134, 168, 255, 0.03));
+  box-sizing: border-box;
+}
+.fdp-hs-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.fdp-hs-icon {
+  color: #caa7ff;
+  flex-shrink: 0;
+}
+.fdp-hs-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.fdp-hs-sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  opacity: 0.85;
+}
+
 /* ── 主内容 ── */
 .fdp-main {
   position: relative;
   z-index: 1;
   width: min(1260px, 100%);
   margin: 0 auto;
-  padding: 58px 16px 80px;
+  padding: 18px 16px 80px;    /* 引导条已占位，缩小顶部间距 */
 }
 .fdp-loading-wrap {
   display: flex; align-items: center; justify-content: center;
@@ -395,7 +511,13 @@ watch(idFromRoute, () => {
 @media (max-width: 720px) {
   .fdp-top { padding: 8px 12px; flex-wrap: wrap; row-gap: 6px; }
   .fdp-top-right { order: 3; width: 100%; justify-content: space-between; }
-  .fdp-main { padding: 88px 10px 60px; }
+  /* 移动端退出按钮：仅 X 图标，省空间 */
+  .fdp-exit { height: 32px; padding: 0 9px; font-size: 0; }
+  .fdp-exit span { display: none; }
+  /* 引导条：移动端适配 */
+  .fdp-hero-strip { width: calc(100% - 24px); margin-top: 60px; padding: 7px 12px; }
+  .fdp-hs-sub { display: none; }
+  .fdp-main { padding: 14px 10px 60px; }
   .fdp-crumb-title { max-width: 58vw; }
 }
 @media (max-width: 420px) {

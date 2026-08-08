@@ -1,5 +1,5 @@
 <template>
-  <div class="folios-page">
+  <div class="folios-page" :class="{ entered: isEntered, leaving: isLeaving }">
     <!-- 背景：银河渐变（同 SkyPage 夜色，不耦合 Three.js） -->
     <div class="fs-bg" aria-hidden="true">
       <div class="fs-bg-milky"></div>
@@ -9,8 +9,10 @@
     <!-- ═══════ 顶部 Sticky 导航栏 ═══════ -->
     <header class="fs-top">
       <div class="fs-top-left">
-        <button class="fs-back" @click="goBack" aria-label="返回上一页">
-          <ChevronLeft :size="16" />
+        <!-- 左上角：醒目退出按钮（直接回天际，取代原右上"回天际"功能） -->
+        <button class="fs-exit" @click="exitToSky" aria-label="退出穹庭书局 · 回天际">
+          <X :size="14" />
+          <span>退出</span>
         </button>
         <div class="fs-brand">
           <span class="pw-icon-wrap pw-icon-gold" aria-hidden="true"><Sparkles :size="14" /></span>
@@ -41,12 +43,17 @@
           <RotateCcw :size="12" />
           <span>刷新</span>
         </button>
-        <button class="fs-btn fs-btn-glass" type="button" @click="goSky">
-          <Orbit :size="12" />
-          <span>回天际</span>
-        </button>
       </div>
     </header>
+
+    <!-- ═══════ 引导条（ca-hero-strip 同款风格） ═══════ -->
+    <div class="fs-hero-strip">
+      <div class="fhs-left">
+        <Library class="fhs-icon" :size="14" />
+        <span class="fhs-label">穹庭书局</span>
+        <span class="fhs-sub">· 星笺书架，收纳观星者们整理的心事合集，漫步翻阅寻找共鸣</span>
+      </div>
+    </div>
 
     <main class="fs-main">
       <!-- ═══════ ① 官方星河·八卷轴（横滑） ═══════ -->
@@ -265,10 +272,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit,
+  ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit, X,
   Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User,
 } from 'lucide-vue-next'
 import FolioGrid, { type FolioLike } from '../components/FolioGrid.vue'
@@ -496,16 +503,28 @@ async function reloadAll() {
   await fetchShelfPage(1)
 }
 
+/* ─── 页面进出动画状态 ⭐ 全用 transition 控制，禁止 animation+forwards 抢优先级 ─── */
+const isEntered = ref(false)
+const isLeaving = ref(false)
+// 进入动画：挂载后双 rAF 触发（确保浏览器先渲染 opacity=0 初始态，然后再切换到 1 才能正确过渡）
+onMounted(() => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { isEntered.value = true })
+  })
+})
+
 /* ─── 跳转 ─── */
-function goBack() {
-  // 优先走 history.back；如果栈浅（直接进来的）则回 /sky
-  if (window.history.length > 1) router.back()
-  else router.push('/sky')
+// 左上角：退出穹庭书局，先播放退出动画再跳转（延时匹配 CSS transition 0.3s）
+function exitToSky() {
+  isLeaving.value = true
+  setTimeout(() => { router.push('/sky') }, 320)
 }
-function goSky() { router.push('/sky') }
+function goSky() { exitToSky() }
 function goProfileNewFolio() { router.push({ path: '/profile', hash: '#pd-collections' }) }
 function openDetail(c: { id: number }) {
-  router.push(`/folios/${c.id}`)
+  // 进入详情页也先淡出
+  isLeaving.value = true
+  setTimeout(() => { router.push(`/folios/${c.id}`) }, 300)
 }
 
 /* ─── 无限滚动监听（IntersectionObserver） ─── */
@@ -582,6 +601,27 @@ updateVolumeCountsQuick()
   overflow-x: hidden;
   font-family: var(--font);
   padding: 0 0 80px;
+  /* ⭐ 初始态：未进入前的状态（opacity:0 / 下浮 10px） */
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.32s ease-out, transform 0.32s ease-out;
+  will-change: opacity, transform;
+}
+/* ⭐ 进入态：onMounted 双 rAF 后触发 entered class，transition 让它从 0→1 平滑过渡 */
+.folios-page.entered {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* ⭐ 退出态：覆盖层脱离文档流淡出（leaving 写在 entered 后面，同级优先级覆盖生效） */
+.folios-page.leaving {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
 }
 .fs-bg {
   position: fixed; inset: 0;
@@ -638,13 +678,52 @@ updateVolumeCountsQuick()
   color: var(--star-blue);
 }
 
+/* ═══════ 引导条（ca-hero-strip 同款风格） ═══════ */
+.fs-hero-strip {
+  position: relative;
+  z-index: 2;
+  width: min(1180px, calc(100% - 40px));
+  margin: 68px auto 0;    /* 顶栏高 56px + 12px 间距 */
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 217, 138, 0.12);
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.07), rgba(202, 167, 255, 0.035));
+  box-sizing: border-box;
+}
+.fhs-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.fhs-icon {
+  color: #ffd98a;
+  flex-shrink: 0;
+}
+.fhs-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.fhs-sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  opacity: 0.85;
+}
+
 /* ═══ 主内容：相对定位，盖在背景上 ═══ */
 .fs-main {
   position: relative;
   z-index: 1;
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 76px 20px 40px;
+  padding: 20px 20px 40px;      /* 引导条已经占了上方空间，这里顶间距缩小 */
 }
 
 /* ═══ 顶部 Sticky Bar（极简扁平：纯色背景，无玻璃模糊/渐变/光辉） ═══ */
@@ -660,17 +739,31 @@ updateVolumeCountsQuick()
   background: rgba(10, 11, 28, 0.9);
 }
 .fs-top-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.fs-back {
-  width: 30px; height: 30px;
-  display: inline-flex; align-items: center; justify-content: center;
+
+/* 左上角：醒目退出按钮（红橙渐变 · 同 CameraHud 退出风格） */
+.fs-exit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
   border-radius: var(--radius-sm);
-  background: var(--overlay-04);
-  color: var(--ink-secondary);
+  border: 1px solid rgba(255, 107, 107, 0.28);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.12), rgba(255, 168, 96, 0.05));
+  color: #ff6b6b;
   cursor: pointer;
-  transition: all var(--transition-normal);
-  padding: 0;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  transition: all 0.2s ease;
 }
-.fs-back:hover { background: var(--accent-subtle); color: var(--accent); }
+.fs-exit:hover {
+  border-color: rgba(255, 107, 107, 0.45);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.18), rgba(255, 168, 96, 0.08));
+  transform: translateY(-1px);
+}
 .fs-brand { display: flex; align-items: center; gap: 10px; }
 .fs-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
 .fs-brand-title {
@@ -1267,7 +1360,13 @@ updateVolumeCountsQuick()
   .fs-top-mid { grid-column: 1 / -1; justify-content: stretch; }
   .fs-search { width: 100%; }
   .fs-top-right { justify-self: end; }
-  .fs-main { padding: 110px 14px 30px; }
+  /* 移动端退出按钮：仅显示 X 图标，省空间 */
+  .fs-exit { height: 32px; padding: 0 9px; font-size: 0; }
+  .fs-exit span { display: none; }
+  /* 引导条：移动端适配宽度 */
+  .fs-hero-strip { width: calc(100% - 28px); margin-top: 62px; padding: 7px 12px; }
+  .fhs-sub { display: none; }   /* 移动端隐藏副标，只留 ICON + 主名 */
+  .fs-main { padding: 16px 14px 30px; }
   .fs-picks { grid-template-columns: 1fr; }
   .fs-pick { min-height: auto; }
   .fs-filters { flex-direction: column; align-items: stretch; }
