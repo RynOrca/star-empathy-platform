@@ -53,7 +53,7 @@
         <BookDashed :size="14" />
       </div>
       <div class="pe-text">
-        <div class="pe-title">心事还不够多</div>
+        <div class="pe-title">星星故事不足</div>
         <div class="pe-sub">当前 <b>{{ storyCount }}</b> 条故事，累计 5 条后 AI 将为它生成人格画像</div>
       </div>
     </div>

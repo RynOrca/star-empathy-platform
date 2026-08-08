@@ -1,15 +1,15 @@
 <template>
   <div class="camera-hud">
     <div class="hud-top">
-      <!-- 左上：退出按钮（共享 hud-pill 通用样式） -->
-      <button class="hud-pill hud-exit" @click="$emit('exit')">
-        <ApertureIcon />
-        <span class="hud-exit-label">天镜览星</span>
+      <!-- 左上：退出按钮（醒目：关闭图标 + 退出文字 + 红橙强调色） -->
+      <button class="hud-pill hud-exit hud-left" @click="$emit('exit')">
+        <CloseIcon />
+        <span class="hud-exit-label">退出</span>
       </button>
-      <!-- 中上：PHOTO MODE 标签胶囊（共享 hud-pill 通用样式） -->
-      <div class="hud-pill hud-mode">
-        <span class="rec-dot" />
-        <span class="hud-mode-text">PHOTO MODE</span>
+      <!-- 中上：「天镜览星」极简标题（小胶囊 + 光圈ICON + 4字标题） -->
+      <div class="hud-pill hud-title">
+        <ApertureIcon class="ht-icon" />
+        <span class="ht-cn">天镜览星</span>
       </div>
       <!-- 右上：RA / DEC / FOV chip 组 -->
       <div class="hud-coords">
@@ -26,6 +26,22 @@
           <span class="hud-chip-value">{{ fov }}°</span>
         </div>
       </div>
+    </div>
+    <!-- 中下方：品红色星图例 + 引导说明 -->
+    <div class="hud-guide">
+      <svg class="hg-dot" viewBox="0 0 16 16" aria-hidden="true">
+        <defs>
+          <radialGradient id="hgGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff4d8a" stop-opacity="0.95"/>
+            <stop offset="55%" stop-color="#ff4d8a" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#ff4d8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="8" cy="8" r="7.2" fill="url(#hgGlow)"/>
+        <circle cx="8" cy="8" r="3.2" fill="#ff6aa1" stroke="#ff96bb" stroke-width="0.6"/>
+      </svg>
+      <span class="hg-label">品红之星</span>
+      <span class="hg-sub">· 承载心事的星辰，点击可共鸣或聆听背后故事</span>
     </div>
     <div class="hud-bottom">
       <div class="hud-params">
@@ -44,7 +60,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { ApertureIcon } from './icons/CameraIcons'
+import { CloseIcon, ApertureIcon } from './icons/CameraIcons'
 
 defineProps<{
   ra: string
@@ -117,7 +133,18 @@ onBeforeUnmount(() => {
   pointer-events: none;
   box-sizing: border-box;
 }
-.hud-top { top: 16px; }        /* 略往下压 16px，避免贴边 */
+.hud-top {
+  top: 16px;                  /* 略往下压 16px，避免贴边 */
+  height: 36px;               /* ⭐ 固定高度，保证标题 translate 居中基准 */
+  /* ⭐ 注意：仍继承共享规则中的 position: absolute（相对于 camera-hud 容器）
+     absolute 元素本身即可作为子元素绝对定位的参照，不需要再加 position: relative */
+}
+/* 左右两栏：防压缩 + 层级高于居中标题，避免被遮挡 */
+.hud-left, .hud-coords {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
 .hud-bottom {
   bottom: 16px;
   font-size: var(--text-xxs);
@@ -143,54 +170,62 @@ onBeforeUnmount(() => {
   isolation: isolate;
 }
 
-/* 左上：退出按钮（胶囊按钮） — 继承 hud-pill 面板样式 + 交互特性 */
+/* 左上：退出按钮（醒目的红橙强调色 — 退出/危险语义） */
 .hud-exit {
   cursor: pointer;
   pointer-events: auto;
   font-family: var(--font);
   font-size: var(--text-sm);
-  font-weight: 500;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   color: var(--ink);
+  /* 红橙 135° 渐变底 + 红边框，视觉上一眼识别为「退出操作」 */
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.09), rgba(255, 168, 96, 0.04));
+  border-color: rgba(255, 107, 107, 0.28);
   transition: border-color var(--transition-normal), transform var(--transition-normal), background var(--transition-normal), box-shadow var(--transition-normal);
 }
 .hud-exit svg {
   width: 16px; height: 16px;
-  color: var(--accent);
+  color: #ff6b6b;
   flex-shrink: 0;
 }
 .hud-exit:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-subtle);
+  border-color: rgba(255, 107, 107, 0.5);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.16), rgba(255, 168, 96, 0.08));
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32), 0 0 0 1px var(--accent-border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 107, 107, 0.4);
 }
 .hud-exit-label {
   color: inherit;
 }
 
-/* 中上：PHOTO MODE 标签胶囊 — 继承 hud-pill 面板样式 */
-.hud-mode {
+/* ═══════════════════ 中上：极简小胶囊标题（ICON + 4字） ═══════════════════ */
+.hud-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+  z-index: 1;
+  /* 金系小胶囊：略深一点的金渐变底，和退出按钮红橙区分开 */
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.09), rgba(255, 196, 100, 0.03));
+  border-color: rgba(255, 217, 138, 0.22);
 }
-.rec-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--rec-color);
-  box-shadow: 0 0 8px var(--rec-color);
-  animation: rec-blink 1.2s ease-in-out infinite;
+/* 光圈 ICON */
+.ht-icon {
+  width: 15px;
+  height: 15px;
+  color: #ffd98a;
   flex-shrink: 0;
 }
-@keyframes rec-blink {
-  0%, 100% { opacity: 1;   transform: scale(1); }
-  50%      { opacity: 0.4; transform: scale(0.75); }
-}
-.hud-mode-text {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--ink-secondary);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+/* 4字标题：正常字距，不要过度设计 */
+.ht-cn {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #ffd98a;
 }
 
 /* 右上：RA / DEC / FOV chip 组（外层只做间距，不包框） */
@@ -244,6 +279,53 @@ onBeforeUnmount(() => {
   transition: opacity 0.2s;
 }
 .hud-chip:last-child .hud-chip-value { color: var(--hud-accent); }
+
+/* ═══════════════════ 中下方：品红之星图例 + 引导说明 ═══════════════════ */
+.hud-guide {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 72px;              /* 避开底部 hud-bottom (16px+32px=48) + 24px 呼吸间距 */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 16px;
+  background: var(--surface);
+  border: 1px solid rgba(255, 77, 138, 0.28);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(255, 77, 138, 0.08) inset;
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  box-sizing: border-box;
+  line-height: 1;
+  background-image: linear-gradient(135deg, rgba(255, 77, 138, 0.06), rgba(255, 154, 188, 0.02));
+  pointer-events: none;
+  animation: hud-guide-in 0.45s var(--ease-out) both;
+  animation-delay: 280ms;
+}
+.hg-dot {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(255, 77, 138, 0.5));
+}
+.hg-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ff7aaf;
+}
+.hg-sub {
+  font-size: 0.72rem;
+  color: var(--ink-secondary);
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+}
+@keyframes hud-guide-in {
+  /* ⭐ 注意：translate 必须包含 X 轴 -50%（和基础定位一致），否则横向会跳 */
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
 
 /* 底部参数 / 元数据：胶囊小面板 */
 .hud-params, .hud-meta {

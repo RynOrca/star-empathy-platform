@@ -60,7 +60,7 @@ export type CollectionAnalysis = {
 
 /**
  * 拉取合集的 AI 预生成分析。
- * - 首次请求若后端 tooFewStories=true：前端立即显示空态（BookDashed "心事不够多"），不轮询
+ * - 首次请求若后端 tooFewStories=true：前端立即显示空态（BookDashed "星笺故事不足"），不轮询
  * - 首次请求 ready=false 但 tooFewStories=false：后台正在异步生成，启动轮询每 POLL_INTERVAL_MS 再拉一次
  * - ready=true：停止轮询，响应式更新驱动 CollectionAnalysis 所有卡片重渲染
  *

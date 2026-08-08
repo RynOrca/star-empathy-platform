@@ -70,36 +70,27 @@ function browserLocate(): Promise<LatLng | null> {
 
 /**
  * IP 地理位置兜底（无需权限，城市级精度足够天文观测）
- * 主：ipapi.co；备：ipwho.is
- * 注：开发模式通过 vite 代理避免 localhost CORS（见 vite.config.ts /ip-api、/ip-who）
+ *
+ * 重要：生产 + 开发统一走同源后端代理 `/api/location/ip`，
+ *      不再让浏览器直连 ipapi.co / ipwho.is（对方免费计划不发
+ *      CORS 头，starsempathy.site 下会被浏览器拦掉）。
+ * 后端 server 会做 server→server 请求，内部自带主 + fallback，
+ * 1~2 小时级缓存，额度可控。
+ *
+ * Vite DEV 时 `/api` 代理到 http://localhost:3000（本已通），
+ * 生产就是本站域名同 origin，零 CORS。
  */
 async function ipLocate(): Promise<LatLng | null> {
-  const DEV = import.meta.env.DEV
-  // 主：ipapi.co
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
-    const url = DEV ? '/ip-api/json' : 'https://ipapi.co/json/'
-    const res = await fetch(url, { signal: ctrl.signal })
+    const res = await fetch('/api/location/ip', { signal: ctrl.signal })
     clearTimeout(t)
     if (res.ok) {
-      const d = await res.json()
-      if (typeof d.latitude === 'number' && typeof d.longitude === 'number') {
-        return { lat: d.latitude, lng: d.longitude }
-      }
-    }
-  } catch { /* fallthrough to backup */ }
-  // 备：ipwho.is
-  try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), IP_API_TIMEOUT)
-    const url = DEV ? '/ip-who/' : 'https://ipwho.is/'
-    const res = await fetch(url, { signal: ctrl.signal })
-    clearTimeout(t)
-    if (res.ok) {
-      const d = await res.json()
-      if (d && d.success && typeof d.latitude === 'number' && typeof d.longitude === 'number') {
-        return { lat: d.latitude, lng: d.longitude }
+      const d = await res.json() as { code?: number; data?: { lat?: number; lng?: number } }
+      const loc = d?.data
+      if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        return { lat: loc.lat, lng: loc.lng }
       }
     }
   } catch { /* ignore */ }
