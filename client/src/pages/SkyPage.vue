@@ -488,6 +488,7 @@
         v-if="showForm"
         :star-name="selectedStarInfo?.displayName ?? ''"
         :catalog-star-id="selectedCatalogStarId"
+        :catalog-star-info="selectedStarInfo"
         @submitted="onStorySubmitted"
         @close="showForm = false"
       />
