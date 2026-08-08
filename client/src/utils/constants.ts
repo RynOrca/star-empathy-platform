@@ -36,6 +36,12 @@ export const HIGH_RESONANCE_THRESHOLD = 50
 // Raycaster
 export const RAYCASTER_THRESHOLD = 8
 
+// 点击命中阈值（屏幕归一化平方距离）— issue #154
+// 与 hover 阈值（STAR_DISPLAY_CONFIG.hoverThreshold=0.003≈55px）解耦：
+// hover 需要宽松容差方便悬浮；但点击若复用同一阈值，定位后背景星会抢占命中，
+// 导致误打开背景星故事。点击阈值更严格（≈25px 半径 @1080p），命中更精准。
+export const CLICK_THRESHOLD = 0.001
+
 // ═══ 行星特写模式（closeup） ═══
 // 物理直径比例下小天体（水星/月球等）盘面亚像素，通过相机距离补偿让用户能"不断放大"看表面
 // 状态机：IDLE → TWEENING → CLOSEUP → EXITING → IDLE

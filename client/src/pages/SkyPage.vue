@@ -1168,7 +1168,13 @@ async function flyToStar(starId: number) {
   }
   const star = catalogStarLookup.get(starId)
   if (!star) return
-  // 模拟点击该星
+  // issue #154：搜索主区域点击同时「定位 + 打开」——先 focusOnStar 移动相机到目标星，
+  // 否则相机原地不动、只弹面板，而背景星反而抢占点击命中（定位不灵敏）
+  if (skyRef.value?.sky) {
+    skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+    setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1200)
+  }
+  // 打开目标星故事面板
   onStarClick(starId)
 }
 
@@ -1738,7 +1744,6 @@ const locatedTarget = ref<SnapTarget | null>(null)
 const lastEnteredTarget = ref<SnapTarget | null>(null)
 
 function onSnapChange(target: SnapTarget | null) {
-  console.log('[onSnapChange] target=', target)
   if (target === null) {
     snappedTarget.value = null
     snappedLabel.value = ''
@@ -3515,6 +3520,72 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   /* Guide cards */
   .guide-cards {
     display: none;
+  }
+
+  /* 三大入口卡：移动端改为纵向单列堆叠，避免三列挤压溢出 */
+  .guide-shell {
+    bottom: 1.5rem;
+    width: calc(100vw - 32px);
+    gap: 8px;
+  }
+
+  .guide-actions-bar {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
+
+  .gac {
+    min-height: 60px;
+    padding: 10px 12px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .gac-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .gac-icon-wrap svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .gac-body {
+    gap: 2px;
+  }
+
+  .gac-index {
+    height: 18px;
+    min-width: 18px;
+    padding: 0 5px;
+    font-size: 0.6rem;
+  }
+
+  .gac-tag {
+    font-size: 0.62rem;
+  }
+
+  .gac-title {
+    font-size: 0.88rem;
+  }
+
+  .gac-desc {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    font-size: 0.68rem;
+  }
+
+  .gac-arrow {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .gac-arrow svg {
+    width: 18px;
+    height: 18px;
   }
 
   /* Zoom controls */
