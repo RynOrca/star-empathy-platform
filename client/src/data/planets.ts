@@ -61,8 +61,10 @@ export const planets: PlanetData[] = [
   },
   {
     name: 'Moon', nameCN: '月球', color: 0xcccccc, texture: '/textures/planets/2k_moon.jpg',
-    // 物理直径 3,474 km → 5.0 * 3474/1392700 = 0.012
-    size: 0.012, planetId: -101, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
+    // 角直径视角：真实太空中月球视径 0.518° ≈ 太阳 0.533°（日全食恰好遮住太阳）。
+    // 当前场景以太阳 size=5.0 为角直径基准，因此月球按角直径比 0.518/0.533≈0.972 → 4.86。
+    // 不做物理直径等比（0.012 会盘面亚像素不可见），让月球成为天球上最大的可看清盘面天体。
+    size: 4.86, planetId: -101, semiMajorAxis: 0.00257, eccentricity: 0.0549, inclination: 5.1, period: 0.075,
     rotationPeriod: 655.7, axialTilt: 6.68,
   },
   {
