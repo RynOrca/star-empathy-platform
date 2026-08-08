@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>星语穹庭 · 复赛作品演示</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- 粒子星空背景 -->
+  <canvas id="bgStars"></canvas>
+
+  <!-- 顶部控制栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M12 2l1.8 5.4L19 9l-4.5 3.6L15.8 18 12 15.3 8.2 18l1.3-5.4L5 9l5.2-1.6z"/>
+      </svg>
+      <span class="brand-title">星语穹庭</span>
+      <span class="brand-sub">复赛演示 · 自动导览脚本</span>
+    </div>
+    <div class="controls">
+      <button id="btnPrev" class="ctrl-btn" title="上一幕">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button id="btnPlay" class="ctrl-btn play" title="播放/暂停">
+        <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="iconPause" class="hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+      </button>
+      <button id="btnNext" class="ctrl-btn" title="下一幕">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <div class="progress-wrap">
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+      </div>
+      <div class="scene-indicator">
+        <span id="sceneIndex">01</span>
+        <span class="sep">/</span>
+        <span id="sceneTotal">08</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 场景舞台 -->
+  <main id="stage" class="stage"></main>
+
+  <!-- 底部字幕旁白 v2 重设计：左大序号 + 右标题/分隔线/旁白 -->
+  <footer class="subtitle-bar v2">
+    <div class="subtitle-inner v2">
+      <div class="nar-col-l">
+        <div id="chNum" class="ch-num">01</div>
+        <div class="ch-en">CHAPTER</div>
+      </div>
+      <div class="nar-col-r">
+        <div id="sceneTitle" class="scene-title v2">
+          <span class="t-ch"></span>
+          <span class="t-sep">·</span>
+          <span class="t-sub"></span>
+        </div>
+        <div class="nar-divider"></div>
+        <div id="sceneNarration" class="scene-narration v2"></div>
+      </div>
+    </div>
+    <!-- 字幕栏底边金色发光装饰 -->
+    <div class="nar-bottom-glow"></div>
+  </footer>
+
+  <!-- 场景指示点 -->
+  <nav class="scene-dots" id="sceneDots"></nav>
+
+  <script src="./scenes.js"></script>
+  <script src="./player.js"></script>
+</body>
+</html>
