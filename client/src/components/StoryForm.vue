@@ -826,9 +826,17 @@ async function doSubmit(
       isAnonymous: isAnonymous.value,
     }
     // 合集归属：选已有传 collectionId；新建传 collectionName（trim 过） + collectionVisibility
-    // 注意：CollectionPicker 现在新建模式不 trim emit，空串也保留对象字段——所以这里要 trim 后再发后端
+    // ══ 合集私密性 = 故事私密性（前端显式对齐 + 后端 createStar 再兜底一次 anonymous 强覆盖） ══
+    //    - 选已有合集：从 CollectionPicker emit 过来的 visibility 直接同步到 body.collectionVisibility
+    //      若 visibility === 'anonymous' → 强制把 body.isAnonymous = true（因为 story 级匿名 checkbox 已经删掉了）
+    //    - 新建合集：body 已经传了 collectionVisibility
     if (collectionSelection.value?.collectionId) {
       body.collectionId = collectionSelection.value.collectionId
+      const colVis = collectionSelection.value.visibility as ('public' | 'private' | 'anonymous' | 'galaxy') | undefined
+      if (colVis) {
+        body.collectionVisibility = colVis
+        if (colVis === 'anonymous') body.isAnonymous = true
+      }
     } else if (collectionSelection.value && 'collectionName' in collectionSelection.value) {
       const trimmedName = (collectionSelection.value.collectionName ?? '').trim()
       if (!trimmedName) {
@@ -839,6 +847,8 @@ async function doSubmit(
       }
       body.collectionName = trimmedName
       if (collectionSelection.value.visibility) body.collectionVisibility = collectionSelection.value.visibility
+      // 新建匿名合集 → 该合集下所有故事（包括第一篇这篇）都匿名
+      if (collectionSelection.value.visibility === 'anonymous') body.isAnonymous = true
     }
     const res = await fetch('/api/stories', {
       method: 'POST',

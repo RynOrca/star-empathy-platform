@@ -274,6 +274,17 @@ export function createStar(
   // 主星：优先取 catalogStarId，否则取 catalogStarIds 第一个
   const effectiveCatalogStarId = catalogStarId ?? (catalogStarIds?.length ? catalogStarIds[0] : undefined);
 
+  // ══════ 合集私密性 = 故事私密性（后端兜底加固，防前端绕过或字段缺失）══════
+  //   - anonymous 合集：故事强制 is_anonymous=1（对外隐藏作者），覆盖前端入参
+  //   - public/private/galaxy：前端入参为主，合集层后续用 collection.visibility 控制可见性
+  let effectiveIsAnonymous = isAnonymous ? 1 : 0;
+  if (collectionId != null) {
+    try {
+      const coll = db.prepare('SELECT visibility FROM collections WHERE id = ?').get(collectionId) as { visibility?: string } | undefined;
+      if (coll?.visibility === 'anonymous') effectiveIsAnonymous = 1;
+    } catch { /* 合集不存在等异常 → 保留前端入参，不让 insert 失败 */ }
+  }
+
   const stmt = db.prepare(`
     INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags, collection_id)
     VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -287,7 +298,7 @@ export function createStar(
     location?.lng ?? null,
     userId ?? null,
     primaryTag,
-    isAnonymous ? 1 : 0,
+    effectiveIsAnonymous,
     imageUrl ?? null,
     tagsJson,
     collectionId ?? null,

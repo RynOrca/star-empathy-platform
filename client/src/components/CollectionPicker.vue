@@ -6,11 +6,31 @@
       <template v-else-if="mode === 'existing' && selectedId">
         <span class="cp-dot" :style="{ background: selectedColor }"></span>
         <Library :size="11" class="cp-icon" />
-        <span class="cp-cur-name">{{ selectedName }}</span>
+        <!-- ═══ [合集名 + icon + 可见性中文字] 同一小组紧贴，和右侧 arrow 分离 ═══ -->
+        <span class="cp-cur-title">
+          <span class="cp-cur-name">{{ selectedName }}</span>
+          <span class="cp-vis-tag cp-vis-tag--sm" :class="visClass(selectedCollection?.visibility)">
+            <Globe v-if="selectedCollection?.visibility === 'public'" :size="9" />
+            <Ghost v-else-if="selectedCollection?.visibility === 'anonymous'" :size="9" />
+            <Galaxy v-else-if="selectedCollection?.visibility === 'galaxy'" :size="9" />
+            <Lock v-else :size="9" />
+            <span>{{ visLabel(selectedCollection?.visibility) }}</span>
+          </span>
+        </span>
       </template>
       <template v-else-if="mode === 'new'">
         <Plus :size="11" class="cp-icon" />
-        <span class="cp-cur-name">新建：{{ newName || '未命名' }}</span>
+        <!-- ═══ 新建模式同样：名字紧跟 icon+中文字 ═══ -->
+        <span class="cp-cur-title">
+          <span class="cp-cur-name">新建：{{ newName || '未命名' }}</span>
+          <span class="cp-vis-tag cp-vis-tag--sm" :class="visClass(newVisibility)">
+            <Globe v-if="newVisibility === 'public'" :size="9" />
+            <Ghost v-else-if="newVisibility === 'anonymous'" :size="9" />
+            <Galaxy v-else-if="newVisibility === 'galaxy'" :size="9" />
+            <Lock v-else :size="9" />
+            <span>{{ visLabel(newVisibility) }}</span>
+          </span>
+        </span>
       </template>
       <ChevronDown :size="12" class="cp-arrow" />
     </div>
@@ -19,29 +39,9 @@
     <Teleport to="body">
       <Transition name="cp-drop">
         <div v-if="open" ref="panelRef" class="cp-panel" :style="panelStyle">
-          <!-- 已有合集列表 -->
-          <div v-if="collections.length" class="cp-group">
-            <div class="cp-group-title">我的合集</div>
-            <button
-              v-for="c in collections"
-              :key="c.id"
-              type="button"
-              class="cp-opt"
-              :class="{ on: mode === 'existing' && selectedId === c.id }"
-              @click="chooseExisting(c.id)"
-            >
-              <span class="cp-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
-              <Library :size="11" class="cp-icon" />
-              <span class="cp-opt-name">{{ c.name }}</span>
-              <Lock v-if="c.visibility === 'private'" :size="9" class="cp-opt-lock" />
-              <Ghost v-else-if="c.visibility === 'anonymous'" :size="9" class="cp-opt-lock cp-opt-anon" />
-              <Galaxy v-else-if="c.visibility === 'galaxy'" :size="9" class="cp-opt-lock cp-opt-galaxy" />
-              <span class="cp-opt-count">{{ c.storyCount }}</span>
-            </button>
-          </div>
-
-          <!-- 新建合集 -->
-          <div class="cp-group cp-new-group">
+          <!-- ══════ 新建合集 · 永久置顶（包括按钮+输入框+公开/匿名/星河/私密选项） ══════ -->
+          <div class="cp-group cp-new-group cp-sticky">
+            <div class="cp-group-title cp-group-title-accent">新建合集</div>
             <button
               type="button"
               class="cp-opt"
@@ -54,19 +54,20 @@
             <Transition name="cp-expand">
               <div v-if="mode === 'new'" class="cp-new-form">
                 <input
-                ref="newInputRef"
-                v-model="newName"
-                class="cp-new-input"
-                placeholder="合集名称（如：夏夜独白）"
-                maxlength="40"
-                @keydown.enter.prevent
-              />
+                  ref="newInputRef"
+                  v-model="newName"
+                  class="cp-new-input"
+                  placeholder="合集名称（如：夏夜独白）"
+                  maxlength="40"
+                  @keydown.enter.prevent
+                />
                 <div class="cp-visi">
                   <button
                     type="button"
                     class="cp-visi-btn"
                     :class="{ on: newVisibility === 'public' }"
                     @click="newVisibility = 'public'"
+                    title="公开：所有人可见"
                   >
                     <Globe :size="10" />
                     <span>公开</span>
@@ -76,6 +77,7 @@
                     class="cp-visi-btn"
                     :class="{ on: newVisibility === 'anonymous' }"
                     @click="newVisibility = 'anonymous'"
+                    title="匿名：故事发布后不显示发布者（合集的私密性=故事的私密性）"
                   >
                     <Ghost :size="10" />
                     <span>匿名</span>
@@ -83,8 +85,19 @@
                   <button
                     type="button"
                     class="cp-visi-btn"
+                    :class="{ on: newVisibility === 'galaxy' }"
+                    @click="newVisibility = 'galaxy'"
+                    title="星河：跨合集漫游池可见（星穹金）"
+                  >
+                    <Galaxy :size="10" />
+                    <span>星河</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="cp-visi-btn"
                     :class="{ on: newVisibility === 'private' }"
                     @click="newVisibility = 'private'"
+                    title="私有：仅自己可见"
                   >
                     <Lock :size="10" />
                     <span>私有</span>
@@ -92,6 +105,40 @@
                 </div>
               </div>
             </Transition>
+          </div>
+
+          <!-- ══════ 已有合集 · 列表区（滚动时不会带跑上方置顶的新建区） ══════ -->
+          <div v-if="collections.length" class="cp-group cp-list">
+            <div class="cp-group-title">我的合集（全部可见）</div>
+            <button
+              v-for="c in collections"
+              :key="c.id"
+              type="button"
+              class="cp-opt"
+              :class="{ on: mode === 'existing' && selectedId === c.id }"
+              @click="chooseExisting(c.id)"
+            >
+              <span class="cp-dot" :style="{ background: c.coverColor || '#E8B86D' }"></span>
+              <Library :size="11" class="cp-icon" />
+              <!-- ══════ [合集名 + icon + 可见性中文字] 作为一个紧贴的小组，和 count 两端分离 ══════ -->
+              <span class="cp-opt-title">
+                <span class="cp-opt-name">{{ c.name }}</span>
+                <!-- ══ icon + 中文字紧跟名字后面（小组内 gap 2px → 真正贴着标题） ══ -->
+                <span class="cp-vis-tag cp-vis-tag--list" :class="visClass(c.visibility)">
+                  <Globe v-if="c.visibility === 'public'" :size="9" />
+                  <Ghost v-else-if="c.visibility === 'anonymous'" :size="9" />
+                  <Galaxy v-else-if="c.visibility === 'galaxy'" :size="9" />
+                  <Lock v-else :size="9" />
+                  <span>{{ visLabel(c.visibility) }}</span>
+                </span>
+              </span>
+              <span class="cp-opt-count">{{ c.storyCount }}</span>
+            </button>
+          </div>
+          <!-- 空状态：没有任何合集 -->
+          <div v-else class="cp-group cp-list">
+            <div class="cp-group-title">我的合集（空）</div>
+            <div class="cp-opt cp-opt-empty">还没有合集，在上方新建第一个吧。</div>
           </div>
         </div>
       </Transition>
@@ -105,7 +152,29 @@ import { Library, Lock, Plus, ChevronDown, Globe, Ghost, Sparkles } from 'lucide
 const Galaxy = Sparkles
 import { useCollections, type Collection, type CollectionVisibility } from '../composables/useCollections'
 
-type Mode = 'none' | 'existing' | 'new'
+export type Mode = 'none' | 'existing' | 'new'
+export type ColVisLabel = 'public' | 'private' | 'anonymous' | 'galaxy'
+
+/* ══ 可见性 → 中文字标签（合集名后/顶部选中行都用） ══ */
+function visLabel(v: unknown): string {
+  switch (v) {
+    case 'public': return '公开'
+    case 'anonymous': return '匿名'
+    case 'galaxy': return '星河'
+    case 'private': return '私有'
+    default: return '公开'
+  }
+}
+/* ══ 可见性 → 胶囊修饰类（控制 4 档颜色：蓝/蓝灰/金/紫灰锁） ══ */
+function visClass(v: unknown): string {
+  switch (v) {
+    case 'public': return 'cp-vis-tag--public'
+    case 'anonymous': return 'cp-vis-tag--anon'
+    case 'galaxy': return 'cp-vis-tag--galaxy'
+    case 'private': return 'cp-vis-tag--private'
+    default: return 'cp-vis-tag--public'
+  }
+}
 
 const props = defineProps<{
   modelValue: { collectionId?: number; collectionName?: string; visibility?: CollectionVisibility } | null
@@ -224,7 +293,11 @@ function chooseExisting(id: number) {
   mode.value = 'existing'
   selectedId.value = id
   newName.value = ''
-  emit('update:modelValue', { collectionId: id })
+  // ══ 合集私密性 = 故事私密性 ══
+  //    选已有合集时，把该合集的 visibility 一起放进 modelValue emit，
+  //    这样外部 StoryForm 能直接拿到 visibility → 派生前 body.isAnonymous / 传 collectionVisibility。
+  const c = collections.value.find((x) => x.id === id)
+  emit('update:modelValue', { collectionId: id, visibility: c?.visibility })
   open.value = false
 }
 
@@ -296,11 +369,62 @@ watch(() => props.modelValue, (v) => {
 .cp-select:hover { border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); }
 .cp-select.active { border-color: rgba(255, 217, 138, 0.28); background: rgba(255, 217, 138, 0.035); }
 .cp-placeholder { color: rgba(255, 255, 255, 0.36); }
-.cp-cur-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 顶部行的箭头永远贴最右，靠下面的 margin-left:auto 管，名字不再强制列宽 */
 .cp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .cp-icon { color: rgba(255, 255, 255, 0.5); flex-shrink: 0; }
-.cp-arrow { margin-left: auto; color: rgba(255, 255, 255, 0.34); transition: transform .18s ease; }
+.cp-arrow { margin-left: auto; color: rgba(255, 255, 255, 0.34); transition: transform .18s ease; flex-shrink: 0; }
 .cp-select.active .cp-arrow { transform: rotate(180deg); }
+
+/* ══ [合集名 + icon + 可见性中文字] 紧贴小组 wrapper ══
+   flex: 0 1 auto → 绝对不占多余空间，多宽就是多宽，不会"伸满中间"
+   这样它和左边 Library icon 之间的 8px 父 gap 是图标到标题的距离，
+   标题内部（名 ↔ 可见性）空 5px 空隙（不贴成一坨，也不表格空一大段）。
+   右边 count 用 margin-left:auto 直接贴最右，跟它没关系 → 不再三列表格 */
+.cp-cur-title,
+.cp-opt-title {
+  display: inline-flex;
+  align-items: baseline;     /* 跟名字用同一条基线，就是同一段文字 */
+  gap: 5px;                  /* 名字 → 可见性标签 5px 空隙（不贴成一坨，也不表格空一大段） */
+  flex: 0 1 auto;            /* 不 grow 撑满中间；允许 shrink 被挤时名字出省略号 */
+  min-width: 0;              /* 允许内部 ellipsis 生效 */
+  overflow: hidden;
+}
+
+/* ══ 可见性"标签"：icon + 中文字 嵌在标题里（同一段字，无框无背景） ══ */
+.cp-vis-tag {
+  display: inline-flex;
+  align-items: baseline;     /* 跟同段文字基线对齐 */
+  gap: 2px;                  /* icon ↔ 中文字 2px */
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;            /* 再挤也不把 icon+中文字 挤没 */
+  white-space: nowrap;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  margin-left: 10px;
+}
+/* 列表行 / 顶部行 同一个字号 */
+.cp-vis-tag--list,
+.cp-vis-tag--sm { font-size: 12.5px; }
+/* 4 色语义色（饱和度中等偏低，不会当独立 UI 块，就是标题中的修饰色字） */
+.cp-vis-tag--public   { color: rgba(140, 214, 255, 0.76); }   /* 公开：柔蓝 */
+.cp-vis-tag--anon     { color: rgba(169, 189, 255, 0.80); }   /* 匿名：柔蓝灰 */
+.cp-vis-tag--galaxy   { color: rgba(232, 184, 109, 0.86); }   /* 星河：浅金 */
+.cp-vis-tag--private  { color: rgba(255, 255, 255, 0.48); }   /* 私有：浅灰 */
+
+/* ══ 标题名字：和可见性同段文字，不再有外层 max-width 列宽限制 ══ */
+.cp-cur-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 0; margin-right: 0; }
+.cp-opt-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 0;
+  margin-right: 0;
+}
 
 /* ═══ Teleport 到 body 后，不再依赖父级 relative，也不再被父容器 overflow 裁剪 ═══ */
 .cp-panel {
@@ -334,12 +458,37 @@ watch(() => props.modelValue, (v) => {
 }
 .cp-group { padding: 4px 0; border-top: 0.5px solid rgba(255, 255, 255, 0.05); }
 .cp-group:first-of-type { border-top: none; }
+/* ══ 新建合集整段（标题+按钮+输入框+4 档私密选项）永久置顶 ══
+   滚动已有合集列表时，新建区始终粘在下拉面板顶部，不会被滚走。
+   背景与 backdrop-filter 故意与 cp-panel 一致，并加底部细分割视觉隔离。 */
+.cp-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -6px -6px 0;
+  padding: 6px;
+  padding-bottom: 8px;
+  background: inherit;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
 .cp-group-title {
   padding: 6px 12px 4px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.32);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+/* 新建合集标题用金色强调，跟"我的合集"灰色标题区分等级 */
+.cp-group-title-accent {
+  color: rgba(255, 217, 138, 0.62);
+  letter-spacing: 0.1em;
+}
+.cp-list {
+  max-height: 100%;
 }
 .cp-opt {
   display: flex;
@@ -359,18 +508,27 @@ watch(() => props.modelValue, (v) => {
 }
 .cp-opt:hover { background: rgba(255, 255, 255, 0.05); }
 .cp-opt.on { background: rgba(255, 217, 138, 0.10); color: #ffe5a8; }
-.cp-opt-empty { color: rgba(255, 255, 255, 0.5); }
-.cp-opt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cp-opt-lock { color: rgba(255, 255, 255, 0.3); }
-.cp-opt-lock.cp-opt-anon    { color: rgba(169, 189, 255, 0.74); }   /* 匿名：灰蓝面具 */
-.cp-opt-lock.cp-opt-galaxy  { color: rgba(232, 184, 109, 0.86); }   /* 星河：星穹金 */
+.cp-opt-empty { color: rgba(255, 255, 255, 0.5); cursor: default; }
+/* 列表项布局：色点·Library icon → [标题格子(名字+可见性紧贴)] → 故事数(最右，margin-left:auto) */
+.cp-opt .cp-icon       { color: rgba(255, 255, 255, 0.5); flex-shrink: 0; }
+.cp-opt .cp-dot        { color: initial; flex-shrink: 0; } /* dot 用 style 色，不受 icon 颜色影响 */
+/* ❌ 旧 max-width:42% 已经删除（它会强制名字 42% 宽，可见性被推到中间，像三列表格）
+   现在由外层小组 wrapper 管理空间，长名字只在小组内自由省略号，不影响可见性位置 */
 .cp-opt-count {
+  margin-left: auto;     /* 有它就永远最右贴边，不用计算弹性 */
+  flex-shrink: 0;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.3);
   font-variant-numeric: tabular-nums;
 }
+/* 保留旧选择器 class：cp-opt-lock（仍作为小 icon 独用时的 class，虽然目前列表里不用单个 icon 了，但兼容外部 */
+.cp-opt-lock { color: rgba(255, 255, 255, 0.3); }
+.cp-opt-public             { color: rgba(140, 214, 255, 0.7); }    /* 公开：蓝 globe */
+.cp-opt-lock.cp-opt-anon   { color: rgba(169, 189, 255, 0.74); }   /* 匿名：灰蓝面具 */
+.cp-opt-lock.cp-opt-galaxy { color: rgba(232, 184, 109, 0.86); }   /* 星河：星穹金 */
+.cp-opt-lock.cp-opt-public { color: rgba(140, 214, 255, 0.7); }
 
-.cp-new-group { border-top: 0.5px solid rgba(255, 255, 255, 0.05); }
+.cp-new-group { /* 兼容仅 .cp-new-group 选择器路径 */ }
 .cp-new-form {
   padding: 6px 8px 8px;
   display: flex;
@@ -389,16 +547,23 @@ watch(() => props.modelValue, (v) => {
   font-size: 13px;
   outline: none;
 }
-.cp-new-input:focus { border-color: rgba(255, 217, 138, 0.28); }
+.cp-new-input:focus { border-color: rgba(255, 217, 138, 0.28); background: rgba(255, 255, 255, 0.055); }
 .cp-new-input::placeholder { color: rgba(255, 255, 255, 0.26); }
-.cp-visi { display: flex; gap: 6px; }
+/* 4 档可见性按钮：公开/匿名/星河/私密
+   flex-wrap + gap，宽度不够时 4 个会自动 2+2 换行，永远不挤字 */
+.cp-visi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .cp-visi-btn {
-  flex: 1;
+  flex: 1 1 calc(50% - 3px);
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 7px 0;
+  padding: 7px 6px;
   border-radius: 8px;
   border: 0.5px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.028);
@@ -407,12 +572,12 @@ watch(() => props.modelValue, (v) => {
   font-size: 12px;
   cursor: pointer;
   transition: all .15s ease;
+  white-space: nowrap;
 }
-.cp-visi-btn.on {
-  background: rgba(255, 217, 138, 0.10);
-  border-color: rgba(255, 217, 138, 0.28);
-  color: #ffe5a8;
-}
+.cp-visi-btn:nth-child(1).on { background: rgba(140, 214, 255, 0.10); border-color: rgba(140, 214, 255, 0.28); color: rgba(180, 228, 255, 0.96); } /* 公开蓝 */
+.cp-visi-btn:nth-child(2).on { background: rgba(169, 189, 255, 0.10); border-color: rgba(169, 189, 255, 0.3); color: rgba(200, 216, 255, 0.96); } /* 匿名蓝灰 */
+.cp-visi-btn:nth-child(3).on { /* 星河金 */ background: rgba(232, 184, 109, 0.12); border-color: rgba(255, 217, 138, 0.32); color: #ffe5a8; }
+.cp-visi-btn:nth-child(4).on { /* 私密锁紫灰 */ background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.22); color: rgba(255, 255, 255, 0.92); }
 
 .cp-drop-enter-active, .cp-drop-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .cp-drop-enter-from, .cp-drop-leave-to { opacity: 0; transform: translateY(-4px); }
