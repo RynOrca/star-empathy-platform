@@ -9,6 +9,31 @@ interface SeedStory {
   origin: string | null;
 }
 
+/**
+ * 稳定哈希：基于故事标题+内容产出 32bit 正整数，
+ * 保证同一内容每次 seed 得到完全相同的计数，
+ * 不再是 Math.random() 的"随机假数据"。
+ */
+function stableHash32(input: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function stableSeedCounts(item: { title: string; content: string }): {
+  resonance: number;
+  viewCount: number;
+} {
+  const seed = stableHash32(item.title + '\u0001' + item.content);
+  // 共鸣 40 ~ 199（稳定映射，同一内容永远一样）
+  const resonance = 40 + (seed % 160);
+  // 浏览量 按共鸣的 2.2~3.6 倍估算，和真实产品的自然比例一致
+  const viewBase = Math.floor(resonance * (2.2 + ((seed >>> 8) % 140) / 100));
+  return { resonance, viewCount: viewBase };
+}
+
 // 冷启动数据：古诗词 + 星座神话（中/希/埃/巴比伦）+ 社区语录
 // 每条绑定一颗真实的星表恒星（catalog_star_id ←→ stars.json）
 //
@@ -1107,17 +1132,17 @@ function seed() {
   console.log('  已清除旧的历史星数据');
 
   const insert = db.prepare(`
-    INSERT INTO stars (type, title, content, resonance_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
-    VALUES ('history', ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, resonance_count, view_count, pos_x, pos_y, pos_z, catalog_star_id, origin)
+    VALUES ('history', ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const item of seedData) {
-    const resonance = Math.floor(Math.random() * 195) + 5; // 5~200
-    const content = item.content.length > 300
-      ? item.content.substring(0, 297) + '...'
+    const { resonance, viewCount } = stableSeedCounts(item);
+    const content = item.content.length > 2000
+      ? item.content.substring(0, 1997) + '...'
       : item.content;
     const pos = generatePosition();
-    const result = insert.run(item.title, content, resonance, pos.x, pos.y, pos.z, item.catalog_star_id, item.origin);
+    const result = insert.run(item.title, content, resonance, viewCount, pos.x, pos.y, pos.z, item.catalog_star_id, item.origin);
     const storyId = result.lastInsertRowid as number;
 
     // 写入连接表

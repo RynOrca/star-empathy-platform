@@ -6,13 +6,50 @@
     <template v-else>
       <!-- 1. Topbar 固定导航 -->
       <header class="pd-topbar">
-        <button class="pd-back-btn" @click="goBack">← BACK TO SKY</button>
+        <button class="pd-back-btn pd-action-btn" @click="goBack">
+          <span class="pd-roman">Ⅰ</span><span class="pd-action-sep">·</span><span class="pd-action-label">返航</span>
+        </button>
         <div class="pd-brand">STARRY · DOME</div>
-        <div class="pd-actions">
-          <button class="pd-back-btn" @click="startEditSig">✎ 编辑签名</button>
-          <button class="pd-back-btn" @click="clearAndClosePwdModal(); showPwdModal = true">⚙ 修改密码</button>
+        <!-- PC 端：4 个独立按钮 -->
+        <div class="pd-actions pd-actions-pc">
+          <button class="pd-back-btn pd-action-btn" @click="startEditSig">
+            <span class="pd-roman">Ⅱ</span><span class="pd-action-sep">·</span><span class="pd-action-label">题刻</span>
+          </button>
+          <button class="pd-back-btn pd-action-btn" @click="clearAndClosePwdModal(); showPwdModal = true">
+            <span class="pd-roman">Ⅲ</span><span class="pd-action-sep">·</span><span class="pd-action-label">密钥</span>
+          </button>
+          <button class="pd-back-btn pd-action-btn pd-logout-trigger" @click="showLogoutModal = true">
+            <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">离开</span>
+          </button>
         </div>
+        <!-- 移动端：单设置按钮触发弹窗（合并 Ⅱ Ⅲ Ⅳ） -->
+        <button class="pd-back-btn pd-action-btn pd-settings-trigger" @click="showSettingsModal = true">
+          <span class="pd-roman">Ⅱ Ⅲ Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-action-label">设置</span>
+        </button>
       </header>
+
+      <!-- 移动端设置弹窗（题刻/密钥/离开） -->
+      <Transition name="pd-modal">
+      <div v-if="showSettingsModal" class="pd-modal-mask" @click.self="showSettingsModal = false">
+        <div class="pd-modal-panel pd-modal-sm pd-settings-sheet">
+          <header class="pd-modal-head">
+            <h3>· STELLAR SETTINGS ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="showSettingsModal = false">×</button>
+          </header>
+          <main class="pd-modal-body pd-settings-list">
+            <button class="pd-settings-item" @click="showSettingsModal = false; startEditSig()">
+              <span class="pd-roman">Ⅱ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">题刻签名</span>
+            </button>
+            <button class="pd-settings-item" @click="showSettingsModal = false; clearAndClosePwdModal(); showPwdModal = true">
+              <span class="pd-roman">Ⅲ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">重铸密钥</span>
+            </button>
+            <button class="pd-settings-item pd-settings-leave" @click="showSettingsModal = false; showLogoutModal = true">
+              <span class="pd-roman">Ⅳ</span><span class="pd-action-sep">·</span><span class="pd-settings-item-label">离开星穹</span>
+            </button>
+          </main>
+        </div>
+      </div>
+      </Transition>
 
       <!-- 2. Hero 区 100vh -->
       <section class="pd-hero">
@@ -33,6 +70,10 @@
             <span class="pd-gold-sep">◆</span>
             <span>加入星空 {{ daysAgo }} 天</span>
             <span class="pd-gold-sep">◆</span>
+          </div>
+          <div class="pd-hero-email">
+            <span class="pd-gold-sep">◆</span>
+            <span>{{ user?.email || '未绑定邮箱（无法找回密钥）' }}</span>
           </div>
         </div>
         <div class="pd-scroll-hint">
@@ -93,7 +134,15 @@
                 </div>
                 <p class="pd-t-body">{{ s.content }}</p>
                 <div class="pd-t-foot">
-                  <span v-if="s.tag" class="pd-t-tag" :class="'tag-' + s.tag">{{ s.tag }}</span>
+                  <template v-if="displayStoryTags(s).length">
+                    <span
+                      v-for="t in displayStoryTags(s)"
+                      :key="'tag-' + s.id + '-' + t"
+                      class="pd-t-tag"
+                      :style="tagStyle(t)"
+                    >#{{ t }}</span>
+                  </template>
+                  <span class="pd-t-sep" v-if="displayStoryTags(s).length && (s.resonanceCount || 0) > 0"></span>
                   <span class="pd-t-res">{{ s.resonanceCount || 0 }} 共鸣</span>
                 </div>
               </button>
@@ -114,6 +163,29 @@
           <button v-if="visibleCount < stories.length" class="pd-btn-expand" @click="expandStories">展开更多故事</button>
           <button v-else-if="hasMore" class="pd-btn-expand" @click="loadAndExpandNext5">加载并展开下一组</button>
         </div>
+      </section>
+
+      <!-- 星笺 Section · 合集管理 -->
+      <section id="pd-collections" class="pd-collections-section" aria-label="我的星笺合集">
+        <div class="pd-section-head pd-section-head-with-action">
+          <div class="pd-section-head-main">
+            <h2>我的星笺 · FOLIO</h2>
+            <p>—— 把散落的故事收进合集，让它们彼此呼应 ——</p>
+          </div>
+          <button type="button" class="pd-goto-square" @click="$router.push('/folios')" title="穹庭书局 · 星笺广场">
+            <BookMarked :size="11" />
+            <span>去穹庭书局逛逛 →</span>
+          </button>
+        </div>
+        <CollectionGrid
+          :collections="collections"
+          :loading="collectionsLoading"
+          :error="collectionsError"
+          @create="openCreateCollection"
+          @open="openCollectionDetail"
+          @edit="openEditCollection"
+          @delete="deleteCollectionWithConfirm"
+        />
       </section>
 
       <section id="pd-constellation" class="pd-constellation-section" aria-label="我的私人星座">
@@ -273,6 +345,7 @@
       </div>
 
       <!-- 修改密码弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="showPwdModal" class="pd-modal-mask" @click.self="clearAndClosePwdModal">
         <div class="pd-modal-panel">
           <header class="pd-modal-head">
@@ -302,14 +375,36 @@
           </footer>
         </div>
       </div>
+      </Transition>
+
+      <!-- 退出登录确认弹窗 -->
+      <Transition name="pd-modal">
+      <div v-if="showLogoutModal" class="pd-modal-mask" @click.self="showLogoutModal = false">
+        <div class="pd-modal-panel pd-modal-sm">
+          <header class="pd-modal-head">
+            <h3>· 确认离开星穹 ·</h3>
+            <button type="button" class="pd-modal-close" aria-label="关闭" @click="showLogoutModal = false">×</button>
+          </header>
+          <main class="pd-modal-body">
+            <p class="pd-modal-hint">退出后需重新登录才能查看你的故事与星座。<br />未保存的草稿将随星风消散。</p>
+          </main>
+          <footer class="pd-modal-foot">
+            <button type="button" class="pd-back-btn" @click="showLogoutModal = false">留在星空</button>
+            <button type="button" class="pd-btn-danger" @click="handleLogout" :disabled="logoutLoading">
+              {{ logoutLoading ? '正在离开...' : '确认退出' }}
+            </button>
+          </footer>
+        </div>
+      </div>
+      </Transition>
 
       <!-- 故事详情弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="activeStory" class="pd-modal-mask" @click.self="activeStory = null">
         <div class="pd-modal-panel pd-story-panel">
           <header class="pd-modal-head">
             <div class="pd-story-head-title">
               <h3>{{ activeStory.title || '未命名故事' }}</h3>
-              <span v-if="activeStory.tag" class="pd-t-tag" :class="'tag-' + activeStory.tag">{{ activeStory.tag }}</span>
             </div>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="activeStory = null">×</button>
           </header>
@@ -334,6 +429,27 @@
               <img v-if="activeStory.imageUrl" :src="activeStory.imageUrl" class="pd-story-image" alt="故事图片" />
               {{ activeStory.content }}
             </div>
+            <!-- 合集归属：正文下方、标签行上方（详情弹窗用大号徽章，显示标题+故事数，可点击） -->
+            <div v-if="activeStory.collectionName" class="pd-story-collection-row">
+              <CollectionBadge
+                :collection-name="activeStory.collectionName"
+                :cover-color="activeStory.collectionCoverColor ?? null"
+                :collection-visibility="activeStory.collectionVisibility ?? null"
+                :collection-story-count="activeStory.collectionStoryCount ?? null"
+                :clickable="!!activeStory.collectionId"
+                size="md"
+                @click="openCollectionFromStory(activeStory)"
+              />
+            </div>
+            <!-- 详情标签行：正文下方、弹窗 footer 上方，空时隐藏 -->
+            <div v-if="displayStoryTags(activeStory).length" class="pd-story-tags">
+              <span
+                v-for="t in displayStoryTags(activeStory)"
+                :key="'dtag-' + activeStory.id + '-' + t"
+                class="pd-t-tag"
+                :style="tagStyle(t)"
+              >#{{ t }}</span>
+            </div>
           </main>
           <footer class="pd-modal-foot">
             <button type="button" class="pd-back-btn" @click="resonateStory">共鸣 +1</button>
@@ -341,10 +457,12 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- 删除确认弹窗 -->
+      <Transition name="pd-modal">
       <div v-if="showDeleteConfirm" class="pd-modal-mask" @click.self="showDeleteConfirm = false">
-        <div class="pd-modal-panel" style="width: 400px;">
+        <div class="pd-modal-panel pd-modal-sm">
           <header class="pd-modal-head">
             <h3>· 摘取故事 · REMOVE ·</h3>
             <button type="button" class="pd-modal-close" aria-label="关闭" @click="showDeleteConfirm = false">×</button>
@@ -360,6 +478,7 @@
           </footer>
         </div>
       </div>
+      </Transition>
 
       <!-- Gold flash banner -->
       <Transition name="pd-flash">
@@ -367,6 +486,30 @@
           <span>{{ flash.text }}</span>
         </div>
       </Transition>
+
+      <!-- 星笺编辑/新建弹窗 -->
+      <CollectionEditModal
+        :show="showCollectionEdit"
+        :collection="editingCollection"
+        :submitting="collectionSubmitting"
+        :error="collectionEditError"
+        @close="showCollectionEdit = false"
+        @submit="handleCollectionSubmit"
+      />
+
+      <!-- 星笺详情（点击合集卡 / 故事 Badge 时打开） -->
+      <CollectionDetail
+        v-if="showCollectionDetail"
+        :collection-id="collectionDetailId"
+        :collections="collections"
+        :current-user-id="user?.id ?? null"
+        :is-owner="collectionDetailIsOwner"
+        @close="showCollectionDetail = false"
+        @story-click="onCollectionStoryClick"
+        @edit="handleCollectionDetailEdit"
+        @delete="deleteCollectionWithConfirm"
+        @collection-switch="onCollectionSwitchFromDetail"
+      />
     </template>
   </div>
 </template>
@@ -374,16 +517,50 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star } from 'lucide-vue-next'
+import { Star, BookMarked } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
-import catalogData from '../data/stars.json'
+import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
+import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
+import CollectionBadge from '../components/CollectionBadge.vue'
+import CollectionGrid from '../components/CollectionGrid.vue'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
+import CollectionDetail from '../components/CollectionDetail/index.vue'
+import { useCollections, type Collection, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
+
+/** 开放标签 hash 染色工具 */
+function _hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 供模板调用：tag → { color, borderColor, backgroundColor, border } */
+function tagStyle(tag: string | null | undefined): Record<string, string> {
+  if (!tag) return {}
+  const h = Math.abs(_hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.30)`
+  const bg = `hsla(${h}, 62%, 74%, 0.05)`
+  return { color, borderColor: border, backgroundColor: bg, border: '1px solid ' + border }
+}
+
+/** 故事展示用：统一取 tags[]，空时退回 tag 单列（旧数据兼容），最多 5 条 */
+function displayStoryTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
+}
 
 const PAGE_SIZE = 20
 const VISIBLE_STEP = 5
 
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const { logout } = useAuth()
 // 解构出 pause/resume：卡片 hover 时暂停 canvas，把主线程完整让给 CSS transition 跑 0.5s
 const { pause: pauseSky, resume: resumeSky } = useParticleSky(canvasRef)
 // hover 计数器（防止鼠标在多张卡片间快速移动时 canvas 被反复 pause/resume）
@@ -402,7 +579,7 @@ interface FavoriteItem {
   createdAt?: string
 }
 const loaded = ref(false)
-const user = ref<{ id: number; username: string; signature: string; createdAt: string } | null>(null)
+const user = ref<{ id: number; username: string; email: string; signature: string; createdAt: string } | null>(null)
 const stories = ref<any[]>([])
 const favorites = ref<FavoriteItem[]>([])
 const stats = ref({ storyCount: 0, totalResonance: 0, resonanceGivenCount: 0, favoriteCount: 0 })
@@ -419,6 +596,131 @@ const pwdError = ref('')
 const oldPwd = ref('')
 const newPwd = ref('')
 const confirmPwd = ref('')
+
+// ─── 退出登录 ───
+const showLogoutModal = ref(false)
+const logoutLoading = ref(false)
+// 移动端设置弹窗
+const showSettingsModal = ref(false)
+
+// ─── 星笺（合集）状态 ───
+const {
+  list: collections,
+  loading: collectionsLoading,
+  error: collectionsError,
+  fetchList: fetchCollections,
+  create: createCollection,
+  update: updateCollection,
+  remove: removeCollection,
+} = useCollections()
+const showCollectionEdit = ref(false)
+const editingCollection = ref<Collection | null>(null)
+const collectionSubmitting = ref(false)
+const collectionEditError = ref<string | null>(null)
+const showCollectionDetail = ref(false)
+const collectionDetailId = ref<number | null>(null)
+const collectionDetailIsOwner = ref(false)
+
+async function handleCollectionSubmit(payload: {
+  isEdit: boolean
+  id?: number
+  data: CreateCollectionInput | UpdateCollectionInput
+}) {
+  collectionSubmitting.value = true
+  collectionEditError.value = null
+  try {
+    if (payload.isEdit && payload.id != null) {
+      const ok = await updateCollection(payload.id, payload.data as UpdateCollectionInput)
+      if (!ok) {
+        collectionEditError.value = '保存失败，请重试'
+        return
+      }
+      showFlash('星笺已更新', 'success')
+    } else {
+      const created = await createCollection(payload.data as CreateCollectionInput)
+      if (!created) {
+        collectionEditError.value = '创建失败，请重试'
+        return
+      }
+      showFlash('星笺已创建', 'success')
+    }
+    showCollectionEdit.value = false
+    editingCollection.value = null
+  } finally {
+    collectionSubmitting.value = false
+  }
+}
+
+function openCreateCollection() {
+  editingCollection.value = null
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+}
+
+function openEditCollection(c: Collection) {
+  editingCollection.value = c
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+  // 关闭详情弹窗，避免叠加
+  showCollectionDetail.value = false
+}
+
+async function deleteCollectionWithConfirm(c: Collection) {
+  if (typeof window !== 'undefined' && !window.confirm(`确认删除星笺「${c.name}」？\n合集内的故事会保留，但不再归属此合集。`)) return
+  const ok = await removeCollection(c.id)
+  if (ok) {
+    showFlash('星笺已删除', 'success')
+    // 若正在查看该合集详情，关闭
+    if (collectionDetailId.value === c.id) {
+      showCollectionDetail.value = false
+      collectionDetailId.value = null
+    }
+  } else {
+    showFlash('删除失败，请重试', 'error')
+  }
+}
+
+function openCollectionDetail(c: Collection) {
+  collectionDetailId.value = c.id
+  collectionDetailIsOwner.value = true // ProfilePage 列表中都是自己的合集
+  showCollectionDetail.value = true
+}
+
+/** 从故事卡片的 CollectionBadge 点击进入合集详情 */
+function openCollectionFromStory(story: any) {
+  const cid = story.collectionId
+  if (cid == null) return
+  collectionDetailId.value = cid
+  // 自己的故事合集可能是自己所有（编辑按钮显隐由 CollectionDetailModal 内部判断）
+  collectionDetailIsOwner.value = !!user.value && story.userId === user.value.id
+  showCollectionDetail.value = true
+}
+
+async function handleCollectionDetailEdit(c: any) {
+  // 来自 CollectionDetail 的编辑事件：c 已含合集字段
+  openEditCollection(c as Collection)
+}
+
+/** 合集详情内切换到另一个合集 */
+function onCollectionSwitchFromDetail(id: number) {
+  collectionDetailId.value = id
+}
+
+/** 从星笺详情点击单条故事：故事已在 CollectionDetail 内联展示，此回调仅做通知 */
+function onCollectionStoryClick(_story: any) {
+  // no-op：故事详情已在 CollectionDetail 内部展示
+}
+
+async function handleLogout() {
+  logoutLoading.value = true
+  try {
+    await logout()
+  } finally {
+    logoutLoading.value = false
+    showLogoutModal.value = false
+    router.push('/')
+  }
+}
 
 async function updatePassword() {
   pwdError.value = ''
@@ -547,13 +849,11 @@ const daysAgo = computed(() => {
 
 function formatDate(d: string) { if (!d) return ''; return d.slice(0, 16).replace('T', ' ') }
 
-interface CatalogStarLite { name: string; con: string; mag: number; color: string }
-const starLookup = new Map<number, CatalogStarLite>()
-for (const s of catalogData.stars) starLookup.set(s.id, { name: s.name || `${s.con || ''} #${s.id}`, con: s.con || '', mag: s.mag, color: s.color || '#fff' })
-function getStarName(id: number) { return starLookup.get(id)?.name || `星星 #${id}` }
-function getStarCon(id: number) { const c = starLookup.get(id)?.con; return c ? (constellationNames[c] || c) : '' }
-function getStarMag(id: number) { return starLookup.get(id)?.mag ?? null }
-function getStarColor(id: number) { return starLookup.get(id)?.color || '#ffffff' }
+// 星名/元信息查找走共享工具（合并 stars.json 恒星 + planets.ts 行星），修复收藏行星显示「星星 #-100」(issue #135)
+function getStarName(id: number) { return getStarDisplayName(id) }
+function getStarCon(id: number) { const c = getStarNameInfo(id)?.con; return c ? (constellationNames[c] || c) : '' }
+function getStarMag(id: number) { return getStarNameInfo(id)?.mag ?? null }
+function getStarColor(id: number) { return getStarNameInfo(id)?.color || '#ffffff' }
 
 function goToStar(starId: number) { router.push({ path: '/sky', query: { star: String(starId) } }) }
 
@@ -808,16 +1108,20 @@ async function loadProfileData() {
   loadingMore.value = false
   activeStory.value = null
   visibleCount.value = VISIBLE_STEP
+  showCollectionEdit.value = false
+  showCollectionDetail.value = false
+  collectionDetailId.value = null
+  editingCollection.value = null
 
   const token = getToken()
   if (!token) { router.push('/'); return }
   try {
     const [meRes, firstPageRes, favRes, linesRes, statsRes] = await Promise.all([
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch(`/api/profile/stories?page=1&limit=${PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/kernel-lines', { headers: { Authorization: `Bearer ${token}` } }),
+      authFetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
     if (meRes.ok) user.value = meJson.data
@@ -832,14 +1136,14 @@ async function loadProfileData() {
     try { await linesRes.json() } catch { /* 静默 */ }
     const favJson = await favRes.json()
     if (favRes.ok && Array.isArray(favJson.data)) {
-      // 后端返回的是 catalog_star_id: number[]，需要用 starLookup 填充星名/星座等字段
+      // 后端返回的是 catalog_star_id: number[]，用共享工具填充星名/星座（含行星负 id）
       favorites.value = (favJson.data as number[]).map((cid) => {
-        const star = starLookup.get(cid)
+        const info = getStarNameInfo(cid)
         return {
           id: cid,
           starCatalogId: cid,
-          starName: star?.name || `星星 #${cid}`,
-          starConstellation: star ? (constellationNames[star.con] || star.con) : '',
+          starName: getStarDisplayName(cid),
+          starConstellation: info?.con ? (constellationNames[info.con] || info.con) : '',
           resonanceCount: 0,
           createdAt: '',
         } as FavoriteItem
@@ -856,6 +1160,8 @@ async function loadProfileData() {
       stats.value.favoriteCount = favorites.value.length
     }
   } catch (e) { console.error('加载失败', e) }
+  // 星笺列表异步加载，不阻塞首屏
+  fetchCollections().catch((e) => console.error('加载星笺失败', e))
   loaded.value = true
 }
 
@@ -1075,16 +1381,100 @@ onBeforeUnmount(() => {
 }
 
 .pd-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--pd-font-deco);
   font-size: 0.85rem;
   letter-spacing: 0.3em;
   color: rgba(255,217,138,0.6);
+  pointer-events: none;
 }
 
 .pd-actions {
   display: flex;
   gap: 10px;
 }
+
+/* 顶部罗马数字按钮 — 史诗编号风格 */
+.pd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--pd-font-serif);
+  white-space: nowrap;
+}
+.pd-roman {
+  font-family: var(--pd-font-deco);
+  color: var(--pd-gold);
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+}
+.pd-action-sep {
+  color: rgba(255,217,138,0.4);
+  font-size: 0.75rem;
+  margin: 0 1px;
+}
+.pd-action-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+}
+/* 退出按钮微弱警示色调 */
+.pd-logout-trigger:hover {
+  border-color: rgba(255,107,138,0.5);
+  color: #ff8b9e;
+  background: rgba(255,107,138,0.05);
+}
+.pd-logout-trigger:hover .pd-roman {
+  color: #ff8b9e;
+}
+.pd-logout-trigger:hover .pd-action-sep {
+  color: rgba(255,107,138,0.4);
+}
+
+/* 移动端设置按钮 — 默认隐藏，768px 以下显示 */
+.pd-settings-trigger { display: none; }
+
+/* 移动端设置弹窗列表项 */
+.pd-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px;
+}
+.pd-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,217,138,0.2);
+  color: #b9b4d6;
+  padding: 14px 18px;
+  font-family: var(--pd-font-serif);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+.pd-settings-item:hover {
+  border-color: rgba(255,217,138,0.5);
+  color: var(--pd-gold);
+  background: rgba(255,217,138,0.05);
+}
+.pd-settings-item-label { flex: 1; text-align: left; }
+.pd-settings-leave {
+  border-color: rgba(255,107,138,0.25);
+  color: #d6a0ad;
+}
+.pd-settings-leave:hover {
+  border-color: rgba(255,107,138,0.5);
+  color: #ff8b9e;
+  background: rgba(255,107,138,0.05);
+}
+.pd-settings-leave:hover .pd-roman { color: #ff8b9e; }
 
 /* ═══ (b) Hero 100vh ═══ */
 .pd-hero {
@@ -1185,6 +1575,19 @@ onBeforeUnmount(() => {
   letter-spacing: 0.12em;
 }
 
+/* Hero 邮箱行 — 复用 joined 风格，字号略小 */
+.pd-hero-email {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: rgba(255,217,138,0.45);
+  font-family: var(--pd-font-deco);
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+}
+
 .pd-gold-sep {
   color: var(--pd-gold);
   opacity: 0.75;
@@ -1251,6 +1654,40 @@ onBeforeUnmount(() => {
   letter-spacing: 0.1em;
   font-size: 0.85rem;
   margin: 0;
+}
+
+/* 星笺 section 头：右边的书局跳转胶囊 */
+.pd-section-head-with-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 20px;
+  text-align: left;
+  flex-wrap: wrap;
+}
+.pd-section-head-with-action .pd-section-head-main { text-align: center; flex: 1; min-width: 0; }
+.pd-goto-square {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  background: rgba(202, 167, 255, 0.12);
+  color: var(--star-purple);
+  font-family: var(--font);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+  font-weight: 600;
+  align-self: center;
+  flex-shrink: 0;
+}
+.pd-goto-square:hover {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12));
+}
+@media (max-width: 640px) {
+  .pd-section-head-with-action { flex-direction: column; align-items: center; gap: 12px; }
 }
 
 /* Stats — 严格对齐 style-a.html 的 .stats/.stat-num/.stat-label */
@@ -1466,25 +1903,53 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* Card foot */
+/* Card foot：标签在左、共鸣在右，不混在一起；紧凑分隔 */
 .pd-t-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 14px;
+  gap: 8px;
+  padding-top: 9px;
   border-top: 1px solid rgba(255,217,138,0.1);
   font-size: 0.72rem;
   color: rgba(255,217,138,0.6);
 }
-
-.pd-t-tag {
-  padding: 3px 10px;
-  border-radius: 2px;
-  border: 1px solid;
-  font-size: 0.7rem;
+/* 独立标签行：标签胶囊左侧对齐，右侧保留共鸣数；flex-wrap 避免窄屏溢出 */
+.pd-t-foot {
+  flex-wrap: wrap;
+  padding-bottom: 0;
+}
+.pd-t-sep { flex: 1; }
+.pd-t-res {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
-/* Tag 配色 — 严格对齐 style-d.html */
+/* 开放标签胶囊样式：圆角 11px，compact */
+.pd-t-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  border: 0.5px solid transparent; /* 真正的色值走 tagStyle() 内联 */
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  transition: transform .15s ease, filter .15s ease;
+}
+.pd-t-tag:hover { filter: brightness(1.06); transform: translateY(-0.3px); }
+
+/* 详情弹窗正文下方的标签行：紧凑上下虚线分隔 */
+.pd-story-tags {
+  display: flex; flex-wrap: wrap; gap: 4px 7px;
+  align-items: center;
+  padding: 6px 2px;
+  margin-top: 12px;
+  border-top: 0.5px dashed var(--pd-rule);
+  border-bottom: 0.5px dashed var(--pd-rule);
+}
+
+/* Tag 开放染色 — 旧 5 色保留作向后兼容，但新标签统一走内联 tagStyle() */
 .tag-思念, .tag-miss { color: #ff9eb8; border-color: rgba(255,158,184,0.3); background: rgba(255,158,184,0.05); }
 .tag-愿望, .tag-wish { color: var(--pd-gold); border-color: rgba(255,217,138,0.3); background: rgba(255,217,138,0.05); }
 .tag-孤独, .tag-lonely { color: #95f0c0; border-color: rgba(149,240,192,0.3); background: rgba(149,240,192,0.05); }
@@ -1726,6 +2191,23 @@ onBeforeUnmount(() => {
   animation: pd-story-flash-kf 1.4s ease-out forwards;
 }
 
+/* ═══ (e0) Collections / 星笺 Section ═══ */
+.pd-collections-section {
+  position: relative;
+  z-index: 2;
+  padding: 80px 48px 120px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* 弹窗中故事卡片合集归属行（与卡片/详情视觉位一致） */
+.pd-story-collection-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
 /* ═══ (e) Favorites Section ═══ */
 .pd-favorites-section {
   position: relative;
@@ -1872,12 +2354,25 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: pd-modal-fade-in 300ms ease-out both;
 }
 
-@keyframes pd-modal-fade-in {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+/* —— Transition：PC 端 fade + scale，移动端从底部丝滑滑入 —— */
+.pd-modal-enter-active,
+.pd-modal-leave-active {
+  transition: opacity 300ms ease;
+}
+.pd-modal-enter-from,
+.pd-modal-leave-to {
+  opacity: 0;
+}
+.pd-modal-enter-active .pd-modal-panel,
+.pd-modal-leave-active .pd-modal-panel {
+  transition: transform 360ms cubic-bezier(.2,.9,.3,1), opacity 300ms ease;
+}
+.pd-modal-enter-from .pd-modal-panel,
+.pd-modal-leave-to .pd-modal-panel {
+  opacity: 0;
+  transform: scale(0.9) translateY(24px);
 }
 
 .pd-modal-panel {
@@ -2053,6 +2548,18 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
   margin: 8px 0 0;
   font-style: italic;
+}
+
+/* 退出确认小弹窗 */
+.pd-modal-sm { max-width: 380px; }
+.pd-modal-hint {
+  font-family: var(--pd-font-serif);
+  font-size: 0.88rem;
+  line-height: 1.85;
+  color: var(--pd-text-pri);
+  text-align: center;
+  padding: 8px 0;
+  margin: 0;
 }
 
 /* Buttons */
@@ -2273,6 +2780,9 @@ onBeforeUnmount(() => {
     gap: 12px;
   }
   .pd-brand { display: none; }
+  /* 移动端：隐藏 PC 三按钮，显示单设置按钮 */
+  .pd-actions-pc { display: none; }
+  .pd-settings-trigger { display: inline-flex; }
   .pd-actions { gap: 6px; }
   .pd-back-btn { padding: 7px 12px; font-size: 0.72rem; letter-spacing: 0.05em; }
 
@@ -2282,8 +2792,34 @@ onBeforeUnmount(() => {
   .pd-hero-role { font-size: 0.6rem; letter-spacing: 0.3em; margin-bottom: 14px; }
   .pd-hero-band { padding: 8px 20px; font-size: 0.78rem; }
   .pd-hero-joined { font-size: 0.66rem; gap: 8px; margin-top: 18px; }
+  .pd-hero-email { font-size: 0.6rem; gap: 8px; margin-top: 8px; }
   .pd-scroll-hint { bottom: 36px; font-size: 0.6rem; gap: 10px; }
   .pd-scroll-line { height: 30px; }
+
+  /* 退出/设置弹窗自适应 */
+  .pd-modal-sm { max-width: 92vw; }
+  .pd-modal-hint { font-size: 0.82rem; }
+  .pd-settings-item { padding: 12px 16px; font-size: 0.82rem; }
+
+  /* —— 移动端弹窗：底部抽屉式，丝滑滑入/滑出 —— */
+  .pd-modal-mask {
+    align-items: flex-end;
+  }
+  .pd-modal-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 85vh;
+    border-radius: 18px 18px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  /* Transition：移动端从底部滑入，而非 PC 端的 scale+translateY */
+  .pd-modal-enter-from .pd-modal-panel,
+  .pd-modal-leave-to .pd-modal-panel {
+    transform: translateY(100%);
+    opacity: 1;
+  }
 
   /* Timeline section */
   .pd-timeline-section { padding: 40px 18px 80px; }
@@ -2334,6 +2870,8 @@ onBeforeUnmount(() => {
 
   /* Favorites — 移动端严格保持 grid 2 列竖直排布，不被 PC 5 列影响 */
   .pd-favorites-section { padding: 60px 18px 120px; }
+  /* 星笺 — 移动端收紧内边距 */
+  .pd-collections-section { padding: 60px 18px 100px; }
   .pd-favorites-title { font-size: 0.9rem; letter-spacing: 0.2em; margin-bottom: 40px; }
   .pd-gallery {
     display: grid !important;
@@ -2380,6 +2918,7 @@ onBeforeUnmount(() => {
   .pd-moon { width: 260px; height: 260px; }
   .pd-hero-name { font-size: 1.9rem; }
   .pd-hero-band { padding: 6px 14px; font-size: 0.7rem; }
+  .pd-hero-email { font-size: 0.54rem; }
   .pd-stat .stat-num { font-size: 2rem; }
   .pd-stat .stat-label { font-size: 0.55rem; letter-spacing: 0.08em; }
   .pd-t-card { padding: 16px 14px; }
@@ -2388,5 +2927,8 @@ onBeforeUnmount(() => {
   .pd-gal-img { height: 60px; font-size: 1.8rem; }
   .pd-gal-name { font-size: 0.72rem; }
   .pd-gal-sub { font-size: 0.55rem; }
+  /* 极窄屏弹窗按钮纵向堆叠 */
+  .pd-modal-foot { flex-direction: column; }
+  .pd-modal-foot button { width: 100%; }
 }
 </style>

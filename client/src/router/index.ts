@@ -20,6 +20,19 @@ const router = createRouter({
       component: () => import('../pages/ProfilePage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/folios',
+      name: 'folio-square',
+      component: () => import('../pages/FolioSquare.vue'),
+      meta: { requiresAuth: false }, // 访客可逛广场，只看公开/匿名/星河
+    },
+    {
+      path: '/folios/:id',
+      name: 'folio-detail',
+      component: () => import('../pages/FolioDetail.vue'),
+      meta: { requiresAuth: false }, // 星河/公开星笺所有人可访问
+      props: true,
+    },
   ],
 })
 

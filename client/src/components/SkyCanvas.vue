@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useSky, type SkyAPI } from '../composables/useSky'
+import { useSky, type SkyAPI, type SnapTarget } from '../composables/useSky'
 
 const props = defineProps<{
   observerLat?: number
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   starHover: [starId: number | null]
   starHoverLong: [starId: number | null]
   planetClick: [name: string, nameCN: string, planetId: number]
+  snapChange: [target: SnapTarget | null]
 }>()
 
 onMounted(() => {
@@ -27,6 +28,7 @@ onMounted(() => {
     onStarHover: (starId) => emit('starHover', starId),
     onStarHoverLong: (starId) => emit('starHoverLong', starId),
     onPlanetClick: (name, nameCN, planetId) => emit('planetClick', name, nameCN, planetId),
+    onSnapChange: (target) => emit('snapChange', target),
     observerLat: props.observerLat,
     observerLng: props.observerLng,
   })

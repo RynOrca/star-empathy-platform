@@ -938,18 +938,19 @@ onBeforeUnmount(() => {
   transition: opacity 0.25s ease;
 }
 
+.moon-panel-fade-enter-active .moon-panel,
+.moon-panel-fade-leave-active .moon-panel {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .moon-panel-fade-enter-from,
 .moon-panel-fade-leave-to {
   opacity: 0;
 }
 
-.moon-panel-fade-enter-active .moon-panel {
-  animation: panel-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes panel-pop {
-  0% { transform: scale(0.92); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+.moon-panel-fade-enter-from .moon-panel,
+.moon-panel-fade-leave-to .moon-panel {
+  transform: scale(0.92);
 }
 
 /* ─── 响应式 ─── */

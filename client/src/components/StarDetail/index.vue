@@ -1,7 +1,8 @@
 <template>
   <!-- ═══ PC 端布局 ═══ -->
-  <div v-if="!isMobile" class="overlay" @click.self="$emit('close')">
-    <div class="detail-wrap">
+  <Transition name="pc-detail-fade" @after-leave="emit('close')">
+    <div v-if="!isMobile && show" class="overlay" :class="{ 'observe-mode': isPlanetCloseup && observeMode }" @click.self="handleClose">
+    <div v-show="!(isPlanetCloseup && observeMode)" class="detail-wrap">
       <!-- 左：叙事 + 故事面板 -->
       <div class="panel panel-stories">
         <!-- Tab 栏 -->
@@ -24,27 +25,151 @@
           <template v-if="activeTab === 'narrative'">
             <div class="narrative-layout">
               <div class="narrative-top">
-                <StarNarrative
-                  :content="narrative.content.value"
-                  :loading="narrative.loading.value"
-                  :error="narrative.error.value"
-                  :cached="narrative.cached.value"
-                  @retry="narrative.fetchNarrative(catalogStarId)"
+                <!-- 🧠 AI 分析模块（1）星格画像 -->
+                <AIPersonaCard
+                  :storyCount="catalogStats?.storyCount ?? 0"
+                  :updatedAt="analysisUpdatedText || '刚刚生成'"
+                  :starName="currentStarName"
+                  :constellationName="currentConstellation || '未知星座'"
+                  :starColor="getStarColor(catalogStarId)"
+                  :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
-              </div>
-              <div class="narrative-bottom">
-                <SimilarStarsPanel
-                  :similarStars="similarStars.similarStars.value"
-                  :getStarName="getStarName"
-                  :onSimilarStarClick="onSimilarStarClick"
+
+                <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
+                <AIRadarWordcloud
+                  :storyCount="catalogStats?.storyCount ?? 0"
+                  :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
-                <AreaHighlightsPanel
-                  :highlights="areaHighlightsData"
-                  :loading="areaLoading"
-                  :currentStarId="catalogStarId"
-                  :getStarName="getStarName"
-                  :onSimilarStarClick="onSimilarStarClick"
+
+                <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
+                <AIHeatmapThemes
+                  :storyCount="catalogStats?.storyCount ?? 0"
+                  :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                  :analysis-ready="analysisReady"
                 />
+
+                <div class="narrative-bottom">
+                  <div class="panel-wrapper pw-left">
+                    <div class="panel-head">
+                      <Sparkle :size="10" class="pw-icon pw-gold" />
+                      <span class="pw-title">内核相似</span>
+                      <span class="pw-count">{{ similarStars.similarStars.value?.length ?? 0 }} 颗</span>
+                    </div>
+                    <SimilarStarsPanel
+                      :similarStars="similarStars.similarStars.value"
+                      :getStarName="getStarName"
+                      :getStarColor="getStarColor"
+                      :getConstellationName="getConstellationName"
+                      :onSimilarStarClick="onSimilarStarClick"
+                    />
+                  </div>
+                  <div class="panel-wrapper pw-right">
+                    <div class="panel-head">
+                      <BookOpen :size="10" class="pw-icon pw-purple" />
+                      <span class="pw-title">天区精选</span>
+                      <span class="pw-count">{{ areaHighlightsData?.length ?? 0 }} 则</span>
+                    </div>
+                    <AreaHighlightsPanel
+                      :highlights="areaHighlightsData"
+                      :loading="areaLoading"
+                      :currentStarId="catalogStarId"
+                      :getStarName="getStarName"
+                      :getStarColor="getStarColor"
+                      :getConstellationName="getConstellationName"
+                      :onSimilarStarClick="onSimilarStarClick"
+                    />
+                  </div>
+                </div>
+
+                <!-- E. 共鸣榜 Top 3 -->
+                <div v-if="topResonatedStories.length > 0" class="story-section story-section-bottom">
+                  <div class="section-header">
+                    <FlameIcon :size="13" class="section-icon section-icon-orange" />
+                    <span class="section-title">共鸣榜</span>
+                    <span class="section-count">Top {{ topResonatedStories.length }}</span>
+                  </div>
+                  <div class="story-cards">
+                    <div
+                      v-for="(s, si) in topResonatedStories"
+                      :key="s.id"
+                      class="story-card story-card-top"
+                      @click="openStoryDetail(s)"
+                    >
+                      <div class="card-rank" :class="`rank-${si + 1}`">{{ si + 1 }}</div>
+                      <div class="card-body">
+                        <div class="card-title" v-if="s.title">{{ s.title }}</div>
+                        <div class="card-summary">{{ storySummary(s.content) }}</div>
+                        <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'top-' + s.id + '-' + t"
+                            class="story-tag story-tag-inline"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
+                        </div>
+                        <div class="card-meta">
+                          <HeartIcon :size="10" />
+                          <span>{{ getDisplayResonance(s) }} 共鸣</span>
+                          <span v-if="s.username" class="meta-sep">·</span>
+                          <span v-if="s.username" class="meta-user">{{ s.username }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- F. 最新 3 条心事 -->
+                <div v-if="latestStories.length > 0" class="story-section story-section-bottom">
+                  <div class="section-header">
+                    <ClockIcon :size="13" class="section-icon section-icon-blue" />
+                    <span class="section-title">最新心事</span>
+                    <div
+                      class="section-more"
+                      @click.stop="activeTab = 'all' as any"
+                    >
+                      查看全部 <ChevronDown :size="11" />
+                    </div>
+                  </div>
+                  <div class="story-cards">
+                    <div
+                      v-for="s in latestStories"
+                      :key="s.id"
+                      class="story-card"
+                      @click="openStoryDetail(s)"
+                    >
+                      <div class="card-body">
+                        <div class="card-head">
+                          <div class="card-avatar">
+                            <User :size="11" />
+                          </div>
+                          <div class="card-user">
+                            <div class="user-name">{{ s.username || '匿名星友' }}</div>
+                            <div class="user-time">{{ formatTime(s.createdAt) }}</div>
+                          </div>
+                        </div>
+                        <div class="card-summary">{{ storySummary(s.content) }}</div>
+                        <!-- 标签行：正文下方、meta 上方；空时隐藏 -->
+                        <div
+                          v-if="storyDisplayTags(s).length"
+                          class="card-tags card-tags-inline"
+                        >
+                          <span
+                            v-for="t in storyDisplayTags(s)"
+                            :key="'card-' + s.id + '-' + t"
+                            class="story-tag story-tag-inline"
+                            :style="storyTagStyle(t)"
+                          >#{{ t }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -63,9 +188,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -79,8 +212,11 @@
               :displayResonance="(s: any) => getDisplayResonance(s)"
               :displayViews="(s: any) => getStoryViewCount(s.id)"
               :isResonated="(s: any) => justResonatedId === s.id"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -98,9 +234,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -118,10 +262,13 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @update:searchQuery="searchQuery = $event"
               @update:sortKey="onSortKeyChange"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -144,9 +291,17 @@
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
               :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+              :viewCount="getStoryViewCount(detailStory.id)"
+              :origin="detailStory.origin ?? null"
+              :createdAtIso="detailStory.createdAt"
+              :siblingStories="siblingStoriesFor(detailStory)"
+              :showStarBelonging="false"
               @back="detailStoryId = null"
               @resonate="onResonate(detailStory)"
               @delete="confirmDelete(detailStory.id)"
+              :collection-clickable="true"
+              @collection-click="onCollectionClick"
+              @open-story="openStoryDetail"
             />
             <StoryList
               v-else
@@ -162,8 +317,11 @@
               :isResonated="(s: any) => justResonatedId === s.id"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
+              :collectionClickable="true"
+              :showStarBelonging="false"
               @story-click="openStoryDetail"
               @resonate="onResonate"
+              @collection-click="onCollectionClick"
             />
           </template>
 
@@ -181,7 +339,7 @@
       <div class="panel panel-info">
         <!-- 顶部固定：关闭按钮 + 星星名字 -->
         <div class="info-header">
-          <button class="close-btn" @click="$emit('close')"><X :size="15" /></button>
+          <button class="close-btn" @click="handleClose"><X :size="15" /></button>
           <StarHeader :starInfo="starInfo" />
         </div>
 
@@ -269,6 +427,7 @@
                   'tag-theme': t.type === 'theme',
                   'tag-custom': t.custom,
                 }"
+                :style="infoTagStyle(t.tag, t.custom ? 'custom' : t.type)"
               >
                 {{ t.tag }}
                 <span v-if="t.count > 0" class="tag-count">{{ t.count }}</span>
@@ -312,25 +471,34 @@
         </div>
       </div>
     </div>
+    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：观察模式切换 -->
+    <button
+      v-if="isPlanetCloseup"
+      class="observe-toggle-btn"
+      @click="emit('toggleObserve')"
+    >
+      {{ observeMode ? '返回' : '观察' }}
+    </button>
   </div>
+  </Transition>
 
   <!-- ═══ 移动端布局：底部抽屉 ═══ -->
-  <template v-else>
-    <Transition name="mobile-sheet-fade">
-      <div class="mobile-overlay" @click.self="$emit('close')">
+  <Transition name="mobile-sheet-fade" @after-leave="emit('close')">
+    <div v-if="isMobile && show" class="mobile-overlay" @click.self="handleClose">
         <div
           class="mobile-sheet"
+          :class="{ dragging: isDragging }"
           :style="{ height: sheetHeight }"
           @touchstart.passive="onTouchStart"
           @touchmove.passive="onTouchMove"
           @touchend="onTouchEnd"
         >
-          <!-- 拖拽条 -->
-          <div class="mobile-handle"></div>
+          <!-- 拖拽条（点击关闭） -->
+          <div class="mobile-handle" @click="handleClose"></div>
 
           <!-- 顶部栏：关闭 + Tab 下拉 -->
           <div class="mobile-top-bar">
-            <button class="mobile-close-btn" @click="$emit('close')">
+            <button class="mobile-close-btn" @click="handleClose">
               <X :size="18" />
             </button>
             <div class="mobile-tab-select-wrap">
@@ -382,6 +550,8 @@
                   <SimilarStarsPanel
                     :similarStars="similarStars.similarStars.value"
                     :getStarName="getStarName"
+                    :getStarColor="getStarColor"
+                    :getConstellationName="getConstellationName"
                     :onSimilarStarClick="onSimilarStarClick"
                   />
                   <AreaHighlightsPanel
@@ -389,6 +559,8 @@
                     :loading="areaLoading"
                     :currentStarId="catalogStarId"
                     :getStarName="getStarName"
+                    :getStarColor="getStarColor"
+                    :getConstellationName="getConstellationName"
                     :onSimilarStarClick="onSimilarStarClick"
                   />
                 </div>
@@ -468,15 +640,175 @@
                 </div>
               </template>
 
-              <!-- AI 叙事 -->
+              <!-- AI 叙事（移动端）：只保留星语AI 往下的内容，旧 Markdown 叙事整块移除 -->
               <template v-else-if="activeTab === 'narrative'">
-                <StarNarrative
-                  :content="narrative.content.value"
-                  :loading="narrative.loading.value"
-                  :error="narrative.error.value"
-                  :cached="narrative.cached.value"
-                  @retry="narrative.fetchNarrative(catalogStarId)"
-                />
+                <div class="narrative-layout mobile-narrative-layout">
+                  <div class="narrative-top">
+                    <!-- A. 星语数据条 -->
+                    <div v-if="catalogStats" class="story-stats-bar">
+                      <div class="stat-item">
+                        <EyeIcon :size="14" class="stat-icon stat-icon-eye" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.starViews?.toLocaleString() ?? 0 }}</div>
+                          <div class="stat-label">凝望次数</div>
+                        </div>
+                      </div>
+                      <div class="stat-divider"></div>
+                      <div class="stat-item">
+                        <BookOpen :size="14" class="stat-icon stat-icon-story" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.storyCount ?? 0 }}</div>
+                          <div class="stat-label">心事总数</div>
+                        </div>
+                      </div>
+                      <div class="stat-divider"></div>
+                      <div class="stat-item">
+                        <HeartIcon :size="14" class="stat-icon stat-icon-heart" />
+                        <div class="stat-info">
+                          <div class="stat-num">{{ catalogStats.totalResonance?.toLocaleString() ?? 0 }}</div>
+                          <div class="stat-label">共鸣总数</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 🧠 AI 分析模块（1）星格画像 -->
+                    <AIPersonaCard
+                      :storyCount="catalogStats?.storyCount ?? 0"
+                      :updatedAt="analysisUpdatedText || '刚刚生成'"
+                      :starName="currentStarName"
+                      :constellationName="currentConstellation || '未知星座'"
+                      :starColor="getStarColor(catalogStarId)"
+                      :persona="starAnalysis.analysis.value?.persona ?? undefined"
+                      :analysis-ready="analysisReady"
+                    />
+
+                    <!-- 🧠 AI 分析模块（2+3）情感雷达 + 关键词云 -->
+                    <AIRadarWordcloud
+                      :storyCount="catalogStats?.storyCount ?? 0"
+                      :emotion="starAnalysis.analysis.value?.emotion ?? undefined"
+                      :analysis-ready="analysisReady"
+                    />
+
+                    <!-- 🧠 AI 分析模块（4+5）24h热力 + 主题分布 -->
+                    <AIHeatmapThemes
+                      :storyCount="catalogStats?.storyCount ?? 0"
+                      :themeHour="starAnalysis.analysis.value?.themehour ?? undefined"
+                      :analysis-ready="analysisReady"
+                    />
+
+                    <div class="narrative-bottom">
+                      <div class="panel-wrapper pw-left">
+                        <div class="panel-head">
+                          <Sparkle :size="10" class="pw-icon pw-gold" />
+                          <span class="pw-title">内核相似</span>
+                          <span class="pw-count">{{ similarStars.similarStars.value?.length ?? 0 }} 颗</span>
+                        </div>
+                        <SimilarStarsPanel
+                          :similarStars="similarStars.similarStars.value"
+                          :getStarName="getStarName"
+                          :getStarColor="getStarColor"
+                          :getConstellationName="getConstellationName"
+                          :onSimilarStarClick="onSimilarStarClick"
+                        />
+                      </div>
+                      <div class="panel-wrapper pw-right">
+                        <div class="panel-head">
+                          <BookOpen :size="10" class="pw-icon pw-purple" />
+                          <span class="pw-title">天区精选</span>
+                          <span class="pw-count">{{ areaHighlightsData?.length ?? 0 }} 则</span>
+                        </div>
+                        <AreaHighlightsPanel
+                          :highlights="areaHighlightsData"
+                          :loading="areaLoading"
+                          :currentStarId="catalogStarId"
+                          :getStarName="getStarName"
+                          :getStarColor="getStarColor"
+                          :getConstellationName="getConstellationName"
+                          :onSimilarStarClick="onSimilarStarClick"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- E. 共鸣榜 Top 3 -->
+                    <div v-if="topResonatedStories.length > 0" class="story-section story-section-bottom">
+                      <div class="section-header">
+                        <FlameIcon :size="13" class="section-icon section-icon-orange" />
+                        <span class="section-title">共鸣榜</span>
+                        <span class="section-count">Top {{ topResonatedStories.length }}</span>
+                      </div>
+                      <div class="story-cards">
+                        <div
+                          v-for="(s, si) in topResonatedStories"
+                          :key="s.id"
+                          class="story-card story-card-top"
+                          @click="openStoryDetail(s)"
+                        >
+                          <div class="card-rank" :class="`rank-${si + 1}`">{{ si + 1 }}</div>
+                          <div class="card-body">
+                            <div class="card-title" v-if="s.title">{{ s.title }}</div>
+                            <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'topm-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
+                            <div class="card-meta">
+                              <HeartIcon :size="10" />
+                              <span>{{ getDisplayResonance(s) }} 共鸣</span>
+                              <span v-if="s.username" class="meta-sep">·</span>
+                              <span v-if="s.username" class="meta-user">{{ s.username }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- F. 最新 3 条心事 -->
+                    <div v-if="latestStories.length > 0" class="story-section story-section-bottom">
+                      <div class="section-header">
+                        <Sparkle :size="12" class="section-icon section-icon-blue" />
+                        <span class="section-title">最新心事</span>
+                        <span class="section-count">{{ latestStories.length }} 则</span>
+                      </div>
+                      <div class="story-cards story-cards-latest">
+                        <div
+                          v-for="s in latestStories"
+                          :key="s.id"
+                          class="story-card story-card-latest"
+                          @click="openStoryDetail(s)"
+                        >
+                          <div class="card-body">
+                            <div class="card-title" v-if="s.title">{{ s.title }}</div>
+                            <div class="card-summary">{{ storySummary(s.content) }}</div>
+                            <!-- 标签行：正文下方、meta 上方，空时隐藏 -->
+                            <div
+                              v-if="storyDisplayTags(s).length"
+                              class="card-tags card-tags-inline"
+                            >
+                              <span
+                                v-for="t in storyDisplayTags(s)"
+                                :key="'l-' + s.id + '-' + t"
+                                class="story-tag story-tag-inline"
+                                :style="storyTagStyle(t)"
+                              >#{{ t }}</span>
+                            </div>
+                            <div class="card-meta">
+                              <ClockIcon :size="10" class="meta-clock" />
+                              <span>{{ formatTime(s.createdAt) }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </template>
 
               <!-- 历史故事 -->
@@ -589,9 +921,17 @@
                 :currentUserId="currentUserId"
                 :formattedTime="formatTime(detailStory.createdAt)"
                 :formattedDistance="formatDistance(detailStory.locationLat, detailStory.locationLng)"
+                :viewCount="getStoryViewCount(detailStory.id)"
+                :origin="detailStory.origin ?? null"
+                :createdAtIso="detailStory.createdAt"
+                :siblingStories="siblingStoriesFor(detailStory)"
+                :showStarBelonging="false"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
+                :collection-clickable="true"
+                @collection-click="onCollectionClick"
+                @open-story="openStoryDetail"
               />
             </div>
           </div>
@@ -606,12 +946,20 @@
         />
       </div>
     </Transition>
-  </template>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch, type Component } from 'vue'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown } from 'lucide-vue-next'
+import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
+const SparklesIcon = Sparkles
+const EyeIcon = Eye
+const HeartIcon = Heart
+const SparkleIcon = Sparkle
+const TrendingIcon = TrendingUp
+const ClockIcon = Clock
+const FlameIcon = Flame
+const MessageIcon = MessageCircle
 import StarNarrative from '../StarNarrative.vue'
 import AncientChat from '../AncientChat.vue'
 import StoryDetail from './StoryDetail.vue'
@@ -623,14 +971,79 @@ import MobileTabSelect from './MobileTabSelect.vue'
 import MobileActionSheet from './MobileActionSheet.vue'
 import SimilarStarsPanel from './SimilarStarsPanel.vue'
 import AreaHighlightsPanel from './AreaHighlightsPanel.vue'
+import AIPersonaCard from './AIPersonaCard.vue'
+import AIRadarWordcloud from './AIRadarWordcloud.vue'
+import AIHeatmapThemes from './AIHeatmapThemes.vue'
 import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
 import { useSimilarStars } from '../../composables/useSimilarStars'
 import { useAreaHighlights } from '../../composables/useAreaHighlights'
+import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
 import { useMediaQuery } from '../../composables/useMediaQuery'
-import catalogData from '../../data/stars.json'
+import { constellationNames } from '../../data/starInfo'
+import { getStarNameInfo } from '../../utils/starName'
 import { marked } from 'marked'
+
+// 摘出故事摘要：纯文本 26 字
+function storySummary(content: string): string {
+  const text = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_`~-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text.length > 26 ? text.slice(0, 26) + '…' : text
+}
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function _tagHashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+/** 故事卡片 story-tag 的染色（用在 userStories / top 卡片内） */
+function storyTagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(_tagHashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.22)`
+  const bg = `hsla(${h}, 62%, 74%, 0.06)`
+  return {
+    color,
+    backgroundColor: bg,
+    borderColor: border,
+    border: '0.5px solid ' + border,
+  }
+}
+/** 标签展示数组：优先 tags[]，空时退回 tag 单列（老数据兼容），最多 5 条、去重 */
+function storyDisplayTags(s: { tag?: string | null; tags?: string[] | null } | null | undefined): string[] {
+  if (!s) return []
+  const arr = Array.isArray(s.tags) ? s.tags.filter((t) => !!t && typeof t === 'string') : []
+  if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  return s.tag ? [s.tag] : []
+}
+/** Star 详情展示区的标签（type = emotion/theme/custom 都用） */
+function infoTagStyle(tag: string, type: 'emotion' | 'theme' | 'custom'): Record<string, string> {
+  if (type === 'custom') {
+    // custom：沿用故事 tag 的颜色
+    const h = Math.abs(_tagHashCode(tag)) % 360
+    const color = `hsl(${h} 62% 74%)`
+    return {
+      color,
+      borderColor: `hsla(${h}, 62%, 74%, 0.26)`,
+      backgroundColor: `hsla(${h}, 62%, 74%, 0.06)`,
+    }
+  }
+  // emotion/theme：统一用原设计（金/紫弱区），不做强染色，保持 StarDetail 原有味道
+  if (type === 'emotion') {
+    return { color: '#ffe5a8', borderColor: 'rgba(255,217,138,0.22)', backgroundColor: 'rgba(255,217,138,0.05)' }
+  }
+  return { color: '#d9c6ff', borderColor: 'rgba(202,167,255,0.22)', backgroundColor: 'rgba(202,167,255,0.05)' }
+}
 import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -640,11 +1053,13 @@ const { isMobile } = useMediaQuery()
 const sheetHeight = ref('60vh')
 const touchStartY = ref(0)
 const touchStartHeight = ref(0)
+const isDragging = ref(false)
 
 function onTouchStart(e: TouchEvent) {
   touchStartY.value = e.touches[0].clientY
   const sheet = (e.target as HTMLElement).closest('.mobile-sheet') as HTMLElement
   touchStartHeight.value = sheet?.offsetHeight || window.innerHeight * 0.6
+  isDragging.value = true
 }
 
 function onTouchMove(e: TouchEvent) {
@@ -659,9 +1074,10 @@ function onTouchEnd() {
   const sheet = document.querySelector('.mobile-sheet') as HTMLElement
   const currentH = sheet?.offsetHeight || window.innerHeight * 0.6
   const vh = window.innerHeight
+  isDragging.value = false
   if (currentH < vh * 0.3) {
     // 下拉低于 30vh → 关闭
-    emit('close')
+    handleClose()
   } else if (currentH < vh * 0.75) {
     sheetHeight.value = '60vh'
   } else {
@@ -685,6 +1101,11 @@ const props = defineProps<{
     tag: string | null
     userId: number | null
     imageUrl: string | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
+    collectionStoryCount?: number | null
   }>
   activeIndex: number
   starInfo: { id: number; displayName: string; con: string; mag: number; conName: string; distance: number | null; ra: number; dec: number; color: string } | null
@@ -695,6 +1116,21 @@ const props = defineProps<{
   currentUserId: number | null
   observerLat?: number | null
   observerLng?: number | null
+  isGuest?: boolean
+  /** PC 端行星特写模式（selectedCatalogStarId < 0 且 PC 端）：点击 overlay 空白进入观察模式而非关闭 */
+  isPlanetCloseup?: boolean
+  /** 观察模式：隐藏故事面板和模糊背景，露出 3D 行星特写供用户观察 */
+  observeMode?: boolean
+  /**
+   * 外部强制打开某则故事的详情页（v-model:targetStoryId）。
+   * - 父级设置为某 story.id → 本组件自动：
+   *   ① 在 realStories 中找到该 story；
+   *   ② 根据 type 切换到对应 Tab（history→history，其余→all）；
+   *   ③ 切 Tab 完成后打开 StoryDetail 页面（等价于用户点击该故事卡片）；
+   *   ④ 完成后 emit('update:targetStoryId', null) 让父级清零，避免下次同值不触发 watch。
+   * - 找不到或传 null 时不会产生任何动作。
+   */
+  targetStoryId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -710,7 +1146,29 @@ const emit = defineEmits<{
   writeStory: []
   updateSimilarStars: [ids: number[]]
   deleteStory: [storyId: number]
+  /** 故事集合或权重发生了实质变动 → 父级可用于通知 SkyPage 做跨星同步
+   *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
+   */
+  storiesMutated: [kind: 'new' | 'delete' | 'resonate' | 'kernel-edit']
+  /** PC 端行星特写：点击 overlay 空白切换观察模式（隐藏故事面板露出行星） */
+  toggleObserve: []
+  /** 合集徽章点击：透传合集信息给父组件，由父组件决定如何展示合集内所有故事 */
+  'collection-click': [data: { collectionId: number; collectionName: string | null; userId: number | null }]
+  /** 配合 props.targetStoryId 做 v-model 双向绑定：消费完 targetStoryId 后 emit 给父级清零 */
+  'update:targetStoryId': [id: number | null]
 }>()
+
+const router = useRouter()
+// 访客拦截：体验账号不能收藏/共鸣/写故事/与古人共赏，跳登录页
+// 必须先清 token 再跳转，否则路由守卫（to.path === '/' && token）会重定向回 /sky
+function guestGuard(): boolean {
+  if (props.isGuest) {
+    localStorage.removeItem('token')
+    router.push('/')
+    return true
+  }
+  return false
+}
 
 const realStories = computed(() => props.stories.filter(s => s.id > 0))
 const hasRealStory = computed(() => realStories.value.length > 0)
@@ -718,6 +1176,20 @@ const hasRealStory = computed(() => realStories.value.length > 0)
 const historyStories = computed(() => realStories.value.filter(s => s.type === 'history'))
 const userStories = computed(() => realStories.value.filter(s => s.type !== 'history'))
 const myStories = computed(() => realStories.value.filter(s => s.userId != null && s.userId === props.currentUserId))
+
+// 共鸣榜 Top 3（所有故事按共鸣数倒序）
+const topResonatedStories = computed(() => {
+  return [...realStories.value]
+    .sort((a, b) => getDisplayResonance(b) - getDisplayResonance(a))
+    .slice(0, 3)
+})
+
+// 最新 3 条（按 createdAt 倒序）
+const latestStories = computed(() => {
+  return [...realStories.value]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3)
+})
 
 // ─── 天文事件 ───
 const { data: astroData } = useAstroEvents({
@@ -804,6 +1276,38 @@ function getStoryViewCount(storyId: number): number {
   return s?.viewCount ?? 0
 }
 
+/** 同星其他故事推荐：按 catalogStarId 匹配（共享任一归属星视为同星），最多返回 4 条预览 */
+import type { SiblingStoryPreview } from './StoryDetail.vue'
+function siblingStoriesFor(story: any): SiblingStoryPreview[] {
+  if (!story?.id) return []
+  const ownIds = new Set<number>()
+  if (typeof story.catalogStarId === 'number' && story.catalogStarId !== 0) ownIds.add(story.catalogStarId)
+  if (Array.isArray(story.catalogStarIds)) {
+    for (const n of story.catalogStarIds) if (typeof n === 'number' && n !== 0) ownIds.add(n)
+  }
+  const sharesStar = (s: any): boolean => {
+    if (s.id === story.id) return false
+    if (ownIds.size === 0) return false
+    if (typeof s.catalogStarId === 'number' && ownIds.has(s.catalogStarId)) return true
+    if (Array.isArray(s.catalogStarIds)) {
+      for (const n of s.catalogStarIds) if (typeof n === 'number' && ownIds.has(n)) return true
+    }
+    return false
+  }
+  const pool = realStories.value.filter(sharesStar)
+    .sort((a, b) => (b.resonanceCount ?? 0) - (a.resonanceCount ?? 0))
+    .slice(0, 4)
+  return pool.map<SiblingStoryPreview>((s: any) => ({
+    id: s.id,
+    title: s.title ?? null,
+    type: s.type === 'history' ? 'history' : 'user',
+    isNew: !!s.isNew,
+    resonanceCount: s.resonanceCount ?? 0,
+    viewCount: s.viewCount ?? 0,
+    contentPreview: ((s.content ?? '').replace(/\s+/g, ' ').slice(0, 60)),
+  }))
+}
+
 const detailStoryId = ref<number | null>(null)
 const detailStory = computed(() => {
   if (detailStoryId.value === null) return null
@@ -818,10 +1322,13 @@ const pcTabs: { id: TabId; label: string; icon: Component }[] = [
   { id: 'all', label: '用户故事', icon: List },
   { id: 'mine', label: '我的故事', icon: User },
 ]
-// 移动端：包含「星信息」
-const mobileTabs: { id: TabId; label: string; icon: Component }[] = [
-  { id: 'info', label: '星信息', icon: Star },
-  ...pcTabs,
+// 移动端：包含「星信息」，下拉框使用罗马数字前缀（与设置弹窗风格一致）
+const mobileTabs: { id: TabId; label: string; roman: string; icon: Component }[] = [
+  { id: 'info', label: '星信息', roman: 'Ⅰ', icon: Star },
+  { id: 'narrative', label: 'AI 叙事', roman: 'Ⅱ', icon: Sparkles },
+  { id: 'history', label: '历史故事', roman: 'Ⅲ', icon: BookOpen },
+  { id: 'all', label: '用户故事', roman: 'Ⅳ', icon: List },
+  { id: 'mine', label: '我的故事', roman: 'Ⅴ', icon: User },
 ]
 // 初始化时同步判断移动端（useMediaQuery 在 onMounted 才生效，不能用）
 const isMobileInit = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
@@ -878,6 +1385,35 @@ watch(activeTab, () => {
   detailStoryId.value = null
 })
 
+// ─── 外部驱动：打开指定 storyId 的详情页（支持父级 v-model:targetStoryId）───
+/**
+ * 执行顺序（关键：必须等 activeTab 切换的 watch 把 detailStoryId=null 跑完之后再赋值）：
+ *  1. 定位到 targetStoryId 对应的 story；
+ *  2. 切 Tab：history 类 → activeTab='history'，其他（用户故事）→ activeTab='all'；
+ *  3. nextTick 等 activeTab 的 watch 清空 detailStoryId 后；
+ *  4. 设置 detailStoryId.value = targetStoryId → StoryDetail 页面展示；
+ *  5. emit('update:targetStoryId', null) 让父级清零，避免下次传同样 id watch 不触发。
+ */
+watch(
+  () => props.targetStoryId,
+  async (id) => {
+    if (id == null) return
+    const target = realStories.value.find(s => s.id === id)
+    if (!target) {
+      emit('update:targetStoryId', null)
+      return
+    }
+    const needTab: TabId = target.type === 'history' ? 'history' : 'all'
+    if (activeTab.value !== needTab) {
+      activeTab.value = needTab
+    }
+    await nextTick()
+    detailStoryId.value = id
+    emit('update:targetStoryId', null)
+  },
+  { flush: 'post' }
+)
+
 // ─── AI 内核标签 ───
 const kernel = useKernel()
 watch(() => props.catalogStarId, (id) => {
@@ -897,20 +1433,66 @@ watch(() => similarStars.similarStars.value, (stars) => {
 const areaHighlights = useAreaHighlights(() => props.catalogStarId)
 const { highlights: areaHighlightsData, loading: areaLoading } = areaHighlights
 
-const catalogLookup = new Map<number, { name: string | null; con: string }>()
-for (const s of (catalogData as any).stars) {
-  catalogLookup.set(s.id, { name: s.name, con: s.con })
+// ─── AI 预生成分析（persona/emotion/themehour） ───
+const catalogStarIdRef = toRef(props, 'catalogStarId')
+const catalogStarIdNullable = computed<number | null>(() => catalogStarIdRef.value ?? null)
+const starAnalysis = useStarAnalysis(catalogStarIdNullable)
+
+/**
+ * 触发一次 AI 分析"就地刷新"：
+ *  - reset() 清除缓存 ready 标记
+ *  - fetchAnalysis() 立即拉一次并自动启动 3s × 20 次的 ready 轮询
+ * 所有会改变 catalog 级故事集合/权重分布的动作都应调用：新增故事 / 删除故事 / 共鸣成功 / 内核被用户修改
+ */
+function retriggerStarAnalysis() {
+  starAnalysis.reset()
+  if (catalogStarIdNullable.value) {
+    starAnalysis.fetchAnalysis()
+  }
 }
+
+// 从 persona 返回里取 updatedAt 文案（用服务端生成时间）
+const analysisUpdatedText = computed(() => {
+  const t = starAnalysis.analysis.value?.generatedAt
+  if (!t) return undefined
+  const diff = Date.now() - t
+  if (diff < 60 * 1000) return '刚刚生成'
+  if (diff < 3600 * 1000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
+  return new Date(t).toLocaleDateString('zh-CN')
+})
+// 传递给所有 AI 子卡的"ready 信号"：子卡用它判断"骨架是否还能一直转"，避免 ready=true 但卡片仍显示"生成中"
+const analysisReady = computed(() => starAnalysis.analysis.value?.ready ?? false)
+
+// 星名/元信息查找走共享工具（合并 stars.json 恒星 + planets.ts 行星），修复行星显示「恒星 #-100」(issue #135)
 function getStarName(catalogStarId: number): string {
-  const s = catalogLookup.get(catalogStarId)
-  return s?.name || s?.con || `恒星 #${catalogStarId}`
+  const info = getStarNameInfo(catalogStarId)
+  return info?.name || `恒星 #${catalogStarId}`
 }
+function getStarColor(catalogStarId: number): string {
+  return getStarNameInfo(catalogStarId)?.color || '#ffd98a'
+}
+function getConstellationName(catalogStarId: number): string {
+  const con = getStarNameInfo(catalogStarId)?.con
+  if (!con) return ''
+  return constellationNames[con] || con
+}
+const currentStarName = computed(() => getStarName(props.catalogStarId))
+const currentConstellation = computed(() => getConstellationName(props.catalogStarId))
 function onSimilarStarClick(catalogStarId: number) {
+  // 跳转新星星：直接 emit('close') 让父组件卸载当前 StarDetail，新 StarDetail 挂载时有 enter 动画
   emit('close')
   window.dispatchEvent(new CustomEvent('fly-to-star', { detail: { catalogStarId } }))
 }
 
+// ─── 抽屉动画控制：内部 show 状态触发 enter/leave ───
+const show = ref(false)
+function handleClose() {
+  show.value = false
+}
+
 onMounted(() => {
+  nextTick(() => { show.value = true })
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -931,11 +1513,15 @@ onMounted(() => {
 })
 
 function onResonate(story: { id: number; resonanceCount: number }) {
+  if (guestGuard()) return
   const current = getDisplayResonance(story)
   resonanceOverrides.set(story.id, current + 1)
   emit('resonate', story.id)
+  emit('storiesMutated', 'resonate')
   justResonatedId.value = story.id
   setTimeout(() => { justResonatedId.value = null }, 2000)
+  // 共鸣改变故事权重分布 → 通知 composable 重置轮询，等后端异步重新生成完（15s debounce + 串行）就地刷新
+  retriggerStarAnalysis()
 }
 
 // ─── 删除故事 ───
@@ -960,9 +1546,12 @@ async function doDeleteStory() {
     })
     if (res.ok) {
       emit('deleteStory', deletingStoryId.value)
+      emit('storiesMutated', 'delete')
       showDeleteConfirm.value = false
       deletingStoryId.value = null
       detailStoryId.value = null
+      // 删除改变故事集合 → 立即重新拉 analysis + 启动 ready 轮询
+      retriggerStarAnalysis()
     } else {
       const json = await res.json()
       alert(json.message || '删除失败')
@@ -985,6 +1574,7 @@ const isFavorited = computed(() => props.favoriteStarIds.includes(props.catalogS
 function getToken() { return localStorage.getItem('token') }
 
 async function toggleFavorite() {
+  if (guestGuard()) return
   const token = getToken()
   if (!token) {
     alert('请先登录后再收藏')
@@ -1017,22 +1607,37 @@ async function fetchCatalogStatsFromFront() {
   } catch { /* 静默 */ }
 }
 
-function onWriteStory() { emit('writeStory') }
+function onWriteStory() { if (guestGuard()) return; emit('writeStory') }
 
 // ─── 古人陪看聊天 ───
 const showChat = ref(false)
-function openChat() { showChat.value = true }
+function openChat() { if (guestGuard()) return; showChat.value = true }
 
-function openStoryDetail(story: { id: number }) {
-  detailStoryId.value = story.id
-  const current = getStoryViewCount(story.id)
-  viewCountOverrides.set(story.id, current + 1)
+function openStoryDetail(input: { id: number } | number) {
+  const id: number = typeof input === 'number' ? input : input.id
+  detailStoryId.value = id
+  const current = getStoryViewCount(id)
+  viewCountOverrides.set(id, current + 1)
   emit('incrementViews')
-  fetch(`/api/stories/${story.id}/view`, { method: 'POST' })
+  fetch(`/api/stories/${id}/view`, { method: 'POST' })
     .then(() => emit('refreshStories'))
     .catch(() => {
-      viewCountOverrides.set(story.id, current)
+      viewCountOverrides.set(id, current)
     })
+}
+
+/**
+ * 合集徽章点击：透传合集信息给父组件（SkyPage）。
+ * 具体的合集详情视图由父组件决定如何展示（弹窗/路由跳转）
+ */
+function onCollectionClick(story: any) {
+  if (story?.collectionId != null) {
+    emit('collection-click', {
+      collectionId: story.collectionId,
+      collectionName: story.collectionName ?? null,
+      userId: story.userId ?? null,
+    })
+  }
 }
 
 // ─── 时间格式化 ───
@@ -1225,6 +1830,42 @@ watch(() => props.catalogStarId, () => {
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* ─── 观察模式（PC 端行星特写）：移除模糊背景，overlay 透传事件让 3D 画布接收滚轮/拖拽 ─── */
+/* 「返回」按钮通过自己的 pointer-events: auto 保持可点击 */
+.overlay.observe-mode {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+/* ─── PC 端行星特写 · 观察/返回按钮（issue #136）─── */
+/* 灰色 + 透明风格，与现有 close-btn 等按钮保持一致 */
+.observe-toggle-btn {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 28px;
+  background: rgba(80, 84, 100, 0.35);
+  border: 1px solid rgba(180, 185, 200, 0.25);
+  border-radius: var(--radius-sm);
+  color: rgba(220, 222, 230, 0.85);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 101;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.observe-toggle-btn:hover {
+  background: rgba(100, 105, 122, 0.5);
+  border-color: rgba(200, 205, 220, 0.4);
+  color: rgba(240, 242, 248, 0.95);
+}
+
 /* ─── Container ─── */
 .detail-wrap {
   display: flex;
@@ -1384,21 +2025,21 @@ watch(() => props.catalogStarId, () => {
   background: var(--surface);
 }
 
-/* ─── AI 叙事 Tab 布局：上部叙事 + 下部两栏面板 ─── */
+/* ─── AI 叙事 Tab 布局：上部叙事 + 下部两栏面板（整体滚动） ─── */
 .narrative-layout {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
   min-height: 0;
+  overflow: hidden;
 }
 .narrative-top {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  box-sizing: border-box;
 }
 .narrative-top::-webkit-scrollbar { width: 5px; }
 .narrative-top::-webkit-scrollbar-track { background: transparent; }
@@ -1406,20 +2047,92 @@ watch(() => props.catalogStarId, () => {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
+
 .narrative-bottom {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  height: 220px;
+  gap: 12px;
+  padding: 20px 28px 22px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
-  padding: 0 28px;
 }
+.narrative-bottom > * {
+  height: auto;
+  min-height: 0;
+}
+
+/* ─── 两面板外层统一套框（与 AI 分析卡风格对齐） ─── */
+.panel-wrapper {
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  height: 300px;
+  min-height: 0;
+}
+.panel-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+}
+.pw-left::before {
+  background: linear-gradient(90deg, transparent, rgba(255,217,138,0.4), transparent);
+}
+.pw-right::before {
+  background: linear-gradient(90deg, transparent, rgba(202,167,255,0.4), transparent);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.pw-icon { opacity: 0.85; flex-shrink: 0; }
+.pw-gold { color: #ffd98a; }
+.pw-purple { color: #caa7ff; }
+.pw-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  flex: 1;
+}
+.pw-count {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.03em;
+}
+
+/* ─── 共鸣榜/最新心事下沉后的样式 ─── */
+.story-section-bottom {
+  margin: 0 28px 22px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+.story-section-bottom:last-child { margin-bottom: 24px; }
+
 /* 左栏宽度不足时，双面板收为上下排列 */
 @media (max-width: 1050px) {
   .narrative-bottom {
     grid-template-columns: 1fr;
-    height: auto;
-    min-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .story-section-bottom {
+    margin: 0 18px 20px;
+  }
+  .narrative-bottom {
+    padding: 16px 18px 18px;
   }
 }
 
@@ -1432,6 +2145,269 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-side-panels > * {
   min-height: 200px;
+}
+
+/* ─── A. 星语数据条 ─── */
+.story-stats-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: 14px 18px;
+  margin: 0 28px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  gap: 8px;
+}
+.stat-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.stat-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.stat-icon-eye { color: #86a8ff; }
+.stat-icon-story { color: #ffd98a; }
+.stat-icon-heart { color: #ff8b7d; }
+.stat-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-num {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.stat-label {
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.03em;
+}
+.stat-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 2px 0;
+}
+
+/* ─── 故事通用 Section ─── */
+.story-section {
+  margin: 0 28px 22px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.section-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.section-icon-orange { color: #ffa968; }
+.section-icon-blue { color: #86a8ff; }
+.section-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  flex: 1;
+  letter-spacing: 0.02em;
+}
+.section-count {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.25);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.section-more {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.section-more:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ─── 故事卡片列表 ─── */
+.story-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.story-card {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.story-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.story-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}
+.card-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+.card-rank.rank-1 {
+  background: linear-gradient(135deg, rgba(255, 196, 100, 0.25), rgba(255, 154, 80, 0.08));
+  color: #ffc464;
+  box-shadow: 0 0 8px rgba(255, 196, 100, 0.15);
+}
+.card-rank.rank-2 {
+  background: linear-gradient(135deg, rgba(200, 210, 230, 0.22), rgba(200, 210, 230, 0.06));
+  color: #c8d2e6;
+}
+.card-rank.rank-3 {
+  background: linear-gradient(135deg, rgba(220, 170, 130, 0.2), rgba(220, 170, 130, 0.06));
+  color: #dcaa82;
+}
+.story-card .card-body {
+  flex: 1;
+  min-width: 0;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 7px;
+}
+.card-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+.card-user {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.user-name {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.1;
+}
+.user-time {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.24);
+  letter-spacing: 0.02em;
+}
+.card-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-summary {
+  font-size: 0.74rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.48);
+  margin-bottom: 7px;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.3);
+  flex-wrap: wrap;
+}
+.meta-sep {
+  opacity: 0.4;
+}
+.meta-user {
+  color: rgba(255, 255, 255, 0.35);
+}
+/* 卡片标签区：正文下方 / meta 上方，上下虚线分隔更紧凑 */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding: 5px 1px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
+}
+/* meta 行内嵌式标签（向后兼容但不作为默认视觉） */
+.card-tags-inline {
+  /* 复用默认 card-tags 样式，不额外覆盖 */
+}
+/* story-tag 基础形态：彩色胶囊 + 内描边 0.5px + 色值来自 storyTagStyle() */
+.story-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  transition: transform .15s ease, filter .15s ease;
+}
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.story-tag-inline:first-child { margin-left: 0; }
+
+@media (max-width: 768px) {
+  .story-stats-bar {
+    margin: 0 18px 18px;
+    padding: 12px 14px;
+  }
+  .stat-num {
+    font-size: 0.9rem;
+  }
+  .story-section {
+    margin: 0 18px 20px;
+  }
 }
 
 /* ─── Close Button ─── */
@@ -1752,35 +2728,55 @@ watch(() => props.catalogStarId, () => {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(4, 4, 18, 0.5);
+  background: rgba(7, 8, 22, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-/* ─── Mobile Sheet ─── */
+/* ─── Mobile Sheet（对齐 SettingsModal 风格） ─── */
 .mobile-sheet {
   width: 100%;
   max-width: 500px;
-  background: rgba(12, 16, 36, 0.98);
-  border: 1px solid rgba(48, 55, 87, 0.4);
-  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  /* 顶部金色边框（与罗马数字同色） */
+  border-top: 5px solid var(--accent);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+/* 拖拽时高度变化才需要过渡，enter/leave 用 transform 过渡避免冲突 */
+.mobile-sheet.dragging {
   transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: height;
 }
 
-/* ─── Drag Handle ─── */
+/* ─── Drag Handle（金色拖拽杠，与设置弹窗风格一致） ─── */
 .mobile-handle {
-  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.mobile-handle::after {
+  content: '';
+  width: 40px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  margin: 10px auto 6px;
-  flex-shrink: 0;
+  background: var(--accent-border);
+  transition: background 0.2s;
+}
+.mobile-handle:active::after {
+  background: var(--accent);
 }
 
 /* ─── Mobile Top Bar ─── */
@@ -1788,13 +2784,14 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 16px 10px;
+  padding: 8px 18px 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .mobile-close-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1823,7 +2820,7 @@ watch(() => props.catalogStarId, () => {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 0 16px;
+  padding: 16px 18px;
 }
 
 /* ─── Mobile Section (Collapsible) ─── */
@@ -1974,9 +2971,11 @@ watch(() => props.catalogStarId, () => {
 
 .mobile-story-detail-body {
   flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 16px;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
 }
 
 /* ─── Mobile Transitions ─── */
@@ -1984,13 +2983,13 @@ watch(() => props.catalogStarId, () => {
   transition: opacity 0.25s ease;
 }
 .mobile-sheet-fade-enter-active .mobile-sheet {
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.22s ease;
 }
 .mobile-sheet-fade-leave-active .mobile-sheet {
-  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 .mobile-sheet-fade-enter-from {
   opacity: 0;
@@ -2003,6 +3002,28 @@ watch(() => props.catalogStarId, () => {
 }
 .mobile-sheet-fade-leave-to .mobile-sheet {
   transform: translateY(100%);
+}
+
+/* ─── PC Transitions ─── */
+.pc-detail-fade-enter-active {
+  transition: opacity 0.25s ease;
+}
+.pc-detail-fade-enter-active .detail-wrap {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pc-detail-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.pc-detail-fade-leave-active .detail-wrap {
+  transition: transform 0.2s ease-in;
+}
+.pc-detail-fade-enter-from,
+.pc-detail-fade-leave-to {
+  opacity: 0;
+}
+.pc-detail-fade-enter-from .detail-wrap,
+.pc-detail-fade-leave-to .detail-wrap {
+  transform: scale(0.95) translateY(16px);
 }
 
 .mobile-story-slide-enter-active {

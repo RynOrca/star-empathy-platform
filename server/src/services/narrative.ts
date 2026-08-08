@@ -194,7 +194,21 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 3. 不要编造不存在的古诗或人物
 4. 不要使用 # 和 > 之外的任何 markdown 符号
 5. 文字优美凝练、温暖治愈，120~180字
-6. 中文输出`
+6. 中文输出
+
+---
+
+**在结尾（原结尾段之后）必须追加三个小节（严格遵守顺序和格式）：**
+
+### 🌟 这颗星藏着这些心事
+#期待 #等待 #希望 #未来（提炼 4~6 个与"地平线之下、等待被书写"主题相关的 hashtag，用空格分隔，不要加标点）
+
+### 💭 如果这颗星会说话
+（用第一人称写 30~40 字的独白：作为一颗在地平线下沉睡的星，对仰望它的人说的一句温柔的话）
+
+### 📖 一句摘录
+> "（如果有相关古诗或典故，就用那一句；如果没有，就自己写一句 15~25 字的诗意短句，呼应'等待诗篇'的主题）"
+（摘录下另起一行小字说明来源：如果是古诗则标注"——朝代·诗人·出处"，如果是原创则标注"——星空寄语"）`
 
       const user = `恒星名称：${starName}
 所属星座：${conName}
@@ -243,7 +257,21 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 - 勿编造不存在的人物和诗句
 - 文字优美凝练、温暖治愈，150~250字
 - 结尾回扣：当它再次升起，你与古人看见的，仍是同一颗星
-- 中文输出`
+- 中文输出
+
+---
+
+**在结尾（原结尾段之后）必须追加三个小节（严格遵守顺序和格式）：**
+
+### 🌟 这颗星藏着这些心事
+#思念 #怀古 #共鸣 #等待（提炼 4~6 个与诗句内容、人物情感相关的 hashtag，用空格分隔）
+
+### 💭 如果这颗星会说话
+（用第一人称写 30~40 字的独白：作为一颗见证了千年时光的星，对此刻仰望它的人说的一句温柔的话）
+
+### 📖 一句摘录
+> "（从故事中另选一句相关的古诗，或者如果诗人有其他咏星诗句也可以，不要重复上文中已引用过的同一句）"
+——（朝代·诗人·《出处》，或"——星空寄语"如果是原创短句）`
 
     const user = `恒星名称：${starName}
 所属星座：${conName}
@@ -279,7 +307,21 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 3. 不要编造不存在的古诗或人物
 4. 不要使用 # 和 > 之外的任何 markdown 符号
 5. 文字优美凝练、温暖治愈，120~180字
-6. 中文输出`
+6. 中文输出
+
+---
+
+**在结尾（原结尾段之后）必须追加三个小节（严格遵守顺序和格式）：**
+
+### 🌟 这颗星藏着这些心事
+#新生 #期待 #希望 #共鸣（提炼 4~6 个与"第一首诗、等待故事"主题相关的 hashtag，用空格分隔）
+
+### 💭 如果这颗星会说话
+（用第一人称写 30~40 字的独白：作为一颗正在等待第一个故事的星，对仰望它的人说的话）
+
+### 📖 一句摘录
+> "（没有真实古诗就原创一句 15~25 字的诗意短句，呼应'等第一首诗'的主题）"
+——星空寄语`
 
     const user = `恒星名称：${starName}
 所属星座：${conName}
@@ -324,7 +366,21 @@ function buildNarrativePrompt(star: CatalogStar, isVisible: boolean = true): { s
 - 勿编造不存在的人物和诗句
 - 文字优美凝练、温暖治愈，150~250字
 - 结尾回扣：千年以后，你也正在看同一片天空
-- 中文输出`
+- 中文输出
+
+---
+
+**在结尾（原结尾段之后）必须追加三个小节（严格遵守顺序和格式）：**
+
+### 🌟 这颗星藏着这些心事
+#思念 #怀古 #乡愁 #共鸣（提炼 4~6 个与诗句内容、人物情感相关的 hashtag，用空格分隔，不要加标点）
+
+### 💭 如果这颗星会说话
+（用第一人称写 30~40 字的独白：作为一颗见证了千年时光和无数人仰望的星，对此刻的你说一句温柔的话）
+
+### 📖 一句摘录
+> "（从上文引用诗人的其他作品里选一句呼应主题的诗句，不要重复上文已用过的那一句；如果没有，就原创一句 15~25 字的诗意短句）"
+——（朝代·诗人·《出处》，如果是原创则写"——星空寄语"）`
 
   const user = `恒星名称：${starName}
 所属星座：${conName}
@@ -389,7 +445,21 @@ function buildPlanetNarrativePromptVisible(planetId: number): { system: string; 
 - 勿编造不存在的人物和诗句
 - 文字优美凝练、温暖治愈，150~250字
 - 结尾回扣：千年以后，你也正在看同一片天空
-- 中文输出`
+- 中文输出
+
+---
+
+**在结尾（原结尾段之后）必须追加三个小节（严格遵守顺序和格式）：**
+
+### 🌟 这颗星藏着这些心事
+#永恒 #时光 #传承 #仰望（提炼 4~6 个与天体神话、文明传承主题相关的 hashtag）
+
+### 💭 如果这颗星会说话
+（第一人称写 30~40 字独白：作为太阳系的见证者，对现在仰望它的人说的话）
+
+### 📖 一句摘录
+> "（另选一句关于这颗天体的古语/典籍/名句，不要重复上文那句）"
+——（朝代/文明·出处，原创则写"——星空寄语"）`
 
   const user = `天体名称：${planet.nameCN}（${planet.name}）
 类型：太阳系天体
@@ -454,6 +524,69 @@ export interface NarrativeResult {
 }
 
 /**
+ * 从 narrative.content 里**截掉结尾三个小节**（🌟藏心事 / 💭如果会说话 / 📖一句摘录），
+ * 只保留中间"古今共望"正文段落，拆成数组返回。
+ * 用于复用到 persona.paragraphs / 其他需要"正经叙事段"的地方。
+ */
+export function extractNarrativeBodyParagraphs(content: string): string[] {
+  if (!content) return []
+  // 找到第一个 "### 🌟" / "### 💭" / "### 📖" 的位置，整段截掉
+  const idx = content.search(/###\s*(?:🌟|💭|📖)/)
+  const main = (idx >= 0 ? content.slice(0, idx) : content).trim()
+  // 去掉第一行标题 "# 今夜，你看到 XX。" / "# 此刻，XX 正在地平线之下"
+  const withoutTitle = main.replace(/^\s*#[^\n]*\n+/, '').trim()
+  return withoutTitle
+    .split(/\n\s*\n/)
+    .map(p => p.trim())
+    // 剔除：独立的"（诗人名）写："、`> "...（朝代·出处）"` 引用行、`——...` 来源单独行
+    .filter(p => {
+      if (!p) return false
+      if (/^\s*>\s*[""「]/.test(p)) return false
+      if (/^\s*（.*?）写[：:]/.test(p)) return false
+      if (/^\s*——/.test(p)) return false
+      return true
+    })
+}
+
+/**
+ * 复用旧 AI 叙事逻辑，但**不走 narratives 表缓存也不写缓存**，
+ * 只返回拆好的正文段落数组（一般 2~3 段，每段 70~150 字）。
+ * 不传位置则默认地平线以上 visible=true。
+ */
+export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<string[]> {
+  // ─── 太阳系星体 ───
+  if (isPlanetId(catalogStarId)) {
+    let visible = true
+    const hasPosition = lat !== undefined && lng !== undefined
+    if (hasPosition && ra !== undefined && dec !== undefined) {
+      visible = isAboveHorizon({ ra, dec }, lat, lng)
+    }
+    const { system, user } = visible
+      ? buildPlanetNarrativePromptVisible(catalogStarId)
+      : buildPlanetNarrativePromptHidden(catalogStarId)
+    const content = await deepseekChat(
+      [{ role: 'system', content: system }, { role: 'user', content: user }],
+      // 叙事生成是 Markdown，prompt 里没有 "json" 字样 → 必须关掉 json_mode，否则 DeepSeek 400
+      { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+    )
+    return extractNarrativeBodyParagraphs(content).slice(0, 3)
+  }
+
+  const star = getStarInfo(catalogStarId)
+  if (!star) {
+    throw Object.assign(new Error('恒星不存在'), { statusCode: 404 })
+  }
+  const hasPosition = lat !== undefined && lng !== undefined
+  const visible = hasPosition ? isAboveHorizon(star, lat, lng) : true
+  const { system, user } = buildNarrativePrompt(star, visible)
+  const content = await deepseekChat(
+    [{ role: 'system', content: system }, { role: 'user', content: user }],
+    { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+  )
+  return extractNarrativeBodyParagraphs(content).slice(0, 3)
+}
+
+/**
  * 获取恒星叙事（优先缓存，无缓存则生成并缓存）
  */
 export async function getNarrative(catalogStarId: number, lat?: number, lng?: number, ra?: number, dec?: number): Promise<NarrativeResult> {
@@ -484,6 +617,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
       {
         temperature: 0.9,
         maxTokens: 3000,
+        jsonMode: false,
       },
     )
 
@@ -521,6 +655,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
     {
       temperature: 0.9,
       maxTokens: 3000,
+      jsonMode: false,
     },
   )
 

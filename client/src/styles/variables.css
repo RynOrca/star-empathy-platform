@@ -90,6 +90,7 @@
   --radius-full: 9999px;        /* 胶囊按钮、头像 */
 
   /* ═══ 字体层级 ═══ */
+  --text-xxs: 0.6rem;
   --text-xs: 0.625rem;          /* 10px — caption */
   --text-sm: 0.75rem;           /* 12px — secondary */
   --text-base: 0.875rem;        /* 14px — body */
@@ -99,6 +100,7 @@
 
   --font: "Inter", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-display: 'Cinzel', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
   /* ═══ 阴影 ═══ */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -133,4 +135,41 @@
   --touch-target: 44px;                             /* 最小触控区域 */
   --mobile-safe-bottom: env(safe-area-inset-bottom, 16px);
   --mobile-safe-top: env(safe-area-inset-top, 0px);
+
+  /* ═══ 天镜览星模式（Camera Mode）token — 与主设计系统对齐 ═══ */
+  --accent-purple: #caa7ff;
+  /* 取景框：更柔和的暗角 + 半透明边框，避免"黑框感"过重 */
+  --vf-vignette: rgba(7, 8, 22, 0.42);
+  --vf-border: rgba(255, 255, 255, 0.08);
+  --vf-grid: rgba(202, 167, 255, 0.05);
+  --vf-crosshair: rgba(202, 167, 255, 0.35);
+  /* HUD：复用主 panel 的表面色与边框，避免独立一套视觉语言 */
+  --hud-bg: var(--surface);
+  --hud-bg-soft: rgba(26, 30, 53, 0.72);  /* HUD 顶部/底部渐变条：稍透明 */
+  --hud-border: var(--rule);
+  --hud-text: var(--ink-secondary);
+  --hud-text-strong: var(--ink);
+  --hud-accent: var(--accent);
+  --rec-color: var(--error);
+  /* 气泡（移动端）：复用 panel 变量 */
+  --bubble-bg: var(--surface);
+  --bubble-border: var(--rule);
+  --bubble-active-border: var(--accent);
+  --bubble-active-glow: 0 0 20px var(--accent-glow);
+  /* 故事卡片 & 列表：使用主 surface 系 */
+  --story-card-bg: var(--surface);
+  --story-list-bg: var(--bg-elevated);
+  --story-item-hover: var(--overlay-04);
+  --story-item-active: var(--accent-subtle);
+}
+
+/* ═══ 天镜览星：prefers-reduced-motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+  .camera-overlay *,
+  .camera-overlay *::before,
+  .camera-overlay *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

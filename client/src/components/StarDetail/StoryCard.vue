@@ -10,11 +10,12 @@
       <!-- 历史故事：来源标签 -->
       <span v-if="variant === 'history' && story.origin" class="story-origin">{{ story.origin }}</span>
 
-      <!-- 所有故事：发送者 + 情绪标签 + 共鸣按钮 -->
+      <!-- 所有故事：发送者 + 共鸣按钮 -->
       <template v-if="variant === 'all'">
-        <span v-if="story.username" class="story-sender">by {{ story.username }}</span>
+        <span v-if="story.type === 'history'" class="story-sender">古人</span>
+        <span v-else-if="story.authorHidden" class="story-sender is-anon">匿名观星者</span>
+        <span v-else-if="story.username" class="story-sender">by {{ story.username }}</span>
         <span v-else class="story-sender is-anon">匿名星语</span>
-        <span v-if="story.tag" class="story-tag" :class="'tag-' + story.tag">{{ story.tag }}</span>
         <button
           class="resonate-btn"
           :class="{ done: isResonated }"
@@ -44,6 +45,43 @@
       <img v-if="story.imageUrl" :src="story.imageUrl" class="story-image" @click.stop />
     </div>
 
+    <!-- 合集 / 星星归属 + 标签行：左侧归属、右侧标签，同一行；两者都空时隐藏 -->
+    <div
+      v-if="(showStarBelonging && starBelonging) || story.collectionName || displayTags.length"
+      class="story-tags-row"
+    >
+      <!-- 星星归属（合集上下文：显示挂在哪颗星上） → 点击跳转 /sky?star=xxx -->
+      <span
+        v-if="showStarBelonging && starBelonging && mainStarCatalogId != null"
+        class="story-star-belong ssb-clickable"
+        :style="{ '--ssb-c': starBelonging.color } as Record<string, string>"
+        :title="`前往该星星：${starBelonging.name}`"
+        @click.stop="goToStar(mainStarCatalogId)"
+      >
+        <StarIcon :size="11" class="ssb-icon" />
+        <span class="ssb-name">{{ starBelonging.name }}</span>
+        <span v-if="starBelonging.con" class="ssb-con">· {{ starBelonging.con }}</span>
+      </span>
+      <!-- 合集徽章（非合集上下文） -->
+      <CollectionBadge
+        v-else-if="story.collectionName"
+        :collection-name="story.collectionName"
+        :cover-color="story.collectionCoverColor ?? null"
+        :collection-visibility="story.collectionVisibility ?? null"
+        :clickable="!!story.collectionId && !!collectionClickable"
+        @click="collectionClickable && $emit('collection-click', story)"
+      />
+      <!-- 分隔点：归属/合集和标签同时存在时 -->
+      <span v-if="(showStarBelonging ? !!starBelonging : !!story.collectionName) && displayTags.length" class="story-tag-sep"></span>
+      <!-- 标签（右侧） -->
+      <span
+        v-for="t in displayTags"
+        :key="'tag-' + story.id + '-' + t"
+        class="story-tag story-tag-inline"
+        :style="tagStyle(t)"
+      >#{{ t }}</span>
+    </div>
+
     <div class="story-meta">
       <!-- 历史故事元信息 -->
       <template v-if="variant === 'history'">
@@ -56,33 +94,60 @@
 
       <!-- 所有故事 / 我的故事元信息 -->
       <template v-else>
-        <span v-if="formattedTime" class="meta-time">{{ formattedTime }}</span>
-        <span v-if="formattedTime && formattedDistance?.text" class="meta-sep">·</span>
-        <span v-if="formattedDistance?.text" class="meta-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
-        <span class="meta-sep">·</span>
-        <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
-        <span class="meta-sep">·</span>
-        <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        <!-- 历史故事：在其他上下文（合集等）也不显示无意义的发表时间+地点 -->
+        <template v-if="story.type === 'history'">
+          <span class="meta-history">来自星河</span>
+          <span class="meta-sep">·</span>
+          <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
+          <span class="meta-sep">·</span>
+          <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        </template>
+        <template v-else>
+          <span v-if="formattedTime" class="meta-time">{{ formattedTime }}</span>
+          <span v-if="formattedTime && formattedDistance?.text" class="meta-sep">·</span>
+          <span v-if="formattedDistance?.text" class="meta-dist" :class="{ 'meta-near': formattedDistance.near }">{{ formattedDistance.text }}</span>
+          <span class="meta-sep">·</span>
+          <SparklesIcon :size="12" /> <span>{{ displayResonance }}</span>
+          <span class="meta-sep">·</span>
+          <EyeIcon :size="11" /> <span>{{ displayViews }}</span>
+        </template>
       </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Sparkles, Check, Eye } from 'lucide-vue-next'
+import { Sparkles, Check, Eye, Star } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import CollectionBadge from '../CollectionBadge.vue'
+import { getStarNameInfo } from '../../utils/starName'
 
 const SparklesIcon = Sparkles
 const CheckIcon = Check
 const EyeIcon = Eye
+const StarIcon = Star
+const router = useRouter()
+const route = useRoute()
 
-defineProps<{
+const props = defineProps<{
   story: {
     id: number
+    type?: 'history' | 'user' | string | null
     title: string | null
     imageUrl: string | null
     origin: string | null
     username: string | null
+    /** 合集级匿名 or 单篇 is_anonymous：对外隐藏作者，作者本人/管理员可见 true 时不显示真实作者名 */
+    authorHidden?: boolean
     tag: string | null
+    tags?: string[] | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
+    catalogStarId?: number | null
+    catalogStarIds?: number[]
   }
   variant: 'history' | 'all' | 'mine'
   renderedContent: string
@@ -93,12 +158,62 @@ defineProps<{
   formattedTime?: string
   formattedDistance?: { text: string; near: boolean } | null
   index: number
+  /** 合集 Badge 是否可点击打开合集详情；默认 false（仅展示） */
+  collectionClickable?: boolean
+  /** 合集上下文：显示星星归属（挂在哪颗星上）而非合集徽章 */
+  showStarBelonging?: boolean
 }>()
 
 defineEmits<{
   click: []
   resonate: []
+  'collection-click': [story: any]
 }>()
+
+/** 标签展示：优先 tags[]，空时退回 tag 单列（老数据兼容） */
+const displayTags = computed<string[]>(() => {
+  const arr = Array.isArray(props.story.tags) ? props.story.tags.filter((t) => !!t) : []
+  if (arr.length) return arr.slice(0, 5)
+  return props.story.tag ? [props.story.tag] : []
+})
+
+/** 星星归属：取主星 catalogStarId，否则 catalogStarIds[0]；查 stars.json/planets 取名+星座+颜色 */
+const mainStarCatalogId = computed<number | null>(() => props.story.catalogStarId ?? props.story.catalogStarIds?.[0] ?? null)
+const starBelonging = computed(() => {
+  const id = mainStarCatalogId.value
+  if (id == null) return null
+  return getStarNameInfo(id) ?? null
+})
+
+/** 跳转星空页面并打开该星星详情（防止冒泡触发卡片 click）
+ *  关键兜底：当前 fullPath 与目标完全一致时 Vue Router 不会二次导航，
+ *  改为派发自定义事件 star-identity-click，让合集详情等监听方知道"重复点击了同星 → 要关闭/重聚焦"
+ */
+function goToStar(starId: number) {
+  const target = `/sky?star=${encodeURIComponent(String(starId))}`
+  if (route.fullPath !== target) {
+    router.push({ path: '/sky', query: { star: String(starId) } })
+  } else {
+    window.dispatchEvent(new CustomEvent('star-identity-click', { detail: { starId } }))
+  }
+}
+
+/** 开放标签 hash 染色：字符串 → 稳定 HSL 柔和色 */
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return h
+}
+function tagStyle(tag: string): Record<string, string> {
+  const h = Math.abs(hashCode(tag)) % 360
+  const color = `hsl(${h} 62% 74%)`
+  const border = `hsla(${h}, 62%, 74%, 0.24)`
+  const bg = `hsla(${h}, 62%, 74%, 0.07)`
+  return { color, borderColor: border, backgroundColor: bg, border: '0.5px solid ' + border }
+}
 </script>
 
 <style scoped>
@@ -222,17 +337,69 @@ defineEmits<{
 }
 .story-sender.is-anon { color: #5a5580; }
 
-/* ── 情绪标签色 ── */
+/* ── 开放标签通用样式（正文下方、meta 上方，紧凑分隔带） ── */
 .story-tag {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 0.7rem; font-weight: 500; margin-left: 4px;
-  background: var(--overlay-08); color: var(--muted-light);
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+  border: 0.5px solid transparent;
 }
-.story-tag.tag-思念 { color: #ff8b7d; }
-.story-tag.tag-等待 { color: #86a8ff; }
-.story-tag.tag-离别 { color: #caa7ff; }
-.story-tag.tag-愿望 { color: #ffd98a; }
-.story-tag.tag-孤独 { color: #95f0c0; }
+.story-tag:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.3px);
+}
+.story-tag-inline:first-child { margin-left: 0; }
+.story-tags-row {
+  display: flex; flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  padding: 6px 2px;
+  border-top: 0.5px dashed var(--rule);
+  border-bottom: 0.5px dashed var(--rule);
+}
+
+/* 合集与标签之间的竖线分隔 */
+.story-tag-sep {
+  width: 1px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+/* ── 星星归属（合集上下文） ── */
+.story-star-belong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  padding: 2px 9px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--ssb-c, #fff) 8%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--ssb-c, #fff) 22%, transparent);
+  color: var(--ssb-c, var(--ink-secondary));
+  flex-shrink: 0;
+  line-height: 1.45;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+/* 可点击的星星归属徽章：cursor + hover 高亮（冒泡已 @click.stop 阻止） */
+.story-star-belong.ssb-clickable { cursor: pointer; user-select: none; }
+.story-star-belong.ssb-clickable:hover {
+  background: color-mix(in srgb, var(--ssb-c, #fff) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ssb-c, #fff) 36%, transparent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--ssb-c, #fff) 26%, transparent);
+  transform: translateY(-0.5px);
+}
+.ssb-icon { opacity: 0.85; flex-shrink: 0; }
+.ssb-name { font-weight: 500; }
+.ssb-con { opacity: 0.6; font-size: 0.64rem; }
 
 /* ─── Story Image ─── */
 .story-image {

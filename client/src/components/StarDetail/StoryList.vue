@@ -50,8 +50,11 @@
         :formattedTime="variant !== 'history' && formattedTime ? formattedTime(story) : undefined"
         :formattedDistance="variant !== 'history' && formattedDistance ? formattedDistance(story) : undefined"
         :index="index"
+        :collectionClickable="collectionClickable"
+        :showStarBelonging="showStarBelonging"
         @click="$emit('story-click', story)"
         @resonate="$emit('resonate', story)"
+        @collection-click="$emit('collection-click', story)"
       />
     </div>
 
@@ -90,7 +93,14 @@ const props = defineProps<{
     imageUrl: string | null
     origin: string | null
     username: string | null
+    /** 合集级匿名 or 单篇 is_anonymous：对外隐藏作者 */
+    authorHidden?: boolean
     tag: string | null
+    tags?: string[] | null
+    collectionId?: number | null
+    collectionName?: string | null
+    collectionCoverColor?: string | null
+    collectionVisibility?: string | null
   }>
   variant: 'history' | 'all' | 'mine'
   searchQuery?: string
@@ -105,6 +115,10 @@ const props = defineProps<{
   isResonated: (story: any) => boolean
   formattedTime?: (story: any) => string
   formattedDistance?: (story: any) => { text: string; near: boolean } | null
+  /** 合集 Badge 是否可点击；透传给 StoryCard */
+  collectionClickable?: boolean
+  /** 合集上下文：显示星星归属而非合集徽章；透传给 StoryCard */
+  showStarBelonging?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -112,6 +126,7 @@ const emit = defineEmits<{
   'update:sortKey': [value: SortKey]
   'story-click': [story: any]
   'resonate': [story: any]
+  'collection-click': [story: any]
 }>()
 
 const sortLabels: Record<SortKey, string> = {

@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import fs from 'node:fs';
+import { exec } from 'node:child_process';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import starsRouter from './routes/stars';
@@ -17,6 +18,8 @@ import narrativeRouter from './routes/narrative';
 import chatRouter from './routes/chat';
 import moonRouter from './routes/moon';
 import locationRouter from './routes/location';
+import analysisRouter from './routes/analysis';
+import collectionsRouter from './routes/collections';
 import { ok, badRequest, serverError } from './utils/response';
 import { authRequired } from './middleware/auth';
 import { setApiKey, getApiKey } from './services/deepseek';
@@ -180,6 +183,7 @@ app.use('/api/stories', storiesRouter);
 app.post('/api/catalog/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/catalog/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/catalog/stars', analysisRouter);  // :id/analysis 放最前面，避免被 :id 匹配吞掉
 app.use('/api/catalog/stars', narrativeRouter); // 叙事路由（/narrative）
 app.use('/api/catalog/stars', chatRouter);      // 聊天路由（/chat/figures, /chat）
 app.use('/api/catalog/stars', catalogRouter);
@@ -192,10 +196,17 @@ app.post('/api/stars/:catalogStarId/visit', writeLimiter);
 app.post('/api/stars/story/:storyId/view', writeLimiter);
 app.post('/api/stars/:catalogStarId/favorite', writeLimiter);
 app.delete('/api/stars/:catalogStarId/favorite', writeLimiter);
+app.use('/api/stars', analysisRouter); // 兼容旧 URL: /api/stars/:id/analysis
 app.use('/api/stars', starsRouter);
 
 // 个人主页
 app.use('/api/profile', profileRouter);
+
+// 故事合集（星笺）：故事的唯一系列标识
+app.post('/api/collections', writeLimiter);
+app.patch('/api/collections/:id', writeLimiter);
+app.delete('/api/collections/:id', writeLimiter);
+app.use('/api/collections', collectionsRouter);
 
 // 月相解读
 app.use('/api/moon', moonRouter);
@@ -203,87 +214,40 @@ app.use('/api/moon', moonRouter);
 // 定位（IP 定位 + 反向地理编码）
 app.use('/api/location', locationRouter);
 
-// 设置 API Key（运行时覆盖）
+// ════════════════════════════════════════════════════════════════
+// 设置（只读）：
+//   · Key 只允许通过「环境变量」或「管理员服务器上写 .runtime-key」配置，
+//     不提供前端写入接口（项目不做权限系统，写接口开放 = 任意访客替换/清空 Key）。
+//   · GET /api/settings/*-key 只返回 hasKey 状态，永远不返回 Key 正文。
+//   · POST 写接口 → 统一 405 Method Not Allowed（防止旧版前端 POST 404 或 500 乱蹦）
+// ════════════════════════════════════════════════════════════════
+
+const SETTINGS_READONLY_MSG = '出于安全考虑，运行时 Key 只允许通过服务器环境变量或 .runtime-key 文件配置，前端不提供写入通道。';
+
+function methodNotAllowed(res: Response, msg: string) {
+  res.status(405).json({ code: 405, message: msg, data: null });
+}
+
+// DeepSeek
 app.get('/api/settings/api-key', (_req: Request, res: Response) => {
   ok(res, 'ok', { hasKey: !!getApiKey() });
 });
-app.post('/api/settings/api-key', (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
-    setApiKey(null);
-    ok(res, '已清除 API Key');
-    return;
-  }
-  setApiKey(apiKey.trim());
-  ok(res, 'API Key 已保存');
+app.post('/api/settings/api-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
+});
+app.post('/api/settings/test-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
 
-// 测试 API Key 连通性
-app.post('/api/settings/test-key', async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getApiKey();
-  if (!key) {
-    return badRequest(res, '请先设置 API Key');
-  }
-  try {
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 5,
-      }),
-    });
-    if (resp.ok) {
-      ok(res, '星河已连通');
-    } else {
-      badRequest(res, '未能连通');
-    }
-  } catch (e: any) {
-    serverError(res, `网络错误: ${e.message}`);
-  }
-});
-
-// 高德地图 API Key（运行时覆盖）
+// 高德地图
 app.get('/api/settings/amap-key', (_req: Request, res: Response) => {
   ok(res, 'ok', { hasKey: !!getAmapKey() });
 });
-app.post('/api/settings/amap-key', (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
-    setAmapKey(null);
-    ok(res, '已清除高德 Key');
-    return;
-  }
-  setAmapKey(apiKey.trim());
-  ok(res, '高德 Key 已保存');
+app.post('/api/settings/amap-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
-
-// 测试高德 Key 连通性
-app.post('/api/settings/test-amap-key', async (req: Request, res: Response) => {
-  const { apiKey } = req.body;
-  const key = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : getAmapKey();
-  if (!key) {
-    return badRequest(res, '请先设置高德 API Key');
-  }
-  try {
-    const resp = await fetch(
-      `https://restapi.amap.com/v3/geocode/regeo?key=${encodeURIComponent(key)}&location=116.4,39.9&output=JSON`,
-      { signal: AbortSignal.timeout(5000) },
-    );
-    const data = await resp.json() as { status: string; info?: string };
-    if (data.status === '1') {
-      ok(res, '高德地图已连通');
-    } else {
-      badRequest(res, `高德返回错误: ${data.info || '未知错误'}`);
-    }
-  } catch (e: any) {
-    serverError(res, `网络错误: ${e.message}`);
-  }
+app.post('/api/settings/test-amap-key', (_req: Request, res: Response) => {
+  methodNotAllowed(res, SETTINGS_READONLY_MSG);
 });
 
 // SPA 回退：非 API 路径返回 index.html
@@ -297,24 +261,77 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   serverError(res);
 });
 
-// 启动服务
-app.listen(PORT, () => {
-  console.log(`🌟 星语穹庭后端运行中: http://localhost:${PORT}`);
-  console.log(`   GET  /api/stories               - 获取所有故事`);
-  console.log(`   POST /api/stories               - 投递心事`);
-  console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
-  console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
-
-  // 定时清理过期 token 黑名单（每 10 分钟）
-  setInterval(() => {
-    try { cleanExpiredTokens(); } catch { /* 静默 */ }
-  }, 10 * 60 * 1000);
-
-  // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
-  setImmediate(() => {
-    try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+/**
+ * 解析 Windows/Linux 下占用某 TCP 端口的 PID（仅用于打印提示，绝不自动换端口）
+ */
+function resolvePid(port: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32'
+      ? `netstat -ano | findstr ":${port}" | findstr LISTENING`
+      : `lsof -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null`;
+    exec(cmd, { timeout: 2000 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      const line = stdout.trim().split(/\r?\n/)[0];
+      if (!line) return resolve(null);
+      // Windows: 最后一列 = PID；Linux lsof -t = PID
+      const parts = line.split(/\s+/).filter(Boolean);
+      if (process.platform === 'win32') {
+        resolve(parts[parts.length - 1] || null);
+      } else {
+        resolve(parts[0] || null);
+      }
+    });
   });
-});
+}
+
+// 启动服务（端口被占 → 直接报错退出，绝不 fallback 到其他端口）
+// 为什么不允许自动换端口？
+//   · 前端 vite.config.ts /api 代理硬编码到 3000，换端口 = 前端全 502
+//   · 生产部署 nginx 反代 /api → 后端 3000，换端口 = 线上静默挂掉
+//   · 任何 PORT 变更都必须由运维通过环境变量明确指定（process.env.API_PORT），后端绝不替用户做决定
+function startServer(port: number) {
+  const server = app.listen(port);
+
+  server.once('listening', () => {
+    console.log(`🌟 星语穹庭后端运行中: http://localhost:${port}`);
+    console.log(`   GET  /api/stories               - 获取所有故事`);
+    console.log(`   POST /api/stories               - 投递心事`);
+    console.log(`   POST /api/stories/:id/resonate  - 共鸣点亮`);
+    console.log(`   GET  /api/catalog/stars/:id/stats - 恒星统计`);
+
+    // 定时清理过期 token 黑名单（每 10 分钟）
+    setInterval(() => {
+      try { cleanExpiredTokens(); } catch { /* 静默 */ }
+    }, 10 * 60 * 1000);
+
+    // 启动后自动补全缺失的故事内核（后台运行，不阻塞）
+    setImmediate(() => {
+      try { backfillMissingKernels(); } catch (e) { console.error('[kernel] 补全任务启动失败:', e); }
+    });
+  });
+
+  server.on('error', async (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const pid = await resolvePid(port);
+      console.error(`\n❌❌❌ 端口 ${port} 已被占用，启动终止！`);
+      if (pid) {
+        console.error(`   占用者 PID: ${pid}`);
+        if (process.platform === 'win32') {
+          console.error(`   👉 Windows 释放命令:  taskkill /F /PID ${pid}`);
+        } else {
+          console.error(`   👉 Linux/macOS 释放:  kill -9 ${pid}`);
+        }
+      }
+      console.error(`   👉 如果必须使用其他端口，请通过环境变量 API_PORT=${port + 1} 显式指定（同时修改前端 vite 代理 target，否则前端全 502）`);
+      console.error(`   ❌ 绝不自动换端口——防止"后端实际跑在 3001，但前端代理 3000"这种沉默故障上线。\n`);
+      process.exit(1);
+    }
+    console.error('💥 服务启动异常：', err);
+    process.exit(1);
+  });
+}
+
+startServer(PORT);
 
 export { upload };
 export default app;

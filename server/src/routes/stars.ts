@@ -1,21 +1,24 @@
 import { Router, Request, Response } from 'express';
-import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory } from '../services/starService';
+import { getAllStars, getAllStarsPaged, getStoryById, getStoriesByCatalogStarId, createStar, resonate, recordCatalogVisit, recordStoryView, getCatalogStats, addFavorite, removeFavorite, deleteStory, getCatalogStarIdsForStory } from '../services/starService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
-import { triggerKernelGeneration } from '../services/kernel';
+import { triggerKernelGeneration, triggerAnalysisRegeneration } from '../services/kernel';
+import { verifyCollectionOwnership, createCollection, ensureDefaultCollection, getOrCreateDefaultCollections } from '../services/collectionService';
+import { resolveValidCatalogIds } from '../services/catalogMeta';
 
 const router = Router();
 
 // 获取所有星星（支持分页 ?page=&limit=，不传则返回全量）
-router.get('/', (req: Request, res: Response) => {
+router.get('/', authOptional, (req: Request, res: Response) => {
   try {
+    const currentUserId = (req as Request & { user?: { id: number } }).user?.id;
     const page = parseInt(req.query.page as string, 10);
     const limit = parseInt(req.query.limit as string, 10);
     if (!isNaN(page) && !isNaN(limit)) {
-      const paged = getAllStarsPaged(page, limit);
+      const paged = getAllStarsPaged(page, limit, currentUserId);
       ok(res, 'success', paged);
     } else {
-      const stars = getAllStars();
+      const stars = getAllStars(currentUserId);
       ok(res, 'success', stars);
     }
   } catch (error) {
@@ -39,11 +42,12 @@ router.get('/story/:storyId', (req: Request, res: Response) => {
 });
 
 // 单星下的所有故事（旧路由兼容）
-router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
+router.get('/:catalogStarId/stories', authOptional, (req: Request, res: Response) => {
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
-    const stories = getStoriesByCatalogStarId(catalogStarId);
+    const currentUserId = (req as Request & { user?: { id: number } }).user?.id;
+    const stories = getStoriesByCatalogStarId(catalogStarId, currentUserId);
     ok(res, 'success', stories);
   } catch (error) {
     console.error('GET /api/stars/:catalogStarId/stories error:', error);
@@ -54,7 +58,7 @@ router.get('/:catalogStarId/stories', (req: Request, res: Response) => {
 // 投递心事/创建星星（需登录）
 router.post('/story', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalog_star_id, catalog_star_ids, location, tag, isAnonymous } = req.body;
+    const { title, content, catalog_star_id, catalog_star_ids, location, tag, tags, isAnonymous, collectionId, collectionName, collectionVisibility } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -62,14 +66,21 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
     }
 
     const trimmed = content.trim();
-    if (trimmed.length === 0 || trimmed.length > 300) {
-      return badRequest(res, 'content 长度需在 1~300 字之间');
+    if (trimmed.length === 0 || trimmed.length > 2000) {
+      return badRequest(res, 'content 长度需在 1~2000 字之间');
     }
 
-    const starId = typeof catalog_star_id === 'number' ? catalog_star_id : undefined;
-    const catalogStarIds: number[] | undefined = Array.isArray(catalog_star_ids)
-      ? catalog_star_ids.filter((id: unknown) => typeof id === 'number')
-      : undefined;
+    // ─── 归属星（必填）：要么对着星星填故事，要么 AI 帮忙挑星，绝不允许无归属 ───
+    const resolved = resolveValidCatalogIds(catalog_star_id, catalog_star_ids);
+    if (!resolved) {
+      return badRequest(
+        res,
+        '必须选择或 AI 匹配一颗归属星辰（catalogStarId 或 catalogStarIds 至少含一颗有效星表星/太阳系行星 id）'
+      );
+    }
+    const { ids: effectiveCatalogStarIds, primaryId: starId } = resolved;
+    // 兼容旧字段：把最终有效 ids 数组写回（后面 createStar 会用 catalogStarIds 字段）
+    const catalogStarIds: number[] = effectiveCatalogStarIds;
 
     let locationData: { lat: number; lng: number } | undefined;
     if (
@@ -91,13 +102,46 @@ router.post('/story', authRequired, (req: Request, res: Response) => {
     const safeContent = esc(trimmed);
     const safeTitle = typeof title === 'string' && title.trim() ? esc(title.trim()) : null;
     const safeTag = typeof tag === 'string' ? tag : undefined;
+    const safeTags: string[] | undefined = Array.isArray(tags) ? tags.filter((t) => typeof t === 'string') : undefined;
     const anonymous = typeof isAnonymous === 'boolean' ? isAnonymous : false;
 
-    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds);
+    // 合集归属：collectionId 优先，其次 collectionName 新建，都没有则自动归入默认合集
+    let finalCollectionId: number | undefined;
+    if (typeof collectionId === 'number') {
+      if (!verifyCollectionOwnership(collectionId, user.id)) {
+        return badRequest(res, '合集不存在或不属于当前用户');
+      }
+      finalCollectionId = collectionId;
+    } else if (typeof collectionName === 'string' && collectionName.trim()) {
+      const visi = typeof collectionVisibility === 'string' && ['public', 'private', 'anonymous'].includes(collectionVisibility)
+        ? collectionVisibility as 'public' | 'private' | 'anonymous'
+        : undefined;
+      const created = createCollection(user.id, { name: collectionName.trim(), visibility: visi });
+      if (created.error) return badRequest(res, created.error);
+      finalCollectionId = created.collection?.id;
+    } else {
+      // 用户没选合集、也没指定新建合集名 → 默认进「公开星笺」（系统默认公开合集）
+      const defs = getOrCreateDefaultCollections(user.id);
+      finalCollectionId = defs?.publicCollection?.id;
+    }
+
+    const star = createStar(safeContent, safeTitle ?? undefined, starId, locationData, user.id, safeTag, anonymous, undefined, catalogStarIds, safeTags, finalCollectionId);
 
     // 异步生成 AI 故事内核
     if (star && (star as { id: number }).id) {
       triggerKernelGeneration((star as { id: number }).id, safeContent, safeTitle);
+    }
+
+    // 异步触发 catalog 级分析自动更新（闭环：新增故事 → 够5条 → AI 卡片内容自动重新生成）
+    // 对 createStar 写入的所有 catalog_star_id（包括一对多挂多颗星）都触发一次
+    const allAffectedIds = catalogStarIds?.length
+      ? catalogStarIds
+      : (starId != null ? [starId] : []);
+    if (allAffectedIds.length > 0) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(allAffectedIds); }
+        catch (e) { console.error('[stars/analysis] 自动触发失败:', e); }
+      });
     }
 
     ok(res, '故事已化作星光', star);
@@ -117,6 +161,16 @@ router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) =>
     const result = resonate(storyId, user.id);
     if (!result) return notFound(res, '故事不存在');
     if (result.already) return ok(res, '已共鸣', result);
+
+    // 共鸣会改变 story_count 的聚合权重分布 → 触发 catalog 级 AI 分析延迟再生
+    // （15s debounce 合并窗口，不会每次点击都调 AI）
+    const affected = getCatalogStarIdsForStory(storyId);
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stars/resonate] 自动触发分析失败:', e); }
+      });
+    }
 
     ok(res, '共鸣已点亮', result);
   } catch (error) {
@@ -198,9 +252,18 @@ router.delete('/story/:storyId', authRequired, (req: Request, res: Response) => 
     const storyId = parseInt(req.params.storyId, 10);
     if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
     const user = (req as Request & { user: { id: number } }).user;
+    // 先拿到受影响的 catalog 星（删除后 story_catalog_stars 会被清空，必须在此之前查）
+    const affected = getCatalogStarIdsForStory(storyId);
     const result = deleteStory(storyId, user.id);
     if (result.notFound) return notFound(res, '故事不存在');
     if (result.notOwner) return forbidden(res, '只能删除自己的故事');
+    // 删除成功 → 触发 catalog 级 AI 分析再生（故事集合变了，原来的画像/主题可能失真）
+    if (affected.length) {
+      setImmediate(() => {
+        try { triggerAnalysisRegeneration(affected); }
+        catch (e) { console.error('[stars/delete-story] 自动触发分析失败:', e); }
+      });
+    }
     ok(res, '已删除');
   } catch (error) {
     console.error('DELETE /api/stars/story/:storyId error:', error);

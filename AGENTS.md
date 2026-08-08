@@ -34,13 +34,15 @@ Base URL：`http://localhost:3000`（开发），部署后为 `https://your-doma
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/stars` | 获取所有星星 |
-| POST | `/api/stars/story` | 投递心事（必填 `content` 1~300 字，可选 `catalog_star_id`/`title`/`location`） |
+| POST | `/api/stars/story` | 投递心事（必填 `content` 1~2000 字，可选 `catalog_star_id`/`title`/`location`/`tags` JSON 数组） |
 | POST | `/api/stars/:id/resonate` | 共鸣 +1 |
 | GET | `/api/stars/:id/stats` | 获取某星表的聚合统计 |
 | POST | `/api/stars/:id/visit` | 记录恒星浏览 |
 | POST | `/api/stars/story/:id/view` | 记录故事浏览 |
 | POST | `/api/stars/:id/favorite` | 收藏 |
 | DELETE | `/api/stars/:id/favorite` | 取消收藏 |
+| POST | `/api/stories/ai-tags` | **仅标签推荐（轻量）**：标题+正文 → 3~5 个 AI 建议标签，不触发星星匹配 |
+| POST | `/api/stories/match-star` | AI 归属星辰匹配：标题+正文 → Top 3 契合星辰 + suggestedTags（带匹配理由） |
 
 响应统一格式：`{ code: 200|400|404|500, message: "...", data: ... }`
 
@@ -88,6 +90,8 @@ npm run preview    # 预览构建产物
 - **冷启动数据真实** — seed 脚本中含古诗词、星座神话、社区语录，禁止用假数据
 - **数据迁移兼容** — `server/src/db.ts` 中有 `ALTER TABLE ... ADD COLUMN` 的 try-catch 兼容旧库，新环境不需要但保留无害
 - **星表坐标预计算** — 恒星坐标由 `generateStarCatalog.ts` 离线生成 JSON，后端不参与
+- **天镜览星模式（Camera Mode）** — 相机模式逻辑全部位于 `client/src/composables/useCameraMode.ts`，`useSky.ts` 仅暴露 API（`flyToStar3D`/`getStarsInFrame`/`onCameraFrame` 等）不承载业务；模式切换由 SkyPage 顶层 `v-if="cameraMode === 'observe'"` 分叉；与行星特写状态机互斥（进入相机模式时若在 CLOSEUP 先 `exitCloseup()`）；PC 端复刻方案B（取景框+HUD+列表），移动端复刻方案A（气泡+拖拽补齐）；详细故事卡片复用 `useResonate` 但不复用完整 StarDetail
+- **图标规范（全项目）** — 所有 UI 图标必须使用 SVG icon（内联 SVG 或 SVG 函数式组件），**禁止使用 emoji 字符**（如 ✨🔥📍📜💫👁🌌📖🕐）。新增 icon 统一放 `client/src/components/icons/` 或对应功能模块的 `icons/` 子目录。设计原型中的 emoji 仅作占位，落地时必须替换为 SVG icon
 
 ## 部署
 

@@ -4,7 +4,7 @@ import {
   Line, LineBasicMaterial, LineDashedMaterial, LineSegments,
   AdditiveBlending, Color, Mesh, MeshBasicMaterial, MeshPhongMaterial,
   SphereGeometry, RingGeometry, BackSide, DoubleSide, RepeatWrapping,
-  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4,
+  Raycaster, Vector2, Sprite, SpriteMaterial, Vector3, Group, AmbientLight, Matrix4, Frustum,
   TextureLoader, PointLight, ShaderMaterial, LoadingManager,
   Quaternion, Euler,
   ACESFilmicToneMapping,
@@ -25,11 +25,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 import { SPHERE_RADIUS, DEFAULT_FOV, FOV_MIN, FOV_MAX, CLOSEUP_FOV, CLOSEUP_INIT_RATIO, CLOSEUP_MIN_RATIO, CLOSEUP_MAX_RATIO, CLOSEUP_NEAR, DEFAULT_NEAR, CLOSEUP_WHEEL_FACTOR } from '../utils/constants'
+import { CAMERA_FOV_BY_STAGE, CAMERA_FLY_DURATION_MS, CAMERA_FRAME_THROTTLE_MS, CAMERA_LIST_MAX_ITEMS } from '../utils/constants'
+import { ref, type Ref } from 'vue'
 import { STAR_DISPLAY_CONFIG, type StarDisplayConfig } from '../utils/starDisplayConfig'
 import { dateToJD, lstDeg, orientationEuler, eclipticToRaDecJD, getAsteroidPosition, getAsteroidPositionSync } from '../utils/astro'
-// 阶段 3 P2：小行星 + 流星雨 + GPU 检测
+// 阶段 3 P2：小行星 + GPU 检测
 import { ASTEROIDS } from '../data/asteroids'
-import { getActiveShowers, type MeteorShower } from '../data/meteorShowers'
 import { detectGPU, getRenderParams } from '../utils/gpuDetect'
 // [DISABLED 2026-07-28] 彗星系统已禁用（用户反馈不需要），保留文件以备未来恢复
 // import { COMETS, getCometPositionSync, cometTailDirection, type CometElement } from '../data/comets'
@@ -48,6 +49,78 @@ import rawCatalog from '../data/stars.json'
 import constellationsDataRaw from '../data/constellations.json'
 const CAT = rawCatalog as unknown as CatData
 const constellationsData = constellationsDataRaw as unknown as Record<string, ConstellationData>
+
+// ════════════════════════════════════════════════════════════
+// 视星等 → 辉光参数映射（所有可交互星都有辉光，强弱按星等分层）
+// 越亮(mag 越小)：越大、越亮、越暖色温、呼吸越慢（沉稳）
+// 越暗(mag 越大)：越小、越淡、越冷色温、呼吸稍快（细碎闪烁）
+// ════════════════════════════════════════════════════════════
+interface GlowTier {
+  /** bloomTex 画布尺寸：越大边缘渐变更柔和 */
+  texSize: number
+  /** SpriteMaterial.opacity 峰值（上限 clamp） */
+  peakOpacity: number
+  /** Sprite.scale (x=y) 世界尺寸 */
+  scale: number
+  /** 呼吸周期 ms（mag 越大周期越短，闪烁更细碎） */
+  periodMin: number
+  periodMax: number
+  /** 主色调（亮星暖金，中星银白，暗星冷蓝灰） */
+  tint: string
+  /** 有故事时额外叠加 0~1 的 opacity boost */
+  storyBoostOpacity: number
+  /** 有故事时额外乘以的 scale boost */
+  storyBoostScale: number
+}
+function glowTierForMag(mag: number): GlowTier {
+  if (mag <= -0.5) return {  // T0: 亮星（天狼/老人/南门二 级）
+    texSize: 128, peakOpacity: 0.72, scale: 7.0,
+    periodMin: 5000, periodMax: 8000,
+    tint: '#ffe5a0',
+    storyBoostOpacity: 0.22, storyBoostScale: 1.32,
+  }
+  if (mag <= 0.5) return {   // T1: 0 等星
+    texSize: 118, peakOpacity: 0.62, scale: 6.3,
+    periodMin: 4300, periodMax: 6800,
+    tint: '#ffd98a',
+    storyBoostOpacity: 0.20, storyBoostScale: 1.26,
+  }
+  if (mag <= 1.8) return {   // T2: 1 等星
+    texSize: 108, peakOpacity: 0.54, scale: 5.4,
+    periodMin: 3700, periodMax: 6000,
+    tint: '#f4ecd2',
+    storyBoostOpacity: 0.18, storyBoostScale: 1.22,
+  }
+  if (mag <= 3.0) return {   // T3: 2 等星
+    texSize: 98, peakOpacity: 0.46, scale: 4.6,
+    periodMin: 3100, periodMax: 5200,
+    tint: '#eaeaf2',
+    storyBoostOpacity: 0.16, storyBoostScale: 1.18,
+  }
+  if (mag <= 4.5) return {   // T4: 3~4 等星（用户星默认档）
+    texSize: 90, peakOpacity: 0.40, scale: 3.8,
+    periodMin: 2600, periodMax: 4400,
+    tint: '#c7d2e9',
+    storyBoostOpacity: 0.14, storyBoostScale: 1.14,
+  }
+  // T5: 5 等以下（暗星，最小档 → 基础 scale = 3.0，符合用户 3~7 区间）
+  return {
+    texSize: 80, peakOpacity: 0.32, scale: 3.0,
+    periodMin: 2200, periodMax: 3600,
+    tint: '#a8b8d4',
+    storyBoostOpacity: 0.12, storyBoostScale: 1.10,
+  }
+}
+const bloomTexCache = new Map<string, CanvasTexture>()
+/** 按颜色+尺寸缓存辉光纹理，避免每个星都 new 一张 canvas（防止几百星后显存爆） */
+function getBloomTexCached(color: string, size: number): CanvasTexture {
+  const key = `${color}|${size}`
+  const existing = bloomTexCache.get(key)
+  if (existing) return existing
+  const t = bloomTex(color, size)
+  bloomTexCache.set(key, t)
+  return t
+}
 
 const hexRGB = (h: string): [number, number, number] =>
   [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]
@@ -226,7 +299,32 @@ function milkyWayRibbon(R: number, width: number, segs = 360): { verts: number[]
 }
 
 // ═══════════════════════════════════════════
+export interface CameraPose {
+  position: Vector3
+  lookAt: Vector3
+  fov: number
+  centerRa: string
+  centerDec: string
+}
+
+export interface StarInFrame {
+  starId: number
+  catalogStarId: number | null
+  screenX: number
+  screenY: number
+  inFrame: boolean
+  ra: string
+  dec: string
+  zoomStage: 1 | 2 | 3 | 4
+  starData: { id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }
+}
+
 export interface ObserverLoc { lat: number; lon: number }
+
+// issue #134：准星吸附目标（区分恒星/行星）
+export type SnapTarget =
+  | { type: 'star'; starId: number }
+  | { type: 'planet'; planetName: string; planetNameCN: string; planetId: number }
 
 export interface SkyAPI {
   camera: PerspectiveCamera
@@ -234,7 +332,10 @@ export interface SkyAPI {
   zoomOut: () => void
   dispose: () => void
   setObserver: (obs: ObserverLoc | null) => void
-  setStarStatsCache: (cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) => void
+  setStarStatsCache: (
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+    userStarPos?: Map<number, { x: number; y: number; z: number }>
+  ) => void
   updateHorizonRotation: (lat: number | undefined, lng: number | undefined) => void
   /** 绕世界 X 轴旋转天球（弧度），正角 = 右手定则 */
   rotateX: (rad: number) => void
@@ -276,8 +377,30 @@ export interface SkyAPI {
   setKernelLines: (lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]) => void
   /** 平滑将相机焦点移动到指定恒星（带动画） */
   focusOnStar: (x: number, y: number, z: number) => void
+  /** 天镜览星：飞向故事星（独立 670ms 动画，不进入 CLOSEUP） */
+  flyToStar3D: (star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) => void
+  /** 天镜览星：打断当前飞行动画 */
+  cancelFly: () => void
+  /** 天镜览星：平滑切换相机 FOV（点击罗马数字时调用，300ms 过渡，立即更新 zoomLevel 让 UI 即时响应） */
+  setCameraFov: (targetFov: number) => void
+  /** 天镜览星：订阅相机每帧位姿（订阅者内部自行节流），返回取消订阅函数 */
+  onCameraFrame: (cb: (pose: CameraPose) => void) => () => void
+  /** 天镜览星：取相机视线中心的赤经赤纬（用于 HUD 显示） */
+  getCenterCelestial: () => { ra: string; dec: string }
+  /** 天镜览星：取景框（视锥）内的故事星列表 */
+  getStarsInFrame: (storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => StarInFrame[]
+  /** 天镜览星：进入/退出相机模式 overlay（隐藏 hover 光晕/星名标签等） */
+  setCameraModeOverlay: (enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) => void
+  /** 天镜览星：退出相机模式时 tween 回到进入时的相机快照 */
+  exitCameraModeWithTween: () => void
+  /** 天镜览星：当前是否正在执行飞行动画 */
+  isFlying: Ref<boolean>
+  /** 天镜览星：当前缩放层级 1~4（基于 FOV 反推） */
+  cameraZoomLevel: Ref<number>
   /** 平滑将相机焦点移动到指定行星（按 bodyName 查当前位置），进入特写模式 */
   focusOnPlanet: (bodyName: string) => void
+  /** 移动端行星定位：取行星当前坐标调 focusOnStar 平滑飞行，不进入特写状态机（与普通恒星定位体验一致） */
+  focusOnPlanetSimple: (bodyName: string) => void
   /** 退出特写模式，飞回原点（关闭详情面板时调用） */
   exitCloseup: () => void
   /** 高亮指定恒星位置（短暂 2s） */
@@ -292,6 +415,16 @@ export interface SkyAPI {
   toggleConstellations: () => boolean
   /** issue #34：更新星空显示配置（部分覆盖） */
   updateDisplayConfig: (patch: Partial<StarDisplayConfig>) => void
+  /** issue #124：主动释放准星吸附（未吸附时为 no-op） */
+  releaseSnap: () => void
+  /** 天镜览星模式开关：禁用/启用准星吸附与准星 DOM 显示（进入天镜 false，退出 true） */
+  setSnapEnabled: (enabled: boolean) => void
+  /** issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示） */
+  snapToPlanet: (bodyName: string) => void
+  /** issue #136：PC 端行星特写观察模式开关（true=禁止 hover/点击，只允许拖动/缩放） */
+  setObserveMode: (v: boolean) => void
+  /** 切换行星视运动轨迹显示（不含太阳/月球；黄道线始终显示作为太阳轨迹） */
+  setPlanetTrailsVisible: (v: boolean) => void
 }
 
 export function useSky(
@@ -301,6 +434,8 @@ export function useSky(
     onStarHover?: (starId: number | null) => void
     onStarHoverLong?: (starId: number | null) => void
     onPlanetClick?: (name: string, nameCN: string, planetId: number) => void
+    /** issue #134：准星吸附状态变化通知（吸附目标对象，null 表示脱吸附） */
+    onSnapChange?: (target: SnapTarget | null) => void
     observerLat?: number
     observerLng?: number
     /** 星空显示配置（issue #34）：覆盖默认 STAR_DISPLAY_CONFIG 的任意字段 */
@@ -331,7 +466,7 @@ export function useSky(
   // ═══ 行星实时位置更新器（参考 NASA Eyes / Stellarium：每帧重算位置） ═══
   // astronomy-engine Equator() 单次 ~50-100μs，9 颗行星 × 60fps ≈ 3-5% CPU，可接受
   // 闭包缓存 AE 模块避免重复动态 import；planetUpdaters 存 tiltGroup 引用 + body 名
-  type PlanetUpdater = { tiltGroup: Group; bodyName: string; mesh: Mesh; haloSprite?: Sprite; color: number; size: number }
+  type PlanetUpdater = { tiltGroup: Group; bodyName: string; mesh: Mesh; haloSprite?: Sprite; color: number; size: number; glows?: Object3D[] }
   const planetUpdaters: PlanetUpdater[] = []
   // ═══ 特写状态机（closeup） ═══
   // IDLE: 自由浏览天球，相机在原点，near=DEFAULT_NEAR
@@ -341,9 +476,167 @@ export function useSky(
   // 安全不变式：near 平面、Halo 可见性、wheel 语义必须与状态严格一致
   let closeupState: 'IDLE' | 'TWEENING' | 'CLOSEUP' | 'EXITING' = 'IDLE'
   let closeupTarget: { updater: PlanetUpdater; dist: number; haloSprite: Sprite | null; size: number } | null = null
+  // PC 端行星特写 · 观察模式（issue #136）：true 时禁止 hover 光晕和点击弹出故事界面，只允许拖动/缩放
+  let observeMode = false
+  // 行星特写前的相机快照（pos/quat/fov + rotY/rotX 拖拽基准），exitCloseup 回到这里实现望远镜效果（不回到固定原点）
+  let preCloseupCamera: { pos: Vector3; quat: Quaternion; fov: number; rotY: number; rotX: number } | null = null
+  // 特写/观察模式下隐藏的所有光晕对象（所有行星的 halo + glows），exitCloseup 时统一恢复
+  let hiddenGlows: Object3D[] = []
   // closeup 跟随复用 Vector3（避免每帧 new，animate 循环高频调用）
   const _closeupWorld = new Vector3()
   const _closeupDir = new Vector3()
+  // ═══ 天镜览星模式（Camera Mode） ═══
+  // 相机模式飞行状态（独立于特写状态机，不进入 CLOSEUP）
+  let cameraFlyState: 'idle' | 'flying' = 'idle'
+  let cameraFlyId: number | null = null
+  const flyFromPos = new Vector3()
+  const flyToPos = new Vector3()
+  const flyFromQuat = new Quaternion()
+  const flyToQuat = new Quaternion()
+  let flyFromFov = 0
+  let flyToFov = 0
+  let flyStartTime = 0
+  // 相机模式 overlay 开关
+  let cameraOverlayEnabled = false
+  // 进入相机模式时的相机快照（退出时 tween 回去）
+  const cameraModeEnterPos = new Vector3()
+  const cameraModeEnterQuat = new Quaternion()
+  let cameraModeEnterFov = 0
+  // 天镜览星：所有交互星 glow 元数据（含星等 tier 信息 + 是否有故事 boost）
+  type CameraModeGlowMeta = {
+    glowSprite: Sprite | null
+    phase: number
+    baseScale: number
+    peakOpacity: number
+    storyBoostOpacity: number
+    storyBoostScale: number
+    hasStory: boolean
+  }
+  const cameraModeStoryStars = new Map<number, CameraModeGlowMeta>()
+  // 复用的 frustum / 投影矩阵（避免每帧 new，防止 GC 抖动）
+  const _frustum = new Frustum()
+  const _projScreenMatrix = new Matrix4()
+  // getStarsInFrame 复用的 scratch Vector3（避免每星 new 5 个 Vector3，200+ 星 = 1000+ 对象/次，导致 GC 卡顿）
+  const _sifLocal = new Vector3()
+  const _sifWorld = new Vector3()
+  const _sifStarDir = new Vector3()
+  const _sifNdc = new Vector3()
+  const _sifDir = new Vector3()
+  const _sifCamForward = new Vector3()
+  // onCameraFrame 复用的 scratch Vector3（避免每帧 new 2 个 Vector3）
+  const _ocfLookAt = new Vector3()
+  const _ocfDir = new Vector3()
+  // onCameraFrame 订阅者列表
+  const cameraFrameSubscribers: Array<(pose: CameraPose) => void> = []
+  // 取景框星过滤节流时间戳
+  let lastFrameCheckTime = 0
+  // isFlying ref（供外部响应式读取）
+  const isFlying = ref(false)
+  // cameraZoomLevel ref（1~4，基于 fov 反推）
+  const cameraZoomLevel = ref(1)
+  /** 根据 camera.fov 反推缩放层级 1~4 */
+  function fovToZoomLevel(fov: number): 1 | 2 | 3 | 4 {
+    if (fov > 67) return 1
+    if (fov > 52) return 2
+    if (fov > 39) return 3
+    return 4
+  }
+
+  /** 相机视线中心的赤经（格式 '18h 36m'） */
+  function getCenterRa(): string {
+    _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    const ra = Math.atan2(_ocfDir.y, _ocfDir.x)
+    let raDeg = ra * 180 / Math.PI
+    if (raDeg < 0) raDeg += 360
+    const hours = raDeg / 15
+    const h = Math.floor(hours)
+    const m = Math.floor((hours - h) * 60)
+    return `${h}h ${m}m`
+  }
+
+  /** 相机视线中心的赤纬（格式 '+38° 47′'） */
+  function getCenterDec(): string {
+    _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    const dec = Math.asin(_ocfDir.z) * 180 / Math.PI
+    const sign = dec >= 0 ? '+' : '-'
+    const absDec = Math.abs(dec)
+    const d = Math.floor(absDec)
+    const m = Math.floor((absDec - d) * 60)
+    return `${sign}${d}° ${m}′`
+  }
+
+  /**
+   * 取景框（视锥）内的故事星列表，供相机模式列表/画廊使用。
+   *
+   * 关键设计：用「固定宽角度」（45° 半角 = 90° 锥）筛选，而非实际相机 frustum。
+   * 原因：缩放后实际 FOV 变窄（如 stage 4 = 35°），frustum 内只剩目标星附近的几颗星，
+   * 用户无法在列表中看到/切换到其他星。改用固定宽角度后，无论 zoom 多深，
+   * 列表始终展示当前朝向周围一片区域的星，用户可点击切换。
+   */
+  function getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
+    const result: StarInFrame[] = []
+    skyGroup.updateMatrixWorld()
+    camera.updateMatrixWorld()
+    camera.updateProjectionMatrix()
+
+    const halfW = canvas.clientWidth / 2
+    const halfH = canvas.clientHeight / 2
+
+    // 固定 45° 半角筛选：星星方向与相机朝向夹角 < 45° 即纳入列表
+    const WIDE_HALF_ANGLE_RAD = 45 * Math.PI / 180
+    const cosThreshold = Math.cos(WIDE_HALF_ANGLE_RAD)
+    // 复用 scratch Vector3，避免每星 new 5 个对象（200+ 星 = 1000+ 对象/次 → GC 卡顿）
+    _sifCamForward.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
+
+    for (const s of storyStars) {
+      let x: number, y: number, z: number
+      if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
+        const cat = starById.get(s.catalogStarId)
+        if (!cat) continue
+        x = cat.x; y = cat.y; z = cat.z
+      } else {
+        x = s.posX; y = s.posY; z = s.posZ
+      }
+      _sifLocal.set(x, y, z)
+      _sifWorld.copy(_sifLocal).applyMatrix4(skyGroup.matrixWorld)
+
+      // 角度筛选：星星方向与相机朝向的夹角 < 45°
+      _sifStarDir.copy(_sifWorld).normalize()
+      if (_sifStarDir.dot(_sifCamForward) < cosThreshold) continue
+
+      _sifNdc.copy(_sifWorld).project(camera)
+      const screenX = _sifNdc.x * halfW + halfW
+      const screenY = -_sifNdc.y * halfH + halfH
+
+      // RA/Dec 基于星星固有局部坐标（raDecXYZ 逆变换），不受 skyGroup 旋转影响
+      _sifDir.copy(_sifLocal).normalize()
+      const ra = Math.atan2(-_sifDir.z, _sifDir.x)
+      let raDeg = ra * 180 / Math.PI
+      if (raDeg < 0) raDeg += 360
+      const raH = Math.floor(raDeg / 15)
+      const raM = Math.floor((raDeg / 15 - raH) * 60)
+      const dec = Math.asin(_sifDir.y) * 180 / Math.PI
+      const decSign = dec >= 0 ? '+' : '-'
+      const decD = Math.floor(Math.abs(dec))
+      const decM = Math.floor((Math.abs(dec) - decD) * 60)
+
+      result.push({
+        starId: s.id,
+        catalogStarId: s.catalogStarId,
+        screenX,
+        screenY,
+        inFrame: true,
+        ra: `${raH}h ${raM}m`,
+        dec: `${decSign}${decD}° ${decM}′`,
+        zoomStage: fovToZoomLevel(camera.fov),
+        starData: s,
+      })
+    }
+    return result
+  }
+
+  // 行星视运动轨迹线（不含太阳/月球），供 setPlanetTrailsVisible 切换显示
+  const planetTrailLines: Line[] = []
   // 行星视星等缓存（每 1s 更新一次，避免每帧调 Illumination API）
   let lastMagUpdate = 0
   // 伽利略卫星（木卫 1-4）Sprite 引用，每帧更新位置
@@ -647,34 +940,179 @@ for (const s of stars) starById.set(s.id, s)
   let locateHighlightUntil = 0
   let locateHighlightPulsePhase = 0
 
-  // ═══ 有故事的星星：呼吸辉光（同款 bloomTex，复用 hoverGlow 的方式） ═══
-  const storyGlows: { sprite: Sprite; phase: number; period: number }[] = []
-  function updateStoryGlows(cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>) {
-    const existing = new Set<number>()
-    for (const sg of storyGlows) existing.add(sg.sprite.userData.starId as number)
-    for (const [starId, stats] of cache) {
-      if (stats.stories === 0) continue
-      if (existing.has(starId)) continue
-      const star = starById.get(starId)
-      if (!star) continue
+  // ═══ 所有可交互星：呼吸辉光（按星等分强弱；有故事时额外增亮） ═══
+  //   - 覆盖范围：星表所有星表恒星（从 CAT.stars 自动注入） + 用户星（SkyPage 通过 statsCache 传入 posX/Y/Z）
+  //   - mag 来源：星表恒星读 CatStar.mag；用户星（无 catalogStarId）默认按 3.2 等（T3/T4 交界，中亮度低调不抢镜）
+  interface InteractiveGlow {
+    sprite: Sprite
+    phase: number
+    period: number
+    baseScale: number         // 根据 mag 计算的原始 scale（不含故事增亮）
+    peakOpacity: number       // 根据 mag 计算的峰值 opacity（不含故事增亮）
+    storyBoostOpacity: number // stories>0 时的 opacity 叠加量
+    storyBoostScale: number   // stories>0 时的 scale 倍率
+    storiesCount: number      // 缓存当前 stories 数量，避免每帧去 statsCache 读
+  }
+  const interactiveGlows: InteractiveGlow[] = []
+
+  /** 把 CAT.stars 全量星表恒星以 stories=0 预填进 statsCache，保证每颗都有辉光 */
+  function seedAllCatalogStarsToStatsCache() {
+    for (let i = 0; i < n; i++) {
+      const s = stars[i]
+      if (!statsCache.has(s.id)) {
+        statsCache.set(s.id, { stories: 0, resonance: 0, views: 0, favorites: 0 })
+      }
+    }
+  }
+
+  /** 用户星（无 catalogStarId）的 fallback 星等 */
+  const USER_STAR_DEFAULT_MAG = 3.2
+
+  /**
+   * 根据 starId → (CatStar.mag 或 用户星默认) 取辉光分层参数，
+   * 若无法定位 3D 坐标（即不在星表里也没传 pos）返回 null，跳过创建
+   */
+  function resolveGlowContext(
+    starId: number,
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>
+  ): { star: CatStar | null; pos: { x: number; y: number; z: number }; mag: number; stories: number } | null {
+    const stats = cache.get(starId)
+    if (!stats) return null
+    const cat = starById.get(starId)
+    // ① 星表恒星：直接拿 CatStar 坐标 + mag
+    if (cat) {
+      return {
+        star: cat,
+        pos: { x: cat.x, y: cat.y, z: cat.z },
+        mag: cat.mag,
+        stories: stats.stories,
+      }
+    }
+    // ② 用户星：从 stats 的 userData 找不到位置；这里只接受 starId 时只能靠 starById，
+    //    用户星 glow 走 SkyPage 传入的用户星 Map（下一个函数：updateInteractiveGlowsForUserStars）
+    return null
+  }
+
+  /**
+   * 重建/补齐全部交互星的辉光：
+   *  ✅ 无论有没有故事都显示（stories=0 也有辉光）。
+   *  1. 先把外部传入的 cache（stories 数据）合并进 statsCache；
+   *  2. 再 seed CAT.stars 全量到 statsCache（保证 stories=0 的星也存在 entry）；
+   *  3. 最终遍历 statsCache（而不是传入 cache）建 sprite → 全量星都有辉光。
+   *  - 对星表恒星 + 用户星（通过第二个参数 userStarPos 传入）分别建 sprite
+   */
+  function updateInteractiveGlows(
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+    userStarPos?: Map<number, { x: number; y: number; z: number }>
+  ) {
+    // ① 把外部传入的数据合并进 statsCache（避免后面传参 cache 空导致 for 0 次）
+    cache.forEach((v, k) => statsCache.set(k, v))
+    // ② 把 CAT.stars 全量星表恒星（stories=0）也填进 statsCache — 确保每颗都有 entry
+    seedAllCatalogStarsToStatsCache()
+
+    const existingById = new Map<number, InteractiveGlow>()
+    for (const ig of interactiveGlows) existingById.set(ig.sprite.userData.starId as number, ig)
+
+    // ═══ 处理：星表恒星（含 stories=0）← 遍历 statsCache！
+    for (const [starId, stats] of statsCache) {
+      if (existingById.has(starId)) continue
+      const cat = starById.get(starId)
+      if (!cat) continue  // 用户星在下面独立处理（不在 starById 里）
+      const tier = glowTierForMag(cat.mag)
+      const hasStory = stats.stories > 0
+      const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
       const sp = new Sprite(new SpriteMaterial({
-        map: bloomTex('#ffe5a0', 128),
+        map: getBloomTexCached(tier.tint, tier.texSize),
         blending: AdditiveBlending,
         depthWrite: false,
         depthTest: false,
         transparent: true,
         opacity: 0,
       }))
-      sp.scale.set(10, 10, 1) // 同 hoverGlow 一样大
-      sp.renderOrder = 50
+      sp.scale.set(scale, scale, 1)
+      sp.renderOrder = 48
       sp.userData.starId = starId
-      sp.position.set(star.x, star.y, star.z)
+      sp.position.set(cat.x, cat.y, cat.z)
       skyGroup.add(sp)
-      storyGlows.push({
+      interactiveGlows.push({
         sprite: sp,
         phase: Math.random() * Math.PI * 2,
-        period: 3000 + Math.random() * 2000,
+        period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
+        baseScale: tier.scale,
+        peakOpacity: tier.peakOpacity,
+        storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+        storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+        storiesCount: stats.stories,
       })
+    }
+
+    // ═══ 处理：用户星（无 catalogStarId，pos 由 SkyPage 显式传递）
+    if (userStarPos && userStarPos.size > 0) {
+      for (const [starId, pos] of userStarPos) {
+        if (existingById.has(starId)) continue
+        const tier = glowTierForMag(USER_STAR_DEFAULT_MAG)
+        const stats = statsCache.get(starId)
+        const stories = stats?.stories ?? 1  // 用户星通常是投递心事产生，默认至少有 1 条
+        const hasStory = stories > 0
+        const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
+        const sp = new Sprite(new SpriteMaterial({
+          map: getBloomTexCached(tier.tint, tier.texSize),
+          blending: AdditiveBlending,
+          depthWrite: false,
+          depthTest: false,
+          transparent: true,
+          opacity: 0,
+        }))
+        sp.scale.set(scale, scale, 1)
+        sp.renderOrder = 49
+        sp.userData.starId = starId
+        sp.position.set(pos.x, pos.y, pos.z)
+        skyGroup.add(sp)
+        interactiveGlows.push({
+          sprite: sp,
+          phase: Math.random() * Math.PI * 2,
+          period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
+          baseScale: tier.scale,
+          peakOpacity: tier.peakOpacity,
+          storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+          storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+          storiesCount: stories,
+        })
+      }
+    }
+  }
+
+  /** 事后 stories 变化 → 只更新 existing glow 的 boost 字段（避免重建 sprite，防止闪烁）
+   *  ✅ 从 statsCache 读 stories，避免传入 cache 只有部分条目导致非故事星 boost 没更新
+   */
+  function updateInteractiveGlowsBoost(
+    cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>
+  ) {
+    // 先把外部数据合并进 statsCache（cache 可能只是部分，但 statsCache 是全量）
+    cache.forEach((v, k) => statsCache.set(k, v))
+    for (const ig of interactiveGlows) {
+      const starId = ig.sprite.userData.starId as number
+      let mag: number
+      const cat = starById.get(starId)
+      mag = cat ? cat.mag : USER_STAR_DEFAULT_MAG
+      const tier = glowTierForMag(mag)
+      // ✅ 从 statsCache 取，而不是传入 cache（statsCache 含全量星 = 没故事的也能读到 stories=0）
+      const stats = statsCache.get(starId)
+      const stories = stats?.stories ?? ig.storiesCount
+      const hadStory = ig.storiesCount > 0
+      const hasStory = stories > 0
+      // 故事状态变化 → 更新 boost 与 scale
+      if (hadStory !== hasStory) {
+        ig.storyBoostOpacity = hasStory ? tier.storyBoostOpacity : 0
+        ig.storyBoostScale = hasStory ? tier.storyBoostScale : 1
+      }
+      ig.storiesCount = stories
+      // 同步基础参数（避免前面 tier 定义调整后未立即生效）
+      ig.peakOpacity = tier.peakOpacity
+      ig.baseScale = tier.scale
+      const scale = hasStory ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+      // scale 在 animate 每帧按呼吸 * scalePulse 重算，这里只设基准
+      ig.sprite.scale.set(scale, scale, 1)
     }
   }
 
@@ -1085,6 +1523,175 @@ for (const s of stars) starById.set(s.id, s)
   // hoverLongTimer 提升到外层作用域，以便 dispose 能清除未触发的长悬浮回调
   let hoverLongTimer: ReturnType<typeof setTimeout> | null = null
   let hoveredStarId = -1  // 提升到外层作用域，供 animate 中中心近距检测使用
+
+  // ═══ 移动端准星吸附状态（issue #116） ═══
+  // 仅在 (max-width: 768px) 启用；PC 完全不进入逻辑分支
+  let isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  // 天镜览星模式下禁用准星吸附（进入时 false，退出时 true）
+  let snapEnabled = true
+  let crosshairEl: HTMLDivElement | null = null   // 准星 DOM（append 到 document.body）
+  let crosshairStyle: HTMLStyleElement | null = null
+  let snappedStarId = -1                            // 当前吸附的恒星 ID，-1 = 未吸附恒星
+  // issue #134：当前吸附的行星信息（与 snappedStarId 互斥；非 null 表示正吸附在行星上）
+  let snappedPlanet: { name: string; nameCN: string; planetId: number } | null = null
+  let snapStartX = 0, snapStartY = 0               // 吸附时的指针位置（40px 脱吸附判定）
+  let snapBaseFov = 0                               // 吸附前的 FOV（用于恢复）
+  let snapFovRafId = 0                              // FOV 动画的 requestAnimationFrame ID
+  // 天镜览星：点击罗马数字切换视场时的 FOV 过渡动画 RAF id（与 fly/tween/snapFov 互斥）
+  let cameraFovTweenId: number | null = null
+  // issue #135：程序化 snap 标志（snapToPlanet 设置），防止 pointermove 自动 release
+  // 仅在用户主动 pointerdown 拖动时才清除此标志，允许正常的拖动释放逻辑生效
+  let programmaticSnap = false
+  // 屏幕中心 NDC = (0, 0)；snap 阈值略大于 hover 阈值，便于在密集星区抓住目标
+  const SNAP_THRESHOLD = 0.005                      // 吸附范围（NDC 距离平方，缩小一倍）
+  // issue #134：行星吸附阈值（行星视觉上比恒星大，容差放宽；sqrt(0.01)≈0.1 NDC ≈ 54px@1080p）
+  const SNAP_THRESHOLD_PLANET = 0.01
+  const SNAP_RELEASE_PX = 40                        // 脱吸附的指针移动阈值（屏幕像素）
+  const SNAP_FOV_DELTA = 4                          // 吸附时 FOV 缩小量（度）
+
+  /**
+   * 平滑过渡 camera.fov（issue #116：移动端准星吸附/释放时缩放）
+   * 复用文件已有的 easeOutQuart 缓动；新动画会取消进行中的旧动画。
+   */
+  function animateFov(targetFov: number, durationMs = 300) {
+    cancelAnimationFrame(snapFovRafId)
+    const startFov = camera.fov
+    const startTime = performance.now()
+    function step() {
+      if (disposed) return
+      const t = Math.min(1, (performance.now() - startTime) / durationMs)
+      camera.fov = startFov + (targetFov - startFov) * easeOutQuart(t)
+      camera.updateProjectionMatrix()
+      if (t < 1) snapFovRafId = requestAnimationFrame(step)
+    }
+    snapFovRafId = requestAnimationFrame(step)
+  }
+
+  /** 释放准星吸附：清状态、还原准星视觉、隐藏 tooltip、FOV 缩回 */
+  function releaseSnap() {
+    if (snappedStarId === -1 && snappedPlanet === null) return
+    snappedStarId = -1
+    snappedPlanet = null
+    programmaticSnap = false  // issue #135：清除程序化 snap 标志
+    if (crosshairEl) crosshairEl.classList.remove('snapped')
+    tooltipInner.style.opacity = '0'
+    hoverGlowTargetOpacity = 0
+    if (snapBaseFov > 0) {
+      const targetFov = snapBaseFov
+      animateFov(targetFov, 300)
+      userFov = targetFov
+      snapBaseFov = 0
+    }
+    // issue #124：通知外部已脱吸附
+    options?.onSnapChange?.(null)
+  }
+
+  /**
+   * 天镜览星模式开关：禁用/启用准星吸附与准星 DOM 显示。
+   * 进入天镜时调用 setSnapEnabled(false)：释放当前吸附 + 隐藏准星 + 禁用 pointermove 中的吸附逻辑
+   * 退出天镜时调用 setSnapEnabled(true)：恢复准星显示 + 恢复吸附逻辑
+   */
+  function setSnapEnabled(enabled: boolean): void {
+    if (snapEnabled === enabled) return
+    snapEnabled = enabled
+    if (!enabled) {
+      // 进入天镜：释放当前吸附，隐藏准星
+      releaseSnap()
+      if (crosshairEl) crosshairEl.classList.remove('visible')
+    } else {
+      // 退出天镜：恢复准星显示（仅移动端）
+      if (crosshairEl) crosshairEl.classList.toggle('visible', isMobile)
+    }
+  }
+
+  /**
+   * issue #135：主动吸附到指定行星。
+   * 场景：移动端从搜索结果/收藏卡跳转到行星后，相机虽定位但未触发触屏拖动 snap，
+   * 导致「凝听星语」按钮不显示。此方法主动设置 snap 状态并通知外部。
+   * 仅移动端有意义（PC 端无准星无按钮），但调用安全（PC 端 onSnapChange 也会触发，外部 v-if=isMobile 自然不显示按钮）。
+   */
+  function snapToPlanet(bodyName: string) {
+    const found = planetUpdaters.find(u => u.bodyName === bodyName)
+    if (!found) {
+      console.warn('[snapToPlanet] planet not found:', bodyName)
+      return
+    }
+    // nameCN / planetId 存在 mesh.userData（见 createPlanet 内赋值）
+    const ud = found.mesh.userData as { planetNameCN?: string; planetId?: number }
+    const nameCN = ud.planetNameCN || bodyName
+    const planetId = ud.planetId || 0
+    console.log('[snapToPlanet] snapping to', bodyName, 'nameCN=', nameCN, 'planetId=', planetId)
+    // 清恒星吸附态（互斥）
+    snappedStarId = -1
+    snappedPlanet = { name: found.bodyName, nameCN, planetId }
+    programmaticSnap = true  // issue #135：标记程序化 snap，阻止 pointermove 自动 release
+    if (crosshairEl) crosshairEl.classList.add('snapped')
+    // 记录 snapBaseFov 以便 releaseSnap 恢复（若未在拖动 snap 中则用当前 fov）
+    if (snapBaseFov === 0) snapBaseFov = camera.fov
+    // 通知外部驱动「凝听星语」按钮滑入
+    options?.onSnapChange?.({
+      type: 'planet',
+      planetName: found.bodyName,
+      planetNameCN: nameCN,
+      planetId,
+    })
+  }
+
+  // ═══ 移动端准星 DOM（issue #116） ═══
+  // 仅移动端可见；PC 端 display:none，pointer-events:none 不拦截触摸
+  crosshairEl = document.createElement('div')
+  crosshairEl.className = 'm-crosshair' + (isMobile ? ' visible' : '')
+  crosshairEl.innerHTML = `
+    <span class="mch-arm mch-tl"></span>
+    <span class="mch-arm mch-tr"></span>
+    <span class="mch-arm mch-bl"></span>
+    <span class="mch-arm mch-br"></span>
+  `
+  crosshairStyle = document.createElement('style')
+  crosshairStyle.textContent = `
+    .m-crosshair {
+      position: fixed; top: 50%; left: 50%;
+      width: 26px; height: 26px;
+      margin: -13px 0 0 -13px;
+      pointer-events: none; z-index: 50;
+      display: none;
+      color: rgba(255, 220, 150, 0.5);
+    }
+    .m-crosshair.visible { display: block; }
+    .mch-arm {
+      position: absolute;
+      width: 8px; height: 1.5px;
+      background: currentColor;
+      filter: drop-shadow(0 0 3px currentColor);
+      transition: transform 0.3s cubic-bezier(.2,.9,.3,1), color 0.2s;
+    }
+    .mch-tl { top: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(45deg); }
+    .mch-tr { top: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(-45deg); }
+    .mch-bl { bottom: 1px; left: 1px; transform-origin: 0 50%; transform: rotate(-45deg); }
+    .mch-br { bottom: 1px; right: 1px; transform-origin: 100% 50%; transform: rotate(45deg); }
+    /* 吸附时四线段向中心收缩 4px，形成聚焦感 */
+    .m-crosshair.snapped .mch-tl { transform: rotate(45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-tr { transform: rotate(-45deg) translate(-4px, 0); }
+    .m-crosshair.snapped .mch-bl { transform: rotate(-45deg) translate(4px, 0); }
+    .m-crosshair.snapped .mch-br { transform: rotate(45deg) translate(-4px, 0); }
+    @keyframes mch-breathe {
+      0%, 100% { color: rgba(255, 220, 150, 0.95); filter: drop-shadow(0 0 8px rgba(255, 220, 150, 0.85)) drop-shadow(0 0 14px rgba(255, 220, 150, 0.4)); }
+      50% { color: rgba(202, 167, 255, 0.95); filter: drop-shadow(0 0 8px rgba(202, 167, 255, 0.85)) drop-shadow(0 0 14px rgba(202, 167, 255, 0.4)); }
+    }
+    .m-crosshair.snapped .mch-arm { animation: mch-breathe 1.6s ease-in-out infinite; }
+  `
+  document.head.appendChild(crosshairStyle)
+  document.body.appendChild(crosshairEl)
+  // 响应式：窗口尺寸变化时更新 isMobile 并显示/隐藏准星
+  {
+    const mql = window.matchMedia('(max-width: 768px)')
+    mql.addEventListener('change', () => {
+      isMobile = mql.matches
+      if (crosshairEl) crosshairEl.classList.toggle('visible', isMobile)
+      if (!isMobile) releaseSnap()
+    }, { signal: abortController.signal })
+  }
+
   {
     const mouse = new Vector2()
     const _v = new Vector3()
@@ -1147,6 +1754,37 @@ for (const s of stars) starById.set(s.id, s)
       tooltipLabel.position.set(_w.x, _w.y, _w.z)
       hoverGlow.position.set(_w.x, _w.y, _w.z)
     }
+    // issue #134：行星吸附 tooltip（移动端准星吸附行星时显示行星名 + 统计清零）
+    function updateTooltipContentForPlanet(name: string, nameCN: string) {
+      const nameEl = tooltipEl.querySelector('.tt-name') as HTMLElement
+      const vals = tooltipEl.querySelectorAll('.tt-val') as NodeListOf<HTMLElement>
+      nameEl.textContent = nameCN
+      nameEl.style.textShadow = '0 0 8px rgba(255,217,138,0.5)'
+      vals[0].textContent = '0'
+      vals[1].textContent = '0'
+      vals[2].textContent = '0'
+      vals[3].textContent = '0'
+      _lastStatsKey = `planet:${name}`
+      const updater = planetUpdaters.find(u => u.bodyName === name)
+      if (updater) {
+        const pos = updater.tiltGroup.position
+        _w.set(pos.x, pos.y, pos.z).applyMatrix4(skyGroup.matrixWorld)
+        tooltipLabel.position.set(_w.x, _w.y, _w.z)
+        hoverGlow.position.set(_w.x, _w.y, _w.z)
+      }
+      tooltipInner.style.opacity = '1'
+      hoverGlow.visible = true
+      hoverGlowTargetOpacity = 0.95
+    }
+    // issue #134：行星 tooltip 位置实时更新（行星会随天球运动）
+    function updateTooltipPositionForPlanet(name: string) {
+      const updater = planetUpdaters.find(u => u.bodyName === name)
+      if (!updater) return
+      const pos = updater.tiltGroup.position
+      _w.set(pos.x, pos.y, pos.z).applyMatrix4(skyGroup.matrixWorld)
+      tooltipLabel.position.set(_w.x, _w.y, _w.z)
+      hoverGlow.position.set(_w.x, _w.y, _w.z)
+    }
     function refreshTooltipStats(starId: number) {
       const stats = statsCache.get(starId)
       const key = `${starId}:${stats?.stories ?? ''}:${stats?.resonance ?? ''}:${stats?.views ?? ''}:${stats?.favorites ?? ''}`
@@ -1160,6 +1798,53 @@ for (const s of stars) starById.set(s.id, s)
     }
 
     canvas.addEventListener('pointerdown', () => { clickDrag = false }, { signal: abortController.signal })
+
+      // ─── 屏幕投影星体检测（hover 与 click 共用同一套判断逻辑，issue #116）───
+      // 给定 NDC 坐标，返回距离最近的可见恒星 ID 及其屏幕投影距离平方
+      function detectStarByProjection(ndcX: number, ndcY: number): { id: number; dist: number } {
+        skyGroup.updateMatrixWorld()
+        camera.updateMatrixWorld()
+        camera.updateProjectionMatrix()
+        let bestDist = Infinity
+        let bestId = -1
+        for (const sn of allStarNorms) {
+          _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS)
+            .applyMatrix4(skyGroup.matrixWorld).project(camera)
+          if (_v.z > 1) continue // 在相机后面
+          const dx = _v.x - ndcX
+          const dy = _v.y - ndcY
+          const d = dx * dx + dy * dy
+          if (d < bestDist) { bestDist = d; bestId = sn.id }
+        }
+        return { id: bestId, dist: bestDist }
+      }
+      // issue #134：行星投影检测（与恒星同套逻辑，给准星吸附提供容差，Raycaster 精确命中在屏幕中心太难对准）
+      // 遍历 planetMeshes 取世界坐标投影到 NDC，按 planetName 去重，返回最近的行星
+      function detectPlanetByProjection(ndcX: number, ndcY: number): { name: string; nameCN: string; planetId: number; dist: number } | null {
+        skyGroup.updateMatrixWorld()
+        camera.updateMatrixWorld()
+        camera.updateProjectionMatrix()
+        let bestDist = Infinity
+        let best: { name: string; nameCN: string; planetId: number } | null = null
+        const seen = new Set<string>()
+        for (const mesh of planetMeshes) {
+          const ud = mesh.userData as { planetName?: string; planetNameCN?: string; planetId?: number }
+          if (!ud.planetName || seen.has(ud.planetName)) continue
+          seen.add(ud.planetName)
+          mesh.getWorldPosition(_v)
+          _v.project(camera)
+          if (_v.z > 1) continue // 在相机后面
+          const dx = _v.x - ndcX
+          const dy = _v.y - ndcY
+          const d = dx * dx + dy * dy
+          if (d < bestDist) {
+            bestDist = d
+            best = { name: ud.planetName, nameCN: ud.planetNameCN || ud.planetName, planetId: ud.planetId || 0 }
+          }
+        }
+        return best ? { ...best, dist: bestDist } : null
+      }
+
     canvas.addEventListener('pointermove', (e) => {
       // 给拖动标记距离，由 pointerup 判读是否是点击
       if (dragging) {
@@ -1177,25 +1862,12 @@ for (const s of stars) starById.set(s.id, s)
       if (now - hoverCheckTimer < cfg.hoverThrottleMs) return
       hoverCheckTimer = now
 
-      // 用屏幕投影找最近的星（考虑 skyGroup 旋转）
-      skyGroup.updateMatrixWorld()
-      camera.updateMatrixWorld()
-      camera.updateProjectionMatrix()
-      let bestDist = Infinity
-      let bestId = -1
-      let bestNx = 0, bestNy = 0, bestNz = 0
-      for (const sn of allStarNorms) {
-        _v.set(sn.nx * SPHERE_RADIUS, sn.ny * SPHERE_RADIUS, sn.nz * SPHERE_RADIUS).applyMatrix4(skyGroup.matrixWorld).project(camera)
-        if (_v.z > 1) continue // 在相机后面
-        const dx = _v.x - mouse.x
-        const dy = _v.y - mouse.y
-        const d = dx*dx + dy*dy
-        if (d < bestDist) { bestDist = d; bestId = sn.id; bestNx = sn.nx; bestNy = sn.ny; bestNz = sn.nz }
-      }
+      // 用屏幕投影找最近的星（issue #116：提取为共用函数，hover 与 click 同一套逻辑）
+      let { id: bestId, dist: bestDist } = detectStarByProjection(mouse.x, mouse.y)
       // 行星 hover 检测（issue #82 补充：行星含日月 hover 淡光晕，与恒星互斥）
-      // 特写模式下跳过（相机太近光晕会糊屏）
+      // 特写模式 / 观察模式下跳过（相机太近光晕会糊屏 / 观察模式禁止任何交互反馈）
       let planetHovered = false
-      if (closeupState === 'IDLE' && planetMeshes.length) {
+      if (closeupState === 'IDLE' && !observeMode && planetMeshes.length) {
         const planetRay = new Raycaster()
         planetRay.setFromCamera(mouse, camera)
         const planetHits = planetRay.intersectObjects(planetMeshes)
@@ -1221,33 +1893,120 @@ for (const s of stars) starById.set(s.id, s)
       if (!planetHovered) planetHoverTargetOpacity = 0
       // 行星 hover 时跳过恒星 hover（bestId = -1 让下方阈值判断走 else 分支清除恒星高亮）
       if (planetHovered) bestId = -1
-      // 阈值通过 cfg.hoverThreshold 配置
-      if (bestDist < cfg.hoverThreshold && bestId !== -1) {
-        if (bestId !== hoveredStarId) {
-          // 清除旧的长悬浮计时器
+      // 观察模式下强制清除 hover 状态（禁止任何 hover 反馈）
+      if (observeMode) bestId = -1
+      // 阈值通过 cfg.hoverThreshold 配置（移动端跳过 hover：仅吸附星显示 tooltip）
+      if (!isMobile) {
+        if (bestDist < cfg.hoverThreshold && bestId !== -1) {
+          if (bestId !== hoveredStarId) {
+            // 清除旧的长悬浮计时器
+            if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
+            hoveredStarId = bestId
+            // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
+            const currentStarId = bestId
+            hoverLongTimer = setTimeout(() => {
+              options?.onStarHoverLong?.(currentStarId)
+            }, cfg.hoverLongDelayMs)
+            updateTooltipContent(bestId)
+          } else {
+            // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
+            updateTooltipPosition(bestId)
+            refreshTooltipStats(bestId)
+          }
+        } else if (hoveredStarId !== -1) {
           if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-          hoveredStarId = bestId
-          // 启动长悬浮计时器（延时通过 cfg.hoverLongDelayMs 配置）
-          const currentStarId = bestId
-          hoverLongTimer = setTimeout(() => {
-            options?.onStarHoverLong?.(currentStarId)
-          }, cfg.hoverLongDelayMs)
-          updateTooltipContent(bestId)
+          // 拖拽旋转时不触发离开逻辑，保持连线可见
+          if (!dragging) {
+            options?.onStarHoverLong?.(null)
+          }
+          hoveredStarId = -1
+          tooltipInner.style.opacity = '0'
+          hoverGlowTargetOpacity = 0
+          options?.onStarHover?.(null)
+        }
+      }
+
+      // ─── issue #116 移动端准星吸附（issue #134 扩展：支持行星吸附） ───
+      // 仅移动端 + 非行星特写模式 + 非天镜览星模式启用；拖拽时也运行（拖拽瞄准是核心交互）
+      if (isMobile && closeupState === 'IDLE' && snapEnabled) {
+        // issue #134：投影法检测屏幕中心最近的行星（Raycaster 精确命中在中心太难对准，改用投影距离+容差）
+        // 优先级：行星 > 恒星（与 PC 端点击一致）
+        const centerPlanet = detectPlanetByProjection(0, 0)
+
+        if (centerPlanet && centerPlanet.dist < SNAP_THRESHOLD_PLANET) {
+          // 命中行星
+          if (!snappedPlanet || snappedPlanet.name !== centerPlanet.name) {
+            // 新吸附行星（从恒星或其他行星切换）：先清恒星吸附态
+            snappedStarId = -1
+            snappedPlanet = { name: centerPlanet.name, nameCN: centerPlanet.nameCN, planetId: centerPlanet.planetId }
+            snapStartX = e.clientX
+            snapStartY = e.clientY
+            if (snapBaseFov === 0) {
+              cancelAnimationFrame(snapFovRafId)
+              snapBaseFov = camera.fov
+            }
+            if (crosshairEl) crosshairEl.classList.add('snapped')
+            updateTooltipContentForPlanet(centerPlanet.name, centerPlanet.nameCN)
+            // 同步 hoveredStarId = -1，避免下一帧 hover 逻辑覆盖准星 tooltip
+            hoveredStarId = -1
+            animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+            // issue #134：通知外部已吸附到该行星（驱动底部「凝听星语」按钮滑入）
+            options?.onSnapChange?.({ type: 'planet', planetName: centerPlanet.name, planetNameCN: centerPlanet.nameCN, planetId: centerPlanet.planetId })
+          } else {
+            // 已吸附同一行星：检查是否移动超过阈值
+            const dx = e.clientX - snapStartX
+            const dy = e.clientY - snapStartY
+            if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
+              releaseSnap()
+            } else {
+              // 维持吸附：刷新 tooltip 位置（行星随天球运动）
+              updateTooltipPositionForPlanet(centerPlanet.name)
+            }
+          }
         } else {
-          // issue #34 修复：同一颗星停留时也更新位置（应对 skyGroup 旋转）
-          updateTooltipPosition(bestId)
-          refreshTooltipStats(bestId)
+          // 未命中行星 → 检测恒星
+          const { id: centerId, dist: centerDist } = detectStarByProjection(0, 0)
+          if (centerId !== -1 && centerDist < SNAP_THRESHOLD) {
+            if (snappedStarId !== centerId) {
+              // 新吸附恒星（从行星或其他恒星切换）：先清行星吸附态
+              snappedPlanet = null
+              snappedStarId = centerId
+              snapStartX = e.clientX
+              snapStartY = e.clientY
+              if (snapBaseFov === 0) {
+                cancelAnimationFrame(snapFovRafId)
+                snapBaseFov = camera.fov
+              }
+              if (crosshairEl) crosshairEl.classList.add('snapped')
+              updateTooltipContent(centerId)
+              // 同步 hoveredStarId，避免下一帧 hover 逻辑覆盖准星 tooltip
+              hoveredStarId = centerId
+              animateFov(Math.max(FOV_MIN, snapBaseFov - SNAP_FOV_DELTA))
+              // issue #124：通知外部已吸附到该星（驱动底部「凝听星语」按钮滑入）
+              options?.onSnapChange?.({ type: 'star', starId: centerId })
+            } else {
+              // 已吸附同一颗星：检查是否移动超过阈值
+              const dx = e.clientX - snapStartX
+              const dy = e.clientY - snapStartY
+              if (Math.sqrt(dx * dx + dy * dy) > SNAP_RELEASE_PX) {
+                releaseSnap()
+              } else {
+                // 维持吸附：刷新 tooltip 位置（skyGroup 可能已旋转）
+                updateTooltipPosition(centerId)
+              }
+            }
+          } else if (snappedStarId !== -1 || snappedPlanet !== null) {
+            // 中心无星/行星且超出范围：释放吸附
+            // issue #135：程序化 snap（搜索/收藏卡跳转）不被 pointermove 自动释放，
+            // 必须等用户主动 pointerdown 拖动（pointerdown handler 会清除 programmaticSnap）
+            if (programmaticSnap) {
+              // 程序化 snap 下 pointermove 不释放，但仍刷新 tooltip 位置（若吸附行星）
+              if (snappedPlanet) updateTooltipPositionForPlanet(snappedPlanet.name)
+            } else {
+              releaseSnap()
+            }
+          }
         }
-      } else if (hoveredStarId !== -1) {
-        if (hoverLongTimer) { clearTimeout(hoverLongTimer); hoverLongTimer = null }
-        // 拖拽旋转时不触发离开逻辑，保持连线可见
-        if (!dragging) {
-          options?.onStarHoverLong?.(null)
-        }
-        hoveredStarId = -1
-        tooltipInner.style.opacity = '0'
-        hoverGlowTargetOpacity = 0
-        options?.onStarHover?.(null)
       }
     }, { signal: abortController.signal })
     canvas.addEventListener('pointerup', (e) => {
@@ -1261,69 +2020,43 @@ for (const s of stars) starById.set(s.id, s)
         hoverCheckTimer = 0 // 重置节流，强制下一帧立即检测
         return
       }
-      if (hoveredStarId !== -1) {
-        // 仍需与行星 hitbox 比较：hover 命中的恒星可能位于行星 hitbox 之后，
-        // 取几何距离最近者，避免恒星"吞掉"行星点击
-        skyGroup.updateMatrixWorld()
-        const raycaster = new Raycaster()
-        raycaster.setFromCamera(mouse, camera)
-        let bestStarDist = Infinity
-        let bestStarId = hoveredStarId
-        // 用 raycaster 复测恒星距离
-        raycaster.params.Points!.threshold = 8
-        const starHits = raycaster.intersectObjects(starPointsRefs)
-        if (starHits.length > 0) {
-          const tier = (starHits[0].object as Points).userData.tierIndex as number
-          const sid = tierStarIds[tier]?.[starHits[0].index!]
-          if (sid != null) bestStarDist = starHits[0].distance
-        }
-        // 同时检测行星 hitbox
-        let bestPlanetDist = Infinity
-        let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
-        if (planetMeshes.length) {
-          const planetHits = raycaster.intersectObjects(planetMeshes)
-          if (planetHits.length) {
-            const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-            if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
-          }
-        }
-        // 几何距离最近者获胜：行星更近则命中行星，否则命中恒星
-        if (bestPlanetPd && bestPlanetDist < bestStarDist) {
-          options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
-        } else {
-          options?.onStarClick?.(bestStarId)
-        }
-        return
-      }
 
-      // 悬浮检测未命中恒星，仍同时检测恒星和行星，取几何距离最近者
+      // issue #124：移动端不再用触屏点击进入故事页，改为吸附后点击底部「凝听星语」按钮
+      // 移动端 pointerup 一律不触发 PC 端 Raycaster 点击逻辑（进入故事由底部按钮驱动）
+      if (isMobile) return
+
+      // issue #116 修复：用真实点击坐标更新 mouse，确保检测位置准确
+      const rect = canvas.getBoundingClientRect()
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      // 用屏幕投影检测点击位置最近的恒星（与 hover 同一套逻辑，不依赖 hoveredStarId）
+      const { id: clickStarId, dist: clickStarDist } = detectStarByProjection(mouse.x, mouse.y)
+      const starHit = clickStarId !== -1 && clickStarDist < cfg.hoverThreshold
+
+      // 行星检测仍用 Raycaster（行星有 Mesh hitbox，投影法不适用）
       skyGroup.updateMatrixWorld()
       const raycaster = new Raycaster()
       raycaster.setFromCamera(mouse, camera)
-      raycaster.params.Points!.threshold = 8
-      const starHits = raycaster.intersectObjects(starPointsRefs)
-      let bestStarDist = Infinity
-      let bestStarId: number | null = null
-      if (starHits.length > 0) {
-        const tier = (starHits[0].object as Points).userData.tierIndex as number
-        const sid = tierStarIds[tier]?.[starHits[0].index!]
-        if (sid != null) { bestStarDist = starHits[0].distance; bestStarId = sid }
-      }
-      // 同时检测行星 hitbox
-      let bestPlanetDist = Infinity
       let bestPlanetPd: { planetName: string; planetNameCN: string; planetId: number } | null = null
       if (planetMeshes.length) {
         const planetHits = raycaster.intersectObjects(planetMeshes)
         if (planetHits.length) {
           const pd = (planetHits[0].object as Mesh).userData as { planetName: string; planetNameCN: string; planetId: number }
-          if (pd.planetName) { bestPlanetDist = planetHits[0].distance; bestPlanetPd = pd }
+          if (pd.planetName) { bestPlanetPd = pd }
         }
       }
-      // 几何距离最近者获胜
-      if (bestPlanetPd && bestPlanetDist < bestStarDist) {
+
+      // 优先级：行星直接命中 > 恒星在阈值内
+      // 观察模式下禁止点击弹出故事界面（只允许拖动/缩放）
+      if (observeMode) {
+        return
+      }
+      // 行星 hitbox 是几何 Mesh，Raycaster 命中即说明点击在行星上
+      if (bestPlanetPd) {
         options?.onPlanetClick?.(bestPlanetPd.planetName, bestPlanetPd.planetNameCN, bestPlanetPd.planetId)
-      } else if (bestStarId != null) {
-        options?.onStarClick?.(bestStarId)
+      } else if (starHit) {
+        options?.onStarClick?.(clickStarId)
       }
     }, { signal: abortController.signal })
   }
@@ -1377,6 +2110,9 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
       }
+      // issue #135：用户主动拖动时清除程序化 snap 标志，
+      // 让后续 pointermove 的正常 release 逻辑生效（拖动远离行星时释放吸附）
+      programmaticSnap = false
     } else if (activePointers.size === 2) {
       // 双指启用 pinch，禁用旋转
       dragging = false
@@ -1389,12 +2125,23 @@ for (const s of stars) starById.set(s.id, s)
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.size === 1 && dragging) {
-      // 特写模式下拖拽 → 立即退出特写到 IDLE（counterexample: 不应飞回，相机停留继续旋转）
+      // 观察模式 + CLOSEUP：禁止拖动旋转，只允许滚轮/pinch 缩放，行星保持在视野中心
+      if (observeMode && closeupState === 'CLOSEUP') {
+        px = e.clientX; py = e.clientY
+        return
+      }
+      // 非观察模式特写下拖拽 → 立即退出特写到 IDLE（counterexample: 不应飞回，相机停留继续旋转）
       if (closeupState === 'CLOSEUP' || closeupState === 'TWEENING') {
         if (activeTweenId !== null) { cancelAnimationFrame(activeTweenId); activeTweenId = null }
         camera.near = DEFAULT_NEAR
         camera.updateProjectionMatrix()
         if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+        // 非观察模式下恢复 glows；观察模式下 glows 统一由 exitCloseup 恢复
+        if (!observeMode) {
+          if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          for (const g of hiddenGlows) g.visible = true
+          hiddenGlows = []
+        }
         closeupState = 'IDLE'
         closeupTarget = null
         // 从当前相机朝向同步 rotY/rotX，避免拖拽首帧跳变
@@ -1402,9 +2149,11 @@ for (const s of stars) starById.set(s.id, s)
         rotX = camera.rotation.x - baseRotX + 0.3
         userFov = camera.fov
       }
-      // 单指旋转
-      rotY += (e.clientX - px) * 0.004
-      rotX += (e.clientY - py) * 0.004
+      // 单指旋转（issue #116：吸附时拖动阻力 1/4 速度，模拟"穿越糖蜜"手感）
+      // issue #134：行星吸附同样需要阻力（snappedStarId 或 snappedPlanet 任一非空）
+      const dragFactor = (isMobile && (snappedStarId !== -1 || snappedPlanet !== null)) ? 0.1667 : 1  // 吸附时阻力增大 1.5 倍（1/6 速度）
+      rotY += (e.clientX - px) * 0.004 * dragFactor
+      rotX += (e.clientY - py) * 0.004 * dragFactor
       rotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, rotX))
       if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
       px = e.clientX; py = e.clientY
@@ -1422,14 +2171,23 @@ for (const s of stars) starById.set(s.id, s)
           const maxDist = closeupTarget.size * CLOSEUP_MAX_RATIO
           const newDist = closeupTarget.dist * factor
           if (newDist >= maxDist) {
-            // 拉远到极限 → 退出特写到 IDLE（相机停留，继续 pinch 调 FOV）
-            camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
-            if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
-            closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
+            // 观察模式：clamp 到 maxDist 保持 CLOSEUP 跟随，不退出（issue #144）
+            // 非观察模式：拉远到极限 → 退出特写到 IDLE（相机停留，继续 pinch 调 FOV）
+            if (observeMode) {
+              closeupTarget.dist = maxDist
+            } else {
+              camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
+              if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
+              if (closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+              for (const g of hiddenGlows) g.visible = true
+              hiddenGlows = []
+              closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
+            }
           } else {
             closeupTarget.dist = Math.max(minDist, newDist)
           }
-        } else {
+        } else if (!isFlying.value) {
+          // 飞行动画期间禁止滚轮调整 FOV，避免覆盖 flyToStar3D 的目标 FOV
           userFov = Math.max(FOV_MIN, Math.min(FOV_MAX, userFov + delta * 0.1))
           camera.fov = userFov
           camera.updateProjectionMatrix()
@@ -1463,14 +2221,23 @@ for (const s of stars) starById.set(s.id, s)
       const maxDist = closeupTarget.size * CLOSEUP_MAX_RATIO
       const newDist = closeupTarget.dist * factor
       if (newDist >= maxDist) {
-        // 拉远到极限 → 退出特写到 IDLE（相机停留，继续滚轮调 FOV）
-        camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
-        if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
-        closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
+        // 观察模式：clamp 到 maxDist 保持 CLOSEUP 跟随，不退出（issue #144）
+        // 非观察模式：拉远到极限 → 退出特写到 IDLE（相机停留，继续滚轮调 FOV）
+        if (observeMode) {
+          closeupTarget.dist = maxDist
+        } else {
+          camera.near = DEFAULT_NEAR; camera.updateProjectionMatrix()
+          if (closeupTarget.haloSprite) closeupTarget.haloSprite.visible = true
+          if (closeupTarget.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          for (const g of hiddenGlows) g.visible = true
+          hiddenGlows = []
+          closeupState = 'IDLE'; closeupTarget = null; userFov = camera.fov
+        }
       } else {
         closeupTarget.dist = Math.max(minDist, newDist)
       }
-    } else {
+    } else if (!isFlying.value) {
+      // 飞行动画期间禁止滚轮调整 FOV，避免覆盖 flyToStar3D 的目标 FOV
       userFov = Math.max(FOV_MIN, Math.min(FOV_MAX, userFov + e.deltaY * 0.05))
       camera.fov = userFov
       camera.updateProjectionMatrix()
@@ -1729,6 +2496,9 @@ for (const s of stars) starById.set(s.id, s)
       tiltGroup.add(hitboxMesh)
       planetMeshes.push(hitboxMesh)
 
+      // 收集所有光晕对象（太阳 corona 三层 + 行星大气层），特写模式下统一隐藏避免糊屏
+      const planetGlows: Object3D[] = []
+
       // Halo 辅助光点：物理直径比例下小天体（size < 0.5）盘面亚像素不可见
       // 用 Sprite 渲染行星颜色的光点，辅助肉眼定位（类似 Stellarium hint circle）
       // halo 不参与 raycast（点击靠 hitbox），不影响物理比例（盘面仍按 size 渲染）
@@ -1751,7 +2521,7 @@ for (const s of stars) starById.set(s.id, s)
       }
 
       // 注册到 planetUpdaters，供 animate 循环每帧重算位置 + 每 1s 重算视星等
-      planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh, haloSprite, color: planet.color, size: planet.size })
+      planetUpdaters.push({ tiltGroup, bodyName: planet.name, mesh, haloSprite, color: planet.color, size: planet.size, glows: planetGlows })
 
       // ═══ 伽利略卫星（木卫 1-4）：实时位置模拟 ═══
       // astronomy-engine JupiterMoons() 返回 jovicentric EQJ 向量（AU）
@@ -1838,7 +2608,9 @@ for (const s of stars) starById.set(s.id, s)
           side: BackSide,
           depthWrite: false,
         })
-        tiltGroup.add(new Mesh(innerGlowGeo, innerGlowMat))
+        const innerGlowMesh = new Mesh(innerGlowGeo, innerGlowMat)
+        tiltGroup.add(innerGlowMesh)
+        planetGlows.push(innerGlowMesh)
 
         // 中层：日冕扩散光晕
         const coronaGeo = new SphereGeometry(planet.size * 1.8, 32, 16)
@@ -1868,7 +2640,9 @@ for (const s of stars) starById.set(s.id, s)
           side: BackSide,
           depthWrite: false,
         })
-        tiltGroup.add(new Mesh(coronaGeo, coronaMat))
+        const coronaMesh = new Mesh(coronaGeo, coronaMat)
+        tiltGroup.add(coronaMesh)
+        planetGlows.push(coronaMesh)
 
         // 外层：大范围 sprite 光晕（被 Bloom 进一步扩散）
         const outerGlow = new Sprite(new SpriteMaterial({
@@ -1881,6 +2655,7 @@ for (const s of stars) starById.set(s.id, s)
         }))
         outerGlow.scale.set(planet.size * 6, planet.size * 6, 1)
         tiltGroup.add(outerGlow)
+        planetGlows.push(outerGlow)
       }
 
       // P0-3 / OPT-9：行星大气层光晕
@@ -2009,7 +2784,9 @@ for (const s of stars) starById.set(s.id, s)
             depthWrite: false,
           })
         }
-        tiltGroup.add(new Mesh(atmoGeo, atmoMat))
+        const atmoMesh = new Mesh(atmoGeo, atmoMat)
+        tiltGroup.add(atmoMesh)
+        planetGlows.push(atmoMesh)
       }
 
       // ═══ 土星环：ShaderMaterial（P1 优化 — world-space HG 前向散射 + Blinn-Phong 冰粒高光） ═══
@@ -2248,6 +3025,7 @@ for (const s of stars) starById.set(s.id, s)
         })
         const line = new Line(g, mat)
         skyGroup.add(line)
+        planetTrailLines.push(line)
       }).catch(err => console.error('[useSky] 轨道线计算失败', planet.name, err))
     }
   }).catch(err => {
@@ -2388,207 +3166,6 @@ for (const s of stars) starById.set(s.id, s)
   //   asteroidPositionsPromise.then(renderAsteroidsAsPoints)
   //     .catch(err => console.error('[useSky] 小行星降级渲染失败', err))
   // }
-
-  // ═══ 阶段 3 P2-2：流星雨粒子系统（季节性触发） ═══
-  // 活跃期内从辐射点向外发散的拖尾粒子
-  // 粒子数按 GPU 等级：high=60, medium=40, low=20, fallback=0
-  interface MeteorParticle {
-    active: boolean       // 是否激活
-    pos: Vector3          // 当前位置
-    vel: Vector3          // 速度向量
-    life: number          // 剩余寿命 (0~1)
-    maxLife: number       // 总寿命
-    color: Color          // 拖尾颜色
-    trail: Float32Array   // 拖尾历史位置（用于线段渲染）
-    trailLen: number      // 当前拖尾长度
-  }
-  const maxParticles = renderParams.meteorParticles
-  const meteorParticles: MeteorParticle[] = []
-  // OPT-25：流星拖尾改用 ShaderMaterial，加入程序化湍流抖动
-  // 改进点：
-  //   1. uTime uniform 驱动 sin 噪声，让 alpha 沿位置相位抖动（等离子体湍流感）
-  //   2. 保留 vertexColors 通道，但片元 shader 中乘以 vAlpha 实现亮度调制
-  //   3. 替代 LineBasicMaterial 的固定 opacity，获得"程序化形状"的视觉
-  let meteorTrailMat: ShaderMaterial | null = null
-  const meteorTrailLines: LineSegments | null = maxParticles > 0 ? (() => {
-    // 拖尾用 LineSegments：每个粒子 8 段 = 16 个顶点
-    const TRAIL_SEGMENTS = 8
-    const totalVerts = maxParticles * TRAIL_SEGMENTS * 2
-    const positions = new Float32Array(totalVerts * 3)
-    const colors = new Float32Array(totalVerts * 3)
-    const g = new BufferGeometry()
-    g.setAttribute('position', new BufferAttribute(positions, 3))
-    g.setAttribute('color', new BufferAttribute(colors, 3))
-    meteorTrailMat = new ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uOpacity: { value: 0.85 },
-      },
-      vertexShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uTime;
-        void main() {
-          vColor = color;
-          // 程序化湍流：基于位置相位 + 时间的 sin 噪声，让 alpha 抖动
-          // 相邻顶点位置接近，相位接近，alpha 过渡连续；远处顶点相位差大，形成湍流
-          float phase = position.x * 0.15 + position.y * 0.15 + position.z * 0.15;
-          vAlpha = 0.75 + 0.25 * sin(uTime * 4.0 + phase);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uOpacity;
-        void main() {
-          // vColor 已包含寿命衰减（CPU 端预乘），vAlpha 是湍流抖动，uOpacity 是全局透明度
-          gl_FragColor = vec4(vColor, vAlpha * uOpacity);
-        }
-      `,
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      vertexColors: true,
-    })
-    const lines = new LineSegments(g, meteorTrailMat)
-    lines.frustumCulled = false
-    skyGroup.add(lines)
-    // 初始化粒子池
-    for (let i = 0; i < maxParticles; i++) {
-      meteorParticles.push({
-        active: false,
-        pos: new Vector3(),
-        vel: new Vector3(),
-        life: 0,
-        maxLife: 0,
-        color: new Color(),
-        trail: new Float32Array(TRAIL_SEGMENTS * 3),
-        trailLen: 0,
-      })
-    }
-    return lines
-  })() : null
-
-  // OPT-25：流星头部光晕 Points（参考 OPT-24 透视缩放模板 + fake-glow-material 思路）
-  // 改进点：
-  //   1. 每颗激活流星在当前位置渲染一个发光点，复用 OPT-24 透视缩放公式
-  //   2. aSize 按寿命衰减（出现时大，消失时小）
-  //   3. sin(uTime * 频率 + 粒子索引) 呼吸抖动，模拟等离子体"闪烁"
-  //   4. 圆形软边缘 + AdditiveBlending，比 LineSegments 起点更亮
-  let meteorHeadPoints: Points | null = null
-  let meteorHeadPosAttr: BufferAttribute | null = null
-  let meteorHeadSizeAttr: BufferAttribute | null = null
-  let meteorHeadColorAttr: BufferAttribute | null = null
-  let meteorHeadMat: ShaderMaterial | null = null
-  if (maxParticles > 0) {
-    const headPositions = new Float32Array(maxParticles * 3)
-    const headSizes = new Float32Array(maxParticles)
-    const headColors = new Float32Array(maxParticles * 3)
-    const headGeo = new BufferGeometry()
-    meteorHeadPosAttr = new BufferAttribute(headPositions, 3)
-    meteorHeadSizeAttr = new BufferAttribute(headSizes, 1)
-    meteorHeadColorAttr = new BufferAttribute(headColors, 3)
-    headGeo.setAttribute('position', meteorHeadPosAttr)
-    headGeo.setAttribute('aSize', meteorHeadSizeAttr)
-    headGeo.setAttribute('aColor', meteorHeadColorAttr)
-    // 初始 drawRange = 0（无激活流星时不渲染）
-    headGeo.setDrawRange(0, 0)
-    meteorHeadMat = new ShaderMaterial({
-      uniforms: {
-        uMap: { value: texCache.get(8) ?? glowTex('white', 32) },
-        uDpr: { value: dpr },  // OPT-29：使用共享 dpr 变量，与 renderer.setPixelRatio 一致
-        uTime: { value: 0 },
-      },
-      vertexShader: `
-        attribute float aSize;
-        attribute vec3 aColor;
-        varying vec3 vColor;
-        varying float vBreath;
-        uniform float uDpr;
-        uniform float uTime;
-        void main() {
-          vColor = aColor;
-          // 呼吸抖动：sin(uTime * 6 + 粒子相位)，模拟等离子体闪烁
-          // gl_VertexID 在 WebGL1 不可用，用 position 推导相位
-          float phase = position.x * 0.3 + position.y * 0.3;
-          vBreath = 0.85 + 0.15 * sin(uTime * 6.0 + phase);
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          // 复用 OPT-24 透视缩放公式
-          gl_PointSize = aSize * (300.0 * uDpr / max(1.0, -mvPosition.z));
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D uMap;
-        varying vec3 vColor;
-        varying float vBreath;
-        void main() {
-          // 圆形粒子 + 软边缘 discard
-          vec2 c = gl_PointCoord - 0.5;
-          float d = length(c);
-          if (d > 0.5) discard;
-          vec4 tex = texture2D(uMap, gl_PointCoord);
-          // vBreath 调制亮度，让光晕"呼吸"
-          gl_FragColor = vec4(vColor * vBreath, tex.a);
-        }
-      `,
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-    })
-    meteorHeadPoints = new Points(headGeo, meteorHeadMat)
-    meteorHeadPoints.frustumCulled = false
-    skyGroup.add(meteorHeadPoints)
-  }
-
-  // 当前活跃的流星雨（每小时刷新一次，基于模拟时间）
-  let activeShowers: Array<MeteorShower & { intensity: number }> = []
-  let lastShowerRefresh = 0
-  function refreshShowers(date: Date = new Date()) {
-    activeShowers = getActiveShowers(date)
-    lastShowerRefresh = performance.now()
-  }
-  refreshShowers()
-
-  // 发射一颗流星
-  function spawnMeteor(particle: MeteorParticle) {
-    if (activeShowers.length === 0) return
-    // 按强度加权选流星雨
-    const totalWeight = activeShowers.reduce((s, sh) => s + sh.intensity * sh.zhr, 0)
-    let r = Math.random() * totalWeight
-    let shower = activeShowers[0]
-    for (const sh of activeShowers) {
-      r -= sh.intensity * sh.zhr
-      if (r <= 0) { shower = sh; break }
-    }
-    // 辐射点位置
-    const radiant = raDecXYZ(shower.radiantRA, shower.radiantDec, SPHERE_RADIUS)
-    // 在辐射点附近随机偏移（±5°）
-    const offsetAngle = (Math.random() - 0.5) * 10 * D2R
-    const offsetDir = new Vector3(radiant.x, radiant.y, radiant.z).normalize()
-    // 随机切线方向
-    const tangent = new Vector3(-offsetDir.y, offsetDir.x, 0).normalize()
-    const finalPos = offsetDir.applyAxisAngle(tangent, offsetAngle).multiplyScalar(SPHERE_RADIUS)
-    particle.pos.copy(finalPos)
-    // 速度方向：从辐射点向外（沿天球切平面）
-    // 切平面法向量 = finalPos.normalize()，取随机向量投影到切平面
-    const normal = finalPos.clone().normalize()
-    const randVec = new Vector3(
-      Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5,
-    )
-    // 减去法向量分量，得到切平面内向量
-    randVec.addScaledVector(normal, -randVec.dot(normal)).normalize()
-    particle.vel.copy(randVec.multiplyScalar(shower.speed * 0.5))
-    // 寿命：0.8~2.0 秒
-    particle.maxLife = 0.8 + Math.random() * 1.2
-    particle.life = particle.maxLife
-    particle.color.set(shower.color)
-    particle.trailLen = 0
-    particle.active = true
-  }
 
   /* [DISABLED 2026-07-28] 彗星渲染已禁用（用户反馈不需要），保留代码以备未来恢复
   // ═══ OPT-10：彗星渲染（哈雷 + 恩克，2 颗著名短/长周期彗星） ═══
@@ -2804,6 +3381,20 @@ for (const s of stars) starById.set(s.id, s)
     camera.updateProjectionMatrix()
     frameCount++  // OPT-14：帧计数器递增（用于太阳坐标缓存节流）
 
+    // 天镜览星：通知相机帧订阅者（每帧执行，订阅者内部自行节流）
+    // 复用 scratch Vector3 避免每帧 new 2 个对象（60fps = 120 对象/秒 → GC 卡顿）
+    if (cameraFrameSubscribers.length > 0) {
+      _ocfDir.set(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position)
+      const pose: CameraPose = {
+        position: camera.position,  // 直接引用，订阅者不应修改
+        lookAt: _ocfLookAt.copy(_ocfDir),
+        fov: camera.fov,
+        centerRa: getCenterRa(),
+        centerDec: getCenterDec(),
+      }
+      for (const cb of cameraFrameSubscribers) cb(pose)
+    }
+
     // 实时恒星漂移：按真实恒星时与基础 LST 的差修正 rotY
     // 已禁用：天球回归默认不旋转
     // if (observer) {
@@ -2866,10 +3457,11 @@ for (const s of stars) starById.set(s.id, s)
       // 相机沿当前朝向反方向 dist 处，保持盘面在视野中心
       _closeupDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
       camera.position.copy(_closeupWorld).sub(_closeupDir.multiplyScalar(closeupTarget.dist))
-      // 每帧重新朝向行星：行星在持续运动（timeScale 加速下尤甚），
-      // 若只跟位置不跟朝向，行星会逐渐飞出视野中心
-      // counterexample: 月球公转周期 27 天，timeScale=100 时 6.5 小时一圈，不跟朝向会丢失
-      camera.lookAt(_closeupWorld)
+      // 非观察模式：每帧重新朝向行星（行星在持续运动，不跟朝向会飞出视野中心）
+      // 观察模式：不 lookAt，保持用户拖动设置的朝向（绕行星旋转视角）
+      if (!observeMode) {
+        camera.lookAt(_closeupWorld)
+      }
     }
     // 星座连线 opacity lerp（淡入淡出系数与 glow 比例通过 cfg 配置）
     // issue #34：原硬编码 0.15 / 0.43 → cfg.constellationLerpFactor / cfg.constellationGlowRatio
@@ -2899,11 +3491,45 @@ for (const s of stars) starById.set(s.id, s)
         ;(locateHighlight.material as SpriteMaterial).opacity = fadeProgress * (0.4 + pulse * 0.6)
       }
     }
-    // 有故事的星：呼吸辉光动画
-    for (const sg of storyGlows) {
-      const t = ((_now + sg.phase * 1000) % sg.period) / sg.period
-      const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
-      ;(sg.sprite.material as SpriteMaterial).opacity = 0.15 + breath * 0.55
+    // 有故事的星：呼吸辉光动画（相机模式下跳过，interactiveGlows 统一隐藏，避免 400+ sprite 无效更新）
+    if (!cameraOverlayEnabled) {
+      for (const ig of interactiveGlows) {
+        const t = ((_now + ig.phase * 1000) % ig.period) / ig.period
+        const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+        // ✅ 恒定下限：保证"没故事"的星辉光永远存在（不会呼吸到 opacity=0 隐没）
+        //    基础呼吸：opacity ∈ [0.55 * peak, 1.0 * peak]，再额外加故事 boost
+        const baseOpacity = ig.peakOpacity * (0.55 + 0.45 * breath)
+        ;(ig.sprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + ig.storyBoostOpacity)
+        // scale 呼吸：暗星幅度稍大，亮星幅度沉稳（下限 1 - pulseAmt，也不会缩到看不见）
+        const pulseAmt = ig.peakOpacity < 0.4 ? 0.06 : 0.035
+        const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
+        const base = ig.storiesCount > 0 ? ig.baseScale * ig.storyBoostScale : ig.baseScale
+        ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
+      }
+    }
+    // 天镜览星：所有交互星呼吸 glow（只更新取景框内可见），按 mag tier 强弱
+    if (cameraOverlayEnabled && cameraModeStoryStars.size > 0) {
+      const secs = _now / 1000
+      _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+      cameraModeStoryStars.forEach((meta) => {
+        if (!meta.glowSprite) return
+        if (!_frustum.containsPoint(meta.glowSprite.position)) {
+          meta.glowSprite.visible = false
+          return
+        }
+        meta.glowSprite.visible = true
+        // 脉动幅度按 tier.peakOpacity：亮星（peak 高）脉动沉稳，暗星脉动稍细碎
+        const pulseAmp = meta.peakOpacity < 0.4 ? 0.10 : 0.06
+        const pulse = Math.sin(secs * 1.6 + meta.phase) * pulseAmp
+        const mat = meta.glowSprite.material as SpriteMaterial
+        // ✅ 恒定下限：基础 opacity 0.6~1.0 倍 peak，再叠故事 boost + 脉动（不会到 0）
+        const baseOpacity = meta.peakOpacity * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(secs * 1.6 + meta.phase + Math.PI)))
+        mat.opacity = Math.min(1.0, baseOpacity + pulse * 0.5 + meta.storyBoostOpacity)
+        const scalePulseAmt = meta.peakOpacity < 0.4 ? 0.06 : 0.035
+        const scalePulse = 1 + Math.sin(secs * 1.6 + meta.phase) * scalePulseAmt
+        const base = meta.hasStory ? meta.baseScale * meta.storyBoostScale : meta.baseScale
+        meta.glowSprite.scale.set(base * scalePulse, base * scalePulse, 1)
+      })
     }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
     // clamp deltaMs 到 250ms：visibilitychange 已重置 lastFrameTime，但极端情况下（卡顿/调试断点）仍需兜底
@@ -3162,101 +3788,6 @@ for (const s of stars) starById.set(s.id, s)
     if (sunSurfaceMat) {
       (sunSurfaceMat.uniforms.uTime.value as number) = simTimeMs / 1000
     }
-    // ─── 阶段 3 P2-2：流星雨粒子更新 ───
-    // 每小时刷新一次活跃流星雨列表（基于模拟时间，加速时也能正确切换季节）
-    if (_now - lastShowerRefresh > 3600 * 1000) refreshShowers(new Date(simTimeMs))
-    // OPT-25：更新流星拖尾和头部光晕的 uTime uniform
-    const meteorTime = simTimeMs / 1000
-    if (meteorTrailMat) (meteorTrailMat.uniforms.uTime.value as number) = meteorTime
-    if (meteorHeadMat) (meteorHeadMat.uniforms.uTime.value as number) = meteorTime
-    if (meteorTrailLines && maxParticles > 0) {
-      const TRAIL_SEGMENTS = 8
-      const posAttr = meteorTrailLines.geometry.attributes.position as BufferAttribute
-      const colAttr = meteorTrailLines.geometry.attributes.color as BufferAttribute
-      const posArr = posAttr.array as Float32Array
-      const colArr = colAttr.array as Float32Array
-      // 清空顶点（避免残留）
-      posArr.fill(0)
-      colArr.fill(0)
-      let writeIdx = 0  // 顶点写入位置
-      // OPT-25：head points 写入索引（独立于拖尾 writeIdx）
-      let headIdx = 0
-      const headPosArr = meteorHeadPosAttr ? meteorHeadPosAttr.array as Float32Array : null
-      const headSizeArr = meteorHeadSizeAttr ? meteorHeadSizeAttr.array as Float32Array : null
-      const headColorArr = meteorHeadColorAttr ? meteorHeadColorAttr.array as Float32Array : null
-      for (let i = 0; i < maxParticles; i++) {
-        const p = meteorParticles[i]
-        // 激活粒子：更新位置 + 寿命
-        if (p.active) {
-          p.life -= deltaMs / 1000
-          if (p.life <= 0) {
-            p.active = false
-            continue
-          }
-          // 位置更新（速度 × deltaMs，缩放以适应天球尺度）
-          p.pos.x += p.vel.x * deltaMs * 0.01
-          p.pos.y += p.vel.y * deltaMs * 0.01
-          p.pos.z += p.vel.z * deltaMs * 0.01
-          // 拖尾：先 shift 历史点（k=N→1），再写入新位置到 trail[0]
-          // 顺序不能反：若先写 trail[0] 再 shift，shift 会把新点复制到 trail[1]
-          for (let k = TRAIL_SEGMENTS - 1; k > 0; k--) {
-            p.trail[k * 3]     = p.trail[(k - 1) * 3]
-            p.trail[k * 3 + 1] = p.trail[(k - 1) * 3 + 1]
-            p.trail[k * 3 + 2] = p.trail[(k - 1) * 3 + 2]
-          }
-          p.trail[0] = p.pos.x; p.trail[1] = p.pos.y; p.trail[2] = p.pos.z
-          if (p.trailLen < TRAIL_SEGMENTS) p.trailLen++
-          // 写入拖尾线段（每段 2 个顶点）
-          const alpha = p.life / p.maxLife  // 寿命衰减
-          for (let k = 0; k < p.trailLen - 1 && writeIdx + 1 < posArr.length / 3; k++) {
-            posArr[writeIdx * 3]     = p.trail[k * 3]
-            posArr[writeIdx * 3 + 1] = p.trail[k * 3 + 1]
-            posArr[writeIdx * 3 + 2] = p.trail[k * 3 + 2]
-            colArr[writeIdx * 3]     = p.color.r * alpha
-            colArr[writeIdx * 3 + 1] = p.color.g * alpha
-            colArr[writeIdx * 3 + 2] = p.color.b * alpha
-            writeIdx++
-            posArr[writeIdx * 3]     = p.trail[(k + 1) * 3]
-            posArr[writeIdx * 3 + 1] = p.trail[(k + 1) * 3 + 1]
-            posArr[writeIdx * 3 + 2] = p.trail[(k + 1) * 3 + 2]
-            colArr[writeIdx * 3]     = p.color.r * alpha * 0.3
-            colArr[writeIdx * 3 + 1] = p.color.g * alpha * 0.3
-            colArr[writeIdx * 3 + 2] = p.color.b * alpha * 0.3
-            writeIdx++
-          }
-          // OPT-25：写入头部光晕点（每颗激活流星一个点）
-          if (headPosArr && headSizeArr && headColorArr && headIdx < maxParticles) {
-            headPosArr[headIdx * 3]     = p.pos.x
-            headPosArr[headIdx * 3 + 1] = p.pos.y
-            headPosArr[headIdx * 3 + 2] = p.pos.z
-            // aSize 按寿命衰减：出现时大（alpha≈1），消失时小（alpha≈0）
-            // 基准 12.0 让光晕比小行星（基准 6.0）更醒目，符合流星头部亮度
-            headSizeArr[headIdx] = 12.0 * alpha
-            headColorArr[headIdx * 3]     = p.color.r
-            headColorArr[headIdx * 3 + 1] = p.color.g
-            headColorArr[headIdx * 3 + 2] = p.color.b
-            headIdx++
-          }
-        } else if (activeShowers.length > 0) {
-          // 真实 ZHR 速率：spawn 概率 = 总有效 ZHR / 2000，封顶 0.15
-          // 英仙座 ZHR=100 → 0.05/帧 ≈ 3 颗/秒；双子座 ZHR=120 → 0.06/帧
-          // 视觉增强倍数让流星雨肉眼可见（真实 ZHR=100 实际每秒仅 0.028 颗）
-          const totalZHR = activeShowers.reduce((s, sh) => s + sh.zhr * sh.intensity, 0)
-          const spawnProb = Math.min(0.15, totalZHR / 2000)
-          if (Math.random() < spawnProb) spawnMeteor(p)
-        }
-      }
-      posAttr.needsUpdate = true
-      colAttr.needsUpdate = true
-      meteorTrailLines.geometry.setDrawRange(0, writeIdx)
-      // OPT-25：更新 head points 的 drawRange 和 needsUpdate
-      if (meteorHeadPoints && meteorHeadPosAttr && meteorHeadSizeAttr && meteorHeadColorAttr) {
-        meteorHeadPoints.geometry.setDrawRange(0, headIdx)
-        meteorHeadPosAttr.needsUpdate = true
-        meteorHeadSizeAttr.needsUpdate = true
-        meteorHeadColorAttr.needsUpdate = true
-      }
-    }
     // 内核连线呼吸动画
     if (kernelLinesGroup.visible) {
       const kernelBreath = (Math.sin(_now * 0.002) + 1) * 0.5
@@ -3382,10 +3913,220 @@ for (const s of stars) starById.set(s.id, s)
   animate()
   if (!observer) camera.rotation.set(rotX, rotY, 0, 'YXZ')
 
+  // ✅ 关键：不等外部 SkyPage 传 setStarStatsCache（那一步要等 fetchStories 异步完）
+  //   立刻以空 cache 走一次 updateInteractiveGlows → seedAllCatalog 把 CAT.stars 全量（stories=0 也）
+  //   都建辉光 sprite → 用户打开页面第一秒就能看到所有可交互星的辉光，而不是等 stories 加载
+  updateInteractiveGlows(new Map())
+
   return {
     camera,
+    // ═══ 天镜览星 API ═══
+    onCameraFrame(cb: (pose: CameraPose) => void): () => void {
+      cameraFrameSubscribers.push(cb)
+      return () => {
+        const i = cameraFrameSubscribers.indexOf(cb)
+        if (i >= 0) cameraFrameSubscribers.splice(i, 1)
+      }
+    },
+    getCenterCelestial(): { ra: string; dec: string } {
+      return { ra: getCenterRa(), dec: getCenterDec() }
+    },
+    getStarsInFrame(storyStars: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>): StarInFrame[] {
+      return getStarsInFrame(storyStars)
+    },
+    setCameraModeOverlay(this: SkyAPI, enabled: boolean, storyStars?: Array<{ id: number; catalogStarId: number | null; posX: number; posY: number; posZ: number }>) {
+      cameraOverlayEnabled = enabled
+      if (enabled) {
+        // 进入相机模式：保存进入时的相机快照，退出时 tween 回来
+        cameraModeEnterPos.copy(camera.position)
+        cameraModeEnterQuat.copy(camera.quaternion)
+        cameraModeEnterFov = camera.fov
+        // 进入相机模式
+        if (closeupState !== 'IDLE') {
+          // 同步清理 closeup 状态（不启动飞回 tween，相机模式由 flyToStar3D 处理定位）
+          if (activeTweenId !== null) {
+            cancelAnimationFrame(activeTweenId)
+            activeTweenId = null
+          }
+          camera.near = DEFAULT_NEAR
+          camera.updateProjectionMatrix()
+          if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+          if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          for (const g of hiddenGlows) g.visible = true
+          hiddenGlows = []
+          closeupState = 'IDLE'
+          closeupTarget = null
+          preCloseupCamera = null
+        }
+        releaseSnap()
+        planetHoverTargetOpacity = 0
+        planetHoverGlow.visible = false
+        hoverGlowTargetOpacity = 0
+        hoverGlow.visible = false
+        // 隐藏普通模式星名标签
+        starNameLabels.forEach((label) => { label.element.style.display = 'none' })
+
+        // 隐藏普通模式 interactiveGlows（相机模式有独立的 cameraModeStoryStars glow，避免重复渲染）
+        for (const ig of interactiveGlows) ig.sprite.visible = false
+
+        // 为所有交互星创建呼吸 glow（全部星表星 + 传进来的 storyStars 用户星），按 mag tier
+        cameraModeStoryStars.clear()
+
+        // ① 先处理传进来的 storyStars（用户星 + 已确认的故事星，带 id 和 pos）
+        const storyUserPos = new Map<number, { x: number; y: number; z: number; hasStory: boolean }>()
+        if (storyStars) {
+          for (const s of storyStars) {
+            let x: number, y: number, z: number
+            let mag: number
+            if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
+              const cat = starById.get(s.catalogStarId)
+              if (!cat) continue
+              x = cat.x; y = cat.y; z = cat.z
+              mag = cat.mag
+            } else {
+              x = s.posX; y = s.posY; z = s.posZ
+              mag = USER_STAR_DEFAULT_MAG
+            }
+            storyUserPos.set(s.id, { x, y, z, hasStory: true })
+            const tier = glowTierForMag(mag)
+            const hasStory = true
+            const sprite = new Sprite(new SpriteMaterial({
+              map: getBloomTexCached(tier.tint, tier.texSize),
+              blending: AdditiveBlending,
+              depthWrite: false,
+              depthTest: false,
+              transparent: true,
+              opacity: tier.peakOpacity,
+            }))
+            sprite.scale.set(hasStory ? tier.scale * tier.storyBoostScale : tier.scale, hasStory ? tier.scale * tier.storyBoostScale : tier.scale, 1)
+            sprite.position.set(x, y, z)
+            skyGroup.add(sprite)
+            cameraModeStoryStars.set(s.id, {
+              glowSprite: sprite,
+              phase: Math.random() * Math.PI * 2,
+              baseScale: tier.scale,
+              peakOpacity: tier.peakOpacity,
+              storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+              storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+              hasStory,
+            })
+          }
+        }
+
+        // ② 再把星表所有恒星（不在 storyStars 已处理里的）一次性补齐（stories=0 也有辉光）
+        for (let i = 0; i < n; i++) {
+          const s = stars[i]
+          if (cameraModeStoryStars.has(s.id)) continue
+          const tier = glowTierForMag(s.mag)
+          const stats = statsCache.get(s.id)
+          const hasStory = !!(stats && stats.stories > 0)
+          const sprite = new Sprite(new SpriteMaterial({
+            map: getBloomTexCached(tier.tint, tier.texSize),
+            blending: AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
+            transparent: true,
+            opacity: tier.peakOpacity,
+          }))
+          const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
+          sprite.scale.set(scale, scale, 1)
+          sprite.position.set(s.x, s.y, s.z)
+          skyGroup.add(sprite)
+          cameraModeStoryStars.set(s.id, {
+            glowSprite: sprite,
+            phase: Math.random() * Math.PI * 2,
+            baseScale: tier.scale,
+            peakOpacity: tier.peakOpacity,
+            storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
+            storyBoostScale: hasStory ? tier.storyBoostScale : 1,
+            hasStory,
+          })
+        }
+      } else {
+        // 退出相机模式，恢复
+        starNameLabels.forEach((label) => { label.element.style.display = '' })
+
+        // 恢复普通模式 interactiveGlows 可见性
+        for (const ig of interactiveGlows) ig.sprite.visible = true
+
+        // 清理故事星 glow
+        cameraModeStoryStars.forEach((meta) => {
+          if (meta.glowSprite) {
+            skyGroup.remove(meta.glowSprite)
+            ;(meta.glowSprite.material as SpriteMaterial).dispose()
+            meta.glowSprite = null
+          }
+        })
+        cameraModeStoryStars.clear()
+
+        // 用动画过渡回到进入相机模式时的视角
+        this.exitCameraModeWithTween()
+      }
+    },
+    // ═══ 天镜览星：退出相机模式时 tween 回到进入时的相机快照 ═══
+    exitCameraModeWithTween(this: SkyAPI) {
+      // 打断进行中的飞行/特写 tween
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      cameraFlyState = 'idle'
+      isFlying.value = false
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+
+      const startPos = camera.position.clone()
+      const startQuat = camera.quaternion.clone()
+      const startFov = camera.fov
+      const duration = 800
+      const startTime = performance.now()
+
+      function tweenStep(this: SkyAPI, now: number) {
+        if (disposed) { activeTweenId = null; return }
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const e = easeInOutCubic(t)
+
+        camera.position.lerpVectors(startPos, cameraModeEnterPos, e)
+        camera.quaternion.slerpQuaternions(startQuat, cameraModeEnterQuat, e)
+        camera.fov = startFov + (cameraModeEnterFov - startFov) * e
+        camera.updateProjectionMatrix()
+
+        if (t < 1) {
+          activeTweenId = requestAnimationFrame(tweenStep)
+        } else {
+          activeTweenId = null
+          // 同步拖拽基准与 zoom level，避免退出后视角漂移
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+          userFov = camera.fov
+          cameraZoomLevel.value = fovToZoomLevel(camera.fov)
+        }
+      }
+      activeTweenId = requestAnimationFrame(tweenStep)
+    },
+    isFlying,
+    cameraZoomLevel,
     zoomIn()  { userFov = Math.max(FOV_MIN, userFov - 5); camera.fov = userFov; },
     zoomOut() { userFov = Math.min(FOV_MAX, userFov + 5); camera.fov = userFov; },
+    // issue #136：PC 端行星特写观察模式开关
+    // true：禁止 hover 光晕和点击弹出故事界面，只允许拖动视角/滚轮缩放
+    // false：恢复正常交互
+    setObserveMode(v: boolean) {
+      observeMode = v
+      // 进入观察模式时立即清除当前 hover 状态，避免残留光晕
+      if (v) {
+        planetHoverTargetOpacity = 0
+        planetHoverGlow.visible = false
+        hoveredStarId = -1
+      }
+    },
+    // 切换行星视运动轨迹显示（不含太阳/月球；黄道线始终显示作为太阳轨迹）
+    setPlanetTrailsVisible(v: boolean) {
+      for (const line of planetTrailLines) line.visible = v
+    },
     // 设置时间加速倍率（1=真实时间，100=加速 100 倍观察行星运动）
     setTimeScale(scale: number) { timeScale = Math.max(1, Math.min(10000, Math.round(scale))); },
     // 获取当前时间倍率
@@ -3494,9 +4235,13 @@ for (const s of stars) starById.set(s.id, s)
       }
     },
     setObserver,
-    setStarStatsCache(cache) {
-      cache.forEach((v, k) => statsCache.set(k, v))
-      updateStoryGlows(cache)
+    setStarStatsCache(
+      cache: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+      userStarPos?: Map<number, { x: number; y: number; z: number }>
+    ) {
+      // merge / seed / 建 sprite 全部统一在 updateInteractiveGlows 内部做
+      updateInteractiveGlows(cache, userStarPos)
+      updateInteractiveGlowsBoost(cache)
     },
     updateHorizonRotation(lat: number | undefined, lng: number | undefined) {
       // 已禁用：天球回归默认不旋转
@@ -3618,6 +4363,11 @@ for (const s of stars) starById.set(s.id, s)
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
       }
+      // 取消 releaseSnap 的 FOV 恢复动画，避免与飞行动画竞争修改 camera.fov 导致视角抖动
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
 
       const starLocal = new Vector3(x, y, z)
       const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
@@ -3679,6 +4429,174 @@ for (const s of stars) starById.set(s.id, s)
       }
       activeTweenId = requestAnimationFrame(animStep)
     },
+    // ═══ 天镜览星：飞向故事星（独立 670ms 动画，不进入 CLOSEUP） ═══
+    flyToStar3D(star: { catalogStarId: number | null; posX: number; posY: number; posZ: number }, options?: { zoomLevel?: number }) {
+      // 解析坐标：优先用 catalogStarId 查星表，否则用数据库 3D 坐标
+      let x: number, y: number, z: number
+      if (star.catalogStarId !== null && star.catalogStarId !== undefined) {
+        const target = starById.get(star.catalogStarId)
+        if (!target) return
+        x = target.x; y = target.y; z = target.z
+      } else {
+        x = star.posX; y = star.posY; z = star.posZ
+      }
+
+      // 打断旧飞行
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      // 打断特写 tween（互斥）
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+      // 打断 snap FOV 动画
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
+      // 打断视场切换 tween（互斥）
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
+
+      const starLocal = new Vector3(x, y, z)
+      const starWorld = starLocal.clone().applyMatrix4(skyGroup.matrixWorld)
+
+      // ═══ 相机模式核心设计：相机始终在原点（星图球心），不移动位置 ═══
+      // 通过改变朝向（lookAt 目标星）+ 缩小 FOV（放大）来"聚焦"星星
+      // 这样拖动始终围绕球心旋转，视角一致；zoom 控制 FOV 与飞行一致
+      flyFromPos.copy(camera.position) // 应为 (0,0,0)，保留以兼容退出 tween
+
+      flyFromQuat.copy(camera.quaternion)
+      const worldUp = new Vector3(0, 1, 0).applyQuaternion(flyFromQuat)
+      const dummyCam = camera.clone()
+      dummyCam.up.copy(worldUp)
+      dummyCam.lookAt(starWorld)
+      flyToQuat.copy(dummyCam.quaternion)
+
+      flyFromFov = camera.fov
+      const stage = options?.zoomLevel ?? 3
+      flyToFov = CAMERA_FOV_BY_STAGE[stage] ?? 45
+      // 两段式动画：第一段缩小到 FOV 75（zoom level 1，广角全局视角），
+      // 第二段朝向 slerp 到目标星 + 放大到目标 FOV
+      // 关键约束：相机位置始终在原点不动，只改朝向和 FOV
+      const shrinkFov = CAMERA_FOV_BY_STAGE[1] // 75
+      const SPLIT = 0.35
+
+      flyStartTime = performance.now()
+      cameraFlyState = 'flying'
+      isFlying.value = true
+
+      function flyStep(now: number) {
+        if (disposed) { cameraFlyId = null; cameraFlyState = 'idle'; isFlying.value = false; return }
+        const elapsed = now - flyStartTime
+        const t = Math.min(elapsed / CAMERA_FLY_DURATION_MS, 1)
+
+        if (t < SPLIT) {
+          // 第一段：FOV 从 flyFromFov → shrinkFov（缩小到广角，展开全局视野）
+          // 朝向保持不变（用户还在"寻找"阶段）
+          const tt = t / SPLIT
+          const e = easeInOutCubic(tt)
+          camera.quaternion.copy(flyFromQuat)
+          camera.position.set(0, 0, 0) // 始终在原点
+          camera.fov = flyFromFov + (shrinkFov - flyFromFov) * e
+        } else {
+          // 第二段：朝向从 flyFromQuat slerp 到 flyToQuat（转向目标星），
+          // FOV 从 shrinkFov → flyToFov（放大聚焦）
+          // 相机位置始终在原点
+          const tt = (t - SPLIT) / (1 - SPLIT)
+          const e = easeInOutCubic(tt)
+          camera.quaternion.copy(flyFromQuat).slerp(flyToQuat, e)
+          camera.position.set(0, 0, 0) // 始终在原点
+          camera.fov = shrinkFov + (flyToFov - shrinkFov) * e
+        }
+        camera.updateProjectionMatrix()
+
+        if (t < 1) {
+          cameraFlyId = requestAnimationFrame(flyStep)
+        } else {
+          cameraFlyId = null
+          cameraFlyState = 'idle'
+          isFlying.value = false
+          // 同步拖拽基准
+          rotY = camera.rotation.y - baseRotY
+          rotX = camera.rotation.x - baseRotX + 0.3
+          userFov = camera.fov
+          // 更新 zoomLevel
+          cameraZoomLevel.value = fovToZoomLevel(camera.fov)
+        }
+      }
+      cameraFlyId = requestAnimationFrame(flyStep)
+    },
+    cancelFly() {
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+      }
+      cameraFlyState = 'idle'
+      isFlying.value = false
+    },
+    // ═══ 天镜览星：点击罗马数字切换视场 ═══
+    // 300ms RAF tween 平滑过渡 camera.fov，立即更新 cameraZoomLevel 让 UI（罗马数字高亮、
+    // 进度条、视场度数）即时响应并触发 CSS transition；与 fly/tween/snapFov 互斥打断。
+    setCameraFov(targetFov: number) {
+      // 打断飞行
+      if (cameraFlyId !== null) {
+        cancelAnimationFrame(cameraFlyId)
+        cameraFlyId = null
+        cameraFlyState = 'idle'
+        isFlying.value = false
+      }
+      // 打断特写 tween
+      if (activeTweenId !== null) {
+        cancelAnimationFrame(activeTweenId)
+        activeTweenId = null
+      }
+      // 打断 snap FOV 动画
+      if (snapFovRafId) {
+        cancelAnimationFrame(snapFovRafId)
+        snapFovRafId = 0
+      }
+      // 打断已有视场切换 tween
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
+
+      // 立即更新 zoomLevel，让 UI 即时响应（罗马数字高亮、进度条 width、视场度数）
+      // CSS transition 会让进度条/罗马数字在 0.3s 内平滑过渡
+      cameraZoomLevel.value = fovToZoomLevel(targetFov)
+
+      const fromFov = camera.fov
+      const toFov = targetFov
+      if (Math.abs(toFov - fromFov) < 0.1) {
+        userFov = toFov
+        camera.fov = toFov
+        camera.updateProjectionMatrix()
+        return
+      }
+      const duration = 300
+      const startTime = performance.now()
+
+      function fovStep(now: number) {
+        if (disposed) { cameraFovTweenId = null; return }
+        const elapsed = now - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const e = easeInOutCubic(t)
+        camera.fov = fromFov + (toFov - fromFov) * e
+        camera.updateProjectionMatrix()
+        if (t < 1) {
+          cameraFovTweenId = requestAnimationFrame(fovStep)
+        } else {
+          cameraFovTweenId = null
+          userFov = camera.fov
+        }
+      }
+      cameraFovTweenId = requestAnimationFrame(fovStep)
+    },
     // ═══ 行星特写：focusOnPlanet → TWEENING → CLOSEUP（状态机入口） ═══
     // 飞到 CLOSEUP_INIT_RATIO × size 距离，FOV 缩到 CLOSEUP_FOV，末态进入 CLOSEUP 模式
     // CLOSEUP 模式下相机每帧跟随行星（animate 循环实现），wheel 调 dist 而非 FOV
@@ -3696,22 +4614,49 @@ for (const s of stars) starById.set(s.id, s)
         activeTweenId = null
       }
 
-      // 防御性恢复：若从 CLOSEUP/EXITING 进入，先恢复 near/halo 避免状态泄漏
+      // 防御性恢复：若从 CLOSEUP/EXITING 进入，先恢复 near/halo/glows 避免状态泄漏
       if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+      if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+      for (const g of hiddenGlows) g.visible = true
+      hiddenGlows = []
       camera.near = DEFAULT_NEAR
       camera.updateProjectionMatrix()
+
+      // 保存进入特写前的相机快照（pos/quat/fov + rotY/rotX），exitCloseup 时回到这里实现望远镜效果
+      // 注意：仅在首次进入特写时保存（IDLE→TWEENING），避免连续切换行星时丢失原始视角
+      if (closeupState === 'IDLE') {
+        preCloseupCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, rotY, rotX }
+      }
+
+      // 隐藏行星 hover 发光（相机靠近时 planetHoverGlow 会很大，特写中糊屏 + 闪光弹感）
+      planetHoverGlow.visible = false
+      planetHoverTargetOpacity = 0
 
       // 查行星 size 算目标距离（直接从 updater 取，避免依赖动态 import 闭包中的 planets）
       const planetSize = updater.size
       // 初始距离 = size × CLOSEUP_INIT_RATIO，下限 size + 0.5 防穿模
       const targetDist = Math.max(planetSize * CLOSEUP_INIT_RATIO, planetSize + 0.5)
 
-      // 隐藏目标 halo（特写中盘面已可见，halo 糊屏）
-      const haloSprite = updater.haloSprite ?? null
-      if (haloSprite) haloSprite.visible = false
+      // 隐藏所有行星的 halo 和 glows（太阳 corona 三层 + 大气层 + 所有行星 haloSprite）
+      // 特写模式下太阳系所有光晕都会糊屏/闪光弹，统一隐藏
+      hiddenGlows = []
+      for (const pu of planetUpdaters) {
+        if (pu.haloSprite && pu.haloSprite.visible) {
+          pu.haloSprite.visible = false
+          hiddenGlows.push(pu.haloSprite)
+        }
+        if (pu.glows) {
+          for (const g of pu.glows) {
+            if (g.visible) {
+              g.visible = false
+              hiddenGlows.push(g)
+            }
+          }
+        }
+      }
 
       closeupState = 'TWEENING'
-      closeupTarget = { updater, dist: targetDist, haloSprite, size: planetSize }
+      closeupTarget = { updater, dist: targetDist, haloSprite: updater.haloSprite ?? null, size: planetSize }
 
       const startQuat = camera.quaternion.clone()
       const startPos = camera.position.clone()
@@ -3737,8 +4682,9 @@ for (const s of stars) starById.set(s.id, s)
 
       const init = recalcTarget()
       if (!init) {
-        // 恢复并退出
-        if (haloSprite) haloSprite.visible = true
+        // 恢复并退出：恢复所有被隐藏的 halo/glows
+        for (const g of hiddenGlows) g.visible = true
+        hiddenGlows = []
         closeupState = 'IDLE'
         closeupTarget = null
         return
@@ -3788,10 +4734,27 @@ for (const s of stars) starById.set(s.id, s)
       }
       activeTweenId = requestAnimationFrame(animStep)
     },
-    // 退出特写：飞回原点 (0,0,0)，FOV 回 DEFAULT_FOV，末态恢复 near/halo → IDLE
+    // ═══ 移动端行星定位：取行星当前坐标复用 focusOnStar 平滑飞行，不进入特写状态机 ═══
+    // 与普通恒星定位体验一致：相机飞向行星附近朝向它，closeupState 保持 IDLE
+    // 关闭面板时 exitCloseup 对 IDLE 状态 no-op（L4028），相机停在定位位置
+    focusOnPlanetSimple(this: SkyAPI, bodyName: string) {
+      const found = planetUpdaters.find(u => u.bodyName === bodyName)
+      if (!found) return
+      const pos = found.tiltGroup.position
+      // 复用 focusOnStar 的平滑飞行（接收 skyGroup 局部坐标，与 planetUpdaters 坐标系一致）
+      this.focusOnStar(pos.x, pos.y, pos.z)
+    },
+    // 退出特写：飞回进入特写前的相机位置（望远镜效果），FOV/朝向同步恢复，末态 near/halo → IDLE
     // 触发场景：关闭详情面板
+    // 若 preCloseupCamera 为空（异常情况），回退到原点 + 基础朝向 + DEFAULT_FOV
     exitCloseup() {
-      if (closeupState === 'IDLE') return
+      // IDLE 状态下若存在特写前快照（观察模式拖拽退出 CLOSEUP 后关闭详情），仍需飞回原视角
+      if (closeupState === 'IDLE' && !preCloseupCamera) return
+      // IDLE + 有快照：进入 EXITING 执行飞回动画；CLOSEUP/TWEENING/EXITING：正常退出
+      if (closeupState === 'IDLE' && preCloseupCamera) {
+        // 观察模式拖拽已退出 CLOSEUP，closeupTarget 已清空，但 preCloseupCamera 仍在
+        // 直接执行飞回动画，无需清理 closeupTarget
+      }
       if (activeTweenId !== null) {
         cancelAnimationFrame(activeTweenId)
         activeTweenId = null
@@ -3801,10 +4764,15 @@ for (const s of stars) starById.set(s.id, s)
       const startPos = camera.position.clone()
       const startQuat = camera.quaternion.clone()
       const startFov = camera.fov
-      const endPos = new Vector3(0, 0, 0)
-      const endFov = DEFAULT_FOV
-      // 末态朝向：重置到基础朝向
-      const endQuat = new Quaternion().setFromEuler(new Euler(baseRotX + 0.3, baseRotY, 0, 'YXZ'))
+      // 优先回到特写前的相机快照；无快照时回退到原点 + 基础朝向
+      const snap = preCloseupCamera
+      const endPos = snap ? snap.pos.clone() : new Vector3(0, 0, 0)
+      const endFov = snap ? snap.fov : DEFAULT_FOV
+      const endQuat = snap
+        ? snap.quat.clone()
+        : new Quaternion().setFromEuler(new Euler(baseRotX + 0.3, baseRotY, 0, 'YXZ'))
+      const endRotY = snap ? snap.rotY : 0
+      const endRotX = snap ? snap.rotX : 0
 
       const totalMs = 1200
       const rotEnd = 0.58, fovStart = 0.25, fovEnd = 0.83, posStart = 0.42, posEnd = 1.0
@@ -3833,15 +4801,20 @@ for (const s of stars) starById.set(s.id, s)
           activeTweenId = requestAnimationFrame(animStep)
         } else {
           activeTweenId = null
-          // 恢复 IDLE：near 平面、halo 可见性、清空 closeupTarget
+          // 恢复 IDLE：near 平面、halo/glows 可见性、清空 closeupTarget、恢复 rotY/rotX 拖拽基准
           camera.near = DEFAULT_NEAR
           camera.updateProjectionMatrix()
           if (closeupTarget?.haloSprite) closeupTarget.haloSprite.visible = true
+          if (closeupTarget?.updater.glows) for (const g of closeupTarget.updater.glows) g.visible = true
+          for (const g of hiddenGlows) g.visible = true
+          hiddenGlows = []
           closeupState = 'IDLE'
           closeupTarget = null
-          rotY = 0
-          rotX = 0
+          rotY = endRotY
+          rotX = endRotX
           userFov = camera.fov
+          // 清空快照，下次进入特写时重新保存
+          preCloseupCamera = null
         }
       }
       activeTweenId = requestAnimationFrame(animStep)
@@ -3876,6 +4849,15 @@ for (const s of stars) starById.set(s.id, s)
       if (debugEl) debugEl.remove()
       // 移除 tooltipEl DOM（被 CSS2DObject 包装后加入 scene）
       if (tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl)
+      // issue #116：清理移动端准星 DOM + 样式 + FOV 动画
+      cancelAnimationFrame(snapFovRafId)
+      // 天镜览星：清理视场切换 tween
+      if (cameraFovTweenId !== null) {
+        cancelAnimationFrame(cameraFovTweenId)
+        cameraFovTweenId = null
+      }
+      if (crosshairEl && crosshairEl.parentNode) crosshairEl.parentNode.removeChild(crosshairEl)
+      if (crosshairStyle) crosshairStyle.remove()
       // 释放 GPU 资源（geometry/material/texture）
       // scene.clear() 只移除场景图引用，不释放 GPU 内存
       scene.traverse((obj) => {
@@ -3893,7 +4875,6 @@ for (const s of stars) starById.set(s.id, s)
           })
           // [P1-1 修复 2026-07-27] ShaderMaterial uniforms 中的纹理不会被 Object.values(mat) 遍历到
           // 需显式进入 uniforms.{name}.value 释放，否则太阳/土星环等纹理每次卸载都泄漏
-          // 原代码只补充了流星头纹理（texCache.get(8)），遗漏了 sunMat.uMap 和 ringMat.uMap
           const uniforms = mm.uniforms
           if (uniforms && typeof uniforms === 'object') {
             Object.values(uniforms).forEach(u => {
@@ -3943,5 +4924,11 @@ for (const s of stars) starById.set(s.id, s)
       texCache.forEach(t => t.dispose())
       texCache.clear()
     },
+    // issue #124：主动释放准星吸附（供外部「凝听星语」按钮点击后调用）
+    releaseSnap,
+    // issue #135：主动吸附到指定行星（搜索/收藏卡跳转后触发，驱动「凝听星语」按钮显示）
+    snapToPlanet,
+    // 天镜览星模式开关：禁用/启用准星吸附与准星显示
+    setSnapEnabled,
   }
 }

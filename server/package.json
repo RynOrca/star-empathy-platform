@@ -7,7 +7,12 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/src/index.js",
-    "seed": "ts-node scripts/seed.ts"
+    "seed": "ts-node scripts/seed.ts",
+    "seed:history-collections": "ts-node scripts/seed-history-collections.ts",
+    "migrate:default-collections": "ts-node scripts/migrate-default-collections.ts",
+    "agent:kernels": "ts-node scripts/generateKernels.ts",
+    "agent:analyze": "ts-node scripts/generateAllAnalyses.ts",
+    "fix:catalog": "ts-node scripts/fix-invalid-catalog-star-ids.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

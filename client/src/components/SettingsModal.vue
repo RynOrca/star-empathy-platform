@@ -13,110 +13,73 @@
           </div>
 
           <div class="modal-body">
-            <!-- DeepSeek API Key -->
+            <!-- DeepSeek API Key（只读状态） -->
             <div class="form-group">
-              <label class="form-label">DeepSeek API Key</label>
-              <p v-if="hasExistingKey && !apiKey" class="form-existing-hint">
-                <Check :size="14" /> API Key 已配置。如需更换，请在上方输入新 Key。
-              </p>
-              <div class="input-wrap">
-                <input
-                  ref="inputRef"
-                  v-model="apiKey"
-                  :type="showKey ? 'text' : 'password'"
-                  class="form-input"
-                  placeholder="sk-..."
-                  :disabled="saving"
-                  @keydown.enter="save"
-                />
-                <div class="input-actions">
-                  <button
-                    class="input-action-btn"
-                    type="button"
-                    :disabled="testing"
-                    @click="testKey"
-                    title="测试连通性"
-                  >
-                    <Loader2 v-if="testing" :size="15" class="spin" />
-                    <Zap v-else :size="15" />
-                  </button>
-                  <button
-                    class="input-action-btn"
-                    type="button"
-                    @click="showKey = !showKey"
-                    :title="showKey ? '隐藏' : '显示'"
-                  >
-                    <EyeOff v-if="showKey" :size="15" />
-                    <Eye v-else :size="15" />
-                  </button>
-                </div>
+              <div class="status-header">
+                <label class="form-label">DeepSeek AI 服务</label>
+                <span :class="['status-chip', hasExistingKey ? 'ok' : 'missing']">
+                  <Check v-if="hasExistingKey" :size="12" />
+                  <CircleAlert v-else :size="12" />
+                  {{ hasExistingKey ? '已连接' : '未配置' }}
+                </span>
               </div>
               <p class="form-hint">
-                用于生成"古今共望"叙事和"与古人共赏"对话。Key 会安全保存在服务端，刷新不丢失。
+                用于生成「古今共望」叙事、「与古人共赏」对话、AI 星格画像/情感解构/主题森林
+                等所有 AI 功能。
               </p>
-              <div class="form-actions">
-                <button class="btn btn-sm btn-secondary" @click="clear" :disabled="saving">清除</button>
-                <button class="btn btn-sm btn-primary" @click="save" :disabled="saving">
-                  {{ saving ? '保存中...' : '保存' }}
-                </button>
+              <div class="server-config-box">
+                <FileCode :size="14" />
+                <div class="scb-text">
+                  通过服务器环境变量
+                  <code>DEEPSEEK_API_KEY</code>
+                  或写入
+                  <code>server/.runtime-key</code>
+                  文件配置。
+                </div>
               </div>
             </div>
 
             <div class="divider"></div>
 
-            <!-- 高德地图 API Key -->
+            <!-- 高德地图 API Key（只读状态） -->
             <div class="form-group">
-              <label class="form-label">高德地图 API Key</label>
-              <p v-if="hasAmapKey && !amapKey" class="form-existing-hint">
-                <Check :size="14" /> 高德 Key 已配置。如需更换，请在上方输入新 Key。
-              </p>
-              <div class="input-wrap">
-                <input
-                  v-model="amapKey"
-                  :type="showAmapKey ? 'text' : 'password'"
-                  class="form-input"
-                  placeholder="输入高德 Web 服务 Key..."
-                  :disabled="savingAmap"
-                  @keydown.enter="saveAmap"
-                />
-                <div class="input-actions">
-                  <button
-                    class="input-action-btn"
-                    type="button"
-                    :disabled="testingAmap"
-                    @click="testAmapKey"
-                    title="测试连通性"
-                  >
-                    <Loader2 v-if="testingAmap" :size="15" class="spin" />
-                    <Zap v-else :size="15" />
-                  </button>
-                  <button
-                    class="input-action-btn"
-                    type="button"
-                    @click="showAmapKey = !showAmapKey"
-                    :title="showAmapKey ? '隐藏' : '显示'"
-                  >
-                    <EyeOff v-if="showAmapKey" :size="15" />
-                    <Eye v-else :size="15" />
-                  </button>
-                </div>
+              <div class="status-header">
+                <label class="form-label">高德地图定位</label>
+                <span :class="['status-chip', hasAmapKey ? 'ok' : 'warn']">
+                  <Check v-if="hasAmapKey" :size="12" />
+                  <CircleAlert v-else :size="12" />
+                  {{ hasAmapKey ? '已连接' : '未配置（使用浏览器定位）' }}
+                </span>
               </div>
               <p class="form-hint">
-                用于反向地理编码，将 GPS 坐标转为城市名显示。免费额度每日 5000 次。
-                <a href="https://console.amap.com/dev/key/app" target="_blank" class="form-link">获取 Key</a>
+                用于把 GPS 坐标反向解析成城市名显示。
+                <a
+                  href="https://console.amap.com/dev/key/app"
+                  target="_blank"
+                  class="form-link"
+                >申请 Key</a>
               </p>
-              <div class="form-actions">
-                <button class="btn btn-sm btn-secondary" @click="clearAmap" :disabled="savingAmap">清除</button>
-                <button class="btn btn-sm btn-primary" @click="saveAmap" :disabled="savingAmap">
-                  {{ savingAmap ? '保存中...' : '保存' }}
-                </button>
+              <div class="server-config-box">
+                <FileCode :size="14" />
+                <div class="scb-text">
+                  通过服务器环境变量
+                  <code>AMAP_API_KEY</code>
+                  或写入
+                  <code>server/.runtime-amap-key</code>
+                  文件配置。
+                </div>
               </div>
             </div>
           </div>
 
           <div class="modal-footer">
             <div class="modal-status">
-              <span v-if="statusText" class="status-text" :class="statusType">{{ statusText }}</span>
+              <span v-if="statusText" class="status-text" :class="statusType">
+                {{ statusText }}
+              </span>
+              <span v-else class="status-text muted">
+                出于安全考虑，Key 只在服务器端保存，前端不提供写入通道。
+              </span>
             </div>
           </div>
         </div>
@@ -126,186 +89,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
-import { X, Eye, EyeOff, Zap, Loader2, Check } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
+import { X, Check, CircleAlert, FileCode } from 'lucide-vue-next'
 
-const props = defineProps<{
-  visible: boolean
-}>()
+const props = defineProps<{ visible: boolean }>()
+const emit = defineEmits<{ close: [] }>()
 
-const emit = defineEmits<{
-  close: []
-}>()
-
-// DeepSeek
-const apiKey = ref('')
-const showKey = ref(false)
-const saving = ref(false)
-const testing = ref(false)
 const hasExistingKey = ref(false)
-const inputRef = ref<HTMLInputElement | null>(null)
-
-// 高德
-const amapKey = ref('')
-const showAmapKey = ref(false)
-const savingAmap = ref(false)
-const testingAmap = ref(false)
 const hasAmapKey = ref(false)
 
-// 状态
 const statusText = ref('')
 const statusType = ref<'success' | 'error'>('success')
 
-// 打开时读取已有 key 状态
-watch(() => props.visible, async (v) => {
-  if (v) {
+watch(
+  () => props.visible,
+  async (v) => {
+    if (!v) return
     statusText.value = ''
-    apiKey.value = ''
     hasExistingKey.value = false
-    amapKey.value = ''
     hasAmapKey.value = false
-    await nextTick()
-    inputRef.value?.focus()
     try {
       const [dkRes, akRes] = await Promise.all([
         fetch('/api/settings/api-key'),
         fetch('/api/settings/amap-key'),
       ])
-      const dkJson = await dkRes.json()
+      const dkJson = await dkRes.json().catch(() => ({}))
       if (dkRes.ok && dkJson.data?.hasKey) hasExistingKey.value = true
-      const akJson = await akRes.json()
+      const akJson = await akRes.json().catch(() => ({}))
       if (akRes.ok && akJson.data?.hasKey) hasAmapKey.value = true
-    } catch {}
-  }
-})
-
-function showStatus(text: string, type: 'success' | 'error') {
-  statusText.value = text
-  statusType.value = type
-  setTimeout(() => { statusText.value = '' }, 3000)
-}
-
-// ─── DeepSeek ───
-async function save() {
-  const key = apiKey.value.trim()
-  if (!key) { showStatus('请输入 API Key', 'error'); return }
-  saving.value = true
-  try {
-    const res = await fetch('/api/settings/api-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: key }),
-    })
-    if (res.ok) {
-      hasExistingKey.value = true
-      showStatus('DeepSeek Key 已保存', 'success')
-    } else {
-      const json = await res.json()
-      showStatus(json.message || '保存失败', 'error')
+    } catch {
+      statusText.value = '无法读取服务器设置状态'
+      statusType.value = 'error'
     }
-  } catch {
-    showStatus('网络错误，请重试', 'error')
-  } finally { saving.value = false }
-}
-
-async function testKey() {
-  const key = apiKey.value.trim()
-  if (!key && !hasExistingKey.value) { showStatus('请先输入 API Key', 'error'); return }
-  testing.value = true
-  try {
-    const body = key ? { apiKey: key } : {}
-    const res = await fetch('/api/settings/test-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json()
-    if (res.ok) showStatus('星河已连通', 'success')
-    else showStatus(json.message || '未能连通', 'error')
-  } catch {
-    showStatus('网络错误', 'error')
-  } finally { testing.value = false }
-}
-
-async function clear() {
-  saving.value = true
-  try {
-    const res = await fetch('/api/settings/api-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: '' }),
-    })
-    if (res.ok) {
-      apiKey.value = ''
-      hasExistingKey.value = false
-      showStatus('DeepSeek Key 已清除', 'success')
-    }
-  } catch { showStatus('清除失败', 'error') }
-  finally { saving.value = false }
-}
-
-// ─── 高德 ───
-async function saveAmap() {
-  const key = amapKey.value.trim()
-  if (!key) { showStatus('请输入高德 API Key', 'error'); return }
-  savingAmap.value = true
-  try {
-    const res = await fetch('/api/settings/amap-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: key }),
-    })
-    if (res.ok) {
-      hasAmapKey.value = true
-      showStatus('高德 Key 已保存', 'success')
-    } else {
-      const json = await res.json()
-      showStatus(json.message || '保存失败', 'error')
-    }
-  } catch {
-    showStatus('网络错误，请重试', 'error')
-  } finally { savingAmap.value = false }
-}
-
-async function testAmapKey() {
-  const key = amapKey.value.trim()
-  if (!key && !hasAmapKey.value) { showStatus('请先输入高德 API Key', 'error'); return }
-  testingAmap.value = true
-  try {
-    const body = key ? { apiKey: key } : {}
-    const res = await fetch('/api/settings/test-amap-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json()
-    if (res.ok) showStatus('高德地图已连通', 'success')
-    else showStatus(json.message || '未能连通', 'error')
-  } catch {
-    showStatus('网络错误', 'error')
-  } finally { testingAmap.value = false }
-}
-
-async function clearAmap() {
-  savingAmap.value = true
-  try {
-    const res = await fetch('/api/settings/amap-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: '' }),
-    })
-    if (res.ok) {
-      amapKey.value = ''
-      hasAmapKey.value = false
-      showStatus('高德 Key 已清除', 'success')
-    }
-  } catch { showStatus('清除失败', 'error') }
-  finally { savingAmap.value = false }
-}
+  },
+)
 </script>
 
 <style scoped>
-/* ─── Overlay ─── */
+/* ═══ 沿用原 SettingsModal 布局结构（overlay / card / header / body / footer） ═══ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -316,311 +137,160 @@ async function clearAmap() {
   align-items: center;
   justify-content: center;
 }
-
-/* ─── Card ─── */
 .modal-card {
   width: 420px;
   max-width: 90vw;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
+  background: var(--surface, #1a1b2e);
+  border: 1px solid var(--rule, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-
-/* ─── Header ─── */
+.mobile-drag-handle {
+  display: none;
+}
+@media (max-width: 600px) {
+  .mobile-drag-handle {
+    display: block;
+    height: 5px;
+    width: 40px;
+    margin: 10px auto 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+}
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--rule);
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--rule, rgba(255, 255, 255, 0.08));
 }
 .modal-title {
-  font-size: 0.95rem;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--ink);
+  color: #e8eaf6;
 }
 .modal-close {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  color: #c8cae0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  padding: 0;
+  transition: background 0.15s;
 }
-.modal-close:hover {
-  color: var(--ink);
-  border-color: var(--rule-hover);
+.modal-close:hover { background: rgba(255, 255, 255, 0.05); }
+
+.modal-body {
+  padding: 18px 22px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-/* ─── Body ─── */
-.modal-body {
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.form-group { display: flex; flex-direction: column; gap: 8px; }
 .form-label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--ink-secondary);
-}
-.input-wrap {
-  position: relative;
-  display: flex;
-}
-.form-input {
-  flex: 1;
-  padding: 10px 80px 10px 14px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink);
-  font-family: var(--font);
-  font-size: 0.84rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.form-input::placeholder {
-  color: var(--muted-light);
-  opacity: 0.5;
-}
-.form-input:focus {
-  border-color: var(--accent-border);
-}
-.form-input:disabled {
-  opacity: 0.5;
-}
-.input-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-}
-.input-action-btn {
-  background: none;
-  border: none;
-  color: var(--muted-light);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
-}
-.input-action-btn:hover:not(:disabled) {
-  color: var(--ink-secondary);
-  background: rgba(255, 255, 255, 0.05);
-}
-.input-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.spin {
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.form-hint {
-  font-size: 0.72rem;
-  color: var(--muted-light);
-  line-height: 1.5;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e6f5;
   margin: 0;
-  opacity: 0.7;
 }
-.form-existing-hint {
-  font-size: 0.78rem;
-  color: var(--star-green);
-  line-height: 1.5;
-  margin: 0 0 8px;
-  opacity: 0.85;
+.form-hint {
+  font-size: 12px;
+  color: #8a8db0;
+  line-height: 1.6;
+  margin: 0;
 }
+.form-link {
+  color: #9caaff;
+  text-decoration: none;
+  margin-left: 6px;
+}
+.form-link:hover { text-decoration: underline; }
 
 .divider {
   height: 1px;
-  background: var(--rule);
-  margin: 18px 0;
+  background: var(--rule, rgba(255, 255, 255, 0.06));
+  margin: 4px 0;
 }
 
-.form-link {
-  color: var(--accent);
-  text-decoration: none;
-  margin-left: 4px;
-}
-.form-link:hover {
-  text-decoration: underline;
-}
-
-/* ─── Form actions ─── */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-/* ─── Footer ─── */
-.modal-footer {
+.status-header {
   display: flex;
   align-items: center;
-  padding: 14px 22px;
-  border-top: 1px solid var(--rule);
-  background: rgba(0, 0, 0, 0.1);
+  justify-content: space-between;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.status-chip.ok {
+  color: #9ae6b4;
+  background: rgba(154, 230, 180, 0.08);
+  border-color: rgba(154, 230, 180, 0.25);
+}
+.status-chip.warn {
+  color: #fde68a;
+  background: rgba(253, 230, 138, 0.08);
+  border-color: rgba(253, 230, 138, 0.25);
+}
+.status-chip.missing {
+  color: #fca5a5;
+  background: rgba(252, 165, 165, 0.08);
+  border-color: rgba(252, 165, 165, 0.25);
+}
+
+.server-config-box {
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(122, 138, 255, 0.06);
+  border: 1px dashed rgba(122, 138, 255, 0.25);
+  color: #a5b0ff;
+  align-items: flex-start;
+}
+.scb-text {
+  font-size: 12px;
+  line-height: 1.7;
+  flex: 1;
+}
+.scb-text code {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c6d0ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+}
+
+.modal-footer {
+  padding: 12px 22px 18px;
+  margin-top: 6px;
 }
 .modal-status {
-  flex: 1;
-  min-width: 0;
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
-.status-text {
-  font-size: 0.78rem;
-}
-.status-text.success {
-  color: var(--star-green);
-}
-.status-text.error {
-  color: var(--star-red);
-}
-
-/* ─── Buttons ─── */
-.btn {
-  padding: 8px 18px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-  border: none;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-sm {
-  padding: 5px 14px;
-  font-size: 0.76rem;
-}
-.btn-secondary {
-  background: transparent;
-  border: 1px solid var(--rule);
-  color: var(--ink-secondary);
-}
-.btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
-}
-.btn-primary {
-  background: var(--accent);
-  color: rgba(0, 0, 0, 0.75);
-  font-weight: 500;
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-/* ─── Transition ─── */
-.modal-fade-enter-active { transition: opacity 0.2s ease-out; }
-.modal-fade-leave-active { transition: opacity 0.15s ease-in; }
-.modal-fade-enter-from { opacity: 0; }
-.modal-fade-leave-to { opacity: 0; }
-.modal-fade-enter-from .modal-card { transform: scale(0.96) translateY(8px); }
-.modal-fade-leave-to .modal-card { transform: scale(0.96); }
-
-/* ─── Mobile drag handle ─── */
-.mobile-drag-handle {
-  display: none;
-}
-
-/* ─── Mobile Responsive (<=768px) ─── */
-@media (max-width: 768px) {
-  .mobile-drag-handle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 0 4px;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
-
-  .mobile-drag-handle::after {
-    content: '';
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 217, 138, 0.3);
-    transition: background 0.2s;
-  }
-
-  .mobile-drag-handle:active::after {
-    background: var(--accent);
-  }
-
-  .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .modal-card {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 20px 20px 0 0;
-    max-height: 85vh;
-    animation: slideUpSettings 0.28s ease-out;
-  }
-
-  @keyframes slideUpSettings {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  .modal-fade-enter-from .modal-card { transform: translateY(100%); }
-  .modal-fade-leave-to .modal-card { transform: translateY(100%); }
-
-  .modal-header {
-    padding: 16px 18px;
-  }
-
-  .modal-title {
-    font-size: 0.95rem;
-  }
-
-  .modal-close {
-    width: 32px;
-    height: 32px;
-  }
-
-  .modal-body {
-    padding: 18px;
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
-  }
-
-  .form-input {
-    padding: 10px 80px 10px 12px;
-    font-size: 0.84rem;
-  }
-
-  .btn {
-    padding: 9px 16px;
-    font-size: 0.82rem;
-  }
-
-  .modal-footer {
-    padding: 12px 18px;
-  }
-}
+.status-text { font-size: 12px; }
+.status-text.success { color: #9ae6b4; }
+.status-text.error   { color: #fca5a5; }
+.status-text.muted   { color: #6b6f92; }
 </style>

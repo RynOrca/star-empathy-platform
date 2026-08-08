@@ -1,15 +1,15 @@
-﻿﻿﻿﻿﻿<template>
+﻿﻿<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
       <div class="nav-left">
-        <!-- 节气（桌面端） -->
-        <span v-if="solarTerm" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
+        <!-- 节气（桌面端，相机模式隐藏） -->
+        <span v-if="solarTerm && cameraMode.cameraMode.value !== 'observe'" class="solar-term" :title="`节气：${solarTerm.termName}（距${solarTerm.nextTermName}还有 ${solarTerm.daysToNext} 天）`">
           <span class="term-text">{{ solarTerm.termName }}</span>
           <span class="term-next">{{ solarTerm.daysToNext }}天后{{ solarTerm.nextTermName }}</span>
         </span>
         <button
-          v-if="moonPhase"
+          v-if="moonPhase && cameraMode.cameraMode.value !== 'observe'"
           class="moon-phase"
           :title="`月相：${moonPhase.phaseName}（照明 ${Math.round(moonPhase.illumination * 100)}%）点击查看详情`"
           @click="openMoonPanel"
@@ -18,8 +18,8 @@
           <span class="moon-text">{{ moonPhase.phaseName }}</span>
         </button>
       </div>
-      <!-- PC 端搜索框 -->
-      <div v-if="!isMobile" class="nav-center">
+      <!-- PC 端搜索框（相机模式隐藏） -->
+      <div v-if="!isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-center">
         <div class="search-box">
           <Search :size="14" class="search-box-icon" />
           <input
@@ -56,26 +56,26 @@
       </div>
       <div class="nav-right">
         <!-- 搜索按钮（移动端） -->
-        <button v-if="isMobile" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
+        <button v-if="isMobile && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="showSearch = true" title="搜索星星">
           <Search :size="18" />
         </button>
-        <!-- 我的/全部切换 -->
-        <button v-if="username" class="nav-icon-btn" :class="{ active: showMyStoriesOnly }" @click="toggleMyStories" :title="showMyStoriesOnly ? '查看全部故事' : '只看我的故事'">
-          <component :is="showMyStoriesOnly ? Globe : Star" :size="18" />
-        </button>
-        <!-- 定位 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
+        <!-- 定位（相机模式隐藏） -->
+        <button v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="refreshLocation" @mouseenter="startHoverTimer" @mouseleave="clearHoverTimer" title="更改定位">
           <MapPin :size="18" />
         </button>
-        <!-- 设置 -->
-        <button v-if="locationReady" class="nav-icon-btn" @click="showSettings = true" title="设置">
-          <Settings :size="18" />
+        <!-- 星笺：打开我的合集（相机模式隐藏） -->
+        <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
+          <Library :size="18" />
         </button>
-        <!-- 用户 -->
-        <button v-if="username" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
+        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，首帧就显示） -->
+        <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
+          <Orbit :size="18" />
+        </button>
+        <!-- 用户/登录（相机模式隐藏） -->
+        <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-user-btn" @click.stop.prevent="$router.push('/profile')" title="个人中心">
           <User :size="18" />
         </button>
-        <button v-if="!username" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
+        <button v-if="(!username || isGuest) && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn nav-login-btn" @click="goLogin" title="登录">
           <User :size="18" />
         </button>
       </div>
@@ -127,17 +127,36 @@
       </div>
     </Transition>
 
-    <!-- 切换反馈提示 -->
-    <Transition name="toast-fade">
-      <div v-if="myToggleFeedback" class="toggle-toast">{{ myToggleFeedback }}</div>
-    </Transition>
-
     <!-- 定位城市提示 -->
     <Transition name="toast-fade">
       <div v-if="locationCityToast" class="location-toast"><MapPin :size="13" /> {{ locationCityToast }}</div>
     </Transition>
 
-    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" />
+    <SkyCanvas v-if="locationReady" ref="skyRef" :observer-lat="userLat" :observer-lng="userLng" @star-click="onStarClick" @star-hover-long="onStarHoverLong" @planet-click="onPlanetClick" @snap-change="onSnapChange" />
+
+    <!-- 天镜览星 · 相机模式 overlay（PC 端取景框+HUD+列表 / 移动端气泡+拖拽） -->
+    <Transition name="camera-fade">
+      <CameraOverlay
+        v-if="cameraMode.cameraMode.value === 'observe' && !cameraDetailOpen"
+        ref="cameraOverlayRef"
+        :is-mobile="isMobile"
+        :is-guest="isGuest"
+        :stars-in-frame="cameraMode.starsInFrame.value"
+        :frame-stories="cameraMode.frameStories.value"
+        :active-star-id="cameraMode.activeStarId.value"
+        :active-card-star="cameraMode.activeCardStar.value"
+        :filters="cameraMode.filters"
+        :center-celestial="cameraCenterCelestial"
+        :current-fov="cameraCurrentFov"
+        :region="cameraRegion"
+        @exit="onCameraModeExitRequested"
+        @story-click="onCameraStoryClick"
+        @active-change="onCameraActiveChange"
+        @close-card="cameraMode.closeStoryCard()"
+        @set-mode="onCameraSetMode"
+        @collection-click="onCameraCollectionClick"
+      />
+    </Transition>
 
     <!-- 定位加载/失败 -->
     <div v-if="!locationReady" class="loading-overlay">
@@ -228,45 +247,152 @@
       </div>
     </Transition>
 
-    <!-- 三张叙事引导牌 -->
-    <div v-if="locationReady" class="guide-cards">
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        </div>
-        <p class="guide-title">历史里的星</p>
-        <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
+    <!-- 叙事引导牌（相机模式隐藏）：上方 4 卡是信息层（宽 ~900px），下方动作条是独立窄条（为信息服务） -->
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="guide-shell">
+      <!-- ① 四张引导卡：暂时隐藏（用户要求只要下方按钮），后续恢复解开下面这段 HTML 注释即可 -->
+      <!--
+      <div class="guide-cards" :class="{ collapsed: !guideCardsOpen }">
+        <Transition name="guide-cards-row" mode="out-in">
+          <div v-show="guideCardsOpen" class="guide-cards-row">
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <p class="guide-title">历史里的星</p>
+              <p class="guide-desc">织女、牛郎、传说留在夜空。点击一颗星，听听它从前的故事。</p>
+            </div>
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              </div>
+              <p class="guide-title">路过别人的星光</p>
+              <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
+            </div>
+            <div class="guide-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+              </div>
+              <p class="guide-title">挂上我的故事</p>
+              <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
+            </div>
+            <div class="guide-card guide-action-card">
+              <div class="guide-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+              </div>
+              <p class="guide-title">点开一颗星</p>
+              <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
+            </div>
+          </div>
+        </Transition>
       </div>
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        </div>
-        <p class="guide-title">路过别人的星光</p>
-        <p class="guide-desc">发现相似的等待、离别和愿望。每一次共鸣，都是两颗心的相遇。</p>
-      </div>
-      <div class="guide-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-        </div>
-        <p class="guide-title">挂上我的故事</p>
-        <p class="guide-desc">把今天的心事放到某颗星旁，成为一束新光。</p>
-      </div>
-      <div class="guide-card guide-action-card">
-        <div class="guide-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
-        </div>
-        <p class="guide-title">点开一颗星</p>
-        <p class="guide-desc">看看它从前的故事，读读别人留下的心事，或者写一段你自己的。</p>
+      -->
+      <!-- end: 四张引导卡（TBD 恢复时移除前后注释） -->
+
+      <!-- ② 三个引导功能卡 · 信息感 + 引导感：左图标 + 中序标/标题/引导句 + 右箭头 -->
+      <div class="guide-actions-bar" aria-label="星空三大入口">
+        <!-- 卡 ①：记录心事 -->
+        <button
+          type="button"
+          class="gac gac-record"
+          @click="openRecordForm"
+        >
+          <span class="gac-icon-wrap"><PenLine :size="22" /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">壹</span>
+              <span class="gac-tag">写一段心事</span>
+            </span>
+            <span class="gac-title">记录心事</span>
+            <span class="gac-desc">把今晚的心情交给星穹 AI，为你寻一颗最契合的归属星辰。</span>
+          </span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+          </span>
+        </button>
+
+        <!-- 卡 ②：天镜览星（定位就绪点亮） -->
+        <button
+          v-if="locationReady"
+          type="button"
+          class="gac gac-camera"
+          @click="toggleCameraMode"
+        >
+          <span class="gac-icon-wrap"><ApertureIcon /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">贰</span>
+              <span class="gac-tag">今夜取景器</span>
+            </span>
+            <span class="gac-title">天镜览星</span>
+            <span class="gac-desc">进入观星模式，真实星空取框，把此刻的夜空收进画里。</span>
+          </span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+          </span>
+        </button>
+        <button
+          v-else
+          type="button"
+          class="gac gac-camera"
+          disabled
+          title="等待定位就绪"
+        >
+          <span class="gac-icon-wrap"><ApertureIcon /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">贰</span>
+              <span class="gac-tag gac-tag-wait">等待定位</span>
+            </span>
+            <span class="gac-title">天镜览星</span>
+            <span class="gac-desc">正在校准你此刻的经纬，夜空取景框稍后就位…</span>
+          </span>
+          <span class="gac-arrow is-wait">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v6l4 2"/></svg>
+          </span>
+        </button>
+
+        <!-- 卡 ③：穹庭书局 -->
+        <button
+          type="button"
+          class="gac gac-square"
+          @click="goFolioSquare"
+        >
+          <span class="gac-icon-wrap"><BookMarked :size="22" /></span>
+          <span class="gac-body">
+            <span class="gac-meta">
+              <span class="gac-index">叁</span>
+              <span class="gac-tag">翻开星笺</span>
+            </span>
+            <span class="gac-title">穹庭书局</span>
+            <span class="gac-desc">走进星笺广场，今晚谁在同一册星河卷里，与你共读一段。</span>
+          </span>
+          <span class="gac-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+          </span>
+        </button>
       </div>
     </div>
 
-    <div v-if="locationReady" class="zoom-controls">
+    <div v-if="locationReady && cameraMode.cameraMode.value !== 'observe'" class="zoom-controls">
       <button class="zoom-btn" @click="zoomIn">+</button>
       <button class="zoom-btn" @click="zoomOut">−</button>
     </div>
-    <div v-if="locationReady" class="hint">
-      <p>拖拽旋转 <span>·</span> 滚轮缩放 <span>·</span> 点击星星</p>
-    </div>
+
+    <!-- issue #124/#134：移动端吸附星体后的「凝听星语」按钮（替代触屏点击进入故事，支持恒星与行星） -->
+    <!-- issue #135 动画修复：完全复刻 .search-sheet 结构 → wrapper套 Transition + inner 用 @keyframes animation -->
+    <!-- 天镜览星模式下隐藏（仅允许拖动+放大，吸附与按钮均不触发） -->
+    <Transition name="sheet-fade">
+      <div v-if="isMobile && cameraMode.cameraMode.value !== 'observe' && (locatedTarget !== null || snappedTarget !== null) && !selectedStarInfo" class="story-btn-wrap">
+        <button
+          class="story-enter-btn"
+          type="button"
+          @click="onStoryEnterClick"
+        >
+          <span class="story-enter-main">凝听星语</span>
+          <span v-if="snappedLabel" class="story-enter-sub">{{ snappedLabel }}</span>
+        </button>
+      </div>
+    </Transition>
 
       <StarDetail
         v-if="selectedStarInfo"
@@ -280,6 +406,10 @@
         :current-user-id="currentUserId"
         :observer-lat="userLat"
         :observer-lng="userLng"
+        :is-guest="isGuest"
+        :is-planet-closeup="isPlanetCloseup"
+        :observe-mode="planetObserveMode"
+        v-model:targetStoryId="detailTargetStoryId"
         @switch="onSwitchStory"
         @resonate="onResonate"
         @refresh-stories="fetchStories"
@@ -292,6 +422,33 @@
         @close="onCloseDetail"
         @write-story="onWriteStory"
         @delete-story="onDeleteStory"
+        @stories-mutated="onStarDetailStoriesMutated"
+        @toggle-observe="onToggleObserve"
+        @collection-click="onCollectionClick"
+      />
+
+      <!-- 合集详情 overlay（从故事详情的合集徽章点击打开） -->
+      <CollectionDetail
+        v-if="showCollectionDetail"
+        :collection-id="collectionDetailId"
+        :collections="userCollections"
+        :current-user-id="currentUserId"
+        :is-owner="collectionDetailIsOwner"
+        :refresh-nonce="collectionDetailNonce"
+        @close="onCollectionDetailClose"
+        @collection-switch="onCollectionSwitch"
+        @edit="onCollectionEdit"
+        @delete="onCollectionDelete"
+      />
+
+      <!-- 星笺编辑模态框（从合集详情的编辑按钮触发） -->
+      <CollectionEditModal
+        :show="showCollectionEdit"
+        :collection="editingCollection"
+        :submitting="collectionSubmitting"
+        :error="collectionEditError"
+        @close="showCollectionEdit = false; editingCollection = null"
+        @submit="handleCollectionSubmit"
       />
 
       <StoryForm
@@ -302,10 +459,181 @@
         @close="showForm = false"
       />
 
-      <SettingsModal
-        :visible="showSettings"
-        @close="showSettings = false"
+      <!-- ═══ 记录：auto-match 模式表单 + 候选星面板 ═══ -->
+      <StoryForm
+        v-if="showRecordForm"
+        ref="recordFormRef"
+        mode="auto-match"
+        star-name=""
+        :catalog-star-id="-1"
+        :matching="recordMatching.matching.value"
+        :matching-step="recordMatching.step.value"
+        :match-error="recordMatching.error.value"
+        :suggested-tags="recordMatching.suggestedTags.value"
+        @request-match="onRecordRequestMatch"
+        @submitted="onRecordStorySubmitted"
+        @close="closeRecordForm"
       />
+
+      <Transition name="candidates-fade">
+        <div v-if="showMatchCandidates" class="cb-backdrop" @click.self="closeMatchCandidates">
+          <div class="cb-sheet" role="dialog" aria-modal="true" aria-labelledby="cb-title">
+            <!-- HEADER · 纯居中，无分隔线 -->
+            <header class="cb-header">
+              <button class="cb-close" @click="closeMatchCandidates" aria-label="关闭">
+                <X :size="12" />
+              </button>
+              <div class="cb-title-group">
+                <h2 id="cb-title" class="cb-title">为你找到这些契合的星辰</h2>
+                <p class="cb-subtitle">共 {{ matchCandidates.length }} 颗 · 选一颗，挂上你的故事</p>
+              </div>
+            </header>
+
+            <!-- 3 张 AI 候选 + 1 张随机挂，横向等宽 -->
+            <div class="cb-list">
+              <article
+                v-for="(c, idx) in matchCandidates"
+                :key="c.catalogStarId"
+                class="cb-card"
+                :class="{
+                  gold: !c.isFallback,
+                  purple: c.isFallback,
+                  submitting: submittingCandidateId === c.catalogStarId
+                }"
+              >
+                <!-- 卡头：排名圆徽 + 星名星座 -->
+                <header class="cb-card-head">
+                  <div class="cb-rank" :class="{ gold: !c.isFallback, purple: c.isFallback }">{{ idx + 1 }}</div>
+                  <div class="cb-star">
+                    <h3 class="cb-star-name">{{ c.name || `星 #${c.catalogStarId}` }}</h3>
+                    <span class="cb-star-const">{{ c.constellationCN }}</span>
+                  </div>
+                  <span v-if="c.isFallback" class="cb-flag-purple">等待点亮</span>
+                </header>
+
+                <!-- 元信息：极小字 chips，在一行内 -->
+                <div v-if="Number.isFinite(c.mag) || c.distance != null" class="cb-meta">
+                  <span v-if="Number.isFinite(c.mag)" class="cb-meta-item">m{{ c.mag.toFixed(1) }}</span>
+                  <span v-if="c.distance != null" class="cb-meta-item">{{ c.distance }} 光年</span>
+                </div>
+
+                <!-- 契合度：标签 + 条 + 数字 -->
+                <div class="cb-score">
+                  <div class="cb-score-label">契合度</div>
+                  <div class="cb-score-body">
+                    <div class="cb-score-bar" aria-hidden="true">
+                      <div
+                        class="cb-score-fill"
+                        :class="{ purple: c.isFallback }"
+                        :style="{ width: Math.round(c.finalScore * 100) + '%' }"
+                      ></div>
+                    </div>
+                    <span class="cb-score-num" :class="{ purple: c.isFallback }">
+                      {{ c.isFallback && c.finalScore === 0 ? '—' : Math.round(c.finalScore * 100) + '%' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- AI 匹配理由：极简左竖线引用 -->
+                <blockquote class="cb-reason" :class="{ purple: c.isFallback }">
+                  {{ c.matchReason }}
+                </blockquote>
+
+                <!-- 故事内核：小标签 + chips，无装饰 -->
+                <div v-if="c.starEssences.length" class="cb-kernels">
+                  <div class="cb-kernels-label">故事内核</div>
+                  <div class="cb-kernels-chips">
+                    <span v-for="(e, i) in c.starEssences" :key="i" class="cb-kernel-chip" :class="{ purple: c.isFallback }">
+                      {{ e }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 选星按钮：和 StoryForm 同款 -->
+                <button
+                  class="cb-btn"
+                  :class="{ gold: !c.isFallback, purple: c.isFallback }"
+                  :disabled="submittingCandidateId === c.catalogStarId"
+                  @click="pickCandidate(c)"
+                >
+                  <template v-if="submittingCandidateId === c.catalogStarId">
+                    <span class="cb-btn-spinner"></span>
+                    <span>正在挂上星星…</span>
+                  </template>
+                  <template v-else>
+                    <Star :size="13" />
+                    <span>选这颗星</span>
+                  </template>
+                </button>
+              </article>
+
+              <!-- 第 4 卡 · 随机挂：AI 并列的独立选项 -->
+              <article
+                v-if="randomCandidate"
+                class="cb-card cb-card-random"
+                :class="{ submitting: submittingCandidateId === -(randomCandidate.catalogStarId + 1) }"
+              >
+                <header class="cb-card-head">
+                  <div class="cb-rank random">
+                    <Shuffle :size="11" />
+                  </div>
+                  <div class="cb-star">
+                    <h3 class="cb-star-name">随机挂 · {{ randomCandidate.name || `星 #${randomCandidate.catalogStarId}` }}</h3>
+                    <span class="cb-star-const">{{ randomCandidate.constellationCN }}</span>
+                  </div>
+                  <span class="cb-flag-silver">任意星</span>
+                </header>
+
+                <div v-if="Number.isFinite(randomCandidate.mag) || randomCandidate.distance != null" class="cb-meta">
+                  <span v-if="Number.isFinite(randomCandidate.mag)" class="cb-meta-item">m{{ randomCandidate.mag.toFixed(1) }}</span>
+                  <span v-if="randomCandidate.distance != null" class="cb-meta-item">{{ randomCandidate.distance }} 光年</span>
+                </div>
+
+                <div class="cb-score">
+                  <div class="cb-score-label">随机缘分</div>
+                  <div class="cb-score-body">
+                    <div class="cb-score-bar" aria-hidden="true">
+                      <div class="cb-score-fill random" style="width:100%"></div>
+                    </div>
+                    <span class="cb-score-num random">100%</span>
+                  </div>
+                </div>
+
+                <blockquote class="cb-reason random">
+                  不做刻意寻觅，把故事交给今夜的风，让星穹自己选一颗接住你。
+                </blockquote>
+
+                <!-- 换一颗随机：按钮 -->
+                <button
+                  type="button"
+                  class="cb-random-switch"
+                  :disabled="submittingCandidateId != null"
+                  @click.stop="refreshRandomCandidate()"
+                >
+                  <RefreshCw :size="12" />
+                  <span>换一颗随机</span>
+                </button>
+
+                <button
+                  class="cb-btn random"
+                  :disabled="submittingCandidateId != null"
+                  @click="pickRandomCandidate()"
+                >
+                  <template v-if="submittingCandidateId === -(randomCandidate.catalogStarId + 1)">
+                    <span class="cb-btn-spinner"></span>
+                    <span>正在挂上星星…</span>
+                  </template>
+                  <template v-else>
+                    <Sparkles :size="13" />
+                    <span>就挂这颗</span>
+                  </template>
+                </button>
+              </article>
+            </div>
+          </div>
+        </div>
+      </Transition>
+      <!-- ═══ 记录 结束 ═══ -->
 
       <MoonPanel
         :visible="showMoonPanel"
@@ -323,44 +651,75 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { Settings, Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search } from 'lucide-vue-next'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
+import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit, BookMarked } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
-import type { SkyAPI } from '../composables/useSky'
+import type { SkyAPI, SnapTarget } from '../composables/useSky'
 import SkyCanvas from '../components/SkyCanvas.vue'
 import StarDetail from '../components/StarDetail/index.vue'
+import CollectionDetail from '../components/CollectionDetail/index.vue'
+import CollectionEditModal from '../components/CollectionEditModal.vue'
 import StoryForm from '../components/StoryForm.vue'
-import SettingsModal from '../components/SettingsModal.vue'
 import MoonPanel from '../components/MoonPanel.vue'
 import { useMoon } from '../composables/useMoon'
 import { useLocation } from '../composables/useLocation'
+import { useStarMatching, type MatchCandidate } from '../composables/useStarMatching'
 import catalogData from '../data/stars.json'
 import { constellationNames, starDistances } from '../data/starInfo'
 import { getMoonPhase, getSolarTerm, getBodyPosition } from '../data/planets'
 import { useMediaQuery } from '../composables/useMediaQuery'
+import { useCollections, type Collection, type CollectionDetail as CollectionDetailType, type CreateCollectionInput, type UpdateCollectionInput } from '../composables/useCollections'
+import { isPlanetId, getPlanetBodyName } from '../utils/starName'
+import { useCameraMode, type CameraFilterMode } from '../composables/useCameraMode'
+import { useStars } from '../composables/useStars'
+import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
+import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
 
 const { isMobile } = useMediaQuery()
+
+// 天镜览星模式所需的故事星数据源（独立于 storiesByStarId，供 useCameraMode 使用）
+const stars = useStars()
 
 const router = useRouter()
 const route = useRoute()
 const { startRefreshTimer, stopRefreshTimer } = useAuth()
 const username = ref('')
+// 先声明 userId，避免下方同步兜底时出现 TDZ（引用后声明的变量 → ReferenceError）
 const currentUserId = ref<number | null>(null)
+// ── 同步兜底：首帧就从 localStorage 读 token/username，消灭「登录按钮 → User 按钮」的慢一步闪烁 ──
+//   有 token 时立即把 username 置为非空（优先用缓存的真实 username，没有就用占位），
+//   让 User 按钮/星笺按钮首帧就显示；等 /api/auth/me 异步回来会覆盖成真实值，全程不闪
+try {
+  if (typeof localStorage !== 'undefined') {
+    const token = localStorage.getItem('token')
+    if (token) {
+      const cachedUname = localStorage.getItem('username')
+      const cachedUid = localStorage.getItem('userId')
+      username.value = cachedUname || 'placeholder-user'
+      if (cachedUid) currentUserId.value = Number(cachedUid) || null
+    }
+  }
+} catch {}
+// 访客账号（体验账号）无个人主页，点用户按钮应跳登录页
+const isGuest = computed(() => username.value === '星穹访客')
+
+// ─── 合集详情 overlay 状态 ───
+const { list: userCollections, fetchList: fetchUserCollections, update: updateCollection, remove: removeCollection } = useCollections()
+const showCollectionDetail = ref(false)
+const collectionDetailId = ref<number | null>(null)
+const collectionDetailIsOwner = ref(false)
+// 合集详情刷新令牌：编辑后自增以触发 CollectionDetail 重新拉取
+const collectionDetailNonce = ref(0)
+
+// ─── 合集编辑模态框状态 ───
+const showCollectionEdit = ref(false)
+const editingCollection = ref<Collection | null>(null)
+const collectionSubmitting = ref(false)
+const collectionEditError = ref<string | null>(null)
+
 const showMyStoriesOnly = ref(false)
 const myToggleFeedback = ref('')
 const locationCityToast = ref('')
-
-function toggleMyStories() {
-  // 防止 currentUserId 尚未加载时开启过滤（竞态保护）
-  if (!currentUserId.value) {
-    myToggleFeedback.value = '请先登录'
-    setTimeout(() => { myToggleFeedback.value = '' }, 2000)
-    return
-  }
-  showMyStoriesOnly.value = !showMyStoriesOnly.value
-  myToggleFeedback.value = showMyStoriesOnly.value ? '已切换：只看我的故事' : '已切换：查看全部故事'
-  setTimeout(() => { myToggleFeedback.value = '' }, 2000)
-}
 const favoriteStarIds = ref<number[]>([])
 
 // ─── 统一位置管理（快速缓存+低精度优先+后台高精度更新） ───
@@ -546,16 +905,24 @@ function goToCurrentLocation() {
   location.refresh().then(() => {
     if (location.failed.value) {
       locationCityToast.value = ''
+    } else {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
     }
   })
 }
 
 // 模板中使用的 refreshLocation（重新获取定位按钮）
 function refreshLocation() {
+  // 清除悬停计时器：用户点击意图是重新定位，不是切换城市，避免定位期间城市面板误弹
+  clearHoverTimer()
   locationCityToast.value = '正在获取定位...'
   location.refresh().then(() => {
     if (location.failed.value) {
       locationCityToast.value = ''
+    } else {
+      locationCityToast.value = '定位成功'
+      setTimeout(() => { locationCityToast.value = '' }, 2000)
     }
   })
 }
@@ -612,17 +979,55 @@ onMounted(async () => {
   window.addEventListener('fly-to-star', ((e: CustomEvent) => {
     onStarClick(e.detail.catalogStarId)
   }) as EventListener)
+  // 兜底：当前 URL 与目标 URL 完全一致时（重复点击同星），仍要移动到星星位置
+  window.addEventListener('star-identity-click', onStarIdentityClick as EventListener)
 
+  // 天镜览星：ESC 键退出相机模式
+  window.addEventListener('keydown', onCameraKeyDown)
   // 从个人主页收藏点击跳转过来：定位到指定星星
   focusOnQueryStar()
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('star-identity-click', onStarIdentityClick as EventListener)
+})
+function onStarIdentityClick(e: CustomEvent<{ starId: number }>) {
+  const id = e.detail?.starId
+  if (id == null || Number.isNaN(id)) return
+  focusOnQueryStar(id)
+}
 
 // 提取定位逻辑为独立函数，供 onMounted 和 watch 共用
-function focusOnQueryStar() {
-  const targetStarId = route.query.star
+// 新增 starIdOverride：当外部事件（非路由 query）需要触发相同定位时直接传 id，不走 route.query
+function focusOnQueryStar(starIdOverride?: number) {
+  const targetStarId = starIdOverride != null ? String(starIdOverride) : route.query.star
   if (!targetStarId) return
   const starId = parseInt(targetStarId as string, 10)
   if (isNaN(starId)) return
+  // 负 id = 太阳系行星，走 onPlanetClick → focusOnPlanet 路径（修复收藏行星无法跳转 issue #135）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    const tryFocus = () => {
+      if (skyRef.value?.sky) {
+        if (isMobile.value) {
+          // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+          // 用户点按钮后 onStoryEnterClick → onPlanetClick(enterCloseup=false) 才开面板
+          skyRef.value.sky.focusOnPlanetSimple(bodyName)
+          skyRef.value.sky.snapToPlanet(bodyName)
+        } else {
+          // PC 端：直接进特写 + 开面板
+          onPlanetClick(bodyName, info.conName, starId, true)
+        }
+      } else {
+        setTimeout(tryFocus, 300)
+      }
+    }
+    setTimeout(tryFocus, 500)
+    return
+  }
+  // 正 id = 恒星，走 focusOnStar(x,y,z) 路径
   const tryFocus = () => {
     const star = catalogStarLookup.get(starId)
     if (star && skyRef.value?.sky) {
@@ -639,21 +1044,6 @@ function focusOnQueryStar() {
 watch(() => route.query.star, () => {
   focusOnQueryStar()
 })
-
-async function doLogout() {
-  const token = localStorage.getItem('token')
-  if (token) {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    } catch { /* 即使 API 失败也清除本地状态 */ }
-  }
-  stopRefreshTimer()
-  localStorage.removeItem('token')
-  router.push('/')
-}
 
 function goLogin() {
   stopRefreshTimer()
@@ -691,7 +1081,12 @@ function onSearchSelect(starId: number) {
   showSearch.value = false
   searchOpen.value = false
   searchQuery.value = ''
-  flyToStar(starId)
+  // issue #135：移动端等搜索面板滑出（0.25s）后再定位 + 显示按钮，形成先后顺序
+  if (isMobile.value) {
+    setTimeout(() => flyToStar(starId), 300)
+  } else {
+    flyToStar(starId)
+  }
 }
 
 function closeSearchDropdown() {
@@ -711,6 +1106,31 @@ async function onSearchInput() {
 }
 
 async function flyToStar(starId: number) {
+  console.log('[flyToStar] starId=', starId, 'isPlanetId=', isPlanetId(starId), 'isMobile=', isMobile.value)
+  // 负 id = 行星，走 onPlanetClick 路径（防御性，当前搜索不返回行星）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    if (isMobile.value) {
+      // issue #135：移动端定位后直接设置 locatedTarget 驱动按钮显示，
+      // 不再依赖 snapToPlanet（程序化 snap 触发后按钮偶发不显示的 bug）
+      skyRef.value?.sky?.releaseSnap?.()
+      skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
+      locatedTarget.value = {
+        type: 'planet',
+        planetName: bodyName,
+        planetNameCN: info.conName,
+        planetId: starId,
+      }
+      snappedLabel.value = info.conName
+    } else {
+      // PC 端：直接进特写 + 开面板
+      onPlanetClick(bodyName, info.conName, starId, true)
+    }
+    return
+  }
   const star = catalogStarLookup.get(starId)
   if (!star) return
   // 模拟点击该星
@@ -718,10 +1138,33 @@ async function flyToStar(starId: number) {
 }
 
 function locateStar(starId: number) {
+  // 负 id = 行星，调 focusOnPlanetSimple 只定位不进特写（与普通恒星 locateStar 体验一致）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName || !skyRef.value?.sky) return
+    skyRef.value.sky.focusOnPlanetSimple(bodyName)
+    // issue #135：移动端定位后设置 locatedTarget 驱动按钮显示
+    if (isMobile.value) {
+      const info = PLANET_INFO[bodyName]
+      locatedTarget.value = {
+        type: 'planet',
+        planetName: bodyName,
+        planetNameCN: info?.conName || bodyName,
+        planetId: starId,
+      }
+      snappedLabel.value = info?.conName || bodyName
+    }
+    return
+  }
   const star = catalogStarLookup.get(starId)
   if (!star || !skyRef.value?.sky) return
   // 平滑转动相机，以该星为中心（不打开详情面板）
   skyRef.value.sky.focusOnStar(star.x, star.y, star.z)
+  // issue #135：移动端定位后设置 locatedTarget 驱动按钮显示
+  if (isMobile.value) {
+    locatedTarget.value = { type: 'star', starId }
+    snappedLabel.value = formatStarName(star)
+  }
   // 动画结束后高亮该星 2s
   setTimeout(() => {
     skyRef.value?.sky?.highlightStar(star.x, star.y, star.z)
@@ -732,6 +1175,8 @@ function locateStar(starId: number) {
 let hoverLinesAbort: AbortController | null = null
 let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
 async function onStarHoverLong(starId: number | null) {
+  // 天镜览星模式下禁止 hover 触发连线/详情
+  if (cameraMode.cameraMode.value === 'observe') return
   // 取消上一次请求和清除计时器
   if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
   if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
@@ -779,10 +1224,41 @@ interface StoryData {
   id: number; title: string | null; content: string; resonanceCount: number
   catalogStarId: number; catalogStarIds?: number[]; createdAt: string; locationLat: number | null
   locationLng: number | null; type: string; viewCount: number; origin: string | null
-  username: string | null; tag: string | null; userId: number | null
+  username: string | null; tag: string | null; tags?: string[] | null; userId: number | null
   imageUrl: string | null
+  /** 用户星（catalogStarId==null）时，后端返回 pos_x/y/z → 前端 camelCase posX/Y/Z；星表星为 null */
+  posX?: number | null; posY?: number | null; posZ?: number | null
+  collectionId?: number | null; collectionName?: string | null
+  collectionCoverColor?: string | null; collectionVisibility?: string | null
+  collectionStoryCount?: number | null
 }
-const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, userId: null, imageUrl: null }
+const NO_STORY: StoryData = { id: -1, title: null, content: '这颗星还在等待它的故事...', resonanceCount: 0, catalogStarId: -1, catalogStarIds: [], createdAt: '', locationLat: null, locationLng: null, type: '', viewCount: 0, origin: null, username: null, tag: null, tags: [], userId: null, imageUrl: null, collectionId: null, collectionName: null, collectionCoverColor: null, collectionVisibility: null, collectionStoryCount: null }
+
+/** 统一 tags 字段归一化：tags[] 存在(且数组)→ 最多 5 条/去重；否则回退 tag 单列；最后兜底空数组
+ *  避免任何端上出现 undefined/null → displayTags 兜底能保证显示，但是 SkyPage 主动构造 StoryData 时
+ *  把 s.tags 可能是 JSON 字符串/数组/undefined 的 3 种形态全部归一化成 string[]。*/
+function normalizeStoryTags(s: { tag?: string | null; tags?: unknown } | null | undefined): string[] {
+  if (!s) return []
+  // 1) tags 是数组 → 过滤 string 非空
+  if (Array.isArray(s.tags)) {
+    const arr = s.tags.filter((t) => typeof t === 'string' && t.trim().length > 0 && /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t.trim())) as string[]
+    if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+  }
+  // 2) tags 是字符串：可能是 JSON 串（后端没走 convertKeys parse 的异常场景），也可能是旧逗号拼
+  if (typeof s.tags === 'string' && s.tags.length) {
+    try {
+      const p = JSON.parse(s.tags)
+      if (Array.isArray(p)) {
+        const arr = p.filter((t) => typeof t === 'string' && t.trim().length > 0 && /^[\u4e00-\u9fa5A-Za-z0-9]{2,6}$/.test(t.trim())) as string[]
+        if (arr.length) return Array.from(new Set(arr)).slice(0, 5)
+      }
+    } catch { /* 不是 JSON：继续往下兜底单 tag */ }
+  }
+  // 3) 最后兜底老 tag 列
+  if (typeof s.tag === 'string' && s.tag.trim()) return [s.tag.trim()]
+  return []
+}
+
 const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
@@ -803,8 +1279,12 @@ function mergeStoriesIntoMap(
       createdAt: s.createdAt || '',
       locationLat: s.locationLat ?? null, locationLng: s.locationLng ?? null,
       type: s.type || 'user', viewCount: s.viewCount ?? 0, origin: s.origin ?? null,
-      username: s.username ?? null, tag: s.tag ?? null, userId: s.userId ?? null,
+      username: s.username ?? null, tag: s.tag ?? null, tags: normalizeStoryTags(s), userId: s.userId ?? null,
       imageUrl: s.imageUrl ?? null,
+      posX: s.posX ?? null, posY: s.posY ?? null, posZ: s.posZ ?? null,
+      collectionId: s.collectionId ?? null, collectionName: s.collectionName ?? null,
+      collectionCoverColor: s.collectionCoverColor ?? null, collectionVisibility: s.collectionVisibility ?? null,
+      collectionStoryCount: s.collectionStoryCount ?? null,
     }
     for (const cid of cids) {
       if (cid == null) continue
@@ -817,13 +1297,55 @@ function mergeStoriesIntoMap(
   }
 }
 
+/** 把 storiesByStarId 内所有 StoryData（或 fetchStories 里原始 items）聚合出
+ *  用户星的独立 3D 坐标集：key=story.id，value={x,y,z}（注意星表恒星 key=catalogStarId 不需要，starById 能直接查） */
+function collectUserStarPositions(
+  itemsOrStories: any[] | StoryData[]
+): Map<number, { x: number; y: number; z: number }> {
+  const userPos = new Map<number, { x: number; y: number; z: number }>()
+  for (const s of itemsOrStories) {
+    const hasPos = typeof s.posX === 'number' && typeof s.posY === 'number' && typeof s.posZ === 'number'
+    if (!hasPos) continue
+    // 用户星：catalogStarId == null / 空，且没有 catalogStarIds 对应星表 → 用 posX/Y/Z
+    const isUserStar =
+      (s.catalogStarId == null || s.catalogStarId === 0) &&
+      !(Array.isArray(s.catalogStarIds) && s.catalogStarIds.length > 0)
+    if (!isUserStar) continue
+    userPos.set(Number(s.id), { x: Number(s.posX), y: Number(s.posY), z: Number(s.posZ) })
+  }
+  return userPos
+}
+
 function publishStories(
   map: Map<number, StoryData[]>,
   statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>,
+  items?: any[]
 ) {
   storiesByStarId.value = map
   pendingStatsMap.value = statsMap
-  skyRef.value?.sky?.setStarStatsCache(statsMap)
+  const userStarPos = collectUserStarPositions(items ?? Array.from(map.values()).flat())
+  skyRef.value?.sky?.setStarStatsCache(statsMap, userStarPos)
+}
+
+// 从 storiesByStarId 重建全量天空统计并同步到 sky（数据变更后调用）
+function rebuildStatsFromMap() {
+  const fullMap = storiesByStarId.value
+  if (!fullMap) return
+  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
+  const allStories: StoryData[] = []
+  for (const [cid, stories] of fullMap) {
+    if (stories.length === 0) continue
+    statsMap.set(cid, {
+      stories: stories.length,
+      resonance: stories.reduce((sum, s) => sum + s.resonanceCount, 0),
+      views: stories.reduce((sum, s) => sum + s.viewCount, 0),
+      favorites: 0,
+    })
+    allStories.push(...stories)
+  }
+  pendingStatsMap.value = statsMap
+  const userStarPos = collectUserStarPositions(allStories)
+  skyRef.value?.sky?.setStarStatsCache(statsMap, userStarPos)
 }
 
 async function fetchStories() {
@@ -843,7 +1365,7 @@ async function fetchStories() {
     const firstData = firstJson.data?.items ?? firstJson.data ?? []
     const totalPages = firstJson.data?.totalPages ?? 1
     mergeStoriesIntoMap(firstData, map, statsMap)
-    publishStories(map, statsMap)
+    publishStories(map, statsMap, firstData)
 
     // 后台继续加载剩余页
     for (let page = 2; page <= totalPages; page++) {
@@ -852,94 +1374,15 @@ async function fetchStories() {
       const json = await res.json()
       const items = json.data?.items ?? json.data ?? []
       mergeStoriesIntoMap(items, map, statsMap)
-      publishStories(map, statsMap)
+      publishStories(map, statsMap, items)
     }
   } catch (e: any) {
     if (e.name !== 'AbortError') console.error('获取故事失败:', e)
   } finally {
     fetchingStories.value = false
   }
-  // 如果"只看我的"已开启，重新计算过滤后的天空统计
-  if (showMyStoriesOnly.value) recalcFilteredStats()
 }
 onMounted(() => { fetchStories() })
-
-// 根据"只看我的"切换，重新计算天空中的星星统计数据
-function recalcFilteredStats() {
-  const fullMap = storiesByStarId.value
-  if (!fullMap) return
-  const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
-  for (const [cid, stories] of fullMap) {
-    const filtered = showMyStoriesOnly.value
-      ? stories.filter(s => s.userId === currentUserId.value)
-      : stories
-    if (filtered.length === 0) continue
-    statsMap.set(cid, {
-      stories: filtered.length,
-      resonance: filtered.reduce((sum, s) => sum + s.resonanceCount, 0),
-      views: filtered.reduce((sum, s) => sum + s.viewCount, 0),
-      favorites: 0,
-    })
-  }
-  pendingStatsMap.value = statsMap
-  skyRef.value?.sky?.setStarStatsCache(statsMap)
-}
-
-// 监听"只看我的"切换，更新天空统计和私有连线
-watch(showMyStoriesOnly, async () => {
-  recalcFilteredStats()
-  if (showMyStoriesOnly.value) {
-    // 开启"只看我的"：加载私有连线
-    await fetchMyKernelLines()
-  } else {
-    // 关闭"只看我的"：清除连线
-    skyRef.value?.sky?.setKernelLines([])
-  }
-  // 如果详情面板打开：仅当该星完全没有故事时关闭面板
-  // 注意：showMyStoriesOnly 只影响 3D 天空，不影响详情面板数据
-  if (selectedStarInfo.value && selectedCatalogStarId.value) {
-    const allStories = storiesByStarId.value.get(selectedCatalogStarId.value)
-    if (!allStories || allStories.length === 0) {
-      selectedStories.value = []
-      selectedStarInfo.value = null
-      catalogStats.value = null
-    }
-  }
-})
-
-// 获取过滤后的故事（考虑"只看我的"开关）
-function getFilteredStories(starId: number): StoryData[] {
-  const stories = storiesByStarId.value.get(starId)
-  if (!stories) return []
-  if (!showMyStoriesOnly.value) return stories
-  return stories.filter(s => s.userId === currentUserId.value)
-}
-
-// 获取用户私有内核连线
-async function fetchMyKernelLines() {
-  const token = localStorage.getItem('token')
-  if (!token) return
-  try {
-    const res = await fetch('/api/profile/kernel-lines', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const json = await res.json()
-    if (!res.ok || !json.data?.length) {
-      skyRef.value?.sky?.setKernelLines([])
-      return
-    }
-    const lines = (json.data as {
-      from: { catalogStarId: number; x: number; y: number; z: number }
-      to: { catalogStarId: number; x: number; y: number; z: number }
-    }[]).map(l => ({
-      from: { x: l.from.x, y: l.from.y, z: l.from.z },
-      to: { x: l.to.x, y: l.to.y, z: l.to.z },
-    }))
-    skyRef.value?.sky?.setKernelLines(lines)
-  } catch {
-    skyRef.value?.sky?.setKernelLines([])
-  }
-}
 
 function formatStarName(s: CatalogStar): string {
   if (s.name) return s.name
@@ -952,10 +1395,326 @@ function formatStarName(s: CatalogStar): string {
 const skyRef = ref<{ sky: SkyAPI | null } | null>(null)
 const pendingStatsMap = ref<Map<number, { stories: number; resonance: number; views: number; favorites: number }> | null>(null)
 
-// 当 SkyCanvas 渲染完成后，传入等待的统计数据
+// ═══════════════════════════════════════════
+// 天镜览星 · 相机模式
+// ═══════════════════════════════════════════
+// SkyPage 不直接调用 useSky()：sky 实例由 SkyCanvas 内部创建并通过 ref 暴露。
+// useCameraMode 需在 setup 同步调用（内部注册 onBeforeUnmount），但此时 SkyCanvas
+// 尚未挂载、skyRef.value.sky 为 null。故用 Proxy 转发所有属性/方法到最新 skyRef.value.sky；
+// cameraZoomLevel / isFlying 用本地 ref 同步，sky 未就绪时方法 fallback 为 noop。
+const _cameraZoomLevelSync = ref(1)
+const _cameraIsFlyingSync = ref(false)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.cameraZoomLevel?.value,
+  (v) => { if (typeof v === 'number') _cameraZoomLevelSync.value = v },
+  { immediate: true },
+)
+watch(
+  () => (skyRef.value?.sky as SkyAPI | null | undefined)?.isFlying?.value,
+  (v) => { if (typeof v === 'boolean') _cameraIsFlyingSync.value = v },
+  { immediate: true },
+)
+const sky = new Proxy({} as SkyAPI, {
+  get(_t, prop: string | symbol) {
+    if (prop === 'cameraZoomLevel') return _cameraZoomLevelSync
+    if (prop === 'isFlying') return _cameraIsFlyingSync
+    const real = skyRef.value?.sky
+    if (real) return (real as Record<symbol | string, unknown>)[prop]
+    return () => {}
+  },
+}) as SkyAPI
+
+const cameraMode = useCameraMode(sky, stars)
+
+const cameraCenterCelestial = ref({ ra: '', dec: '' })
+const cameraCurrentFov = ref(75)
+const cameraRegion = ref('繁星天区')
+const cameraOverlayRef = ref<InstanceType<typeof CameraOverlay> | null>(null)
+let cameraFrameUnsub: (() => void) | null = null
+// 相机模式下点击右下角条目 → 打开 StarDetail 详情时临时隐藏 overlay
+// true = 详情UI打开中，overlay隐藏；StarDetail关闭后回到false → 恢复相机取景UI（不退出相机模式）
+const cameraDetailOpen = ref(false)
+
+// 相机模式"听语"下点具体故事卡 → 精确跳到该故事的 StoryDetail 页面：
+//   父级设值（故事id）→ StarDetail v-model:targetStoryId 收到后自动：切Tab(history/all) + 打开StoryDetail → emit回null完成消费
+// 关闭详情/退出相机模式时手动清空，避免下次进入残留
+const detailTargetStoryId = ref<number | null>(null)
+
+/**
+ * 根据当前相机指向的赤经(RA)/赤纬(DEC)计算动态天区名。
+ * 不追求88星座精度，只做简洁的「XX天区」描述，保证随相机移动明显变化。
+ * - RA 按 6 段分：00~04h 东曦 / 04~08h 苍龙 / 08~12h 朱雀 / 12~16h 白虎 / 16~20h 玄武 / 20~24h 紫微
+ * - DEC 按 3 段分：>+30° 北辰区 / -30°~+30° 赤道区 / <-30° 南溟区
+ * 组合例子：「苍龙·北辰天区」「朱雀·赤道天区」「紫微·南溟天区」
+ */
+function raDecToRegion(raStr: string, decStr: string): string {
+  // RA 解析：格式如 "12h 30m" → 小时数（0~24）
+  let ra = 12
+  const raMatch = raStr.match(/(\d+(?:\.\d+)?)/)
+  if (raMatch) ra = parseFloat(raMatch[1])
+  if (Number.isNaN(ra)) ra = 12
+  ra = ((ra % 24) + 24) % 24
+
+  // DEC 解析：格式如 "+30° 15'" → 度数（-90 ~ +90）
+  let dec = 0
+  const decNumMatch = decStr.match(/([+-]?\d+(?:\.\d+)?)/)
+  if (decNumMatch) dec = parseFloat(decNumMatch[1])
+  if (Number.isNaN(dec)) dec = 0
+
+  const raNames = ['东曦', '苍龙', '朱雀', '白虎', '玄武', '紫微']
+  const raIdx = Math.min(5, Math.floor(ra / 4))  // 0~5
+  const raName = raNames[raIdx] ?? '繁星'
+
+  let decBand = '赤道'
+  if (dec > 30) decBand = '北辰'
+  else if (dec < -30) decBand = '南溟'
+
+  return `${raName}·${decBand}天区`
+}
+
+// 订阅相机帧更新 HUD 数据 + 动态天区名
+watch(() => cameraMode.cameraMode.value, (mode) => {
+  if (mode === 'observe') {
+    cameraFrameUnsub = sky.onCameraFrame((pose) => {
+      cameraCenterCelestial.value = { ra: pose.centerRa, dec: pose.centerDec }
+      cameraCurrentFov.value = pose.fov
+      cameraRegion.value = raDecToRegion(pose.centerRa, pose.centerDec)
+    })
+  } else if (cameraFrameUnsub) {
+    cameraFrameUnsub()
+    cameraFrameUnsub = null
+  }
+})
+
+function toggleCameraMode() {
+  if (cameraMode.cameraMode.value === 'observe') {
+    cameraMode.exit()
+  } else {
+    cameraMode.enter()
+  }
+}
+
+async function onCameraStoryClick(star: any) {
+  const overlay = cameraOverlayRef.value
+  const panel = (overlay as any)?.panelRef
+
+  // 步骤1：如果卡片未居中，先滚动居中让用户视觉聚焦
+  const centered = panel?.isCardCentered ? panel.isCardCentered(star.id) : true
+  if (!centered) panel?.scrollToCardCenter?.(star.id)
+
+  // ────────────────────────────────────────────────────────────
+  // 解析 & 分类：右下角条目到底是哪一种？
+  //   TYPE_A = 纯 catalog 星介绍：有 catalogStarId 且 star.id === catalogStarId（观星模式）
+  //   TYPE_B = 归属星表星的具体故事：有 catalogStarId 但 star.id !== catalogStarId（用户/历史故事挂在星星下）
+  //   TYPE_C = 纯用户心声（无归属星表星）：catalogStarId 为空（后端随机 3D 坐标生成的独立故事星）
+  // ────────────────────────────────────────────────────────────
+  const hasCatalogStar: boolean = star.catalogStarId != null && !Number.isNaN(Number(star.catalogStarId))
+  const rawCatalogId: number | null = hasCatalogStar ? Number(star.catalogStarId) : null
+  const rawStoryId: number = Number(star.id)
+  const catalogStarIdNum: number = rawCatalogId ?? rawStoryId
+
+  const isTypeC_PureUserStory: boolean = !hasCatalogStar          // 纯用户心声（无归属星）
+  const isTypeB_StoryUnderCatalog: boolean =
+    hasCatalogStar && rawCatalogId !== rawStoryId                 // 挂在 catalog 星下的具体故事（用户/历史）
+  const isTypeA_CatalogStarIntro: boolean =
+    hasCatalogStar && rawCatalogId === rawStoryId                 // 纯 catalog 星介绍（观星模式）
+
+  // 步骤2：镜头飞行到该星（zoomLevel=3 拉近）— 传原始 star 对象
+  sky.flyToStar3D(star, { zoomLevel: 3 })
+
+  // 步骤3：等飞行 700ms，让用户看到飞行动画
+  await new Promise(r => setTimeout(r, 700))
+
+  // ═══════════════════════════════════════════════════════════
+  // 步骤4：不退出相机模式！直接打开 StarDetail + 隐藏 overlay
+  // ═══════════════════════════════════════════════════════════
+  // 4.1 先标记 cameraDetailOpen=true → CameraOverlay 被 v-if="!cameraDetailOpen" 隐藏
+  cameraDetailOpen.value = true
+
+  // 4.2 路由同步写 ?star=xxx（便于 watch 聚焦 + 刷新后能恢复定位）
+  router.replace({
+    path: '/sky',
+    query: { ...route.query, star: String(catalogStarIdNum) },
+  })
+
+  // 4.3 打开 StarDetail（按 TYPE_A/B/C 分三路）
+  if (isTypeC_PureUserStory) {
+    // ──────────────────────────────────────────────────────
+    // TYPE_C：纯用户心声（无归属星表星）
+    //   - catalogStarLookup 和 storiesByStarId 里都没有它的记录
+    //   - 所以不能走 onStarClick()（会 catalogStarLookup.get() 查不到直接 return）
+    //   - 必须手动构造 StarDetail 需要的最小 props，然后把唯一的一条故事塞进 selectedStories，
+    //     再通过 detailTargetStoryId 触发 StarDetail 内部打开 StoryDetail 页面
+    // ──────────────────────────────────────────────────────
+    selectedStories.value = [{
+      id: rawStoryId,
+      title: star.title ?? null,
+      content: star.content ?? '',
+      resonanceCount: star.resonanceCount ?? 0,
+      catalogStarId: 0,          // 无归属星 → 给 0 作为占位（不参与渲染）
+      catalogStarIds: [],
+      createdAt: star.createdAt ?? '',
+      locationLat: star.locationLat ?? null,
+      locationLng: star.locationLng ?? null,
+      type: star.type ?? 'user',
+      viewCount: star.viewCount ?? 0,
+      origin: star.origin ?? null,
+      username: star.username ?? null,
+      tag: star.tag ?? null,
+      tags: star.tags ?? (star.tag ? [star.tag] : []),
+      userId: star.userId ?? null,
+      imageUrl: star.imageUrl ?? null,
+      collectionId: star.collectionId ?? null,
+      collectionName: star.collectionName ?? null,
+      collectionCoverColor: star.collectionCoverColor ?? null,
+      collectionVisibility: star.collectionVisibility ?? null,
+      collectionStoryCount: star.collectionStoryCount ?? null,
+    }]
+    selectedCatalogStarId.value = rawStoryId     // 用故事 id 占位（避免 number|null 报错）
+    selectedStarInfo.value = {
+      id: rawStoryId,
+      displayName: star.title || `星 #${rawStoryId}`,
+      con: 'user',                                // 无星座 → 占位
+      mag: 99,
+      conName: '星友心声',                         // 右栏星座名显示"星友心声"
+      distance: null,
+      ra: star.ra ?? 0,                           // 3D 坐标（若有）
+      dec: star.dec ?? 0,
+      color: '#caa7ff',                           // 用户心声固定紫色（与主设计系统一致）
+    }
+    catalogStats.value = {
+      storyCount: 1,
+      totalResonance: star.resonanceCount ?? 0,
+      totalViews: star.viewCount ?? 0,
+      starViews: 0,
+      favoriteCount: 0,
+    }
+    // 唯一的一条故事 → 自动打开 StoryDetail 详情页
+    await nextTick()
+    await nextTick()
+    setTimeout(() => {
+      detailTargetStoryId.value = rawStoryId
+    }, 0)
+  } else {
+    // ──────────────────────────────────────────────────────
+    // TYPE_A 或 TYPE_B：有归属星表星
+    //   → 正常走 onStarClick：catalogStarLookup 能查到 → selectedStarInfo / selectedStories / catalogStats 自动赋值
+    // ──────────────────────────────────────────────────────
+    onStarClick(catalogStarIdNum)
+
+    // TYPE_B：挂在 catalog 星下的具体故事 → 触发精确打开对应 StoryDetail 页面
+    //   - user 故事 → 切 Tab 到「所有故事」并打开详情
+    //   - history 故事 → 切 Tab 到「历史故事」并打开详情
+    //   - TYPE_A 纯 catalog 星介绍 → 不触发（保持默认 AI 叙事 Tab）
+    if (isTypeB_StoryUnderCatalog && rawStoryId > 0) {
+      await nextTick()
+      await nextTick()
+      setTimeout(() => {
+        detailTargetStoryId.value = rawStoryId
+      }, 0)
+    }
+  }
+}
+
+function onCameraActiveChange(starId: number) {
+  // 移动端单卡片切换时同步 activeStarId（不触发飞镜头，仅高亮）
+  cameraMode.setActiveStar(starId)
+}
+
+function onCameraSetMode(mode: CameraFilterMode) {
+  cameraMode.setMode(mode)
+}
+
+/** 相机模式 StoryDetailCard 合集徽章点击 → 打开 CollectionDetail overlay */
+function onCameraCollectionClick(collectionId: number) {
+  onCollectionClick({ collectionId, collectionName: null })
+}
+
+// ═══ 天镜览星 · 边界处理 ═══
+// ESC 键退出相机模式：优先级：StarDetail开 → 先关StarDetail → 再关相机故事卡片 → 最后退出相机模式
+function onCameraKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && cameraMode.cameraMode.value === 'observe') {
+    if (cameraDetailOpen.value && selectedStarInfo.value) {
+      onCloseDetail()
+    } else if (cameraMode.isCardOpen.value) {
+      cameraMode.closeStoryCard()
+    } else {
+      cameraMode.exit()
+    }
+  }
+}
+
+// 用户从相机 HUD 的「退出」按钮或路由离开前触发：先关 StarDetail（如果开着）再真正退出相机模式
+function onCameraModeExitRequested() {
+  if (cameraDetailOpen.value && selectedStarInfo.value) {
+    // 先把 StarDetail 关掉（清理selectedStarInfo + cameraDetailOpen + 去掉路由star查询）
+    onCloseDetail()
+  }
+  cameraMode.exit()
+}
+
+// 路由离开时清理相机模式状态
+onBeforeRouteLeave(() => {
+  if (cameraMode.cameraMode.value === 'observe') {
+    onCameraModeExitRequested()
+  }
+})
+
+// issue #124/#134：准星吸附目标（驱动移动端底部「凝听星语」按钮显示，区分恒星/行星）
+const snappedTarget = ref<SnapTarget | null>(null)
+const snappedLabel = ref<string>('')
+// issue #135：定位结果目标（独立于 snap 机制，解决程序化 snap 后按钮不显示的 bug）
+// 定位/搜索跳转后直接设置此状态驱动按钮显示，不依赖 pointermove snap 触发
+const locatedTarget = ref<SnapTarget | null>(null)
+// issue #136：点击「凝听星语」时保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示
+const lastEnteredTarget = ref<SnapTarget | null>(null)
+
+function onSnapChange(target: SnapTarget | null) {
+  console.log('[onSnapChange] target=', target)
+  if (target === null) {
+    snappedTarget.value = null
+    snappedLabel.value = ''
+    // issue #135：snap 释放时清除 locatedTarget（用户拖动离开或 releaseSnap 调用）
+    // 注意：flyToStar 中 releaseSnap() 先于 locatedTarget 设置，此处清除无影响
+    locatedTarget.value = null
+    return
+  }
+  // issue #135：用户拖动触发 snap 时，清除 locatedTarget（snap 接管按钮驱动）
+  locatedTarget.value = null
+  snappedTarget.value = target
+  if (target.type === 'star') {
+    const star = catalogStarLookup.get(target.starId)
+    snappedLabel.value = star ? formatStarName(star) : ''
+  } else {
+    snappedLabel.value = target.planetNameCN
+  }
+}
+
+// issue #124/#134：点击「凝听星语」按钮 → 进入故事详情并释放吸附
+// 行星分支不进入特写模式（issue #134：移动端暂不进入行星特写，仅打开故事面板）
+// issue #135：优先用 locatedTarget（独立于 snap 机制），回退到 snappedTarget
+function onStoryEnterClick() {
+  const target = locatedTarget.value || snappedTarget.value
+  if (!target) return
+  // 保存 target，关闭故事后恢复 locatedTarget 让按钮重新显示（移动端视角没动时按钮应保持可用）
+  lastEnteredTarget.value = target
+  // 清除定位目标和吸附状态
+  locatedTarget.value = null
+  skyRef.value?.sky?.releaseSnap?.()
+  if (target.type === 'star') {
+    onStarClick(target.starId)
+  } else {
+    onPlanetClick(target.planetName, target.planetNameCN, target.planetId, false)
+  }
+}
+
+// 当 SkyCanvas 渲染完成后，传入等待的统计数据 + 用户星坐标
 watch([() => skyRef.value, pendingStatsMap], ([sRef, statsMap]) => {
   if (sRef?.sky && statsMap) {
-    sRef.sky.setStarStatsCache(statsMap)
+    const allStories: StoryData[] = []
+    for (const [, arr] of (storiesByStarId.value ?? new Map()).entries()) allStories.push(...arr)
+    const userStarPos = collectUserStarPositions(allStories)
+    sRef.sky.setStarStatsCache(statsMap, userStarPos)
   }
 })
 
@@ -1010,6 +1769,8 @@ onBeforeUnmount(() => {
   if (debugTimer) clearInterval(debugTimer)
   clearInterval(retryInterval)
   clearHoverTimer()
+  // 天镜览星：移除键盘事件监听
+  window.removeEventListener('keydown', onCameraKeyDown)
 })
 const selectedStories = ref<StoryData[]>([])
 const activeStoryIndex = ref(0)
@@ -1018,12 +1779,208 @@ const selectedCatalogStarId = ref(0)
 const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
-const showSettings = ref(false)
+// 行星轨迹开关：true=显示所有行星视运动轨迹，false=只显示太阳轨迹（黄道线）
+const showPlanetTrails = ref(true)
+function togglePlanetTrails() {
+  showPlanetTrails.value = !showPlanetTrails.value
+  skyRef.value?.sky?.setPlanetTrailsVisible(showPlanetTrails.value)
+}
+
+// ─── PC 端行星特写 · 观察模式（issue #136）───
+// planetObserveMode=true 时隐藏故事面板和模糊背景，露出 3D 行星特写供用户滚轮/拖拽观察
+const planetObserveMode = ref(false)
+// 是否处于 PC 端行星特写模式（行星 id < 0 且非移动端）；决定 StarDetail overlay 空白点击行为
+const isPlanetCloseup = computed(() => !isMobile.value && selectedCatalogStarId.value < 0)
+
+// ─── 记录 · AI 归属星辰匹配 ───
+const showRecordForm = ref(false)
+const recordFormRef = ref<InstanceType<typeof StoryForm> | null>(null)
+const recordMatching = useStarMatching()
+const showMatchCandidates = ref(false)
+const matchCandidates = ref<MatchCandidate[]>([])
+const submittingCandidateId = ref<number | null>(null)
+
+/** 「随机挂」候选（和 AI Top3 并列的第 4 选项，前端本地随机取 catalog 星） */
+interface RandomCandidate {
+  catalogStarId: number
+  name: string | null
+  constellationCN: string
+  mag: number
+  distance: number | null
+}
+const randomCandidate = ref<RandomCandidate | null>(null)
+/** 为避免和上一颗完全相同：记录上一次 catalogStarId，最多尝试 8 次 */
+let _lastRandomId = -1
+function refreshRandomCandidate() {
+  const all = catalogData.stars as Array<{ id: number; name?: string | null; con?: string; mag: number; ra: number; dec: number }>
+  if (!all.length) { randomCandidate.value = null; return }
+  let star: typeof all[number] | undefined
+  for (let i = 0; i < 8; i++) {
+    const pick = all[Math.floor(Math.random() * all.length)]
+    if (pick.id !== _lastRandomId) { star = pick; break }
+  }
+  if (!star) star = all[Math.floor(Math.random() * all.length)]
+  _lastRandomId = star.id
+  randomCandidate.value = {
+    catalogStarId: star.id,
+    name: star.name || null,
+    constellationCN: star.con ? (constellationNames[star.con] || star.con) : '未命名',
+    mag: star.mag,
+    distance: starDistances[star.id] ?? null,
+  }
+}
+
+/** 暂存待提交的表单数据（匹配成功后，用户选星时直接用） */
+const pendingRecordPayload = ref<{
+  title: string
+  content: string
+  tag: string | null
+  tags: string[]
+  isAnonymous: boolean
+} | null>(null)
+
+function openRecordForm() {
+  if (isGuest.value) { goLogin(); return }
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  submittingCandidateId.value = null
+  showRecordForm.value = true
+  nextTick(() => recordFormRef.value?.resetForm())
+}
+
+function closeRecordForm() {
+  if (recordMatching.matching.value || submittingCandidateId.value != null) return
+  recordMatching.reset()
+  matchCandidates.value = []
+  showMatchCandidates.value = false
+  pendingRecordPayload.value = null
+  showRecordForm.value = false
+}
+
+function closeMatchCandidates() {
+  if (submittingCandidateId.value != null) return
+  showMatchCandidates.value = false
+  matchCandidates.value = []
+  randomCandidate.value = null
+}
+
+/** StoryForm emit requestMatch：先调 /match-star API 拿候选星 */
+async function onRecordRequestMatch(payload: {
+  title: string; content: string; tag: string | null; tags: string[]; isAnonymous: boolean
+}) {
+  if (isGuest.value) { goLogin(); return }
+  // 暂存表单，选完候选星后再真提交
+  pendingRecordPayload.value = { ...payload, tags: payload.tags ? [...payload.tags] : [] }
+  try {
+    const res = await recordMatching.matchStars(payload.title, payload.content, 3)
+    if (!res.candidates.length) {
+      throw new Error('未找到合适的星辰')
+    }
+    matchCandidates.value = res.candidates
+    // 同步生成「随机挂」的第一颗
+    refreshRandomCandidate()
+    showMatchCandidates.value = true
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    // 不自动清空 form，用户可重试
+    console.warn('[record-match] 匹配失败:', msg)
+  }
+}
+
+/** 抽一个公共完成路径：成功后清空状态 + 飞相机 + 开 StarDetail */
+function afterPickSuccess(catalogStarId: number) {
+  submittingCandidateId.value = null
+  showMatchCandidates.value = false
+  matchCandidates.value = []
+  randomCandidate.value = null
+  showRecordForm.value = false
+  pendingRecordPayload.value = null
+  recordMatching.reset()
+
+  const star = catalogStarLookup.get(catalogStarId)
+  if (star) {
+    skyRef.value?.sky?.focusOnStar(star.x, star.y, star.z)
+    setTimeout(() => skyRef.value?.sky?.highlightStar(star.x, star.y, star.z), 1000)
+  }
+  nextTick(() => onStarClick(catalogStarId))
+}
+
+/** 用户点「选这颗星」→ doSubmit 真正入库 → 飞相机 → 开详情 */
+async function pickCandidate(c: MatchCandidate) {
+  if (!pendingRecordPayload.value || !recordFormRef.value) return
+  submittingCandidateId.value = c.catalogStarId
+  try {
+    const res = await recordFormRef.value.doSubmit(
+      c.catalogStarId,
+      [c.catalogStarId],
+      // 用「用户点匹配按钮那一刻的快照标签」覆盖，避免用户在匹配完成前/后改了表单 selectedTags
+      pendingRecordPayload.value.tags ?? [],
+    )
+    if (!res?.ok) {
+      submittingCandidateId.value = null
+      return
+    }
+    afterPickSuccess(c.catalogStarId)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[record-match] 挂载故事失败:', msg)
+    submittingCandidateId.value = null
+  }
+}
+
+/** 用户选「随机挂」卡片：完全复用 doSubmit 链路，submitting 标志用负数避免和 AI 卡冲突 */
+async function pickRandomCandidate() {
+  if (!randomCandidate.value || !pendingRecordPayload.value || !recordFormRef.value) return
+  const catalogStarId = randomCandidate.value.catalogStarId
+  submittingCandidateId.value = -(catalogStarId + 1)
+  try {
+    const res = await recordFormRef.value.doSubmit(
+      catalogStarId,
+      [catalogStarId],
+      pendingRecordPayload.value.tags ?? [],
+    )
+    if (!res?.ok) {
+      submittingCandidateId.value = null
+      return
+    }
+    afterPickSuccess(catalogStarId)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[record-match] 随机挂载故事失败:', msg)
+    submittingCandidateId.value = null
+  }
+}
+
+/** record 表单 submitted 事件（复用 onStorySubmitted 的数据更新逻辑） */
+function onRecordStorySubmitted(story: any) {
+  onStorySubmitted(story)
+  showRecordForm.value = false
+}
 
 function onStarClick(starId: number) {
+  // 天镜览星模式下：仅在详情未打开时禁止点击星星弹出界面
+  // cameraDetailOpen=true 时（从相机列表点进来），允许正常打开 StarDetail
+  if (cameraMode.cameraMode.value === 'observe' && !cameraDetailOpen.value) return
+  // 负 id = 行星，转走 onPlanetClick 路径（防御性，从 fly-to-star CustomEvent 触发时也能正确处理）
+  if (isPlanetId(starId)) {
+    const bodyName = getPlanetBodyName(starId)
+    if (!bodyName) return
+    const info = PLANET_INFO[bodyName]
+    if (!info) return
+    if (isMobile.value) {
+      // 移动端：只定位 + 主动 snap（驱动「凝听星语」按钮显示），不直接开面板
+      skyRef.value?.sky?.focusOnPlanetSimple(bodyName)
+      skyRef.value?.sky?.snapToPlanet(bodyName)
+    } else {
+      // PC 端：直接进特写 + 开面板
+      onPlanetClick(bodyName, info.conName, starId, true)
+    }
+    return
+  }
   const star = catalogStarLookup.get(starId); if (!star) return
   // 始终传递完整 stories 给 StarDetail，Tab 内部自行筛选
-  // showMyStoriesOnly 只影响 3D 天空渲染，不影响详情面板
   const stories = storiesByStarId.value.get(starId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]; activeStoryIndex.value = 0
   selectedStarInfo.value = { id: star.id, displayName: formatStarName(star), con: star.con, mag: star.mag, conName: constellationNames[star.con] || star.con || '未知星座', distance: starDistances[star.id] ?? null, ra: star.ra, dec: star.dec, color: star.color || '#fff6e8' }
@@ -1058,7 +2015,9 @@ const PLANET_INFO: Record<string, { color: string; conName: string }> = {
   // 'HaleBopp': { color: '#d8e8f8', conName: '海尔-波普彗星' },
 }
 
-async function onPlanetClick(name: string, nameCN: string, planetId: number) {
+async function onPlanetClick(name: string, nameCN: string, planetId: number, enterCloseup = true) {
+  // 天镜览星模式下禁止点击行星弹出特写/故事界面
+  if (cameraMode.cameraMode.value === 'observe') return
   const info = PLANET_INFO[name]
   const stories = storiesByStarId.value.get(planetId)
   selectedStories.value = stories?.length ? stories : [NO_STORY]
@@ -1085,14 +2044,152 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number) {
   selectedCatalogStarId.value = planetId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
-  // 进入行星特写模式（物理直径比例下小天体需相机距离补偿）
-  skyRef.value?.sky?.focusOnPlanet(name)
+  // issue #134：enterCloseup=false 时（移动端入口）只定位不进特写，与普通恒星定位体验一致
+  if (enterCloseup) {
+    // PC 端：进入行星特写模式（物理直径比例下小天体需相机距离补偿）
+    // 重置观察模式状态（切换行星时确保从故事界面开始）
+    planetObserveMode.value = false
+    skyRef.value?.sky?.focusOnPlanet(name)
+  } else {
+    // 移动端：取行星坐标调 focusOnStar 平滑飞行，不进入特写状态机
+    skyRef.value?.sky?.focusOnPlanetSimple(name)
+  }
 }
 async function fetchCatalogStats(starId: number) {
   try { const res = await fetch(`/api/catalog/stars/${starId}/stats`); const json = await res.json(); if (res.ok) { catalogStats.value = { storyCount: json.data.storyCount ?? 0, totalResonance: json.data.totalResonance ?? 0, totalViews: json.data.totalViews ?? 0, starViews: json.data.starViews ?? 0, favoriteCount: json.data.favoriteCount ?? 0 } } } catch {}
 }
-function onCloseDetail() { selectedStories.value = []; selectedStarInfo.value = null; catalogStats.value = null; skyRef.value?.sky?.setKernelLines([]); skyRef.value?.sky?.exitCloseup() }
-function onWriteStory() { if (selectedStarInfo.value) showForm.value = true }
+function onCloseDetail() {
+  // ── 如果是从相机模式打开的详情（cameraDetailOpen=true）：
+  //    ① 还原 cameraDetailOpen=false → 恢复 CameraOverlay 取景UI
+  //    ② 移除路由上的 ?star= 查询（否则 watch route.query.star 会再次调用 onStarClick 把详情重新打开）
+  //    ③ 不调用 cameraMode.exit()，保持相机模式不退出
+  if (cameraDetailOpen.value && cameraMode.cameraMode.value === 'observe') {
+    cameraDetailOpen.value = false
+    const nextQuery: Record<string, any> = { ...route.query }
+    delete nextQuery.star
+    router.replace({ path: '/sky', query: nextQuery })
+  }
+  // 通用清理：
+  selectedStories.value = []
+  selectedStarInfo.value = null
+  catalogStats.value = null
+  locatedTarget.value = null
+  planetObserveMode.value = false
+  skyRef.value?.sky?.setObserveMode(false)
+  skyRef.value?.sky?.setKernelLines([])
+  skyRef.value?.sky?.exitCloseup()
+  detailTargetStoryId.value = null
+  if (lastEnteredTarget.value && isMobile.value) {
+    locatedTarget.value = lastEnteredTarget.value
+    lastEnteredTarget.value = null
+  }
+}
+// PC 端行星特写 · 切换观察模式（issue #136）
+// true：隐藏故事面板露出行星，禁止 hover/点击，只允许拖动/缩放观察
+// false：回到故事界面，恢复正常交互
+function onToggleObserve() {
+  planetObserveMode.value = !planetObserveMode.value
+  skyRef.value?.sky?.setObserveMode(planetObserveMode.value)
+}
+
+/** 星笺广场（穹庭书局）跳转 */
+function goFolioSquare() {
+  router.push('/folios')
+}
+
+/**
+ * 右上角「星笺」按钮：打开当前用户的合集列表。
+ * 拉取用户合集后，默认打开第一个（默认合集），并在 overlay 内可通过合集列表 tab 切换。
+ */
+async function openMyCollections() {
+  if (isGuest.value) { goLogin(); return }
+  if (!username.value) { goLogin(); return }
+  await fetchUserCollections()
+  if (userCollections.value.length === 0) {
+    // 无合集则跳个人主页创建
+    router.push('/profile')
+    return
+  }
+  collectionDetailId.value = userCollections.value[0].id
+  collectionDetailIsOwner.value = true
+  showCollectionDetail.value = true
+}
+
+/**
+ * 合集徽章点击：从故事详情透传上来的合集点击事件。
+ * 打开 CollectionDetail overlay 展示合集内所有故事。
+ */
+async function onCollectionClick(data: { collectionId: number; collectionName: string | null }) {
+  collectionDetailId.value = data.collectionId
+  // 拉取用户合集列表，判断是否为 owner（控制编辑/删除按钮和合集列表 tab）
+  if (currentUserId.value && !isGuest.value) {
+    await fetchUserCollections()
+    collectionDetailIsOwner.value = userCollections.value.some(c => c.id === data.collectionId)
+  } else {
+    collectionDetailIsOwner.value = false
+  }
+  showCollectionDetail.value = true
+}
+
+/** 合集详情关闭 */
+function onCollectionDetailClose() {
+  showCollectionDetail.value = false
+  collectionDetailId.value = null
+}
+
+/** 合集详情内切换合集 */
+function onCollectionSwitch(id: number) {
+  collectionDetailId.value = id
+}
+
+/** 合集详情内编辑 → 打开编辑模态框（不关闭详情，保存后刷新） */
+function onCollectionEdit(c: CollectionDetailType) {
+  editingCollection.value = c as unknown as Collection
+  collectionEditError.value = null
+  showCollectionEdit.value = true
+}
+
+/** 合集详情内删除 → 确认后删除 */
+async function onCollectionDelete(c: CollectionDetailType) {
+  if (typeof window !== 'undefined' && !window.confirm(`确认删除星笺「${c.name}」？\n合集内的故事会保留，但不再归属此星笺。`)) return
+  const ok = await removeCollection(c.id)
+  if (ok) {
+    showCollectionDetail.value = false
+    collectionDetailId.value = null
+    // 刷新合集列表
+    fetchUserCollections()
+  } else {
+    alert('删除失败，请重试')
+  }
+}
+
+/** 编辑模态框提交：更新星笺并刷新详情 */
+async function handleCollectionSubmit(payload: {
+  isEdit: boolean
+  id?: number
+  data: CreateCollectionInput | UpdateCollectionInput
+}) {
+  collectionSubmitting.value = true
+  collectionEditError.value = null
+  try {
+    if (payload.isEdit && payload.id != null) {
+      const ok = await updateCollection(payload.id, payload.data as UpdateCollectionInput)
+      if (!ok) {
+        collectionEditError.value = '保存失败，请重试'
+        return
+      }
+      // 刷新合集列表与详情
+      await fetchUserCollections()
+      collectionDetailNonce.value++
+    }
+    showCollectionEdit.value = false
+    editingCollection.value = null
+  } finally {
+    collectionSubmitting.value = false
+  }
+}
+
+function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
 function onUpdateSimilarStars(ids: number[]) {
   // 查找源星和相似星的 3D 坐标
   const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
@@ -1115,8 +2212,8 @@ function onStorySubmitted(story: StoryData) {
     map.set(cid, existing)
   }
   storiesByStarId.value = map
-  // 更新天空统计（无论是否"只看我的"模式）
-  recalcFilteredStats()
+  // 更新天空统计
+  rebuildStatsFromMap()
   // 更新当前选中星的故事列表（如果故事绑定到当前星）
   if (cids.includes(selectedCatalogStarId.value) && selectedStarInfo.value) {
     selectedStories.value = map.get(selectedCatalogStarId.value) ?? []
@@ -1149,14 +2246,28 @@ function onDeleteStory(storyId: number) {
     storiesByStarId.value = map
   }
   // 更新统计
-  recalcFilteredStats()
+  rebuildStatsFromMap()
   fetchCatalogStats(cid)
   // 如果当前星没有故事了，关闭面板
   if (selectedStories.value.length === 0) {
     onCloseDetail()
   }
 }
+/**
+ * StarDetail 内部发生会改变权重分布的变动（共鸣/删除）时统一回调：
+ *  - 共鸣/删除都已在 StarDetail 内部触发 retriggerStarAnalysis（新一轮轮询）
+ *  - 这里兜底：刷新 catalogStats / 过滤计数（已有 onDeleteStory/onResonate 单独处理，冗余不坏事）
+ */
+function onStarDetailStoriesMutated(kind: 'new' | 'delete' | 'resonate' | 'kernel-edit') {
+  if (!selectedCatalogStarId.value) return
+  if (kind === 'resonate' || kind === 'delete' || kind === 'kernel-edit') {
+    fetchCatalogStats(selectedCatalogStarId.value)
+    rebuildStatsFromMap()
+  }
+}
 async function onResonate(storyId: number) {
+  // 访客账号不能共鸣，跳登录页
+  if (isGuest.value) { goLogin(); return }
   resonating.value = true
   try {
     const token = localStorage.getItem('token')
@@ -1195,7 +2306,7 @@ async function onResonate(storyId: number) {
       // 从后端拉取权威 stats，确保数据准确
       fetchCatalogStats(selectedCatalogStarId.value)
       // 刷新天空统计
-      recalcFilteredStats()
+      rebuildStatsFromMap()
     }
   } catch (e) {
     console.error('共鸣失败:', e)
@@ -1696,19 +2807,41 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   background: rgba(40, 35, 18, 0.6);
 }
 
-/* ─── 叙事引导牌（大号黄色悬浮卡片） ─── */
-.guide-cards {
+/* ─── 引导外壳：包上方4卡(信息层/宽) + 下方动作条(操作层/窄)，底层统一 fixed 定位 ─── */
+.guide-shell {
   position: fixed;
   bottom: 3.2rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   z-index: 15;
   pointer-events: none;
+  width: min(960px, 100vw - 40px);
 }
+
+/* ─── 叙事引导牌（大号黄色悬浮卡片）：信息层 · 独立一行 4 列等宽 ─── */
+.guide-cards {
+  position: static;          /* 外层 guide-shell 统一 fixed 定位 */
+  display: block;
+  width: 100%;
+  transition: opacity 0.22s, visibility 0.22s;
+}
+/* 四张卡一层：4列等宽 */
+.guide-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 0.75rem;
+  pointer-events: none;
+}
+.guide-cards-row > .guide-card { pointer-events: auto; }
+
 .guide-card {
-  width: 220px;
+  width: 100%;
+  min-width: 0;
   padding: 0.65rem 0.9rem 0.55rem;
   border-radius: var(--radius-lg, 12px);
   background: rgba(40, 35, 18, 0.55);
@@ -1742,14 +2875,193 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 32px rgba(255, 200, 80, 0.1);
 }
 
-/* ─── 切换反馈 Toast ─── */
-.toggle-toast {
-  position: fixed; top: 3.5rem; left: 50%; transform: translateX(-50%);
-  z-index: 25; padding: 0.5rem 1.2rem; border-radius: 20px;
-  background: rgba(255, 217, 138, 0.15); border: 1px solid rgba(255, 217, 138, 0.3);
-  color: #ffd98a; font-size: 0.82rem; backdrop-filter: blur(8px);
-  pointer-events: none;
+/* 引导卡收起动画 */
+.guide-cards-row-enter-active,
+.guide-cards-row-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  transform-origin: bottom center;
 }
+.guide-cards-row-enter-from { opacity: 0; transform: translateY(10px) scale(0.98); }
+.guide-cards-row-leave-to   { opacity: 0; transform: translateY(14px) scale(0.96); }
+
+/* ═══ 引导三大入口卡（3 张横版信息卡，信息感 + 引导感） ═══ */
+.guide-actions-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 14px;
+  row-gap: 10px;
+  width: min(900px, 100%);
+  pointer-events: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ─── 卡片基础：横向三段 左图标 / 中信息 / 右箭头 ─── */
+.gac {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 14px;
+  min-height: 96px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--overlay-04);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.2s, transform 0.18s, box-shadow 0.2s, border-color 0.2s;
+}
+.gac:hover:not(:disabled) {
+  transform: translateY(-2.5px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+}
+.gac:active:not(:disabled) { transform: translateY(0); }
+.gac:disabled { cursor: not-allowed; opacity: 0.72; }
+
+/* 左：48×48 图标圆块 */
+.gac-icon-wrap {
+  width: 48px; height: 48px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 中：信息主体（序标+标签 → 标题 → 引导句） */
+.gac-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1 1 0;
+  gap: 4px;
+}
+.gac-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.gac-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.gac-tag {
+  font-size: 0.66rem;
+  font-weight: 600;
+  opacity: 0.82;
+  letter-spacing: 0.02em;
+}
+.gac-tag-wait { opacity: 0.6; }
+.gac-title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+.gac-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  opacity: 0.74;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding-right: 4px;
+}
+
+/* 右：行动箭头（hover 时 + 位移） */
+.gac-arrow {
+  align-self: center;
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  opacity: 0.82;
+  transition: transform 0.18s, background 0.18s, opacity 0.18s;
+}
+.gac:hover:not(:disabled) .gac-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+.gac-arrow.is-wait { opacity: 0.6; }
+
+/* ① 记录心事 · 暖金 */
+.gac-record {
+  background: rgba(52, 40, 12, 0.48);
+  border-color: rgba(255, 217, 138, 0.22);
+  color: #fff3d8;
+}
+.gac-record:hover:not(:disabled) {
+  background: rgba(68, 52, 14, 0.6);
+  border-color: rgba(255, 217, 138, 0.4);
+}
+.gac-record .gac-icon-wrap { background: rgba(255, 217, 138, 0.12); color: var(--accent); }
+.gac-record .gac-index { background: rgba(255, 217, 138, 0.18); color: var(--accent); }
+.gac-record .gac-tag { color: #ffd98a; }
+.gac-record .gac-title { color: #ffe6a8; }
+.gac-record .gac-arrow { color: var(--accent); background: rgba(255, 217, 138, 0.08); }
+.gac-record:hover:not(:disabled) .gac-arrow { background: rgba(255, 217, 138, 0.18); }
+
+/* ② 天镜览星 · 蓝紫 */
+.gac-camera {
+  background: rgba(25, 34, 58, 0.52);
+  border-color: rgba(158, 198, 255, 0.2);
+  color: #e0ecff;
+}
+.gac-camera:hover:not(:disabled) {
+  background: rgba(30, 44, 74, 0.62);
+  border-color: rgba(158, 198, 255, 0.42);
+}
+.gac-camera .gac-icon-wrap { background: rgba(158, 198, 255, 0.1); color: #9ec6ff; }
+.gac-camera .gac-index { background: rgba(158, 198, 255, 0.16); color: #c5daff; }
+.gac-camera .gac-tag { color: #b8d2ff; }
+.gac-camera .gac-title { color: #e3efff; }
+.gac-camera .gac-arrow { color: #9ec6ff; background: rgba(158, 198, 255, 0.08); }
+.gac-camera:hover:not(:disabled) .gac-arrow { background: rgba(158, 198, 255, 0.2); }
+
+/* ③ 穹庭书局 · 紫金 */
+.gac-square {
+  background: rgba(40, 28, 62, 0.5);
+  border-color: rgba(202, 167, 255, 0.22);
+  color: #efe4ff;
+}
+.gac-square:hover:not(:disabled) {
+  background: rgba(52, 36, 84, 0.62);
+  border-color: rgba(202, 167, 255, 0.42);
+}
+.gac-square .gac-icon-wrap { background: rgba(202, 167, 255, 0.1); color: #caa7ff; }
+.gac-square .gac-index { background: rgba(202, 167, 255, 0.16); color: #e4d4ff; }
+.gac-square .gac-tag { color: #d9c4ff; }
+.gac-square .gac-title { color: #f3e8ff; }
+.gac-square .gac-arrow { color: #caa7ff; background: rgba(202, 167, 255, 0.08); }
+.gac-square:hover:not(:disabled) .gac-arrow { background: rgba(202, 167, 255, 0.2); }
+
+/* 收起态不再触发 shell gap：移除废弃 collapsed 样式 */
+
 .toast-fade-enter-active { transition: opacity 0.2s, transform 0.2s; }
 .toast-fade-leave-active { transition: opacity 0.3s, transform 0.3s; }
 .toast-fade-enter-from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
@@ -2049,13 +3361,6 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
   }
 
   /* Toasts */
-  .toggle-toast {
-    top: auto;
-    bottom: 1rem;
-    font-size: 0.78rem;
-    padding: 0.5rem 1rem;
-  }
-
   .location-toast {
     top: auto;
     bottom: 4rem;
@@ -2168,5 +3473,587 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
     right: 0.5rem;
     bottom: 5rem;
   }
+}
+
+/* ================= issue #124：移动端「凝听星语」按钮 ================= */
+/* issue #135：完全复刻 .search-sheet 的动画方案
+   结构：Transition name="sheet-fade" → .story-btn-wrap (wrapper) → .story-enter-btn (inner)
+   对应搜索框：Transition name="sheet-fade" → .search-sheet-overlay (wrapper) → .search-sheet (inner)
+   动画触发：.sheet-fade-enter-active .search-sheet { animation: slideUpSheet }
+   这里等价于：.sheet-fade-enter-active .story-enter-btn { animation: slideUpStoryBtn }
+*/
+
+/* wrapper：与 .search-sheet-overlay 类似，但不做遮罩（只定位+放内部元素） */
+.story-btn-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  pointer-events: none;   /* wrapper 不拦截点击，只传递给 inner */
+}
+.story-btn-wrap .story-enter-btn {
+  pointer-events: auto;   /* inner 正常响应 */
+}
+
+/* inner：按钮本身，美术与之前一致 */
+.story-enter-btn {
+  position: relative;      /* 放在 wrapper 内，由 wrapper 控制 fixed 定位 */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 1rem 1.5rem calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
+  background: #1a1e35;
+  border: none;
+  border-top: 5px solid #ffd98a;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.55);
+  color: #ffd98a;
+  font-family: 'Cinzel', 'Noto Serif SC', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* 注意：这里不加 transition，动画完全由 @keyframes 驱动（和 search-sheet 一致） */
+}
+.story-enter-btn:active {
+  background: #232648;
+}
+.story-enter-main {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: 0.3rem;
+  text-indent: 0.3rem; /* 视觉补偿字距导致的居中偏移 */
+  line-height: 1.2;
+}
+.story-enter-sub {
+  font-size: 0.82rem;
+  letter-spacing: 0.15rem;
+  color: rgba(255, 217, 138, 0.7);
+  line-height: 1.2;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ════════════════════════════════════════════════
+   核心动画：完全对等 .sheet-fade-enter-active .search-sheet { animation: slideUpSheet }
+   ════════════════════════════════════════════════ */
+/* wrapper 挂载时 Transition 加 sheet-fade-enter-active → 内部按钮触发 @keyframes */
+.sheet-fade-enter-active .story-enter-btn {
+  animation: slideUpStoryBtn 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.sheet-fade-leave-active .story-enter-btn {
+  animation: slideDownStoryBtn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes slideUpStoryBtn {
+  /* 位移用 150px（按钮高~80px + 额外缓冲 70px）确保足够明显的从视口外滑入效果 */
+  from { transform: translateY(150px); opacity: 0.5; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes slideDownStoryBtn {
+  from { transform: translateY(0);     opacity: 1; }
+  to   { transform: translateY(150px); opacity: 0.3; }
+}
+
+/* 尊重用户的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-fade-enter-active .story-enter-btn,
+  .sheet-fade-leave-active .story-enter-btn {
+    animation: none !important;
+  }
+}
+
+/* ════════════════════════════════════════════════ */
+/*  记录 · 归属星辰匹配（导航栏按钮 + 候选星面板） */
+/* ════════════════════════════════════════════════ */
+.nav-record-btn {
+  color: #ffe5a8 !important;
+  border-color: rgba(255, 217, 138, 0.28) !important;
+  background: rgba(255, 217, 138, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.06), inset 0 0 12px rgba(255, 217, 138, 0.05);
+  transition: all 0.2s ease !important;
+}
+.nav-record-btn:hover {
+  color: #fff !important;
+  border-color: rgba(255, 217, 138, 0.55) !important;
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.18), rgba(255, 176, 96, 0.1)) !important;
+  box-shadow: 0 0 16px rgba(255, 217, 138, 0.25), inset 0 0 14px rgba(255, 217, 138, 0.08);
+}
+
+/* 穹庭书局 · 星笺广场（导航栏按钮）：紫金调纯块，无硬边、无光辉 */
+.nav-square-btn {
+  color: #ead6ff !important;
+  background: rgba(202, 167, 255, 0.12) !important;
+  transition: all 0.2s ease !important;
+}
+.nav-square-btn:hover {
+  color: #fff !important;
+  background: linear-gradient(135deg, rgba(202, 167, 255, 0.22), rgba(149, 224, 192, 0.12)) !important;
+}
+
+/* ═══════════════════════════════════════════════
+   候选星面板 · 纯苹果 macOS sheet
+   零装饰 · 极致留白 · 严格层级
+   ═══════════════════════════════════════════════ */
+
+.cb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 16, 0.58);
+  backdrop-filter: blur(9px) saturate(160%);
+  -webkit-backdrop-filter: blur(9px) saturate(160%);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cb-fadein .22s ease-out;
+}
+@keyframes cb-fadein { from { opacity: 0 } to { opacity: 1 } }
+.candidates-fade-enter-active, .candidates-fade-leave-active { transition: opacity .28s ease }
+.candidates-fade-enter-from, .candidates-fade-leave-to { opacity: 0 }
+
+/* Sheet */
+.cb-sheet {
+  width: min(1060px, 96vw);
+  max-height: 88vh;
+  background: rgba(28, 29, 44, 0.82);
+  backdrop-filter: blur(38px) saturate(200%);
+  -webkit-backdrop-filter: blur(38px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  box-shadow:
+    0 34px 92px rgba(0, 0, 0, 0.60),
+    0 0 0 0.5px rgba(255,255,255,0.03) inset;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: cb-sheetin .32s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes cb-sheetin {
+  from { opacity: 0; transform: translateY(14px) scale(0.986) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
+}
+
+/* HEADER：无分隔线，纯居中 */
+.cb-header {
+  position: relative;
+  padding: 22px 40px 10px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.cb-close {
+  position: absolute;
+  top: 17px;
+  left: 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  border: none;
+  color: rgba(255, 255, 255, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  padding: 0;
+}
+.cb-close:hover {
+  background: rgba(255, 85, 85, 0.18);
+  color: #ffd5cf;
+  transform: translateY(-0.5px);
+}
+.cb-title-group { padding: 4px 0 0 }
+.cb-title {
+  margin: 0 0 5px;
+  font-size: 21px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.005em;
+}
+.cb-subtitle {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.015em;
+}
+
+/* 卡片列表 */
+.cb-list {
+  padding: 12px 40px 30px;
+  display: flex;
+  gap: 18px;
+  overflow-y: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,217,138,0.12) transparent;
+  flex: 1;
+  min-height: 0;
+}
+.cb-list::-webkit-scrollbar { height: 5px; width: 5px }
+.cb-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.12);
+  border-radius: 10px;
+}
+
+/* 卡片：纯字段组 */
+.cb-card {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 16px 18px;
+  background: rgba(255, 255, 255, 0.032);
+  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  transition: all .22s cubic-bezier(.22, 1, .36, 1);
+  min-height: 0;
+}
+.cb-card:hover { transform: translateY(-2px) }
+.cb-card.gold:hover {
+  background: rgba(255, 217, 138, 0.050);
+  border-color: rgba(255, 217, 138, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(255, 217, 138, 0.06);
+}
+.cb-card.purple:hover {
+  background: rgba(160, 196, 255, 0.040);
+  border-color: rgba(160, 196, 255, 0.24);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(160, 196, 255, 0.06);
+}
+/* 随机挂卡片：银白系独立主题 */
+.cb-card.cb-card-random {
+  background: linear-gradient(180deg, rgba(225,235,255,0.034), rgba(255,255,255,0.028));
+  border-color: rgba(205, 215, 240, 0.14);
+}
+.cb-card.cb-card-random:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(225,235,255,0.052), rgba(255,255,255,0.038));
+  border-color: rgba(205, 215, 240, 0.30);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 0 0 0.5px rgba(205, 215, 240, 0.08);
+}
+.cb-card.submitting {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* 卡头：排名圆徽 + 星名 + 等待点亮旗 */
+.cb-card-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.cb-rank {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8.5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.cb-rank.gold {
+  background: rgba(255, 217, 138, 0.12);
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
+  color: #ffe5a8;
+}
+.cb-rank.purple {
+  background: rgba(160, 196, 255, 0.10);
+  border: 0.5px solid rgba(160, 196, 255, 0.26);
+  color: #d4deff;
+}
+/* 随机挂 rank：银白主题，Shuffle 图标 */
+.cb-rank.random {
+  background: rgba(205, 215, 240, 0.10);
+  border: 0.5px solid rgba(205, 215, 240, 0.24);
+  color: #e4e9f5;
+}
+.cb-star {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cb-star-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+}
+.cb-star-const {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.44);
+  letter-spacing: 0.02em;
+}
+.cb-flag-purple {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(202, 167, 255, 0.085);
+  color: #d9c7ff;
+  border: 0.5px solid rgba(202, 167, 255, 0.20);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.cb-flag-silver {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(205, 215, 240, 0.08);
+  color: #e0e5f3;
+  border: 0.5px solid rgba(205, 215, 240, 0.22);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* 元信息：极小字一行 */
+.cb-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cb-meta-item {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.03em;
+}
+
+/* 契合度：标签在上，条+数字在下，严格 section 级 */
+.cb-score {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-score-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.cb-score-body {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.cb-score-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 2.5px;
+  overflow: hidden;
+}
+.cb-score-fill {
+  height: 100%;
+  border-radius: 2.5px;
+  background: linear-gradient(90deg, #ffd98a, #ffb060);
+  transition: width .55s cubic-bezier(.22, 1, .36, 1);
+}
+.cb-score-fill.purple {
+  background: linear-gradient(90deg, #a0c4ff, #b8a6ff);
+}
+.cb-score-num {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffe5a8;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cb-score-num.purple { color: #d4deff }
+.cb-score-num.random { color: #dfe5f3 }
+.cb-score-fill.random {
+  background: linear-gradient(90deg, #dfe6f5, #ffffff);
+}
+
+/* AI 匹配理由：极简竖线引用 */
+.cb-reason {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 12px;
+  line-height: 1.72;
+  color: rgba(255, 255, 255, 0.74);
+  text-align: justify;
+  background: rgba(255, 217, 138, 0.030);
+  border-left: 2px solid rgba(255, 217, 138, 0.28);
+  border-radius: 0 9px 9px 0;
+  letter-spacing: 0.004em;
+}
+.cb-reason.purple {
+  background: rgba(160, 196, 255, 0.028);
+  border-left-color: rgba(160, 196, 255, 0.28);
+}
+.cb-reason.random {
+  background: rgba(205, 215, 240, 0.030);
+  border-left: 2px solid rgba(205, 215, 240, 0.28);
+  color: rgba(232, 236, 248, 0.72);
+  font-style: italic;
+}
+
+/* 故事内核：小标签 + chips */
+.cb-kernels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-kernels-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.cb-kernels-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.cb-kernel-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: rgba(255, 217, 138, 0.88);
+  background: rgba(255, 217, 138, 0.06);
+  letter-spacing: 0.004em;
+}
+.cb-kernel-chip.purple {
+  color: rgba(217, 199, 255, 0.92);
+  background: rgba(202, 167, 255, 0.065);
+}
+
+/* 随机挂：换一颗随机 + 选星按钮 */
+.cb-random-switch {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 0;
+  border-radius: 10px;
+  background: rgba(205, 215, 240, 0.048);
+  border: 0.5px solid rgba(205, 215, 240, 0.18);
+  color: #dfe5f3;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .18s ease;
+}
+.cb-random-switch:hover:not(:disabled) {
+  background: rgba(205, 215, 240, 0.08);
+  border-color: rgba(205, 215, 240, 0.30);
+}
+.cb-random-switch:active:not(:disabled) { transform: scale(0.99); filter: brightness(0.96) }
+.cb-random-switch:disabled { opacity: 0.30; cursor: not-allowed }
+
+/* 选星按钮：和 StoryForm 同款 */
+.cb-btn {
+  width: 100%;
+  margin-top: auto;
+  padding: 12.5px 0;
+  border-radius: 13px;
+  border: 0.5px solid rgba(255, 217, 138, 0.26);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: all .18s ease, transform .1s ease;
+}
+.cb-btn.gold {
+  background: rgba(255, 217, 138, 0.12);
+  color: #ffe5a8;
+  border-color: rgba(255, 217, 138, 0.26);
+}
+.cb-btn.purple {
+  background: rgba(202, 167, 255, 0.10);
+  color: #e5d6ff;
+  border-color: rgba(202, 167, 255, 0.26);
+}
+.cb-btn.random {
+  background: rgba(205, 215, 240, 0.12);
+  color: #f3f5fb;
+  border-color: rgba(205, 215, 240, 0.28);
+}
+.cb-btn:hover:not(:disabled) { transform: translateY(-0.5px) }
+.cb-btn.gold:hover:not(:disabled) {
+  background: rgba(255, 217, 138, 0.20);
+  border-color: rgba(255, 217, 138, 0.44);
+}
+.cb-btn.purple:hover:not(:disabled) {
+  background: rgba(202, 167, 255, 0.20);
+  border-color: rgba(202, 167, 255, 0.44);
+  color: #fff;
+}
+.cb-btn.random:hover:not(:disabled) {
+  background: rgba(205, 215, 240, 0.22);
+  border-color: rgba(205, 215, 240, 0.48);
+}
+.cb-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.996);
+  filter: brightness(0.96);
+}
+.cb-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+.cb-btn-spinner {
+  width: 13px; height: 13px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: cb-spin 0.8s linear infinite;
+}
+@keyframes cb-spin { to { transform: rotate(360deg) } }
+
+/* 移动端 */
+@media (max-width: 720px) {
+  .cb-backdrop { padding: 0; align-items: flex-end }
+  .cb-sheet {
+    max-height: 94vh;
+    width: 100%;
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+    animation: cb-sheetin-mobile .36s cubic-bezier(.22, 1, .36, 1);
+  }
+  @keyframes cb-sheetin-mobile {
+    from { opacity: 0; transform: translateY(28%) }
+    to   { opacity: 1; transform: translateY(0) }
+  }
+  .cb-header { padding: 20px 26px 8px }
+  .cb-title { font-size: 18px }
+  .cb-close { top: 16px; left: 16px }
+  .cb-list {
+    padding: 10px 18px 24px;
+    flex-direction: column;
+    gap: 13px;
+  }
+  .cb-card { padding: 15px 15px 17px; gap: 12px }
+}
+
+/* ═══ 天镜览星 · 相机模式过渡 ═══ */
+.camera-fade-enter-active, .camera-fade-leave-active {
+  transition: opacity 0.45s var(--ease-in-out);
+}
+.camera-fade-enter-from, .camera-fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -47,7 +47,8 @@ db.exec(`
     origin          TEXT,
     user_id         INTEGER REFERENCES users(id),
     tag             TEXT,
-    image_url       TEXT
+    image_url       TEXT,
+    tags            TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_stars_type ON stars(type);
   CREATE INDEX IF NOT EXISTS idx_stars_catalog ON stars(catalog_star_id);
@@ -139,6 +140,47 @@ db.exec(`
     generated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_moon_insights_day ON moon_insights(phase_label, lunar_day, date(generated_at));
+
+  -- AI 预生成的单星分析结果（门户首页 + 情感 + 主题时辰）
+  CREATE TABLE IF NOT EXISTS catalog_star_analyses (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    catalog_star_id   TEXT NOT NULL UNIQUE,
+    persona_json      TEXT,
+    emotion_json      TEXT,
+    themehour_json    TEXT,
+    story_count       INTEGER NOT NULL DEFAULT 0,
+    story_hash        TEXT,
+    generated_at      INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_csa_star ON catalog_star_analyses(catalog_star_id);
+
+  -- AI 预生成的合集级分析结果（合集画像+情感+夜色流转动效+心事轨迹+天空意象）
+  CREATE TABLE IF NOT EXISTS collection_analyses (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id     INTEGER NOT NULL UNIQUE REFERENCES collections(id),
+    persona_json      TEXT,
+    emotion_json      TEXT,
+    nightscape_json   TEXT,   -- 夜色流转+心事轨迹+五大气象+天窗片段+Hero统计 等合集特有
+    story_count       INTEGER NOT NULL DEFAULT 0,
+    story_hash        TEXT,
+    generated_at      INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_cllct_anly_coll ON collection_analyses(collection_id);
+
+  -- 故事合集（星笺）：故事的唯一系列标识，决定内含故事可见性
+  CREATE TABLE IF NOT EXISTS collections (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    name         TEXT NOT NULL,
+    description  TEXT,
+    cover_color  TEXT,
+    visibility   TEXT NOT NULL DEFAULT 'public',
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
+  -- idx_collections_visibility 在下方迁移（添加 visibility 列）后创建，避免旧库无此列时报错
 `);
 
 // 兼容旧数据库：添加新列
@@ -169,6 +211,21 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_catalog_visits_user ON catalog_vis
 try { db.exec('ALTER TABLE stars ADD COLUMN is_anonymous INTEGER NOT NULL DEFAULT 0'); } catch {}
 // 兼容旧数据库：stars 加 image_url 列
 try { db.exec('ALTER TABLE stars ADD COLUMN image_url TEXT'); } catch {}
+// 兼容旧数据库：stars 加 tags JSON 列（多标签数组）
+try { db.exec('ALTER TABLE stars ADD COLUMN tags TEXT'); } catch {}
+// 兼容旧数据库：stars 加 collection_id 列（故事归属的合集，星笺功能）
+try { db.exec('ALTER TABLE stars ADD COLUMN collection_id INTEGER REFERENCES collections(id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_collection ON stars(collection_id)'); } catch {}
+
+// ── 合集表 schema 迁移：旧版用 is_public (INTEGER 0/1)，新版用 visibility (TEXT) ──
+// 1) 添加 visibility 列（DEFAULT 'public' → 所有现有行自动为 'public'）
+try { db.exec("ALTER TABLE collections ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'"); } catch {}
+// 2) 确保「我的默认合集」始终为 public（修复旧版 is_public=0 导致的误标记）
+try { db.exec("UPDATE collections SET visibility = 'public' WHERE name = '我的默认合集' AND visibility != 'public'"); } catch {}
+// 3) 旧版 cover_color 为 NOT NULL DEFAULT '#ffd98a'，新版允许 NULL；不修改约束（无害），
+//    collectionService 写入时用默认色替代 NULL 以兼容旧约束。
+// 4) 创建 visibility 索引
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_collections_visibility ON collections(visibility)'); } catch {}
 
 // 兼容旧数据库：迁移 story_catalog_stars 连接表（幂等）
 try {
