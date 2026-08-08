@@ -1337,7 +1337,16 @@ const storiesByStarId = ref(new Map<number, StoryData[]>())
 const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 100
+
+// 将数组分成每批 batch 个的小组，用于并发请求
+function chunk<T>(arr: T[], batch: number): T[][] {
+  const result: T[][] = []
+  for (let i = 0; i < arr.length; i += batch) {
+    result.push(arr.slice(i, i + batch))
+  }
+  return result
+}
 
 function mergeStoriesIntoMap(
   items: any[],
@@ -1433,22 +1442,56 @@ async function fetchStories() {
     const map = new Map<number, StoryData[]>()
     const statsMap = new Map<number, { stories: number; resonance: number; views: number; favorites: number }>()
 
-    // 加载第一页，立即显示
-    const first = await fetch(`/api/stories?page=1&limit=${PAGE_SIZE}`, { signal })
-    const firstJson = await first.json()
-    const firstData = firstJson.data?.items ?? firstJson.data ?? []
-    const totalPages = firstJson.data?.totalPages ?? 1
-    mergeStoriesIntoMap(firstData, map, statsMap)
-    publishStories(map, statsMap, firstData)
+    // ─── 第一阶段：优先加载历史故事（星河合集），保证星史长卷立即可见 ───
+    const histFirst = await fetch(`/api/stories?page=1&limit=${PAGE_SIZE}&type=history`, { signal })
+    const histJson = await histFirst.json()
+    const histFirstData = histJson.data?.items ?? histJson.data ?? []
+    const histTotalPages = histJson.data?.totalPages ?? 1
+    mergeStoriesIntoMap(histFirstData, map, statsMap)
+    publishStories(map, statsMap, histFirstData)
 
-    // 后台继续加载剩余页
-    for (let page = 2; page <= totalPages; page++) {
-      if (signal.aborted) break
-      const res = await fetch(`/api/stories?page=${page}&limit=${PAGE_SIZE}`, { signal })
-      const json = await res.json()
-      const items = json.data?.items ?? json.data ?? []
-      mergeStoriesIntoMap(items, map, statsMap)
-      publishStories(map, statsMap, items)
+    // 并发加载剩余历史故事页
+    if (histTotalPages > 1) {
+      const histPages = Array.from({ length: histTotalPages - 1 }, (_, i) => i + 2)
+      const histBatches = chunk(histPages, 6) // 每批 6 个并发请求
+      for (const batch of histBatches) {
+        if (signal.aborted) break
+        const results = await Promise.all(
+          batch.map(pg => fetch(`/api/stories?page=${pg}&limit=${PAGE_SIZE}&type=history`, { signal }).then(r => r.json()).catch(() => null))
+        )
+        for (const json of results) {
+          if (!json) continue
+          const items = json.data?.items ?? json.data ?? []
+          mergeStoriesIntoMap(items, map, statsMap)
+        }
+        if (!signal.aborted) publishStories(map, statsMap, [])
+      }
+    }
+
+    // ─── 第二阶段：并发加载用户故事（故事广场） ───
+    const userFirst = await fetch(`/api/stories?page=1&limit=${PAGE_SIZE}&type=user`, { signal })
+    const userJson = await userFirst.json()
+    const userFirstData = userJson.data?.items ?? userJson.data ?? []
+    const userTotalPages = userJson.data?.totalPages ?? 1
+    mergeStoriesIntoMap(userFirstData, map, statsMap)
+    publishStories(map, statsMap, userFirstData)
+
+    // 并发加载剩余用户故事页
+    if (userTotalPages > 1) {
+      const userPages = Array.from({ length: userTotalPages - 1 }, (_, i) => i + 2)
+      const userBatches = chunk(userPages, 6)
+      for (const batch of userBatches) {
+        if (signal.aborted) break
+        const results = await Promise.all(
+          batch.map(pg => fetch(`/api/stories?page=${pg}&limit=${PAGE_SIZE}&type=user`, { signal }).then(r => r.json()).catch(() => null))
+        )
+        for (const json of results) {
+          if (!json) continue
+          const items = json.data?.items ?? json.data ?? []
+          mergeStoriesIntoMap(items, map, statsMap)
+        }
+        if (!signal.aborted) publishStories(map, statsMap, [])
+      }
     }
   } catch (e: any) {
     if (e.name !== 'AbortError') console.error('获取故事失败:', e)
@@ -2117,6 +2160,10 @@ async function onPlanetClick(name: string, nameCN: string, planetId: number, ent
   selectedCatalogStarId.value = planetId
   const realStories = (stories || []).filter((s: StoryData) => s.id > 0)
   catalogStats.value = { storyCount: realStories.length, totalResonance: realStories.reduce((sum: number, s: StoryData) => sum + s.resonanceCount, 0), totalViews: 0, starViews: 0, favoriteCount: 0 }
+  // 拉取行星真实统计数据（收藏数等），与 onStarClick 行为一致
+  fetchCatalogStats(planetId)
+  // 记录行星访问量 +1（与恒星 visit 行为一致）
+  fetch(`/api/catalog/stars/${planetId}/visit`, { method: 'POST' }).catch(() => {})
   // issue #134：enterCloseup=false 时（移动端入口）只定位不进特写，与普通恒星定位体验一致
   if (enterCloseup) {
     // PC 端：进入行星特写模式（物理直径比例下小天体需相机距离补偿）

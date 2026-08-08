@@ -505,7 +505,7 @@
         </div>
       </div>
     </div>
-    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：观察模式切换 -->
+    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：已隐藏（功能存在 bug，待修复后恢复）
     <button
       v-if="isPlanetCloseup"
       class="observe-toggle-btn"
@@ -513,6 +513,7 @@
     >
       {{ observeMode ? '返回' : '观察' }}
     </button>
+    -->
   </div>
   </Transition>
 
