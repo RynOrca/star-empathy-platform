@@ -227,6 +227,10 @@ try { db.exec("UPDATE collections SET visibility = 'public' WHERE name = '我的
 // 4) 创建 visibility 索引
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_collections_visibility ON collections(visibility)'); } catch {}
 
+// 5) 2026-08-08 新增：is_default INTEGER 列（0=普通合集，1=系统级默认合集，不可删除不可改可见性）
+try { db.exec('ALTER TABLE collections ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_collections_default ON collections(user_id, is_default)'); } catch {}
+
 // 兼容旧数据库：迁移 story_catalog_stars 连接表（幂等）
 try {
   db.exec(`

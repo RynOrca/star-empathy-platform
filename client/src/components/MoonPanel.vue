@@ -2,10 +2,19 @@
   <Transition name="moon-panel-fade">
     <div v-if="visible" class="moon-panel-backdrop" @click.self="$emit('close')">
       <div class="moon-panel" role="dialog" aria-modal="true" aria-label="月相预览">
-        <!-- 关闭按钮 -->
-        <button class="moon-panel-close" @click="$emit('close')" aria-label="关闭">
-          <X :size="18" />
-        </button>
+        <!-- 顶部标题栏（左标题 + 右关闭按钮，避免与内容重叠） -->
+        <div class="moon-panel-header">
+          <div class="mph-title">
+            <svg class="mph-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <span>今月镜鉴</span>
+          </div>
+          <button class="mph-close-btn" @click="$emit('close')" aria-label="关闭页">
+            <X :size="14" />
+            <span>关闭页</span>
+          </button>
+        </div>
 
         <!-- 加载中 -->
         <div v-if="loading && !data" class="moon-panel-loading">
@@ -18,8 +27,20 @@
           <p>{{ error }}</p>
         </div>
 
-        <!-- 主内容 -->
-        <div v-else-if="data" class="moon-panel-content">
+        <!-- 主内容（可滚动区域，自定义滚动条） -->
+        <div v-else-if="data" class="moon-panel-content moon-scrollable">
+          <!-- 顶部引导条：仿 StarDetail tab-intro 风格（小板块 + icon + 标题 + 小字说明） -->
+          <div class="moon-hero-strip">
+            <div class="mhs-left">
+              <!-- 弯月 SVG icon（和引导框色统一，暖金） -->
+              <svg class="mhs-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+              <span class="mhs-label">今月镜鉴</span>
+              <span class="mhs-sub">· 实时计算今夜月相、观星窗口与农历时令，漫步夜色看阴晴圆缺</span>
+            </div>
+          </div>
+
           <!-- 月相预览图（Three.js 3D 球体） -->
           <div class="moon-preview-section">
             <div
@@ -52,112 +73,130 @@
           <!-- 标签页内容 -->
           <div class="moon-tab-content">
             <!-- 今夜 -->
-            <div v-if="activeTab === 'tonight'" class="moon-tonight">
-              <!-- 观测时间 -->
-              <div class="moon-data-section">
-                <div class="moon-section-title">观测时间</div>
-                <div class="moon-data-grid">
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">时刻</span>
-                    <span class="moon-data-value">{{ formatDateTime(data.observer.time) }}</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">时区</span>
-                    <span class="moon-data-value">{{ data.observer.timezone }}</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">农历</span>
-                    <span class="moon-data-value">
-                      {{ data.lunar.yearGanZhi }}年 {{ data.lunar.monthChinese }}{{ data.lunar.dayChinese }}
-                      <span v-if="data.lunar.festival" class="moon-festival">{{ data.lunar.festival }}</span>
-                    </span>
-                  </div>
-                  <div class="moon-data-item" v-if="data.lunar.jieQi">
-                    <span class="moon-data-label">节气</span>
-                    <span class="moon-data-value">{{ data.lunar.jieQi }}</span>
-                  </div>
-                </div>
+          <div v-if="activeTab === 'tonight'" class="moon-tonight">
+            <!-- 观测时间 -->
+            <div class="moon-data-section">
+              <div class="mss-head mss-time">
+                <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="mss-label">观测时间</span>
               </div>
-
-              <!-- 观测位置 -->
-              <div class="moon-data-section">
-                <div class="moon-section-title">观测位置</div>
-                <div class="moon-data-grid">
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">纬度</span>
-                    <span class="moon-data-value">{{ data.observer.lat.toFixed(2) }}°</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">经度</span>
-                    <span class="moon-data-value">{{ data.observer.lon.toFixed(2) }}°</span>
-                  </div>
+              <div class="moon-data-grid">
+                <div class="moon-data-item">
+                  <span class="moon-data-label">时刻</span>
+                  <span class="moon-data-value">{{ formatDateTime(data.observer.time) }}</span>
                 </div>
-              </div>
-
-              <!-- 月球位置 -->
-              <div class="moon-data-section">
-                <div class="moon-section-title">月球位置</div>
-                <div class="moon-data-grid">
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">高度</span>
-                    <span class="moon-data-value" :class="{ visible: data.position.aboveHorizon }">
-                      {{ data.position.altitude.toFixed(1) }}°
-                      <span class="moon-vis-badge">{{ data.position.aboveHorizon ? '可见' : '地平线下' }}</span>
-                    </span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">方位</span>
-                    <span class="moon-data-value">{{ azimuthToDirection(data.position.azimuth) }} {{ data.position.azimuth.toFixed(0) }}°</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">所在</span>
-                    <span class="moon-data-value">{{ data.position.constellation }}</span>
-                  </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">时区</span>
+                  <span class="moon-data-value">{{ data.observer.timezone }}</span>
                 </div>
-              </div>
-
-              <!-- 升落时刻 -->
-              <div class="moon-data-section">
-                <div class="moon-section-title">升落时刻</div>
-                <div class="moon-data-grid">
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">月升</span>
-                    <span class="moon-data-value">{{ data.events.rise ? formatClockTime(data.events.rise) : '—' }}</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">中天</span>
-                    <span class="moon-data-value">
-                      {{ data.events.transit ? formatClockTime(data.events.transit) : '—' }}
-                      <span v-if="data.events.transit" class="moon-sub">最高 {{ data.events.transitAltitude.toFixed(0) }}°</span>
-                    </span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">月落</span>
-                    <span class="moon-data-value">{{ data.events.set ? formatClockTime(data.events.set) : '—' }}</span>
-                  </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">农历</span>
+                  <span class="moon-data-value">
+                    {{ data.lunar.yearGanZhi }}年 {{ data.lunar.monthChinese }}{{ data.lunar.dayChinese }}
+                    <span v-if="data.lunar.festival" class="moon-festival">{{ data.lunar.festival }}</span>
+                  </span>
                 </div>
-              </div>
-
-              <!-- 倒计时 -->
-              <div class="moon-data-section">
-                <div class="moon-section-title">倒计时</div>
-                <div class="moon-data-grid">
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">距满月</span>
-                    <span class="moon-data-value">{{ data.countdown.daysToFullMoon != null ? data.countdown.daysToFullMoon + ' 天' : '—' }}</span>
-                  </div>
-                  <div class="moon-data-item">
-                    <span class="moon-data-label">距新月</span>
-                    <span class="moon-data-value">{{ data.countdown.daysToNewMoon != null ? data.countdown.daysToNewMoon + ' 天' : '—' }}</span>
-                  </div>
+                <div class="moon-data-item" v-if="data.lunar.jieQi">
+                  <span class="moon-data-label">节气</span>
+                  <span class="moon-data-value">{{ data.lunar.jieQi }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- 日程 -->
-            <div v-else-if="activeTab === 'schedule'" class="moon-schedule">
-              <div class="moon-schedule-title">未来 7 日月相</div>
-              <div class="moon-schedule-grid">
+            <!-- 观测位置 -->
+            <div class="moon-data-section">
+              <div class="mss-head mss-loc">
+                <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span class="mss-label">观测位置</span>
+              </div>
+              <div class="moon-data-grid">
+                <div class="moon-data-item">
+                  <span class="moon-data-label">纬度</span>
+                  <span class="moon-data-value">{{ data.observer.lat.toFixed(2) }}°</span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">经度</span>
+                  <span class="moon-data-value">{{ data.observer.lon.toFixed(2) }}°</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 月球位置 -->
+            <div class="moon-data-section">
+              <div class="mss-head mss-moon">
+                <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <span class="mss-label">月球位置</span>
+              </div>
+              <div class="moon-data-grid">
+                <div class="moon-data-item">
+                  <span class="moon-data-label">高度</span>
+                  <span class="moon-data-value" :class="{ visible: data.position.aboveHorizon }">
+                    {{ data.position.altitude.toFixed(1) }}°
+                    <span class="moon-vis-badge">{{ data.position.aboveHorizon ? '可见' : '地平线下' }}</span>
+                  </span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">方位</span>
+                  <span class="moon-data-value">{{ azimuthToDirection(data.position.azimuth) }} {{ data.position.azimuth.toFixed(0) }}°</span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">所在</span>
+                  <span class="moon-data-value">{{ data.position.constellation }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 升落时刻 -->
+            <div class="moon-data-section">
+              <div class="mss-head mss-event">
+                <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+                <span class="mss-label">升落时刻</span>
+              </div>
+              <div class="moon-data-grid">
+                <div class="moon-data-item">
+                  <span class="moon-data-label">月升</span>
+                  <span class="moon-data-value">{{ data.events.rise ? formatClockTime(data.events.rise) : '—' }}</span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">中天</span>
+                  <span class="moon-data-value">
+                    {{ data.events.transit ? formatClockTime(data.events.transit) : '—' }}
+                    <span v-if="data.events.transit" class="moon-sub">最高 {{ data.events.transitAltitude.toFixed(0) }}°</span>
+                  </span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">月落</span>
+                  <span class="moon-data-value">{{ data.events.set ? formatClockTime(data.events.set) : '—' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 倒计时 -->
+            <div class="moon-data-section">
+              <div class="mss-head mss-count">
+                <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 6 12 12 16 14"/><path d="M6 7h-3v-3"/><path d="M18 7h3v-3"/><path d="M18 18a9 9 0 0 1-18 0"/></svg>
+                <span class="mss-label">月相倒计时</span>
+              </div>
+              <div class="moon-data-grid">
+                <div class="moon-data-item">
+                  <span class="moon-data-label">距满月</span>
+                  <span class="moon-data-value">{{ data.countdown.daysToFullMoon != null ? data.countdown.daysToFullMoon + ' 天' : '—' }}</span>
+                </div>
+                <div class="moon-data-item">
+                  <span class="moon-data-label">距新月</span>
+                  <span class="moon-data-value">{{ data.countdown.daysToNewMoon != null ? data.countdown.daysToNewMoon + ' 天' : '—' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 日程 -->
+          <div v-else-if="activeTab === 'schedule'" class="moon-schedule">
+            <div class="mss-head mss-sched mss-head-solo">
+              <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span class="mss-label">未来 7 日月相</span>
+            </div>
+            <div class="moon-schedule-grid">
                 <button
                   v-for="(item, idx) in data.schedule"
                   :key="idx"
@@ -183,6 +222,10 @@
               <!-- 诗句区（不显示来源标签） -->
               <div v-if="insight" class="moon-poem-section">
                 <div class="moon-poem-section-header">
+                  <div class="mss-head mss-poem mss-head-inline">
+                    <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <span class="mss-label">AI 月诗</span>
+                  </div>
                   <button
                     v-if="!insightLoading"
                     class="moon-poem-regen"
@@ -202,6 +245,10 @@
               <!-- 诗词区（始终显示） -->
               <div v-if="data.poem" class="moon-poem-section">
                 <div class="moon-poem-section-header">
+                  <div class="mss-head mss-poem-anc mss-head-inline">
+                    <svg class="mss-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                    <span class="mss-label">古籍月诗</span>
+                  </div>
                   <button class="moon-poem-rotate" @click="$emit('rotate-poem')" title="换一首">
                     <Shuffle :size="13" />
                     <span>换一首</span>
@@ -250,9 +297,9 @@ defineEmits<{
 }>()
 
 const tabs = [
-  { key: 'tonight', label: '今夜' },
-  { key: 'schedule', label: '日程' },
-  { key: 'poem', label: '诗词' },
+  { key: 'tonight', label: '今夜观月' },
+  { key: 'schedule', label: '月历七日' },
+  { key: 'poem', label: '月色诗笺' },
 ] as const
 
 const activeTab = ref<typeof tabs[number]['key']>('tonight')
@@ -506,85 +553,201 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ─── 背景遮罩 ─── */
+/* ═══════════════════════════════════════════════
+   背景遮罩（与 StarDetail .overlay 风格对齐）
+   ═══════════════════════════════════════════════ */
 .moon-panel-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 2000;
+  background: rgba(7, 8, 22, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
 }
 
-/* ─── 主面板 ─── */
+/* ═══════════════════════════════════════════════
+   主面板（对齐 StarDetail .panel 风格 + 设计系统 CSS 变量）
+   ═══════════════════════════════════════════════ */
 .moon-panel {
   position: relative;
   width: 480px;
   max-width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
-  background: linear-gradient(160deg, #0d1230 0%, #0a0e26 50%, #070a1f 100%);
-  border: 1px solid rgba(180, 180, 220, 0.18);
-  border-radius: 16px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
-  color: #e8e8f0;
-  padding: 24px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;           /* 滚动交给内部 moon-scrollable 容器（自定义滚动条） */
+  /* 背景：使用设计系统变量，与 StarDetail .panel 一致 */
+  background: var(--surface);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  /* 边框：使用 --rule（与 StarDetail 一致），再加一层暖金边（呼应月相暖色） */
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  /* 阴影：使用 --shadow-lg（与 StarDetail 一致），再加一层暖金 glow */
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  font-family: var(--font);
+  color: var(--ink);
 }
 
-.moon-panel-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
+/* ═══ 顶部标题栏（左标题 + 右"关闭页"按钮） ═══ */
+.moon-panel-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  color: #c8c8d8;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(255, 217, 138, 0.035), transparent);
+}
+.mph-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.mph-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 5px var(--accent-glow));
+}
+.mph-close-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
+}
+.mph-close-btn:hover {
+  color: var(--error);
+  border-color: rgba(255, 139, 125, 0.28);
+  background: var(--error-subtle);
 }
 
-.moon-panel-close:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+/* ═══ 可滚动内容区（承载自定义滚动条） ═══ */
+.moon-panel-content {
+  padding: 16px 20px 20px;
+}
+.moon-scrollable {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Firefox 自定义滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 217, 138, 0.25) transparent;
 }
 
-/* ─── 月相预览图 ─── */
+/* WebKit 自定义滚动条（与暖金品红 UI 融合的细滚动条） */
+.moon-scrollable::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+.moon-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0 10px;
+  border-radius: 3px;
+}
+.moon-scrollable::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255, 217, 138, 0.22), rgba(202, 167, 255, 0.20));
+  border-radius: 3px;
+  border: 1px solid rgba(255, 217, 138, 0.10);
+  transition: background var(--transition-normal);
+}
+.moon-scrollable::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(255, 217, 138, 0.38), rgba(202, 167, 255, 0.32));
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+/* 角落（横向×纵向相交处）透明 */
+.moon-scrollable::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════════
+   顶部引导条（完全对齐 StarDetail .tab-intro 风格）
+   —— 复用 tab-intro-narrative 的金紫渐变 + 暖金 icon
+   ═══════════════════════════════════════════════ */
+.moon-hero-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  margin: 0 0 16px;
+  border-radius: 10px;
+  /* 与 StarDetail .tab-intro-narrative 完全一致的渐变与边框 */
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.07), rgba(202, 167, 255, 0.035));
+  border: 1px solid rgba(255, 217, 138, 0.14);
+}
+.mhs-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+.mhs-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+  color: var(--accent);              /* 与 .tab-intro-narrative .ti-icon 同色 */
+  filter: drop-shadow(0 0 5px var(--accent-glow));
+}
+.mhs-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);                 /* 与 .ti-label 同色 */
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.mhs-sub {
+  font-size: 0.68rem;
+  color: var(--muted);               /* 与 .ti-sub 同色 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════
+   月相预览图
+   ═══════════════════════════════════════════════ */
 .moon-preview-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0 20px;
+  padding: 8px 0 16px;
 }
-
 .moon-preview-canvas {
-  width: 180px;
-  height: 180px;
+  width: 170px;
+  height: 170px;
   position: relative;
 }
-
 /* WebGL Canvas 居中 */
 .moon-preview-canvas :deep(canvas) {
   display: block;
   border-radius: 50%;
   box-shadow:
-    0 0 60px rgba(240, 230, 200, 0.25),
-    0 0 120px rgba(240, 230, 200, 0.1);
+    0 0 48px rgba(240, 230, 200, 0.20),
+    0 0 100px rgba(240, 230, 200, 0.08);
   animation: moon-glow 5s ease-in-out infinite;
 }
-
 /* CSS 降级方案 */
 .moon-preview-canvas.is-css-fallback {
   border-radius: 50%;
@@ -597,20 +760,14 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 32% 32%, #f5f0e5 0%, #e8e0d0 35%, #c8c0b0 65%, #8a8275 100%);
   box-shadow:
     inset var(--shadow-x, 0px) 0 var(--shadow-blur, 0px) var(--shadow-spread, 0px) rgba(12, 12, 22, 0.92),
-    0 0 60px rgba(240, 230, 200, 0.25),
-    0 0 120px rgba(240, 230, 200, 0.1);
+    0 0 48px rgba(240, 230, 200, 0.20),
+    0 0 100px rgba(240, 230, 200, 0.08);
   animation: moon-glow 5s ease-in-out infinite;
 }
-
 @keyframes moon-glow {
-  0%, 100% {
-    filter: drop-shadow(0 0 24px rgba(240, 230, 200, 0.15));
-  }
-  50% {
-    filter: drop-shadow(0 0 40px rgba(240, 230, 200, 0.28));
-  }
+  0%, 100% { filter: drop-shadow(0 0 22px rgba(240, 230, 200, 0.14)); }
+  50%      { filter: drop-shadow(0 0 38px rgba(240, 230, 200, 0.26)); }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .moon-preview-canvas,
   .moon-preview-canvas :deep(canvas),
@@ -618,227 +775,238 @@ onBeforeUnmount(() => {
 }
 
 .moon-preview-info {
-  margin-top: 18px;
+  margin-top: 16px;
   text-align: center;
 }
-
 .moon-phase-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
-  letter-spacing: 0.12em;
-  color: #f0f0f8;
+  letter-spacing: 0.14em;
+  color: var(--accent);          /* 金色月相名，使用设计系统 --accent */
   margin-bottom: 6px;
 }
-
 .moon-phase-meta {
-  font-size: 13px;
-  color: #a8a8c0;
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
   letter-spacing: 0.05em;
+  opacity: 0.9;
 }
 
-/* ─── 标签页 ─── */
+/* ═══════════════════════════════════════════════
+   标签页（对齐统一的"小板块"Tab 风格 + 设计系统变量）
+   —— 每个 Tab 做成"小胶囊按钮"，active 为暖金渐变描边（与引导条呼应）
+   ═══════════════════════════════════════════════ */
 .moon-tabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid rgba(180, 180, 220, 0.12);
+  gap: 6px;
+  padding: 5px;
   margin-bottom: 18px;
+  background: var(--overlay-02);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
 }
-
 .moon-tab {
   flex: 1;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #a8a8c0;
-  font-family: inherit;
-  font-size: 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
 }
-
-.moon-tab:hover {
-  color: #e8e8f0;
-}
-
+.moon-tab:hover { color: var(--ink-secondary); background: var(--overlay-04); }
 .moon-tab.active {
-  color: #f0f0f8;
-  border-bottom-color: #c8a878;
+  color: var(--accent);                         /* 选中：金色 accent */
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.10), rgba(202, 167, 255, 0.04));
+  border-color: rgba(255, 120, 196, 0.28);
+  box-shadow: 0 0 0 1px var(--accent-border) inset,
+              var(--shadow-glow);
 }
 
-/* ─── 今夜标签页 ─── */
-.moon-data-section {
-  margin-bottom: 18px;
-}
+/* ═══════════════════════════════════════════════
+   数据小节 section 小标题（Mini 引导条风格 · 对齐 StarDetail .tab-intro）
+   —— 每个 section 标题都有 icon + 小板块背景，与顶部 hero-strip 呼应
+   ═══════════════════════════════════════════════ */
+.moon-data-section { margin-bottom: 18px; }
 
-.moon-section-title {
-  font-size: 12px;
+.mss-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  /* 与 StarDetail .tab-intro 默认渐变完全一致 */
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.06), rgba(202, 167, 255, 0.04));
+  border: 1px solid rgba(255, 217, 138, 0.12);
+}
+.mss-head-solo { margin-bottom: 14px; }   /* 日程 tab：单独一行 title 多留点空 */
+
+/* 在 poem-section-header 里用 inline 版本（需要左右两侧：左边头+右边按钮） */
+.mss-head-inline { margin-bottom: 0; }
+
+/* 每个 section icon 颜色差异化（和 StarDetail 多 Tab 引导条完全一致的色板策略） */
+.mss-icon { flex-shrink: 0; opacity: 0.92; }
+.mss-time  .mss-icon { color: #86a8ff; filter: drop-shadow(0 0 4px rgba(134,168,255,0.35)); }  /* 观测时间 - 蓝（故事广场色） */
+.mss-loc   .mss-icon { color: #caa7ff; filter: drop-shadow(0 0 4px rgba(202,167,255,0.35)); } /* 观测位置 - 紫（星史长卷色） */
+.mss-moon  .mss-icon { color: var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); } /* 月球位置 - 金（星语AI色） */
+.mss-event .mss-icon { color: #ffa3b4; filter: drop-shadow(0 0 4px rgba(255,163,180,0.35)); } /* 升落时刻 - 玫瑰（我的星语色） */
+.mss-count .mss-icon { color: #c6d0e4; filter: drop-shadow(0 0 4px rgba(198,208,228,0.35)); } /* 倒计时 - 银（星辰档案色） */
+.mss-sched .mss-icon { color: #7fd4e0; filter: drop-shadow(0 0 4px rgba(127,212,224,0.35)); } /* 七日 - 青 */
+.mss-poem      .mss-icon { color: var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); } /* AI 月诗 - 金 */
+.mss-poem-anc  .mss-icon { color: #caa7ff; filter: drop-shadow(0 0 4px rgba(202,167,255,0.35)); } /* 古籍 - 紫 */
+
+.mss-label {
+  font-size: 0.74rem;
   font-weight: 600;
-  color: #8888a8;
-  letter-spacing: 0.15em;
-  margin-bottom: 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(180, 180, 220, 0.08);
+  color: var(--ink-secondary);     /* 与 StarDetail 引导条次级文字一致的金色系列 section 名 */
+  letter-spacing: 0.03em;
 }
 
+/* ═══════════════════════════════════════════════
+   今夜观月：数据网格（统一设计系统色）
+   ═══════════════════════════════════════════════ */
 .moon-data-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px 16px;
+  padding-left: 4px;
 }
-
 .moon-data-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
 .moon-data-label {
-  font-size: 11px;
-  color: #7878a0;
+  font-size: 10.5px;
+  color: var(--muted);
   letter-spacing: 0.1em;
 }
-
 .moon-data-value {
-  font-size: 14px;
-  color: #e8e8f0;
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-
-.moon-data-value.visible {
-  color: #c8e8c8;
-}
-
+.moon-data-value.visible { color: var(--success); }
 .moon-vis-badge {
   display: inline-block;
   padding: 1px 6px;
   margin-left: 4px;
   font-size: 10px;
-  background: rgba(120, 200, 120, 0.18);
-  color: #88c888;
+  background: var(--success-subtle);
+  color: var(--success);
   border-radius: 8px;
   vertical-align: middle;
 }
-
 .moon-festival {
   display: inline-block;
   padding: 1px 6px;
   margin-left: 4px;
-  font-size: 11px;
-  background: rgba(200, 168, 120, 0.2);
-  color: #d8b888;
+  font-size: 10.5px;
+  background: var(--accent-subtle);
+  color: var(--accent);
   border-radius: 8px;
   vertical-align: middle;
 }
-
 .moon-sub {
   display: inline-block;
   margin-left: 4px;
-  font-size: 11px;
-  color: #7878a0;
+  font-size: 10.5px;
+  color: var(--muted);
 }
 
-/* ─── 日程标签页 ─── */
-.moon-schedule-title {
-  font-size: 13px;
-  color: #a8a8c0;
-  margin-bottom: 14px;
-  letter-spacing: 0.1em;
-}
-
+/* ═══════════════════════════════════════════════
+   月历七日（统一设计系统色）
+   ═══════════════════════════════════════════════ */
+.moon-schedule-title { display: none; }   /* 已由 mss-head-sched 取代 */
 .moon-schedule-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 6px;
 }
-
 .moon-schedule-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 10px 4px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(180, 180, 220, 0.08);
+  background: var(--overlay-02);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
 }
-
 .moon-schedule-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(200, 168, 120, 0.3);
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.05), rgba(202, 167, 255, 0.025));
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-border) inset;
 }
-
 .moon-schedule-item.today {
-  border-color: rgba(200, 168, 120, 0.5);
-  background: rgba(200, 168, 120, 0.06);
+  border-color: rgba(255, 120, 196, 0.36);
+  background: linear-gradient(135deg, rgba(255, 217, 138, 0.08), rgba(202, 167, 255, 0.04));
+  box-shadow: 0 0 0 1px var(--accent-border) inset,
+              var(--shadow-glow);
 }
-
 .moon-schedule-icon {
   width: 44px;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 0 4px rgba(240, 230, 200, 0.15));
+  filter: drop-shadow(0 0 4px rgba(240, 230, 200, 0.18));
 }
-
-.moon-schedule-icon :deep(svg) {
-  display: block;
-}
-
+.moon-schedule-icon :deep(svg) { display: block; }
 .moon-schedule-date {
-  font-size: 11px;
-  color: #c8c8d8;
-  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
 }
-
 .moon-schedule-phase {
   font-size: 10px;
-  color: #a8a8c0;
+  color: var(--muted);
   text-align: center;
 }
-
 .moon-schedule-illum {
   font-size: 10px;
-  color: #7878a0;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-disabled);
+  font-family: var(--font-mono);
 }
-
 .moon-schedule-hint {
   margin-top: 14px;
-  font-size: 11px;
-  color: #7878a0;
+  font-size: 10.5px;
+  color: var(--muted);
   text-align: center;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
 }
 
-/* ─── 诗词标签页 ─── */
+/* ═══════════════════════════════════════════════
+   月色诗笺（统一设计系统色）
+   ═══════════════════════════════════════════════ */
 .moon-poem {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
-
 .moon-poem-section {
   padding: 16px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(180, 180, 220, 0.08);
+  background: linear-gradient(135deg, rgba(255,217,138,0.035), rgba(202,167,255,0.02));
+  border: 1px solid var(--accent-border);
 }
-
 .moon-poem-section-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
-
 .moon-poem-regen,
 .moon-poem-rotate {
   display: flex;
@@ -846,61 +1014,66 @@ onBeforeUnmount(() => {
   gap: 4px;
   padding: 4px 10px;
   background: transparent;
-  border: 1px solid rgba(180, 180, 220, 0.15);
-  border-radius: 12px;
-  color: #a8a8c0;
-  font-family: inherit;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  color: var(--ink-secondary);
+  font-family: var(--font);
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
 }
-
 .moon-poem-regen:hover,
 .moon-poem-rotate:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8e8f0;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-glow);
 }
-
 .moon-poem-content {
   display: flex;
   flex-direction: column;
 }
-
 .moon-poem-verse {
-  font-size: 16px;
-  line-height: 2;
-  color: #f0f0f8;
+  /* 衬线体：典雅古典感，优先 Noto Serif SC → 宋体 → 系统衬线 */
+  font-family: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', 'Source Han Serif SC', serif;
+  font-size: 15.5px;
+  line-height: 2.1;
+  color: var(--ink);
   text-align: center;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   margin-bottom: 10px;
   white-space: pre-line;
 }
-
 .moon-poem-author {
-  font-size: 12px;
-  color: #a8a8c0;
+  /* 作者行也用衬线体，字号略小，右对齐署名感 */
+  font-family: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', 'Source Han Serif SC', serif;
+  font-size: 11.5px;
+  color: var(--ink-secondary);
   text-align: right;
   margin-bottom: 10px;
+  padding-right: 6px;
+  letter-spacing: 0.08em;
 }
-
 .moon-poem-note {
-  font-size: 11px;
-  color: #8888a8;
-  line-height: 1.7;
+  /* 注解保留无衬线体，与诗句主次分明 */
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.75;
   padding-left: 10px;
-  border-left: 2px solid rgba(180, 180, 220, 0.15);
+  border-left: 2px solid var(--accent-border);
 }
-
 .moon-poem-loading {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 0;
-  color: #a8a8c0;
-  font-size: 13px;
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
-/* ─── 加载与错误 ─── */
+/* ═══════════════════════════════════════════════
+   加载与错误（统一设计系统色）
+   ═══════════════════════════════════════════════ */
 .moon-panel-loading,
 .moon-panel-error {
   display: flex;
@@ -908,70 +1081,73 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #a8a8c0;
+  color: var(--muted);
 }
-
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 2px solid rgba(200, 168, 120, 0.2);
-  border-top-color: #c8a878;
+  border: 2px solid var(--accent-border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 14px;
 }
-
 .loading-spinner.small {
   width: 14px;
   height: 14px;
   border-width: 2px;
   margin-bottom: 0;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ─── 过渡动画 ─── */
+/* ═══════════════════════════════════════════════
+   过渡动画（与 StarDetail .detail-wrap slideUp 节奏对齐）
+   ═══════════════════════════════════════════════ */
 .moon-panel-fade-enter-active,
 .moon-panel-fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity var(--duration-slow) ease;
 }
-
 .moon-panel-fade-enter-active .moon-panel,
 .moon-panel-fade-leave-active .moon-panel {
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--duration-slow) var(--ease-in-out);
 }
-
 .moon-panel-fade-enter-from,
-.moon-panel-fade-leave-to {
-  opacity: 0;
-}
-
+.moon-panel-fade-leave-to { opacity: 0; }
 .moon-panel-fade-enter-from .moon-panel,
-.moon-panel-fade-leave-to .moon-panel {
-  transform: scale(0.92);
-}
+.moon-panel-fade-leave-to .moon-panel { transform: translateY(10px); }
 
-/* ─── 响应式 ─── */
+/* ═══════════════════════════════════════════════
+   响应式
+   ═══════════════════════════════════════════════ */
 @media (max-width: 540px) {
   .moon-panel {
     width: 100%;
-    padding: 20px 18px;
+    padding: 18px 16px 22px;
+    border-radius: var(--radius-xl);
   }
-
-  .moon-preview-canvas {
-    width: 140px;
-    height: 140px;
+  .moon-hero-strip {
+    padding: 7px 11px;
+    margin-bottom: 14px;
   }
-
+  .mhs-label { font-size: 0.74rem; }
+  .mhs-sub   { font-size: 0.64rem; }
+  .moon-preview-canvas { width: 140px; height: 140px; }
+  .moon-phase-title { font-size: 18px; letter-spacing: 0.10em; }
+  .moon-phase-meta { font-size: 11.5px; }
+  .moon-tabs {
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .moon-tab { font-size: 12px; padding: 7px 8px; }
   .moon-data-grid {
     grid-template-columns: 1fr;
   }
-
   .moon-schedule-grid {
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
   }
+  .mss-label { font-size: 0.70rem; }
 }
 </style>

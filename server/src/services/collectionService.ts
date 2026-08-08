@@ -13,6 +13,7 @@ export interface Collection {
   cover_color: string | null;
   visibility: CollectionVisibility;
   sort_order: number;
+  is_default: number;   // INTEGER 0/1：1=系统级默认合集（不可删/不可改可见性/不可改名）
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +138,8 @@ export function normalizeCollectionRow(row: any, opts?: { withStories?: boolean 
     userId: row.user_id ?? row.userId,
     coverColor: row.cover_color ?? row.coverColor,
     sortOrder: row.sort_order ?? row.sortOrder,
+    /** 系统级默认合集标志：DB INTEGER 0/1 → 前端 boolean，避免再判 type */
+    isDefault: row.is_default === 1 || !!row.isDefault || false,
     createdAt: row.created_at ?? row.createdAt,
     updatedAt: row.updated_at ?? row.updatedAt,
     // 计数：snake 已经由 attachStoryCount / 详情 SQL 计算，这里直接双写
@@ -219,6 +222,7 @@ export function getCollectionDetail(id: number, currentUserId?: number): any | n
 }
 
 // 编辑合集（仅 owner 可编辑；星河合集仅后台/DB 管理，普通 API 直接拒绝创建/更新 visibility=galaxy）
+// ⚠️ 默认合集（is_default=1）三禁止：改可见性 / 改名字 / 改 sort_order（保证系统默认排最前）
 export function updateCollection(
   id: number,
   userId: number,
@@ -229,6 +233,20 @@ export function updateCollection(
   // 星河合集：仅后台/DB 管理，普通前端接口不允许改
   if (existing.visibility === 'galaxy') return { forbidden: true };
   if (userId !== existing.user_id) return { forbidden: true };
+
+  // ── 系统级默认合集：三项强锁 ──
+  if (Number(existing.is_default) === 1) {
+    if (patch.visibility !== undefined && patch.visibility !== existing.visibility) {
+      return { error: '系统默认合集不可改变可见性' };
+    }
+    if (patch.name !== undefined && patch.name.trim() !== existing.name) {
+      return { error: '系统默认合集名称由平台管理，不可手动修改' };
+    }
+    if (patch.sortOrder !== undefined && (Math.floor(Number(patch.sortOrder)) || 0) !== existing.sort_order) {
+      return { error: '系统默认合集排序固定（置顶），不可手动调整' };
+    }
+  }
+
   // 切换到 galaxy：不开放（后台管理）
   const nextVisibility = patch.visibility ?? existing.visibility;
   if (nextVisibility === 'galaxy') return { error: '星河合集仅由官方后台统一维护，不开放自建' };
@@ -251,11 +269,12 @@ export function updateCollection(
   return { collection: normalizeCollectionRow(enriched[0], { withStories: false }) };
 }
 
-// 删除合集（仅 owner 可删；星河合集仅后台/DB 管理，接口层面不允许删）
-export function deleteCollection(id: number, userId: number): { notFound?: boolean; forbidden?: boolean } {
+// 删除合集（仅 owner 可删；星河合集 & 系统默认合集，接口层面不允许删）
+export function deleteCollection(id: number, userId: number): { notFound?: boolean; forbidden?: boolean; error?: string } {
   const existing = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as Collection | undefined;
   if (!existing) return { notFound: true };
-  if (existing.visibility === 'galaxy') return { forbidden: true };
+  if (existing.visibility === 'galaxy') return { forbidden: true, error: '星河合集仅由官方后台统一维护，不允许删除' };
+  if (Number(existing.is_default) === 1) return { forbidden: true, error: '系统默认合集不可删除' };
   if (userId !== existing.user_id) return { forbidden: true };
   invalidateCollectionAnalysisCache(id);
   db.prepare('UPDATE stars SET collection_id = NULL WHERE collection_id = ?').run(id);
@@ -421,63 +440,89 @@ export function getDefaultCollection(userId: number): any | null {
 }
 
 /**
- * 🌟 新默认机制：每个用户必有「公开星笺」+「私密星笺」两个系统级默认合集
- *   - 公开星笺（name='公开星笺', visibility='public', sort_order=0）→ 所有投稿默认进这里
- *   - 私密星笺（name='私密星笺', visibility='private', sort_order=1）→ 用户手动切到私密
- * 幂等：存在就复用，不存在才创建；返回值始终非 null。
+ * 🌟 新默认机制（2026-08-08 重构）：每个用户必有两本系统级默认合集（is_default=1）
+ *   - 默认公开合集：name = `{用户名}的默认公开合集`, visibility = 'public',  sort_order = 0
+ *   - 默认私有合集：name = `默认私有合集`,                 visibility = 'private', sort_order = 1
+ *   命中优先级：is_default=1 且 visibility 匹配 → fallback 同名/近似名行 → fallback 同 visibility 第一个 → 新建
+ *   幂等：存在就复用（若标记不对自动补上 is_default），不存在才创建。
  */
 export interface DefaultCollections {
-  publicCollection: any;   // 公开星笺（所有新故事/历史故事默认放这）
-  privateCollection: any;  // 私密星笺（用户手动放）
+  publicCollection: any;   // 默认公开合集（所有新故事/历史故事默认放这）
+  privateCollection: any;  // 默认私有合集（用户手动放）
 }
-const PUBLIC_DEFAULT_NAME = '公开星笺';
-const PRIVATE_DEFAULT_NAME = '私密星笺';
+function publicNameOf(username: string): string { return `${username}的默认公开合集`; }
+function privateNameOf(_username: string): string { return `默认私有合集`; }
 const PUBLIC_DEFAULT_DESC = '默认收纳所有未指定合集的公开故事，公开可见';
 const PRIVATE_DEFAULT_DESC = '收纳仅自己可见的私密心事，不对外展示';
 const PUBLIC_DEFAULT_COLOR = '#E8B86D';   // 暖金（原默认色，星空感）
 const PRIVATE_DEFAULT_COLOR = '#6A7ACB';  // 星靛蓝（私密夜色感）
 
 export function getOrCreateDefaultCollections(userId: number): DefaultCollections {
-  // 1) 先找该用户所有合集
+  // 1) 拿用户名（动态命名公开默认合集用）
+  const userRow = db.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string } | undefined;
+  const username = userRow?.username ?? `user${userId}`;
+  const wantPublicName = publicNameOf(username);
+  const wantPrivateName = privateNameOf(username);
+
+  // 2) 先找该用户所有合集
   const all = db.prepare('SELECT * FROM collections WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC').all(userId) as unknown as Collection[];
 
-  // 2) 精准匹配（名字+可见性同时命中），存在就复用
-  let publicColl = all.find((c) => c.name === PUBLIC_DEFAULT_NAME && c.visibility === 'public');
-  let privateColl = all.find((c) => c.name === PRIVATE_DEFAULT_NAME && c.visibility === 'private');
-
-  // 3) 找不到精准名：fallback 用任意一个同 visibility 的（兼容老用户已有"我的默认合集"等公开合集）
-  if (!publicColl) publicColl = all.find((c) => c.visibility === 'public') || null as any;
+  // 3) 命中候选：按 is_default → 精确名 → 近似名 → 同 visibility 第一 的顺序
+  let publicColl: Collection | undefined = all.find((c) => Number(c.is_default) === 1 && c.visibility === 'public');
+  let privateColl: Collection | undefined = all.find((c) => Number(c.is_default) === 1 && c.visibility === 'private');
+  if (!publicColl)  publicColl  = all.find((c) => c.visibility === 'public'  && c.name === wantPublicName);
+  if (!privateColl) privateColl = all.find((c) => c.visibility === 'private' && c.name === wantPrivateName);
+  if (!publicColl)  publicColl  = all.find((c) => c.visibility === 'public'  && (
+    c.name === '公开星笺' || c.name === '我的默认合集' || c.name.includes('默认公开')
+  ));
+  if (!privateColl) privateColl = all.find((c) => c.visibility === 'private' && (
+    c.name === '私密星笺' || c.name.includes('默认私有')
+  ));
+  if (!publicColl)  publicColl  = all.find((c) => c.visibility === 'public')  || null as any;
   if (!privateColl) privateColl = all.find((c) => c.visibility === 'private') || null as any;
 
-  // 4) 还没找到 → 创建公开星笺（sort_order=0 第一个）
-  if (!publicColl) {
-    const created = createCollection(userId, {
-      name: PUBLIC_DEFAULT_NAME,
-      description: PUBLIC_DEFAULT_DESC,
-      coverColor: PUBLIC_DEFAULT_COLOR,
-      visibility: 'public',
-    });
-    // createCollection 返回 { error?, collection? }，尽量把 sort_order 改成 0 排在最前
-    if (created.collection) {
-      db.prepare('UPDATE collections SET sort_order = 0 WHERE id = ?').run(created.collection.id);
-      created.collection.sort_order = 0;
-    }
-    publicColl = created.collection as any;
+  // 4) 找到后：如果 is_default 还没标 1，补上；顺便修正 name/visibility/排序（幂等）
+  function ensureTouched(row: Collection, wantVisibility: 'public' | 'private', wantName: string, wantSort: 0 | 1): void {
+    if (!row) return;
+    const fixes: { sql: string; params: any[] }[] = [];
+    if (Number(row.is_default) !== 1)
+      fixes.push({ sql: 'UPDATE collections SET is_default = 1 WHERE id = ?', params: [row.id] });
+    if (row.visibility !== wantVisibility)
+      fixes.push({ sql: 'UPDATE collections SET visibility = ? WHERE id = ?', params: [wantVisibility, row.id] });
+    if (row.name !== wantName)
+      fixes.push({ sql: 'UPDATE collections SET name = ? WHERE id = ?', params: [wantName, row.id] });
+    if (row.sort_order !== wantSort)
+      fixes.push({ sql: 'UPDATE collections SET sort_order = ?, updated_at = datetime(\'now\') WHERE id = ?', params: [wantSort, row.id] });
+    for (const f of fixes) { try { db.prepare(f.sql).run(...f.params); } catch { /* 忽略迁移型小报错 */ } }
+    // 回写内存对象，保证 normalize 用到最新字段
+    (row as any).is_default = 1;
+    if (row.visibility !== wantVisibility) (row as any).visibility = wantVisibility;
+    if (row.name !== wantName) (row as any).name = wantName;
+    if (row.sort_order !== wantSort) (row as any).sort_order = wantSort;
   }
 
-  // 5) 还没找到 → 创建私密星笺（sort_order=1 第二个）
+  // 5) 还没找到 → 创建默认公开合集（sort_order=0 第一个）
+  if (!publicColl) {
+    const result = db.prepare(`
+      INSERT INTO collections (user_id, name, description, cover_color, visibility, sort_order, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 0, 1, datetime('now'), datetime('now'))
+    `).run(userId, wantPublicName, PUBLIC_DEFAULT_DESC, PUBLIC_DEFAULT_COLOR, 'public');
+    const id = result.lastInsertRowid as number;
+    publicColl = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as unknown as Collection;
+  } else {
+    ensureTouched(publicColl, 'public', wantPublicName, 0);
+  }
+
+  // 6) 还没找到 → 创建默认私有合集（sort_order=1 第二个）
   if (!privateColl) {
-    const created = createCollection(userId, {
-      name: PRIVATE_DEFAULT_NAME,
-      description: PRIVATE_DEFAULT_DESC,
-      coverColor: PRIVATE_DEFAULT_COLOR,
-      visibility: 'private',
-    });
-    if (created.collection) {
-      db.prepare('UPDATE collections SET sort_order = 1 WHERE id = ?').run(created.collection.id);
-      created.collection.sort_order = 1;
-    }
-    privateColl = created.collection as any;
+    const result = db.prepare(`
+      INSERT INTO collections (user_id, name, description, cover_color, visibility, sort_order, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))
+    `).run(userId, wantPrivateName, PRIVATE_DEFAULT_DESC, PRIVATE_DEFAULT_COLOR, 'private');
+    const id = result.lastInsertRowid as number;
+    privateColl = db.prepare('SELECT * FROM collections WHERE id = ?').get(id) as unknown as Collection;
+  } else {
+    ensureTouched(privateColl, 'private', wantPrivateName, 1);
   }
 
   return {

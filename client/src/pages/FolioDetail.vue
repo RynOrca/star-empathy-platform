@@ -182,14 +182,15 @@ function exitToSky() {
 function goSky() { exitToSky() }
 
 /**
- * 详情页内点击故事：
- *  - 优先回到 /sky 并在 search 挂 ?storyId=xxx 打开 StarDetail + 高亮该故事
- *  - 但目前 SkyPage 还不支持 URL query 定位故事（P2 TODO），先直接跳 /sky
- *  - 如果故事挂在 collection 下的 overlay 内部，它原本会 emit story-click，
- *    SkyPage 自己用 overlay 开 StoryDetailModal，这里我们就不让 modal 再弹，
- *    直接跳天际，保留预期。
+ * 星笺详情内点击单条故事：
+ *  - CollectionDetail 内部自己会把 detailStoryId 设为该故事 id，
+ *    在左侧故事列表内直接切换到 StoryDetail 视图，所以 **这里不要再跳转路由**！
+ *  - 之前误调用 exitToSky() → router.push('/sky')，导致"点开星笺再点故事会回到主界面"
+ *    的 bug，现改为 no-op，与 ProfilePage 的 onCollectionStoryClick 行为一致。
  */
-function onStoryClick(_s: any) { exitToSky() }
+function onStoryClick(_s: any) {
+  // no-op：故事详情已在 CollectionDetail 内嵌的 StoryDetail 里展示
+}
 
 /** 广场详情页，不允许就地从该页编辑（入口在个人主页），闪个提示即可 */
 function onWantEditDenied(_c: any) {

@@ -452,7 +452,13 @@
             </div>
           </main>
           <footer class="pd-modal-foot">
-            <button type="button" class="pd-back-btn" @click="resonateStory">共鸣 +1</button>
+            <button
+              type="button"
+              class="pd-back-btn"
+              :disabled="isStoryResonated(activeStory) || resonatingId === activeStory?.id"
+              :class="{ done: isStoryResonated(activeStory), loading: resonatingId === activeStory?.id }"
+              @click="resonateStory"
+            >{{ isStoryResonated(activeStory) ? '已共鸣' : (resonatingId === activeStory?.id ? '共鸣中…' : '共鸣 +1') }}</button>
             <button type="button" class="pd-btn-danger" @click="activeStoryId = activeStory?.id ?? null; showDeleteConfirm = true">删除此故事</button>
           </footer>
         </div>
@@ -515,10 +521,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Star, BookMarked } from 'lucide-vue-next'
 import { useParticleSky } from '../composables/useParticleSky'
+import { useResonate } from '../composables/useResonate'
 import { useAuth, authFetch } from '../stores/auth'
 import { constellationNames } from '../data/starInfo'
 import { getStarNameInfo, getStarDisplayName } from '../utils/starName'
@@ -561,6 +568,23 @@ const VISIBLE_STEP = 5
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { logout } = useAuth()
+// ─── 共鸣 ───
+const {
+  resonate: doResonate,
+  resonatingId,
+  isResonated,
+  syncFromServerRows,
+  lastError: resonateError,
+} = useResonate()
+/** 合并后端 resonated + 前端 useResonate 状态（同 StarDetail 的策略） */
+function isStoryResonated(story: { id: number; resonated?: boolean } | null | undefined): boolean {
+  if (!story) return false
+  return isResonated(story.id) || !!story.resonated
+}
+/** 列表 stories 首次拉回时同步 resonated=true 的条目到本地 */
+function syncResonatedState(list: { id: number; resonated?: boolean }[]) {
+  syncFromServerRows(list)
+}
 // 解构出 pause/resume：卡片 hover 时暂停 canvas，把主线程完整让给 CSS transition 跑 0.5s
 const { pause: pauseSky, resume: resumeSky } = useParticleSky(canvasRef)
 // hover 计数器（防止鼠标在多张卡片间快速移动时 canvas 被反复 pause/resume）
@@ -826,19 +850,40 @@ function showFlash(text: string, tone: 'success' | 'error' | 'info' = 'success')
     flashTimer = null
   }, 2600)
 }
+// 提示 useResonate 的错误信息（如"登录后共鸣才会被记录喔"）
+watch(resonateError, (msg: string | null) => {
+  if (msg) showFlash(msg, 'info')
+})
 
 async function resonateStory() {
   const id = activeStory.value?.id
   if (id == null) return
-  try {
-    const res = await fetch(`/api/stars/${id}/resonate`, { method: 'POST' })
-    if (res.ok) {
-      activeStory.value = { ...activeStory.value!, resonanceCount: (activeStory.value!.resonanceCount || 0) + 1 }
-      const idx = stories.value.findIndex(s => s.id === id)
-      if (idx >= 0) stories.value[idx].resonanceCount = (stories.value[idx].resonanceCount || 0) + 1
-      showFlash('✦ 共鸣已传向那颗星 ✦', 'success')
-    }
-  } catch { showFlash('共鸣失败', 'error') }
+  if (isStoryResonated(activeStory.value)) {
+    showFlash('你已经共鸣过这则故事啦', 'info')
+    return
+  }
+  const beforeStory = (activeStory.value?.resonanceCount || 0)
+  const idx = stories.value.findIndex(s => s.id === id)
+  const beforeList = idx >= 0 ? (stories.value[idx].resonanceCount || 0) : 0
+  // 乐观 +1
+  if (activeStory.value) activeStory.value = { ...activeStory.value, resonanceCount: beforeStory + 1 }
+  if (idx >= 0) stories.value[idx] = { ...stories.value[idx], resonanceCount: beforeList + 1 }
+
+  const result = await doResonate(id)
+  if (result.ok) {
+    const realCnt = result.resonanceCount >= 0 ? result.resonanceCount : beforeStory + 1
+    if (activeStory.value?.id === id) activeStory.value = { ...activeStory.value, resonanceCount: realCnt }
+    const i2 = stories.value.findIndex(s => s.id === id)
+    if (i2 >= 0) stories.value[i2] = { ...stories.value[i2], resonanceCount: realCnt }
+    showFlash(result.status === 'already' ? '✦ 已点亮共鸣 ✦' : '✦ 共鸣已传向那颗星 ✦', 'success')
+  } else {
+    // 回滚乐观更新
+    if (activeStory.value?.id === id) activeStory.value = { ...activeStory.value, resonanceCount: beforeStory }
+    const i2 = stories.value.findIndex(s => s.id === id)
+    if (i2 >= 0) stories.value[i2] = { ...stories.value[i2], resonanceCount: beforeList }
+    if (result.status === 'error') showFlash(result.message || '共鸣失败', 'error')
+    // unauthorized：在 watch(resonateError) 里已经弹 flash 提示
+  }
 }
 
 const sigText = computed(() => user.value?.signature || '')
@@ -1008,6 +1053,7 @@ async function loadNextPage() {
     if (res.ok && json.data) {
       const items = json.data.items ?? json.data ?? []
       stories.value = [...stories.value, ...items]
+      syncResonatedState(items)
       currentPage.value = json.data.page ?? nextPage
       hasMore.value = (json.data.page ?? nextPage) < (json.data.totalPages ?? 1)
       // 统计数据由 /api/profile/stats 提供，这里不再客户端累加
@@ -1129,6 +1175,7 @@ async function loadProfileData() {
     if (firstPageRes.ok && firstJson.data) {
       const items = firstJson.data.items ?? firstJson.data ?? []
       stories.value = items
+      syncResonatedState(items)
       currentPage.value = firstJson.data.page ?? 1
       hasMore.value = (firstJson.data.page ?? 1) < (firstJson.data.totalPages ?? 1)
     }
@@ -1378,6 +1425,19 @@ onBeforeUnmount(() => {
   border-color: rgba(255,217,138,0.5);
   color: var(--pd-gold);
   background: rgba(255,217,138,0.05);
+}
+.pd-back-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pd-back-btn.done {
+  border-color: rgba(149, 240, 192, 0.28);
+  color: #8FE3B8;
+  background: rgba(149, 240, 192, 0.08);
+}
+.pd-back-btn.loading {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .pd-brand {

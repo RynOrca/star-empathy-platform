@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="sky-page">
     <!-- 导航栏 -->
     <nav class="sky-nav">
@@ -394,6 +394,39 @@
       </div>
     </Transition>
 
+    <!-- 相关星连线顶部引导框：说明关联星数 + 关联原因（情绪/主题交集） -->
+    <Transition name="khint-fade">
+      <div v-if="kernelHint.show" class="kernel-hint-pill" :class="{ 'has-themes': kernelHint.sharedThemes.length > 0, 'has-emotions': kernelHint.sharedEmotions.length > 0 }">
+        <div class="khp-left">
+          <!-- 三颗星连线 icon -->
+          <svg class="khp-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="7" r="2"/>
+            <circle cx="19" cy="7" r="2"/>
+            <circle cx="12" cy="18" r="2"/>
+            <line x1="5" y1="7" x2="12" y2="18"/>
+            <line x1="19" y1="7" x2="12" y2="18"/>
+            <line x1="5" y1="7" x2="19" y2="7"/>
+          </svg>
+          <span class="khp-title">共鸣星群</span>
+          <span class="khp-count">{{ kernelHint.count }} 颗</span>
+          <span class="khp-sep">·</span>
+          <span class="khp-source">与「{{ kernelHint.sourceName }}」相关</span>
+        </div>
+        <div v-if="kernelHint.sharedThemes.length > 0 || kernelHint.sharedEmotions.length > 0" class="khp-right">
+          <template v-if="kernelHint.sharedEmotions.length > 0">
+            <span class="khp-tag khp-tag-emo" v-for="e in kernelHint.sharedEmotions" :key="'e-'+e">{{ e }}</span>
+          </template>
+          <template v-if="kernelHint.sharedThemes.length > 0">
+            <span v-if="kernelHint.sharedEmotions.length > 0" class="khp-sep">·</span>
+            <span class="khp-tag khp-tag-theme" v-for="t in kernelHint.sharedThemes" :key="'t-'+t">{{ t }}</span>
+          </template>
+        </div>
+        <button class="khp-close" @click="hideKernelHint" type="button" aria-label="关闭">
+          <X :size="12" />
+        </button>
+      </div>
+    </Transition>
+
       <StarDetail
         v-if="selectedStarInfo"
         :stories="selectedStories"
@@ -455,6 +488,7 @@
         v-if="showForm"
         :star-name="selectedStarInfo?.displayName ?? ''"
         :catalog-star-id="selectedCatalogStarId"
+        :catalog-star-info="selectedStarInfo"
         @submitted="onStorySubmitted"
         @close="showForm = false"
       />
@@ -650,7 +684,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { Crosshair, Globe, Star, MapPin, User, RefreshCw, X, Search, PenLine, Sparkles, Shuffle, Library, Orbit, BookMarked } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
@@ -672,6 +706,7 @@ import { useCollections, type Collection, type CollectionDetail as CollectionDet
 import { isPlanetId, getPlanetBodyName } from '../utils/starName'
 import { useCameraMode, type CameraFilterMode } from '../composables/useCameraMode'
 import { useStars } from '../composables/useStars'
+import { type SimilarStar } from '../composables/useSimilarStars'
 import CameraOverlay from '../components/CameraMode/CameraOverlay.vue'
 import { ApertureIcon } from '../components/CameraMode/icons/CameraIcons'
 
@@ -1177,21 +1212,43 @@ function locateStar(starId: number) {
   }, 1200)
 }
 
+// ─── 内核连线：顶部引导提示框 ───
+//  当"相关星连线"出现时，顶部提示框说明：关联的星数量、关联原因（情绪交集/主题交集）
+interface KernelHintState {
+  show: boolean
+  count: number
+  sourceName: string
+  sharedThemes: string[]
+  sharedEmotions: string[]
+}
+const kernelHint = reactive<KernelHintState>({
+  show: false, count: 0, sourceName: '', sharedThemes: [], sharedEmotions: [],
+})
+// ✨ 不再用 kernelHintHideTimer：引导框 + 连线**常驻**，
+//    仅在以下 2 种情况消失：
+//    ① 用户手动点 ✕ 关闭  ② 切到另一颗星（hover/详情打开新星 → 自然替换）
+function showKernelHint(params: { count: number; sourceName: string; sharedThemes: string[]; sharedEmotions: string[] }) {
+  Object.assign(kernelHint, params, { show: true })
+}
+// ✨ hideKernelHint：用户手动点关闭按钮触发 = 同时隐藏提示框 + 清空内核连线（同步消失）
+function hideKernelHint() {
+  kernelHint.show = false
+  skyRef.value?.sky?.setKernelLines([])
+}
+
 // ─── 长悬浮显示内核连线 ───
 let hoverLinesAbort: AbortController | null = null
-let clearLinesTimer: ReturnType<typeof setTimeout> | null = null
+// ✨ 不再有 clearLinesTimer：鼠标离开不会自动清连线（连线+提示框常驻）
+//    保留变量声明仍在函数内取消即可，不再使用
 async function onStarHoverLong(starId: number | null) {
   // 天镜览星模式下禁止 hover 触发连线/详情
   if (cameraMode.cameraMode.value === 'observe') return
-  // 取消上一次请求和清除计时器
+  // 取消上一次请求（若切换到另一颗星 → 新请求覆盖旧的；旧请求 abort 避免 race）
   if (hoverLinesAbort) { hoverLinesAbort.abort(); hoverLinesAbort = null }
-  if (clearLinesTimer) { clearTimeout(clearLinesTimer); clearLinesTimer = null }
 
   if (starId === null) {
-    // 鼠标离开：2s 后再清除连线（给用户时间看清）
-    clearLinesTimer = setTimeout(() => {
-      skyRef.value?.sky?.setKernelLines([])
-    }, 2000)
+    // ✨ 鼠标离开：**不再 2s 后自动清连线**（连线 + 引导框保持常驻）
+    //    只有用户点 ✕ 关闭、或长悬浮/点击切到其他星 → 才替换新内容
     return
   }
   // 详情面板打开时不重复显示连线
@@ -1203,17 +1260,28 @@ async function onStarHoverLong(starId: number | null) {
     const json = await res.json()
     if (!res.ok || !json.data?.length) {
       skyRef.value?.sky?.setKernelLines([])
+      hideKernelHint()
       return
     }
     const sourceStar = catalogStarLookup.get(starId)
     if (!sourceStar) return
-    const lines = (json.data as { catalogStarId: number }[]).map(s => {
+    const sims = json.data as SimilarStar[]
+    const lines = sims.map(s => {
       const target = catalogStarLookup.get(s.catalogStarId)
       return target ? { from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } } : null
     }).filter(Boolean) as { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[]
     skyRef.value?.sky?.setKernelLines(lines)
+    // ─── 顶部引导提示框：合并 sharedThemes / sharedEmotions（去重，取前3） ───
+    const themes = Array.from(new Set(sims.flatMap(s => s.sharedThemes || []))).slice(0, 3)
+    const emotions = Array.from(new Set(sims.flatMap(s => s.sharedEmotions || []))).slice(0, 3)
+    showKernelHint({
+      count: sims.length,
+      sourceName: formatStarName(sourceStar),
+      sharedThemes: themes,
+      sharedEmotions: emotions,
+    })
   } catch {
-    if (!controller.signal.aborted) skyRef.value?.sky?.setKernelLines([])
+    if (!controller.signal.aborted) { skyRef.value?.sky?.setKernelLines([]); hideKernelHint() }
   }
 }
 
@@ -2082,6 +2150,7 @@ function onCloseDetail() {
   planetObserveMode.value = false
   skyRef.value?.sky?.setObserveMode(false)
   skyRef.value?.sky?.setKernelLines([])
+  hideKernelHint()  // 关闭详情时同步隐藏"相关星引导框"
   skyRef.value?.sky?.exitCloseup()
   detailTargetStoryId.value = null
   if (lastEnteredTarget.value && isMobile.value) {
@@ -2195,18 +2264,28 @@ async function handleCollectionSubmit(payload: {
 }
 
 function onWriteStory() { if (isGuest.value) { goLogin(); return } if (selectedStarInfo.value) showForm.value = true }
-function onUpdateSimilarStars(ids: number[]) {
+function onUpdateSimilarStars(stars: SimilarStar[]) {
   // 查找源星和相似星的 3D 坐标
   const sourceStar = catalogStarLookup.get(selectedCatalogStarId.value)
   if (!sourceStar) return
   const lines: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }[] = []
-  for (const id of ids) {
-    const target = catalogStarLookup.get(id)
+  for (const s of stars) {
+    const target = catalogStarLookup.get(s.catalogStarId)
     if (target) {
       lines.push({ from: { x: sourceStar.x, y: sourceStar.y, z: sourceStar.z }, to: { x: target.x, y: target.y, z: target.z } })
     }
   }
   skyRef.value?.sky?.setKernelLines(lines)
+  if (!lines.length) { hideKernelHint(); return }
+  // ─── 顶部引导提示框：合并 sharedThemes / sharedEmotions（去重，取前3） ───
+  const themes = Array.from(new Set(stars.flatMap(s => s.sharedThemes || []))).slice(0, 3)
+  const emotions = Array.from(new Set(stars.flatMap(s => s.sharedEmotions || []))).slice(0, 3)
+  showKernelHint({
+    count: lines.length,
+    sourceName: formatStarName(sourceStar),
+    sharedThemes: themes,
+    sharedEmotions: emotions,
+  })
 }
 function onStorySubmitted(story: StoryData) {
   // 获取故事绑定的所有恒星 ID（兼容旧数据只有 catalogStarId）
@@ -2324,6 +2403,101 @@ function zoomOut() { skyRef.value?.sky?.zoomOut() }
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════
+   内核（共鸣）星群连线 顶部引导框
+   ═══════════════════════════════════════════════ */
+/* 淡入淡出 transition 类：Vue Transition name=khint-fade */
+.khint-fade-enter-from, .khint-fade-leave-to { opacity: 0; transform: translate(-50%, -16px); }
+.khint-fade-enter-active, .khint-fade-leave-active {
+  transition: opacity 320ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kernel-hint-pill {
+  position: fixed;
+  top: calc(var(--topbar-h, 72px) + 12px);
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 150;      /* 比 HUD 高，在 StarDetail overlay(220) 之下 */
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px 10px 14px;
+  border-radius: 999px;
+  /* 底色：深蓝半透明 + 多层模糊 → 星空胶囊感 */
+  background:
+    linear-gradient(180deg, rgba(26, 22, 54, 0.82) 0%, rgba(18, 15, 42, 0.78) 100%);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  /* 边框：品红 → 暖金 → 柔品红渐变描边，呼应品红星辉光 */
+  border: 1px solid rgba(255, 120, 196, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(255, 197, 130, 0.06) inset,   /* 内圈暖金边 */
+    0 0 18px rgba(255, 77, 138, 0.16),            /* 品红外发光 */
+    0 6px 24px rgba(5, 3, 22, 0.45);
+  max-width: calc(100vw - 40px);
+  will-change: transform, opacity;
+  pointer-events: auto;
+}
+.khp-left { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.khp-icon {
+  color: #ff99c9;    /* 品红 icon，呼应品红星 */
+  filter: drop-shadow(0 0 6px rgba(255, 77, 138, 0.45));
+  flex-shrink: 0;
+}
+.khp-title {
+  font-size: 0.88rem; font-weight: 600; color: #ffe5a0;  /* 金色标题 */
+  letter-spacing: 0.03em;
+}
+.khp-count {
+  font-size: 0.80rem; color: #ffc7a0; font-weight: 500;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(255, 175, 120, 0.10);
+  border: 1px solid rgba(255, 175, 120, 0.18);
+}
+.khp-sep { color: rgba(222, 210, 255, 0.22); margin: 0 2px; font-size: 0.80rem; }
+.khp-source { font-size: 0.80rem; color: #d8d4ff; opacity: 0.85; }
+.khp-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.khp-tag {
+  font-size: 0.72rem; line-height: 1; padding: 5px 10px;
+  border-radius: 999px; font-weight: 500;
+}
+.khp-tag-emo {
+  /* 情绪标签：品红底（柔和） */
+  color: #ffd8e8;
+  background: rgba(255, 88, 148, 0.16);
+  border: 1px solid rgba(255, 140, 190, 0.28);
+}
+.khp-tag-theme {
+  /* 主题标签：暖金/柔橙底 */
+  color: #ffe7c2;
+  background: rgba(255, 195, 120, 0.12);
+  border: 1px solid rgba(255, 195, 120, 0.22);
+}
+.khp-close {
+  margin-left: 2px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: rgba(255,255,255,0.06);
+  color: rgba(222, 210, 255, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 180ms ease;
+}
+.khp-close:hover { background: rgba(255, 100, 150, 0.18); color: #ffd8e8; }
+@media (max-width: 768px) {
+  .kernel-hint-pill {
+    top: calc(var(--topbar-h, 64px) + 8px);
+    padding: 8px 12px 8px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    border-radius: 18px;
+    max-width: calc(100vw - 24px);
+  }
+  .khp-right { gap: 4px; }
+  .khp-tag { font-size: 0.68rem; padding: 4px 8px; }
+  .khp-source { font-size: 0.75rem; }
+  .khp-count { display: none; }
+}
+
 .sky-page {
   width: 100vw; height: 100vh; position: relative; overflow: hidden;
   background: var(--bg); font-family: var(--font); color: var(--ink);

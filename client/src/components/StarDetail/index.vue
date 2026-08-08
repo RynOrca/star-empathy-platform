@@ -198,8 +198,8 @@
               :backLabel="detailBackLabel"
               :renderedContent="renderMarkdown(detailStory.content)"
               :displayResonance="getDisplayResonance(detailStory)"
-              :isResonated="justResonatedId === detailStory.id"
-              :resonating="resonating"
+              :isResonated="isStoryResonated(detailStory)"
+              :resonating="isStoryResonating(detailStory)"
               :deleting="deleting"
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
@@ -227,7 +227,7 @@
               :renderedContent="(s: any) => renderMarkdown(s.content)"
               :displayResonance="(s: any) => getDisplayResonance(s)"
               :displayViews="(s: any) => getStoryViewCount(s.id)"
-              :isResonated="(s: any) => justResonatedId === s.id"
+              :isResonated="(s: any) => isStoryResonated(s)"
               :collectionClickable="true"
               :showStarBelonging="false"
               @story-click="openStoryDetail"
@@ -252,8 +252,8 @@
               :backLabel="detailBackLabel"
               :renderedContent="renderMarkdown(detailStory.content)"
               :displayResonance="getDisplayResonance(detailStory)"
-              :isResonated="justResonatedId === detailStory.id"
-              :resonating="resonating"
+              :isResonated="isStoryResonated(detailStory)"
+              :resonating="isStoryResonating(detailStory)"
               :deleting="deleting"
               :currentUserId="currentUserId"
               :formattedTime="formatTime(detailStory.createdAt)"
@@ -283,7 +283,7 @@
               :renderedContent="(s: any) => renderMarkdown(s.content)"
               :displayResonance="(s: any) => getDisplayResonance(s)"
               :displayViews="(s: any) => getStoryViewCount(s.id)"
-              :isResonated="(s: any) => justResonatedId === s.id"
+              :isResonated="(s: any) => isStoryResonated(s)"
               :formattedTime="(s: any) => formatTime(s.createdAt)"
               :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
               :collectionClickable="true"
@@ -318,8 +318,8 @@
                 :backLabel="detailBackLabel"
                 :renderedContent="renderMarkdown(detailStory.content)"
                 :displayResonance="getDisplayResonance(detailStory)"
-                :isResonated="justResonatedId === detailStory.id"
-                :resonating="resonating"
+                :isResonated="isStoryResonated(detailStory)"
+                :resonating="isStoryResonating(detailStory)"
                 :deleting="deleting"
                 :currentUserId="currentUserId"
                 :formattedTime="formatTime(detailStory.createdAt)"
@@ -347,7 +347,7 @@
                 :renderedContent="(s: any) => renderMarkdown(s.content)"
                 :displayResonance="(s: any) => getDisplayResonance(s)"
                 :displayViews="(s: any) => getStoryViewCount(s.id)"
-                :isResonated="(s: any) => justResonatedId === s.id"
+                :isResonated="(s: any) => isStoryResonated(s)"
                 :formattedTime="(s: any) => formatTime(s.createdAt)"
                 :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
                 :collectionClickable="true"
@@ -881,7 +881,7 @@
                   :renderedContent="(s: any) => renderMarkdown(s.content)"
                   :displayResonance="(s: any) => getDisplayResonance(s)"
                   :displayViews="(s: any) => getStoryViewCount(s.id)"
-                  :isResonated="(s: any) => justResonatedId === s.id"
+                  :isResonated="(s: any) => isStoryResonated(s)"
                   @story-click="openStoryDetail"
                   @resonate="onResonate"
                 />
@@ -909,7 +909,7 @@
                   :renderedContent="(s: any) => renderMarkdown(s.content)"
                   :displayResonance="(s: any) => getDisplayResonance(s)"
                   :displayViews="(s: any) => getStoryViewCount(s.id)"
-                  :isResonated="(s: any) => justResonatedId === s.id"
+                  :isResonated="(s: any) => isStoryResonated(s)"
                   :formattedTime="(s: any) => formatTime(s.createdAt)"
                   :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
                   @update:searchQuery="searchQuery = $event"
@@ -945,7 +945,7 @@
                     :renderedContent="(s: any) => renderMarkdown(s.content)"
                     :displayResonance="(s: any) => getDisplayResonance(s)"
                     :displayViews="(s: any) => getStoryViewCount(s.id)"
-                    :isResonated="(s: any) => justResonatedId === s.id"
+                    :isResonated="(s: any) => isStoryResonated(s)"
                     :formattedTime="(s: any) => formatTime(s.createdAt)"
                     :formattedDistance="(s: any) => formatDistance(s.locationLat, s.locationLng)"
                     @story-click="openStoryDetail"
@@ -990,8 +990,8 @@
                 :backLabel="detailBackLabel"
                 :renderedContent="renderMarkdown(detailStory.content)"
                 :displayResonance="getDisplayResonance(detailStory)"
-                :isResonated="justResonatedId === detailStory.id"
-                :resonating="resonating"
+                :isResonated="isStoryResonated(detailStory)"
+                :resonating="isStoryResonating(detailStory)"
                 :deleting="deleting"
                 :currentUserId="currentUserId"
                 :formattedTime="formatTime(detailStory.createdAt)"
@@ -1051,11 +1051,12 @@ import AIRadarWordcloud from './AIRadarWordcloud.vue'
 import AIHeatmapThemes from './AIHeatmapThemes.vue'
 import { useNarrative } from '../../composables/useNarrative'
 import { useKernel } from '../../composables/useKernel'
-import { useSimilarStars } from '../../composables/useSimilarStars'
+import { useSimilarStars, type SimilarStar } from '../../composables/useSimilarStars'
 import { useAreaHighlights } from '../../composables/useAreaHighlights'
 import { useStarAnalysis, type StarAnalysis } from '../../composables/useStarAnalysis'
 import { useAstroEvents, formatTime as formatClockTime, formatDateTime, formatAltitude, azimuthToDirection } from '../../composables/useAstroEvents'
 import { useMediaQuery } from '../../composables/useMediaQuery'
+import { useResonate } from '../../composables/useResonate'
 import { constellationNames } from '../../data/starInfo'
 import { getStarNameInfo } from '../../utils/starName'
 import { marked } from 'marked'
@@ -1123,6 +1124,30 @@ import DOMPurify from 'dompurify'
 marked.setOptions({ breaks: true, gfm: true })
 
 const { isMobile } = useMediaQuery()
+
+// ─── 共鸣（useResonate） ───
+const {
+  resonate: doResonate,
+  resonatingId: resonatingStoryId,
+  lastError: resonateError,
+  isResonated: resonatedInClient,
+  syncFromServerRows,
+} = useResonate()
+/**
+ * 合并两种「已共鸣」来源：
+ *  1) 后端响应里的 `story.resonated`（登录用户拉取列表时一次性注入，跨设备可靠）；
+ *  2) 前端 useResonate 的 resonatedIds（本会话共鸣后立即生效、未登录 localStorage 缓存）。
+ * 任一 true 就视为「已共鸣」，按钮显示"已共鸣"且禁用。
+ */
+function isStoryResonated(story: { id: number; resonated?: boolean } | null | undefined): boolean {
+  if (!story) return false
+  return resonatedInClient(story.id) || !!story.resonated
+}
+/** 共鸣按钮 loading：useResonate resonatingId 匹配（优先级高）+ 父级老 resonating prop（兼容） */
+function isStoryResonating(story: { id: number } | null | undefined): boolean {
+  if (!story) return false
+  return resonatingStoryId.value === story.id || props.resonating
+}
 
 // ─── 移动端底部抽屉状态 ───
 const sheetHeight = ref('60vh')
@@ -1219,7 +1244,7 @@ const emit = defineEmits<{
   updateStats: [data: { storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number }]
   close: []
   writeStory: []
-  updateSimilarStars: [ids: number[]]
+  updateSimilarStars: [stars: SimilarStar[]]
   deleteStory: [storyId: number]
   /** 故事集合或权重发生了实质变动 → 父级可用于通知 SkyPage 做跨星同步
    *  kind: 'new' | 'delete' | 'resonate' | 'kernel-edit'
@@ -1232,6 +1257,16 @@ const emit = defineEmits<{
   /** 配合 props.targetStoryId 做 v-model 双向绑定：消费完 targetStoryId 后 emit 给父级清零 */
   'update:targetStoryId': [id: number | null]
 }>()
+
+// 列表/详情 props.stories 更新时：同步后端 resonated=true 的故事 id 到本地 resonatedIds
+// （放在 defineProps 之后，避免 setup 阶段访问未初始化的 props）
+watch(
+  () => props.stories,
+  (list) => {
+    if (Array.isArray(list)) syncFromServerRows(list)
+  },
+  { immediate: true, deep: false }
+)
 
 const router = useRouter()
 // 访客拦截：体验账号不能收藏/共鸣/写故事/与古人共赏，跳登录页
@@ -1501,7 +1536,7 @@ watch(() => props.catalogStarId, (id) => {
 // ─── 相似星星 ───
 const similarStars = useSimilarStars(() => props.catalogStarId)
 watch(() => similarStars.similarStars.value, (stars) => {
-  emit('updateSimilarStars', stars.map(s => s.catalogStarId))
+  emit('updateSimilarStars', stars || [])
 })
 
 // ─── 天区故事精选 ───
@@ -1587,17 +1622,31 @@ onMounted(() => {
   fetchNarrativeWithPosition()
 })
 
-function onResonate(story: { id: number; resonanceCount: number }) {
+async function onResonate(story: { id: number; resonanceCount: number }) {
   if (guestGuard()) return
-  const current = getDisplayResonance(story)
-  resonanceOverrides.set(story.id, current + 1)
-  emit('resonate', story.id)
-  emit('storiesMutated', 'resonate')
-  justResonatedId.value = story.id
-  setTimeout(() => { justResonatedId.value = null }, 2000)
-  // 共鸣改变故事权重分布 → 通知 composable 重置轮询，等后端异步重新生成完（15s debounce + 串行）就地刷新
-  retriggerStarAnalysis()
+  if (isStoryResonated(story)) return // 已共鸣的按钮已经 disabled，这里二次兜底
+  const before = getDisplayResonance(story)
+  // 乐观 +1；失败再回滚
+  resonanceOverrides.set(story.id, before + 1)
+  const result = await doResonate(story.id)
+  if (result.ok) {
+    emit('resonate', story.id)
+    emit('storiesMutated', 'resonate')
+    // 成功：保留乐观更新；如果返回了真实 resonanceCount，直接对齐
+    if (result.resonanceCount >= 0) resonanceOverrides.set(story.id, result.resonanceCount)
+    // 共鸣改变故事权重分布 → 通知 composable 重置轮询，等后端异步重新生成完（15s debounce + 串行）就地刷新
+    retriggerStarAnalysis()
+  } else {
+    // 失败：回滚乐观更新；如果是 unauthorized / 401，useResonate 已自动写入本地 resonatedIds 并提示
+    resonanceOverrides.set(story.id, before)
+    if (result.status !== 'unauthorized') {
+      // 401 已经在 useResonate 里 set 了 lastError，不重复 alert
+      if (result.message) alert(result.message)
+    }
+  }
 }
+// 把 useResonate lastError 暴露给可能的 UI 使用（目前不强制渲染 UI，保持静默）
+watch(resonateError, () => { /* 预留：将来想在组件内显示 toast 时用 */ })
 
 // ─── 删除故事 ───
 const showDeleteConfirm = ref(false)
