@@ -506,6 +506,7 @@ export function useSky(
   type CameraModeGlowMeta = {
     glowSprite: Sprite | null
     phase: number
+    period: number          // ✅ 与普通模式同口径：每颗星独立呼吸周期（animate 用 phase+period）
     baseScale: number
     peakOpacity: number
     storyBoostOpacity: number
@@ -3507,28 +3508,27 @@ for (const s of stars) starById.set(s.id, s)
         ig.sprite.scale.set(base * scalePulse, base * scalePulse, 1)
       }
     }
-    // 天镜览星：所有交互星呼吸 glow（只更新取景框内可见），按 mag tier 强弱
-    if (cameraOverlayEnabled && cameraModeStoryStars.size > 0) {
-      const secs = _now / 1000
+    // 天镜览星：所有交互星呼吸 glow（只渲染取景框内可见，但无论在不在视锥都持续更新呼吸相位 — 避免切视角时辉光「暂停/突跳」）
+    // ✅ 算法与普通浏览模式（L3495-L3507）完全一致：
+    //    - opacity 下限 = 0.55 × peakOpacity（呼吸谷值不会到 0）
+    //    - scale 呼吸：暗星 ±6% / 亮星 ±3.5%
+    //    - period/phase 与普通模式同口径（每颗星独立 period 不抢节奏）
+    if (cameraOverlayEnabled) {
+      const _nowMs = _now
       _frustum.setFromProjectionMatrix(_projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
       cameraModeStoryStars.forEach((meta) => {
         if (!meta.glowSprite) return
-        if (!_frustum.containsPoint(meta.glowSprite.position)) {
-          meta.glowSprite.visible = false
-          return
-        }
-        meta.glowSprite.visible = true
-        // 脉动幅度按 tier.peakOpacity：亮星（peak 高）脉动沉稳，暗星脉动稍细碎
-        const pulseAmp = meta.peakOpacity < 0.4 ? 0.10 : 0.06
-        const pulse = Math.sin(secs * 1.6 + meta.phase) * pulseAmp
-        const mat = meta.glowSprite.material as SpriteMaterial
-        // ✅ 恒定下限：基础 opacity 0.6~1.0 倍 peak，再叠故事 boost + 脉动（不会到 0）
-        const baseOpacity = meta.peakOpacity * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(secs * 1.6 + meta.phase + Math.PI)))
-        mat.opacity = Math.min(1.0, baseOpacity + pulse * 0.5 + meta.storyBoostOpacity)
-        const scalePulseAmt = meta.peakOpacity < 0.4 ? 0.06 : 0.035
-        const scalePulse = 1 + Math.sin(secs * 1.6 + meta.phase) * scalePulseAmt
+        // 先算呼吸相位（无论在不在视锥里都要推进时间，避免「停住」感）
+        const t = ((_nowMs + meta.phase * 1000) % meta.period) / meta.period
+        const breath = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) * 0.5
+        const baseOpacity = meta.peakOpacity * (0.55 + 0.45 * breath)
+        ;(meta.glowSprite.material as SpriteMaterial).opacity = Math.min(1.0, baseOpacity + meta.storyBoostOpacity)
+        const pulseAmt = meta.peakOpacity < 0.4 ? 0.06 : 0.035
+        const scalePulse = 1 + (Math.sin(t * Math.PI * 2 - Math.PI / 2)) * pulseAmt
         const base = meta.hasStory ? meta.baseScale * meta.storyBoostScale : meta.baseScale
         meta.glowSprite.scale.set(base * scalePulse, base * scalePulse, 1)
+        // 视锥判断只控制可见性（不渲染视锥外的节省 draw call，但时间相位不中断）
+        meta.glowSprite.visible = _frustum.containsPoint(meta.glowSprite.position)
       })
     }
     // 行星自转（14-A §4）：rotationPeriod 单位为小时，负值表示逆向自转
@@ -3969,41 +3969,67 @@ for (const s of stars) starById.set(s.id, s)
         // 隐藏普通模式 interactiveGlows（相机模式有独立的 cameraModeStoryStars glow，避免重复渲染）
         for (const ig of interactiveGlows) ig.sprite.visible = false
 
-        // 为所有交互星创建呼吸 glow（全部星表星 + 传进来的 storyStars 用户星），按 mag tier
+        // ════════════════════════════════════════════════════════════════════
+        // 相机模式辉光初始化 — 严格对齐用户要求的普通模式 4 步标准：
+        //  ① merge 外部传入（storyStars）→ statsCache
+        //  ② seedAllCatalogStarsToStatsCache() 全量 CAT 注入 stories=0
+        //  ③ 遍历全量源（用户星段 userStarPos + 星表恒星段 CAT.stars）建 sprite
+        //  ④ hasStory / stories 统一从 statsCache.get 读（不依赖传参部分覆盖）
+        // ════════════════════════════════════════════════════════════════════
         cameraModeStoryStars.clear()
 
-        // ① 先处理传进来的 storyStars（用户星 + 已确认的故事星，带 id 和 pos）
-        const storyUserPos = new Map<number, { x: number; y: number; z: number; hasStory: boolean }>()
+        // ① 把传进来的 storyStars（心事数据）merge 进 statsCache
+        if (storyStars && storyStars.length > 0) {
+          for (const s of storyStars) {
+            // 星表恒星的存储 key 用 catalogStarId；用户星的 key 用 s.id（故事 ID）
+            const k = (s.catalogStarId !== null && s.catalogStarId !== undefined) ? s.catalogStarId : s.id
+            const prev = statsCache.get(k)
+            // 保守：至少 stories ≥ 1（storyStars 里的每条都至少对应 1 条心事）
+            const stories = Math.max(1, (prev && typeof prev.stories === 'number') ? prev.stories : 1)
+            statsCache.set(k, {
+              stories,
+              resonance: prev?.resonance ?? 0,
+              views: prev?.views ?? 0,
+              favorites: prev?.favorites ?? 0,
+            })
+          }
+        }
+        // ② seed 全量 CAT.stars（stories=0 的 entry，确保暗星也能查到）
+        seedAllCatalogStarsToStatsCache()
+
+        // ═══ 用户星：从传入 storyStars 中把「无 catalogStarId」的挑出来单独建（pos 必须从参数拿，starById 查不到）
+        const userStarPos = new Map<number, { x: number; y: number; z: number }>()
         if (storyStars) {
           for (const s of storyStars) {
-            let x: number, y: number, z: number
-            let mag: number
-            if (s.catalogStarId !== null && s.catalogStarId !== undefined) {
-              const cat = starById.get(s.catalogStarId)
-              if (!cat) continue
-              x = cat.x; y = cat.y; z = cat.z
-              mag = cat.mag
-            } else {
-              x = s.posX; y = s.posY; z = s.posZ
-              mag = USER_STAR_DEFAULT_MAG
-            }
-            storyUserPos.set(s.id, { x, y, z, hasStory: true })
-            const tier = glowTierForMag(mag)
-            const hasStory = true
+            const isUser = s.catalogStarId === null || s.catalogStarId === undefined
+            if (!isUser) continue
+            userStarPos.set(s.id, { x: s.posX, y: s.posY, z: s.posZ })
+          }
+        }
+        if (userStarPos.size > 0) {
+          for (const [starId, pos] of userStarPos) {
+            const tier = glowTierForMag(USER_STAR_DEFAULT_MAG)
+            const stats = statsCache.get(starId)
+            const stories = stats?.stories ?? 1
+            const hasStory = stories > 0
             const sprite = new Sprite(new SpriteMaterial({
               map: getBloomTexCached(tier.tint, tier.texSize),
               blending: AdditiveBlending,
               depthWrite: false,
               depthTest: false,
               transparent: true,
-              opacity: tier.peakOpacity,
+              opacity: 0,
             }))
-            sprite.scale.set(hasStory ? tier.scale * tier.storyBoostScale : tier.scale, hasStory ? tier.scale * tier.storyBoostScale : tier.scale, 1)
-            sprite.position.set(x, y, z)
+            const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
+            sprite.scale.set(scale, scale, 1)
+            sprite.renderOrder = 49
+            sprite.userData.starId = starId
+            sprite.position.set(pos.x, pos.y, pos.z)
             skyGroup.add(sprite)
-            cameraModeStoryStars.set(s.id, {
+            cameraModeStoryStars.set(starId, {
               glowSprite: sprite,
               phase: Math.random() * Math.PI * 2,
+              period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
               baseScale: tier.scale,
               peakOpacity: tier.peakOpacity,
               storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
@@ -4013,28 +4039,32 @@ for (const s of stars) starById.set(s.id, s)
           }
         }
 
-        // ② 再把星表所有恒星（不在 storyStars 已处理里的）一次性补齐（stories=0 也有辉光）
-        for (let i = 0; i < n; i++) {
-          const s = stars[i]
-          if (cameraModeStoryStars.has(s.id)) continue
-          const tier = glowTierForMag(s.mag)
-          const stats = statsCache.get(s.id)
-          const hasStory = !!(stats && stats.stories > 0)
+        // ═══ 星表恒星：遍历 statsCache 全量（含 stories=0）建 sprite — 与普通模式 ③ 完全同口径
+        const existingCameraKeys = new Set(cameraModeStoryStars.keys())
+        for (const [starId, stats] of statsCache) {
+          if (existingCameraKeys.has(starId)) continue
+          const cat = starById.get(starId)
+          if (!cat) continue  // 用户星不在 starById 里，已在上面独立段处理
+          const tier = glowTierForMag(cat.mag)
+          const hasStory = stats.stories > 0
           const sprite = new Sprite(new SpriteMaterial({
             map: getBloomTexCached(tier.tint, tier.texSize),
             blending: AdditiveBlending,
             depthWrite: false,
             depthTest: false,
             transparent: true,
-            opacity: tier.peakOpacity,
+            opacity: 0,
           }))
           const scale = hasStory ? tier.scale * tier.storyBoostScale : tier.scale
           sprite.scale.set(scale, scale, 1)
-          sprite.position.set(s.x, s.y, s.z)
+          sprite.renderOrder = 48
+          sprite.userData.starId = starId
+          sprite.position.set(cat.x, cat.y, cat.z)
           skyGroup.add(sprite)
-          cameraModeStoryStars.set(s.id, {
+          cameraModeStoryStars.set(starId, {
             glowSprite: sprite,
             phase: Math.random() * Math.PI * 2,
+            period: tier.periodMin + Math.random() * (tier.periodMax - tier.periodMin),
             baseScale: tier.scale,
             peakOpacity: tier.peakOpacity,
             storyBoostOpacity: hasStory ? tier.storyBoostOpacity : 0,
