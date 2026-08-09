@@ -44,15 +44,15 @@
 | `location.ts` | 反向地理编码路由（`/api/location/reverse`）。高德 → BigDataCloud → Nominatim 三级回退 |
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
-| `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回；**未 ready 且故事数 ≥5 时懒触发 `triggerAnalysisRegeneration` 后台补生成（60s 冷却 + kernel 15s 防抖 + 并发 1）** | 
+| `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回；**未 ready 且故事数 ≥5 时懒触发 `triggerAnalysisRegeneration` 后台补生成（60s 冷却 + kernel 15s 防抖 + 并发 1）**；**允许 id=0（天枢 Dubhe 是星表中 id=0 的合法恒星）** | 
 | `collections.ts` | **合集路由**。CRUD 列表/创建/详情/更新/删除/公开列表。新增 **`GET /:id/analysis` 合集 AI 分析接口**（对齐单星分析三态）；**公开列表** `GET /public` 支持 `page/limit/sort=hot | new | resonance | name_asc | stories_desc / visibility=public | anonymous | galaxy`分页排序过滤；**`GET /picks`** 穹庭书局推荐 Picks：前 N 本官方星河 + 14 天内热榜补足。可见性：`visibility ∈ {public, private, anonymous, galaxy}` 四态。星河（galaxy）仅 user_id=0（星穹守护·系统管理员）可创建编辑删除；匿名（anonymous）合集公开展示故事但对外隐藏作者名（owner/管理员除外）；公开/私有为原逻辑 |
 
 ### 服务层 `src/services/`
 
 | 文件 | 用途 |
 | --- | --- |
-| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt）。**所有叙事生成调用固定 `model: 'deepseek-chat'`（非思考模型），避免 v4-flash 等思考模型输出自由文时中途中断（如只输出"杜牧写："）** |
-| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**JSON 任务（默认开）遇到思考模型（deepseek-v4-flash/reasoner/R1）自动回退 `deepseek-chat`**，避免 content 为空导致生成失败 |
+| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt）。叙事生成走统一 deepseekChat（思考已全局关闭，输出不中断） |
+| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**模型统一 `deepseek-v4-flash`（deepseek-chat 已下线）**，请求体带 `thinking: { type: 'disabled' }` 全局关闭思考模式——v4-flash 思考会抢占 max_tokens 导致 content 为空/截断；默认 max_tokens 800→2048，`finish_reason=length` 时显式报错提示 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者） |
 | `collectionService.ts` | 合集业务服务。类型 `CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'`；`PUBLIC_VISIBILITIES = [public, anonymous, galaxy]`；`SYSTEM_ADMIN_USER_ID = 0`（星穹守护 = 管理员）。`validateCollectionInput`校验星河仅管理员可创建；`listPublicCollections`公开合集分页（sort=hot/new/resonance/name_asc/stories_desc，visibility 过滤；**带 keyword 时排序前置匹配优先级：合集名称 > 合集描述 > 故事标签 tags > 故事标题/正文**，同档内保留 sort 次级排序）；`getPublicCollectionPicks(wanted, galaxyN)` 穹庭书局推荐（前 galaxyN 本官方星河按 sort_order ASC + 最近 14 天 hot 补足 wanted 本）。星河合集（visibility=galaxy）默认 sort_order 用于官方卷轴排序；作者可见性规则封装供 starService 复用 |
@@ -94,6 +94,7 @@
 | `migrate-default-collections.ts` | 为所有用户创建「公开星笺 + 私密星笺」双默认合集；把以前没有归属合集的用户故事（type='user', collection_id NULL）归入「公开星笺」。幂等：重复执行安全，已有合集的故事不动。命令：`npm run migrate:default-collections`。 |
 | `seed-history-collections.ts` | **为 477 条历史故事创建 8 个主题合集并自动归类**。合集 owner 是用户表自动创建的「星穹守护」系统用户，全部 public。8 个合集按 origin + 标题关键词匹配，优先级从高到低：①月韵·唐诗中的星空（10 首唐诗）②星官故实（143 篇·中国星官/星宿/`·由来` 标题）③奥林匹斯星河（63 条·古希腊/希腊语/拉丁语/罗马语）④阿拉伯星名考（95 条·阿拉伯语/苏美尔/巴比伦/古埃及）⑤近代星名志（82 条·近代/现代命名）⑥星界编年史（72 条·天文学+跨文化）⑦天汉神话（7 条·中国天文神话：夸父/嫦娥/启明/彗星等）⑧星友之声（5 条·社区 origin=NULL 原创心声）。幂等：合集按 name 精确复用；仅补写 collection_id 为 NULL 的历史故事。命令：`npm run seed:history-collections`。 |
 | `fix-invalid-catalog-star-ids.ts` | 修复 stars 表中坏故事的归属星：catalog_star_id 为 NULL、负数非行星、正数不在 catalog 范围的故事，随机挂到有效 catalog 星上，并补写 `story_catalog_stars` 连接表。命令：`npm run fix:catalog`。 |
+| `fix-persona-truncated.ts` | **一次性修复**：扫描 `catalog_star_analyses.persona_json`，把被 AI 中断截断的段落（<10 字 / 以冒号逗号等不完整标点结尾）替换为有效内容（另一段 → 金句 quote → 通用文案）。命令：`npm run fix:persona-truncated`。 |
 | `story-rewrite-prompt.md` | 故事改写 Prompt 参考 |
 | **`AGENT_CONTROL.md`** | **Agent 控制手册**。Key 配置、冷启动、agent:kernels、agent:analyze 参数、幂等&安全、常见 401/429 排查、自动再生闭环、部署自检清单（**部署必读**） |
 | `fix-cids.mjs` | 修复 catalog_star_id 脏数据（历史迁移，异常场景才用） |
@@ -104,7 +105,7 @@
 | --- | --- |
 | `starAnalysisAgent.ts` | **分析总控 Agent**。`ensureOne()` 单星懒生成（story_hash 幂等 + 1200ms 节流 + partial 入库）；`runAll()` 批量按故事数 DESC + 亮星优先级排序；`upsertAnalysis()` 写 catalog_star_analyses 表 |
 | `collectionAnalysisAgent.ts` | **合集级 AI 分析总控 Agent（Phase 2 预留，当前无文件，待接真实 pipeline）**。将复用 personaGen/emotionGen 并新增 nightscapeGen 做夜空意象/夜色流转/心事轨迹五大气象模型生成；`triggerAnalysisIfNeeded()` 会检查 ready=false → 启动异步任务 → 写 `collection_analyses` 表回 ready=true 给前端轮询拉到 |
-| `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读。**段落完整性校验**：过滤 <10 字 / "XX写："残句，依次兜底（有效叙事段 → 金句 → 通用文案），残句永不入库 |
+| `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读。**段落完整性校验**：过滤 <10 字 / 以冒号逗号等不完整标点结尾的残句（"杜牧写：""……思念："），依次兜底（有效叙事段 → 金句 → 通用文案），残句永不入库 |
 | `generators/emotionGen.ts` | 情感解构 + 故事摘录生成器。5 色情绪球 + 百分比洞察 + Top3 独白卡片 |
 | `generators/themeHourGen.ts` | 主题森林/时辰观察三段文生成器。forestNote（森林引导） + peakText（活跃时段） + lowText（沉睡时段） |
 

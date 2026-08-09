@@ -13,6 +13,7 @@
     "default-collections": "ts-node scripts/default-collections.ts",
     "agent:kernels": "ts-node scripts/generateKernels.ts",
     "agent:analyze": "ts-node scripts/generateAllAnalyses.ts",
+    "fix:persona-truncated": "ts-node scripts/fix-persona-truncated.ts",
     "fix:catalog": "ts-node scripts/fix-invalid-catalog-star-ids.ts"
   },
   "dependencies": {

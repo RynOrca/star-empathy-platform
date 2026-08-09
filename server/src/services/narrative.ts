@@ -567,8 +567,7 @@ export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: num
     const content = await deepseekChat(
       [{ role: 'system', content: system }, { role: 'user', content: user }],
       // 叙事生成是 Markdown，prompt 里没有 "json" 字样 → 必须关掉 json_mode，否则 DeepSeek 400
-      // 叙事对完整性要求高（诗句/段落不能被截断），固定用非思考模型 deepseek-chat
-      { model: 'deepseek-chat', temperature: 0.9, maxTokens: 3000, jsonMode: false },
+      { temperature: 0.9, maxTokens: 8000, jsonMode: false },
     )
     return extractNarrativeBodyParagraphs(content).slice(0, 3)
   }
@@ -582,8 +581,7 @@ export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: num
   const { system, user } = buildNarrativePrompt(star, visible)
   const content = await deepseekChat(
     [{ role: 'system', content: system }, { role: 'user', content: user }],
-    // 固定非思考模型：v4-flash 等思考模型输出自由文时偶发中途中断（如只输出"杜牧写："）
-    { model: 'deepseek-chat', temperature: 0.9, maxTokens: 3000, jsonMode: false },
+    { temperature: 0.9, maxTokens: 8000, jsonMode: false },
   )
   return extractNarrativeBodyParagraphs(content).slice(0, 3)
 }
@@ -617,9 +615,8 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
         { role: 'user', content: user },
       ],
       {
-        model: 'deepseek-chat',
         temperature: 0.9,
-        maxTokens: 3000,
+        maxTokens: 8000,
         jsonMode: false,
       },
     )
@@ -656,9 +653,8 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
       { role: 'user', content: user },
     ],
     {
-      model: 'deepseek-chat',
       temperature: 0.9,
-      maxTokens: 3000,
+      maxTokens: 8000,
       jsonMode: false,
     },
   )

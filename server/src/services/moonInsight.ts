@@ -115,7 +115,7 @@ export async function getMoonInsight(opts: GenerateOptions): Promise<{
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      { temperature: 0.85, maxTokens: 300 },
+      { temperature: 0.85, maxTokens: 8000 },
     )
 
     // 提取 JSON（兼容 markdown 代码块包裹）
