@@ -9,11 +9,7 @@
     <!-- 顶部导航栏（sticky） -->
     <header class="fdp-top">
       <div class="fdp-top-left">
-        <!-- 左上角：醒目退出按钮（直接回天际 · 取代原右上"回天际"功能） -->
-        <button type="button" class="fdp-exit" @click="exitToSky" aria-label="退出 · 回天际">
-          <X :size="14" />
-          <span>退出</span>
-        </button>
+        <!-- 返回按钮（红色退出按钮已按用户要求移除，此按钮右移占位） -->
         <button type="button" class="fdp-back" @click="goBack" aria-label="返回书局">
           <ChevronLeft :size="16" />
         </button>
@@ -67,7 +63,7 @@
       </div>
 
       <!-- 详情：直接嵌入 CollectionDetail 组件
-           用 fdp-content-wrap 强制取消它原本的 overlay fixed 定位（用 :deep 覆盖） -->
+           任务4：移动端用 flat-mode 整页展示，不再是底部抽屉；PC 端继续用 :deep 拍平模态壳 -->
       <div v-else class="fdp-content-wrap" :key="refreshNonce">
         <CollectionDetail
           :collection-id="collectionId"
@@ -75,6 +71,7 @@
           :current-user-id="userId"
           :is-owner="isOwner"
           :refresh-nonce="refreshNonce"
+          :flat-mode="true"
           @close="backToSquare"
           @story-click="onStoryClick"
           @edit="onWantEditDenied"
@@ -174,12 +171,6 @@ function goBack() {
 }
 // 返回书局（与 goBack 效果相同，不同入口共用退出动画）
 function backToSquare() { goBack() }
-// 退出到天际：先淡出再跳转
-function exitToSky() {
-  isLeaving.value = true
-  setTimeout(() => { router.push('/sky') }, 320)
-}
-function goSky() { exitToSky() }
 
 /**
  * 星笺详情内点击单条故事：
@@ -290,31 +281,6 @@ watch(idFromRoute, () => {
   padding: 0;
 }
 .fdp-back:hover { background: var(--accent-subtle); color: var(--accent); transform: translateX(-1px); }
-
-/* 左上角：醒目退出按钮（红橙渐变 · 同 CameraHud 退出风格） */
-.fdp-exit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 107, 107, 0.28);
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.12), rgba(255, 168, 96, 0.05));
-  color: #ff6b6b;
-  cursor: pointer;
-  font-family: var(--font);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  transition: all 0.2s ease;
-}
-.fdp-exit:hover {
-  border-color: rgba(255, 107, 107, 0.45);
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.18), rgba(255, 168, 96, 0.08));
-  transform: translateY(-1px);
-}
 
 /* 胶囊：高度统一 30px（对齐 FolioSquare.fs-btn），纯背景块无硬边框 */
 .fdp-pill {
@@ -484,39 +450,26 @@ watch(idFromRoute, () => {
   max-height: none !important;
   overflow: visible !important;
 }
-/* 详情页关闭按钮：纯 overlay 块，无硬边 */
-.fdp-content-wrap :deep(.close-btn),
-.fdp-content-wrap :deep(.mobile-close-btn) {
+/* 详情页关闭按钮：纯 overlay 块，无硬边（仅 PC 端 .close-btn；移动端 flatMode 下不存在 .mobile-close-btn） */
+.fdp-content-wrap :deep(.close-btn) {
   background: var(--overlay-04) !important;
   color: var(--ink-secondary) !important;
   border: none !important;
 }
-.fdp-content-wrap :deep(.close-btn:hover),
-.fdp-content-wrap :deep(.mobile-close-btn:hover) {
+.fdp-content-wrap :deep(.close-btn:hover) {
   background: var(--accent-subtle) !important;
   color: var(--accent) !important;
 }
-/* Mobile: 改 sheet 为正常流容器 */
-.fdp-content-wrap :deep(.mobile-sheet) {
-  position: relative !important;
-  bottom: auto !important;
-  width: 100% !important;
-  max-height: none !important;
-  border-radius: var(--radius-xl) !important;
-  margin: 10px auto 0 !important;
-  transform: none !important;
-}
-.fdp-content-wrap :deep(.sheet-handle) { display: none !important; }
+/* 任务4：移动端 flat-mode 整页样式已在 CollectionDetail 内部 .mobile-overlay.flat-mode /
+ * .mobile-sheet.flat-mode 中定义，这里不再重复 :deep 覆盖（避免 !important 冲突） */
 
 /* 响应式 */
 @media (max-width: 720px) {
-  .fdp-top { padding: 8px 12px; flex-wrap: wrap; row-gap: 6px; }
-  .fdp-top-right { order: 3; width: 100%; justify-content: space-between; }
-  /* 移动端退出按钮：仅 X 图标，省空间 */
-  .fdp-exit { height: 32px; padding: 0 9px; font-size: 0; }
-  .fdp-exit span { display: none; }
+  /* 顶部栏单行：返回/穹庭书局/更多星笺/刷新全部同行同高（红色退出按钮已移除） */
+  .fdp-top { padding: 8px 12px; }
+  .fdp-top-right { justify-content: flex-end; }
   /* 引导条：移动端适配 */
-  .fdp-hero-strip { width: calc(100% - 24px); margin-top: 60px; padding: 7px 12px; }
+  .fdp-hero-strip { width: calc(100% - 24px); margin-top: 56px; padding: 7px 12px; }
   .fdp-hs-sub { display: none; }
   .fdp-main { padding: 14px 10px 60px; }
   .fdp-crumb-title { max-width: 58vw; }

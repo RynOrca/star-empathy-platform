@@ -5486,24 +5486,6 @@ function tagStyle(tag: string): Record<string, string> {
   .ca-et-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 860px) {
-  .ca-hero-body { grid-template-columns: 1fr; }
-  .ca-hero-body-stats {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    gap: 16px;
-    padding: 2px 0 8px;
-  }
-  /* 移动端：纯容器，不需要额外padding */
-  .ca-h-left-block { padding: 0; height: auto; }
-  .ca-h-left-block .ca-starmap-wrap { height: auto; }
-  .ca-h-right-block { padding: 0; gap: 11px; }
-  .ca-emotion-body-double { grid-template-columns: 1fr; }
-  /* 夜色+心事轨迹双栏 → 移动端单列 */
-  .ca-night-track-wrap { grid-template-columns: 1fr; }
-  .ca-night-flow-left, .ca-night-side-track { height: auto; }
-  .ca-night-scroll { max-height: none; overflow-y: visible; }
-}
 @media (max-width: 540px) {
   .ca-h-stats { grid-template-columns: 1fr 1fr; }
   .ca-h-ss-quad { grid-template-columns: 1fr 1fr; }
@@ -6037,5 +6019,25 @@ function tagStyle(tag: string): Record<string, string> {
 .ca-traj-toggle:hover {
   background: rgba(154, 230, 180, 0.16);
   color: rgba(154, 230, 180, 0.92);
+}
+
+/* 移动端单列覆盖（原 860 块：必须放在所有双栏基础样式之后，否则同特异性被基础样式覆盖） */
+@media (max-width: 860px) {
+  .ca-hero-body { grid-template-columns: 1fr; }
+  .ca-hero-body-stats {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    gap: 16px;
+    padding: 2px 0 8px;
+  }
+  /* 移动端：纯容器，不需要额外padding */
+  .ca-h-left-block { padding: 0; height: auto; }
+  .ca-h-left-block .ca-starmap-wrap { height: auto; }
+  .ca-h-right-block { padding: 0; gap: 11px; }
+  .ca-emotion-body-double { grid-template-columns: 1fr; }
+  /* 夜色+心事轨迹双栏 → 移动端单列 */
+  .ca-night-track-wrap { grid-template-columns: 1fr; }
+  .ca-night-flow-left, .ca-night-side-track { height: auto; }
+  .ca-night-scroll { max-height: none; overflow-y: visible; }
 }
 </style>

@@ -1,6 +1,7 @@
 <template>
   <div class="story-detail-root">
-    <div class="detail-toolbar">
+    <!-- 任务1：外部已有返回栏时（移动端全屏故事详情），隐藏内部工具栏避免双栏重复 -->
+    <div v-if="!hideToolbar" class="detail-toolbar">
       <button class="back-btn" @click="$emit('back')">
         <ArrowLeftIcon :size="15" />
         <span>{{ backLabel }}</span>
@@ -229,6 +230,8 @@ const props = defineProps<{
   createdAtIso?: string | null
   /** 同星其他故事推荐（新增） */
   siblingStories?: SiblingStoryPreview[]
+  /** 任务1：隐藏内部 .detail-toolbar（外层已提供返回/共鸣/删除入口时传 true，避免双栏重复） */
+  hideToolbar?: boolean
 }>()
 
 defineEmits<{

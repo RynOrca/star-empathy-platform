@@ -15,7 +15,8 @@ router.get('/', authOptional, (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string, 10);
     const limit = parseInt(req.query.limit as string, 10);
     if (!isNaN(page) && !isNaN(limit)) {
-      const paged = getAllStarsPaged(page, limit, currentUserId);
+      const typeFilter = req.query.type as string | undefined;
+      const paged = getAllStarsPaged(page, limit, currentUserId, typeFilter);
       ok(res, 'success', paged);
     } else {
       const stories = getAllStars(currentUserId);

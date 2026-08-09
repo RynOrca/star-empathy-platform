@@ -41,6 +41,8 @@ export async function authFetch(input: RequestInfo, init?: RequestInit) {
   const res = await fetch(input, init)
   if (res.status === 401) {
     localStorage.removeItem('token')
+    localStorage.removeItem('username')
+    localStorage.removeItem('userId')
     user.value = null
     stopRefreshTimer()
     if (routerInstance) {
@@ -70,6 +72,8 @@ async function login(username: string, password: string, rememberMe?: boolean): 
   const json = await res.json()
   if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
+  localStorage.setItem('username', json.data.user.username)
+  localStorage.setItem('userId', String(json.data.user.id))
   user.value = json.data.user
   startRefreshTimer()
   return json.data.token
@@ -84,6 +88,8 @@ async function register(username: string, password: string, email?: string): Pro
   const json = await res.json()
   if (!res.ok) throw new Error(json.message || '请求失败')
   localStorage.setItem('token', json.data.token)
+  localStorage.setItem('username', json.data.user.username)
+  localStorage.setItem('userId', String(json.data.user.id))
   user.value = json.data.user
   startRefreshTimer()
   return json.data.token
@@ -163,6 +169,8 @@ async function logout() {
     } catch { /* 即使 API 失败也清除本地状态 */ }
   }
   localStorage.removeItem('token')
+  localStorage.removeItem('username')
+  localStorage.removeItem('userId')
   user.value = null
   stopRefreshTimer()
 }

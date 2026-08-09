@@ -23,23 +23,52 @@
         </div>
       </div>
       <div class="fs-top-mid">
-        <div class="fs-search">
-          <Search :size="12" class="fs-search-icon" />
-          <input
-            v-model="searchQuery"
-            class="fs-search-input"
-            type="search"
-            placeholder="搜索星笺 / 故事正文 / 标签…"
-            aria-label="搜索星笺或故事"
-          />
+        <div class="fs-search-wrap">
+          <div class="fs-search" :class="{ 'fs-search-active': searchQuery.trim() }">
+            <Search :size="12" class="fs-search-icon" />
+            <input
+              v-model="searchQuery"
+              class="fs-search-input"
+              type="search"
+              placeholder="搜索星笺 / 故事正文 / 标签…"
+              aria-label="搜索星笺或故事"
+              @focus="openSearchDropdown"
+              @blur="onSearchBlur"
+              @keydown.enter.prevent="openFirstSearchResult"
+            />
+            <!-- 搜索中 spinner / 清除按钮 -->
+            <span v-if="searchLoading && searchQuery.trim()" class="fs-search-spinner" aria-label="搜索中"></span>
+            <button v-else-if="searchQuery.trim()" class="fs-search-clear" @click="searchQuery = ''" aria-label="清除搜索">
+              <X :size="12" />
+            </button>
+          </div>
+          <!-- 搜索下拉结果（即时反馈，不再整页跳转到书架） -->
+          <div v-if="searchDropdownOpen" class="fs-search-dropdown" @mousedown.prevent>
+            <div v-if="searchLoading" class="fs-sd-loading">正在检索星笺…</div>
+            <template v-else>
+              <button
+                v-for="r in searchResults"
+                :key="r.id"
+                type="button"
+                class="fs-sd-item"
+                @click="openSearchResult(r)"
+              >
+                <span class="fs-sd-name">{{ r.name }}</span>
+                <span class="fs-sd-meta">{{ r.storyCount ?? 0 }} 则</span>
+                <span class="fs-sd-go">开卷 →</span>
+              </button>
+              <div v-if="!searchResults.length" class="fs-sd-empty">未找到匹配的星笺</div>
+            </template>
+          </div>
         </div>
       </div>
       <div class="fs-top-right">
-        <button v-if="canCreate" class="fs-btn fs-btn-warm" type="button" @click="goProfileNewFolio">
+        <!-- 移动端隐藏"写星笺"按钮，让刷新按钮独占右上角；PC 端两个按钮都显示 -->
+        <button v-if="canCreate" class="fs-btn fs-btn-warm fs-btn-create" type="button" @click="goProfileNewFolio">
           <Plus :size="12" />
           <span>写星笺</span>
         </button>
-        <button class="fs-btn fs-btn-glass" type="button" @click="reloadAll">
+        <button class="fs-btn fs-btn-glass fs-btn-refresh" type="button" @click="reloadAll">
           <RotateCcw :size="12" />
           <span>刷新</span>
         </button>
@@ -196,7 +225,12 @@
             <h2 class="fs-head-title">{{ volumeTabLabel }}</h2>
             <span class="fs-head-sub">{{ volumeTotalLabel }}</span>
           </div>
-          <span class="fs-head-hint">{{ shelfList.length }} 册已加载</span>
+          <span class="fs-head-hint">
+            <template v-if="searchQuery.trim()">
+              {{ shelfLoading ? '搜索中…' : `找到 ${shelfList.length} 册` }}
+            </template>
+            <template v-else>{{ shelfList.length }} 册已加载</template>
+          </span>
         </header>
 
         <!-- 卷目 Tab：全部卷 / 官方星河 / 星友新作 / 匿名手记，移到「全部卷」下方；筛选只针对书架生效 -->
@@ -215,6 +249,9 @@
           </button>
         </div>
 
+        <div v-if="rateLimited" class="fs-rate-hint">
+          请求太频繁，已静默暂停加载，稍候自动重试…
+        </div>
         <FolioGrid
           :collections="shelfListWithOwner"
           :loading="shelfLoading && shelfList.length === 0"
@@ -268,6 +305,20 @@
         </span>
       </footer>
     </main>
+
+    <!-- 任务2：回顶部悬浮按钮（顶部栏滚出可视区域时显示，点击平滑回顶部） -->
+    <Transition name="fs-backtop">
+      <button
+        v-if="showBackTop"
+        type="button"
+        class="fs-back-top"
+        @click="scrollToTop"
+        aria-label="回顶部"
+        title="回顶部"
+      >
+        <ArrowUp :size="17" />
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -276,7 +327,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit, X,
-  Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User,
+  Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User, ArrowUp,
 } from 'lucide-vue-next'
 import FolioGrid, { type FolioLike } from '../components/FolioGrid.vue'
 import { authFetch, authHeaders, useAuth } from '../stores/auth'
@@ -333,24 +384,75 @@ const volumeTotalLabel = computed(() => {
   return `共 ${totalFolios.value} 册公开星笺 · ${totalStories.value} 则故事`
 })
 
-/* ─── 搜索：P2 正式启用；防抖 250ms 触发书架重新拉取 ─── */
+/* ─── 搜索：防抖 250ms。
+     类型即搜：拉取下拉结果（即时反馈，悬浮在搜索框下，不再整页跳到书架），同时同步过滤书架 ─── */
 const searchQuery = ref('')
+const searchLoading = ref(false)
+const searchResults = ref<Collection[]>([])
+const searchDropdownOpen = ref(false)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-function debounceReloadShelf(reason: 'search' | 'sort' = 'search') {
+
+function openSearchDropdown() {
+  if (searchQuery.value.trim()) searchDropdownOpen.value = true
+}
+function onSearchBlur() {
+  // 延迟关闭，让下拉项 click 先触发
+  setTimeout(() => { searchDropdownOpen.value = false }, 150)
+}
+
+async function fetchSearchResults() {
+  const kw = searchQuery.value.trim()
+  if (!kw) {
+    searchResults.value = []
+    searchDropdownOpen.value = false
+    return
+  }
+  searchLoading.value = true
+  searchDropdownOpen.value = true
+  try {
+    const params = new URLSearchParams()
+    params.set('search', kw)
+    params.set('limit', '8')
+    params.set('sort', 'hot')
+    const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
+    const json = await res.json()
+    searchResults.value = res.ok
+      ? ((json.data?.items ?? []) as any[]).map((r: any) => normalizeCollection(r, { withStories: false }))
+      : []
+  } catch {
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+function debounceSearch() {
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
     searchDebounceTimer = null
+    fetchSearchResults()
+    // 书架同步按当前搜索词过滤（保留全量结果面板，用作"查看全部"）
     resetShelf()
     fetchShelfPage(1)
-  }, reason === 'sort' ? 0 : 250)
+  }, 250)
 }
 watch(searchQuery, () => {
-  // 防抖 250ms；空搜索词也重拉（回到当前卷默认结果）
-  debounceReloadShelf('search')
+  debounceSearch()
 })
+
+function openSearchResult(c: { id: number; name: string }) {
+  searchDropdownOpen.value = false
+  openDetail(c)
+}
+function openFirstSearchResult() {
+  if (searchResults.value.length > 0) {
+    openSearchResult(searchResults.value[0])
+  }
+}
 /* 排序切换：立即刷新书架列表 */
 watch(activeSort, () => {
-  debounceReloadShelf('sort')
+  resetShelf()
+  fetchShelfPage(1)
 })
 
 /* ─── 权限：登录且非访客才能新建 ─── */
@@ -390,7 +492,13 @@ async function fetchGalaxyReels() {
   try {
     const res = await authFetch('/api/collections/public?visibility=galaxy&page=1&limit=12&sort=stories_desc')
     const json = await res.json()
+    if (res.status === 429) {
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
     if (res.ok) {
+      rateLimited.value = false
       const rawItems = (json.data?.items ?? []) as any[]
       const list = rawItems.map((r) => normalizeCollection(r, { withStories: false })) as Collection[]
       galaxyReels.value = list
@@ -416,7 +524,13 @@ async function fetchPicks() {
   try {
     const res = await authFetch('/api/collections/picks?wanted=6&galaxyN=3')
     const json = await res.json()
+    if (res.status === 429) {
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
     if (res.ok) {
+      rateLimited.value = false
       const raw = Array.isArray(json.data) ? json.data : []
       picks.value = raw.map((r: any) => normalizeCollection(r, { withStories: false })) as Collection[]
     }
@@ -429,6 +543,19 @@ async function fetchPicks() {
 const shelfList = ref<Collection[]>([])
 const shelfLoading = ref(false)
 const shelfError = ref<string | null>(null)
+/** 429 降噪：限流时静默降级 + 轻提示，8 秒后自动重试一次 */
+const rateLimited = ref(false)
+let rateRetryTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRateRetry() {
+  if (rateRetryTimer) return
+  rateRetryTimer = setTimeout(() => {
+    rateRetryTimer = null
+    rateLimited.value = false
+    if (!shelfLoading.value && !searchLoading.value) {
+      fetchShelfPage(shelfPage.value || 1)
+    }
+  }, 8000)
+}
 const shelfPage = ref(1)
 const shelfTotalPages = ref(0)
 const shelfPageSize = 24
@@ -463,6 +590,14 @@ async function fetchShelfPage(page: number) {
     if (kw) params.set('search', kw)
     const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
     const json = await res.json()
+    // 限流降噪：429 不弹红色错误条，轻提示 + 稍后自动重试
+    if (res.status === 429) {
+      shelfError.value = null
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
+    rateLimited.value = false
     if (!res.ok) throw new Error(json.message || '加载失败')
     const d = json.data || {}
     shelfTotalPages.value = d.totalPages ?? Math.ceil((d.total ?? 0) / shelfPageSize)
@@ -494,6 +629,7 @@ function loadNextPage() {
 
 /* ─── 总览数据 + 初次拉取 ─── */
 async function reloadAll() {
+  rateLimited.value = false
   resetShelf()
   galaxyReels.value = []
   picks.value = []
@@ -568,19 +704,44 @@ function onReelsTrackScroll() {
   reelsScrollRaf = requestAnimationFrame(updateReelButtons)
 }
 
+/* ─── 任务2：回顶部悬浮按钮（放弃“下滑隐藏/上滑弹出顶部栏”方案，改为曲线救国） ───
+ * 顶部栏（.fs-top）滚出可视区域时显示，回到顶部附近时隐藏；点击平滑滚动回顶部。
+ * 仅移动端展示（隐藏方案原本也只服务移动端，PC 端顶部栏常驻）。 */
+const showBackTop = ref(false)
+let backTopRaf = 0
+/* 移动端顶部栏两行高约 91px，滚动超过 120px 即视为“已滚出可视区域” */
+const BACK_TOP_SHOW_Y = 120
+
+function onWindowScrollForBackTop() {
+  if (backTopRaf) cancelAnimationFrame(backTopRaf)
+  backTopRaf = requestAnimationFrame(() => {
+    const y = window.scrollY || window.pageYOffset || 0
+    const show = y > BACK_TOP_SHOW_Y
+    if (showBackTop.value !== show) showBackTop.value = show
+  })
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 onMounted(() => {
   reloadAll().finally(attachInfiniteScroll)
-  // reels scroll 监听
   setTimeout(() => {
     const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
     track?.addEventListener('scroll', onReelsTrackScroll, { passive: true })
   }, 200)
+  // 顶部栏滚动监听（passive + rAF 节流）→ 任务2：仅用于控制回顶部按钮显隐
+  window.addEventListener('scroll', onWindowScrollForBackTop, { passive: true })
 })
 onBeforeUnmount(() => {
+  if (rateRetryTimer) { clearTimeout(rateRetryTimer); rateRetryTimer = null }
   io?.disconnect()
   io = null
   const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
   track?.removeEventListener('scroll', onReelsTrackScroll)
+  window.removeEventListener('scroll', onWindowScrollForBackTop)
+  if (backTopRaf) cancelAnimationFrame(backTopRaf)
 })
 
 /* 暴露一个只读的计数 state 辅助（以后可以放 store） */
@@ -778,9 +939,10 @@ updateVolumeCountsQuick()
 }
 
 .fs-top-mid { display: flex; align-items: center; justify-content: center; }
+.fs-search-wrap { position: relative; width: min(520px, 100%); }
 .fs-search {
   display: inline-flex; align-items: center; gap: 8px;
-  width: min(520px, 100%);
+  width: 100%;
   padding: 7px 12px;
   border-radius: var(--radius-full);
   background: var(--overlay-04);
@@ -797,6 +959,77 @@ updateVolumeCountsQuick()
 }
 .fs-search-input::placeholder { color: var(--muted); opacity: 0.6; }
 .fs-search-input:disabled { cursor: not-allowed; opacity: 0.6; }
+/* 搜索激活态：边框高亮 */
+.fs-search-active { background: var(--overlay-08); box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.25); }
+/* 搜索中 spinner */
+.fs-search-spinner {
+  width: 14px; height: 14px; flex-shrink: 0;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: fs-spin 0.6s linear infinite;
+}
+@keyframes fs-spin { to { transform: rotate(360deg); } }
+/* 清除搜索按钮 */
+.fs-search-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: var(--overlay-08);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.fs-search-clear:hover { background: var(--overlay-16); color: var(--ink); }
+/* 隐藏 input type=search 原生清除按钮，避免与自定义清除按钮重复出现两个叉叉 */
+.fs-search-input::-webkit-search-cancel-button,
+.fs-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+
+/* ═══ 搜索下拉结果面板（类型即搜，悬浮于搜索框之下） ═══ */
+.fs-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  z-index: 60;
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(16, 18, 40, 0.98);
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.fs-sd-loading, .fs-sd-empty {
+  padding: 14px 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+.fs-sd-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.fs-sd-item:hover { background: var(--overlay-08); }
+.fs-sd-name {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 500;
+}
+.fs-sd-meta { font-size: 0.68rem; color: var(--muted); flex-shrink: 0; }
+.fs-sd-go { font-size: 0.7rem; color: var(--accent); flex-shrink: 0; font-weight: 500; }
 
 .fs-top-right { display: flex; align-items: center; gap: 8px; }
 .fs-btn {
@@ -1345,7 +1578,54 @@ updateVolumeCountsQuick()
 }
 .fs-foot-chip b { color: var(--accent); font-weight: 600; margin: 0 1px; }
 
-/* ═══ 响应式：平板 / 手机 ═══ */
+/* ═══════ 限流轻提示 ═══════ */
+.fs-rate-hint {
+  margin: 10px auto 2px;
+  max-width: 560px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(255, 217, 138, 0.08);
+  border: 1px solid rgba(255, 217, 138, 0.22);
+  text-align: center;
+}
+
+/* ═══════ 回顶部悬浮按钮（任务2） ═══════ */
+/* 圆形玻璃钮，右下角固定；PC/移动端都显示（PC 顶栏常驻但长页面同样需要快捷回顶） */
+.fs-back-top {
+  position: fixed;
+  right: 16px;
+  bottom: 28px;
+  z-index: 45;               /* 低于 .fs-top(50)，不与顶栏打架 */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 30, 53, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 217, 138, 0.28);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 217, 138, 0.06);
+  transition: background var(--transition-normal), border-color var(--transition-normal),
+              transform var(--transition-fast), box-shadow var(--transition-normal);
+}
+.fs-back-top:hover {
+  background: rgba(202, 167, 255, 0.14);
+  border-color: rgba(255, 217, 138, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(255, 217, 138, 0.15);
+}
+.fs-back-top:active { transform: scale(0.94); }
+/* 进出场：淡入 + 上浮 */
+.fs-backtop-enter-active, .fs-backtop-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.fs-backtop-enter-from, .fs-backtop-leave-to { opacity: 0; transform: translateY(10px) scale(0.9); }
+
+/* ═══════ 响应式：平板 / 手机 ═══════ */
 @media (max-width: 960px) {
   .fs-picks { grid-template-columns: 1fr 1fr; }
   .fs-pick:nth-child(3) { grid-column: 1 / -1; }
@@ -1357,16 +1637,25 @@ updateVolumeCountsQuick()
     row-gap: 8px;
     padding: 8px 12px;
   }
-  .fs-top-mid { grid-column: 1 / -1; justify-content: stretch; }
+  /* 明确 grid 位置：DOM 顺序为 left→mid→right，但 mid 跨两列会导致 auto-placement 把 right 推到第3行，
+     必须显式指定 left/right 在第1行、mid 在第2行 */
+  .fs-top-left { grid-column: 1; grid-row: 1; }
+  .fs-top-right { grid-column: 2; grid-row: 1; justify-self: end; }
+  .fs-top-mid { grid-column: 1 / -1; grid-row: 2; justify-content: stretch; }
+  .fs-search-wrap { width: 100%; }
   .fs-search { width: 100%; }
-  .fs-top-right { justify-self: end; }
+  /* 移动端隐藏"写星笺"按钮，刷新按钮独占右上角 */
+  .fs-btn-create { display: none; }
   /* 移动端退出按钮：仅显示 X 图标，省空间 */
   .fs-exit { height: 32px; padding: 0 9px; font-size: 0; }
   .fs-exit span { display: none; }
-  /* 引导条：移动端适配宽度 */
-  .fs-hero-strip { width: calc(100% - 28px); margin-top: 62px; padding: 7px 12px; }
-  .fhs-sub { display: none; }   /* 移动端隐藏副标，只留 ICON + 主名 */
-  .fs-main { padding: 16px 14px 30px; }
+  /* 引导条：移动端与顶部栏「穹庭书局」品牌重复，且会与搜索框重叠 → 隐藏 */
+  .fs-hero-strip { display: none; }
+  /* 预留 fixed 顶部栏空间（实测顶部栏两行高约 91px + 1px 间距），
+     避免"官方星河"等内容跑到顶部栏背景层被遮挡 */
+  .fs-main { padding: 92px 14px 30px; }
+  /* 移动端缩小 section-head 顶部 margin，让"官方星河"紧接顶部栏 */
+  .fs-section-head { margin-top: 12px; }
   .fs-picks { grid-template-columns: 1fr; }
   .fs-pick { min-height: auto; }
   .fs-filters { flex-direction: column; align-items: stretch; }

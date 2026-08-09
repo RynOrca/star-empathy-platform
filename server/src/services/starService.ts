@@ -192,7 +192,7 @@ export function getAllStars(currentUserId?: number): (Star & { username: string 
 }
 
 // 分页获取所有星星
-export function getAllStarsPaged(page: number, limit: number, currentUserId?: number): {
+export function getAllStarsPaged(page: number, limit: number, currentUserId?: number, typeFilter?: string): {
   items: (Star & { username: string | null; tag: string | null; userId: number | null; catalogStarIds?: number[]; tags: string[]; authorHidden?: boolean; resonated: boolean })[];
   total: number;
   page: number;
@@ -203,12 +203,18 @@ export function getAllStarsPaged(page: number, limit: number, currentUserId?: nu
   const l = Math.max(1, Math.min(100, Math.floor(limit)));
   const offset = (p - 1) * l;
 
+  // 可选按故事类型过滤（history/user/planet）：客户端分阶段拉取，避免全量重复下载
+  const allowedTypes = ['history', 'user', 'planet'];
+  const hasType = !!typeFilter && allowedTypes.includes(typeFilter);
+  const typeFilterSql = hasType ? ' AND s.type = ?' : '';
+  const typeParam = hasType ? [typeFilter] : [];
+
   const { sql: countFilterSql, params: countParams } = buildVisibilityFilter(currentUserId);
   const totalRow = db.prepare(`
     SELECT COUNT(*) as cnt FROM stars s
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE ${countFilterSql}
-  `).get(...countParams) as { cnt: number };
+    WHERE ${countFilterSql}${typeFilterSql}
+  `).get(...countParams, ...typeParam) as { cnt: number };
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l);
 
@@ -218,10 +224,10 @@ export function getAllStarsPaged(page: number, limit: number, currentUserId?: nu
     FROM stars s
     LEFT JOIN users u ON s.user_id = u.id
     LEFT JOIN collections c ON c.id = s.collection_id
-    WHERE ${listFilterSql}
+    WHERE ${listFilterSql}${typeFilterSql}
     ORDER BY s.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(...listParams, l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
+  `).all(...listParams, ...typeParam, l, offset) as unknown as (Star & { username: string | null; tag: string | null; userId: number | null })[];
 
   const collMap = buildCollectionMap(items as any[]);
   const hidden = hideAuthorForRows(items as any[], collMap, currentUserId);

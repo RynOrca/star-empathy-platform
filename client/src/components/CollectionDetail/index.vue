@@ -288,22 +288,25 @@
   </Transition>
 
   <!-- ═══════════════ 移动端布局 ═══════════════ -->
-  <Transition name="mobile-sheet-fade" @after-leave="emit('close')">
-    <div v-if="isMobile && show" class="mobile-overlay" @click.self="handleClose">
+  <Transition :name="flatMode ? 'flat-fade' : 'mobile-sheet-fade'" @after-leave="emit('close')">
+    <div
+      v-if="isMobile && show"
+      class="mobile-overlay"
+      :class="{ 'flat-mode': flatMode }"
+      @click.self="handleClose"
+    >
       <div
         class="mobile-sheet"
-        :class="{ dragging: isDragging }"
-        :style="{ height: sheetHeight }"
-        @touchstart.passive="onTouchStart"
-        @touchmove.passive="onTouchMove"
-        @touchend="onTouchEnd"
+        :class="{ dragging: isDragging && !flatMode, 'flat-mode': flatMode }"
+        :style="flatMode ? {} : { height: sheetHeight }"
+        v-on="flatMode ? {} : { touchstart: onTouchStart, touchmove: onTouchMove, touchend: onTouchEnd }"
       >
-        <!-- 拖拽条 -->
-        <div class="mobile-handle" @click="handleClose"></div>
+        <!-- 拖拽条（flatMode 下隐藏） -->
+        <div v-if="!flatMode" class="mobile-handle" @click="handleClose"></div>
 
-        <!-- 顶部栏 -->
-        <div class="mobile-top-bar">
-          <button class="mobile-close-btn" @click="handleClose">
+        <!-- 顶部栏（flatMode 下隐藏关闭按钮，父页面已有自己的返回栏） -->
+        <div class="mobile-top-bar" :class="{ 'flat-top-bar': flatMode }">
+          <button v-if="!flatMode" class="mobile-close-btn" @click="handleClose">
             <X :size="18" />
           </button>
           <div class="mobile-tab-select-wrap">
@@ -613,6 +616,9 @@ const props = defineProps<{
   isOwner: boolean
   /** 刷新令牌：自增时强制重新拉取详情（编辑后刷新用） */
   refreshNonce?: number
+  /** 任务4：扁平整页模式（移动端）。true 时禁用底部抽屉 / 拖拽 / 模态遮罩，
+   *  内容直接以整页形式嵌入父页面。仅 FolioDetail 用，不影响其他场景。 */
+  flatMode?: boolean
 }>()
 
 // ─── Emits ───
@@ -1768,6 +1774,87 @@ function infoTagStyle(tag: string): Record<string, string> {
 .mobile-sheet-fade-enter-from .mobile-sheet { transform: translateY(100%); }
 .mobile-sheet-fade-leave-to { opacity: 0; }
 .mobile-sheet-fade-leave-to .mobile-sheet { transform: translateY(100%); }
+
+/* ═══════ 任务4：扁平整页模式（flatMode · 仅 FolioDetail 用） ═══════ */
+/* 把底部抽屉彻底拍平为整页内容：无模态遮罩 / 无 5px 金色顶边 / 无圆角 /
+ * 无最大宽 500px 限制 / 无 box-shadow，与父页面自然衔接 */
+.mobile-overlay.flat-mode {
+  position: static;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  display: block;
+  z-index: auto;
+}
+.mobile-sheet.flat-mode {
+  width: 100%;
+  max-width: none;
+  background: transparent;
+  border: none;
+  border-top: none;
+  border-radius: 0;
+  box-shadow: none;
+  height: auto !important;
+  min-height: auto;
+  overflow: visible;
+}
+/* flatMode 下顶部栏：sticky 吸顶 + 给点底色保证 tab 可读。
+ * top 取 48px：对齐 FolioDetail .fdp-top 移动端单行高度（8+32+8 ≈ 48px，红色退出按钮已移除），
+ * 避免吸顶后被 fixed 外层顶栏遮挡；若外层顶栏高度调整需同步此值 */
+.mobile-top-bar.flat-top-bar {
+  position: sticky;
+  top: 48px;
+  z-index: 5;
+  padding: 10px 14px;
+  background: rgba(10, 11, 28, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+/* flatMode 下内容区：取消内嵌滚动，跟父页面一起滚 */
+.mobile-sheet.flat-mode .mobile-content {
+  overflow: visible;
+  padding: 4px 6px 24px;
+}
+/* ═══════ flatMode 通栏化：不再分卡片块，整页宽度 + 横线分隔（markdown --- 风格） ═══════ */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 2px;
+  overflow: visible;
+}
+/* 相邻 panel-wrapper 块之间用横线分隔（代替卡片边界） */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper + .panel-wrapper) {
+  border-top: 1px solid var(--rule);
+}
+/* 星河合集下卷目疏/典藏谱系等子卡也扁平化，避免残留卡片感 */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper .panel-wrapper) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 10px 2px;
+}
+/* flatMode 下底部操作栏：不再 sticky 在 sheet 底部，跟内容流式排布 */
+.mobile-sheet.flat-mode .mobile-bottom-bar {
+  border-top: none;
+  padding: 8px 14px 18px;
+}
+/* flatMode 下故事详情全屏：用全屏覆盖式（与 sheet 解耦，避免圆角错位） */
+.mobile-sheet.flat-mode .mobile-story-detail {
+  position: fixed;
+  inset: 0;
+  border-radius: 0;
+  z-index: 220;
+}
+/* flatMode Transition：仅淡入淡出，无 translateY 滑入 */
+.flat-fade-enter-active { transition: opacity 0.22s ease; }
+.flat-fade-leave-active { transition: opacity 0.18s ease; }
+.flat-fade-enter-from, .flat-fade-leave-to { opacity: 0; }
 
 .pc-detail-fade-enter-active { transition: opacity 0.25s ease; }
 .pc-detail-fade-enter-active .detail-wrap { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }

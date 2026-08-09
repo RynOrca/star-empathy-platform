@@ -338,6 +338,8 @@ async function handleGuestAccess() {
     const json = await res.json()
     if (!res.ok) throw new Error(json.message || '请求失败')
     localStorage.setItem('token', json.data.token)
+    localStorage.setItem('username', '星穹访客')
+    localStorage.setItem('userId', String(json.data.user.id))
     router.push('/sky')
   } catch (e: any) {
     error.value = e.message || '访客登录失败'
@@ -399,6 +401,8 @@ onMounted(async () => {
   padding-right: 5%;
   z-index: 2;
   background: transparent;
+  /* 开场黑幕淡入后，卡片错落出现（从下 14px + 淡入） */
+  animation: panelIn 0.8s 0.05s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .brand-title {
@@ -431,6 +435,20 @@ onMounted(async () => {
   padding: 0 5%;
   z-index: 3;
   box-shadow: -15px 0 40px rgba(0, 0, 0, 0.8);
+  /* 开场黑幕淡入后，卡片错落出现（延迟 0.22s，比左栏稍晚） */
+  animation: panelIn 0.8s 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* 面板入场：从下 14px + 淡入（与开场黑幕衔接） */
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .form-container {
@@ -790,6 +808,13 @@ onMounted(async () => {
   .forgot-link,
   .back-link {
     transition: none;
+  }
+  /* 开场衔接入场动画：减少动画时直接显示，不延迟不位移 */
+  .left-panel,
+  .right-panel {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 </style>
