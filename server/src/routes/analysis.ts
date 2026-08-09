@@ -11,8 +11,16 @@
 import { Router, Request, Response } from 'express'
 import { ok, badRequest } from '../utils/response'
 import { readAnalysis } from '../services/starAnalysis'
+import { getStarStoryMeta } from '../agents/starAnalysisAgent'
+import { triggerAnalysisRegeneration } from '../services/kernel'
 
 const router = Router()
+
+// 懒生成触发冷却：同一颗星 60s 内只触发一次。
+// 前端详情页会 5s 轮询 analysis 接口，若不冷却会反复重置 kernel 的 15s 防抖，
+// 导致 ensureOne 被无限推迟到轮询结束。
+const TRIGGER_COOLDOWN_MS = 60 * 1000
+const lastTriggerAt = new Map<string, number>()
 
 function getCatalogId(req: Request, res: Response): number | null {
   const raw = req.params.id
@@ -29,6 +37,18 @@ router.get('/:id/analysis', (req: Request, res: Response) => {
   const id = getCatalogId(req, res)
   if (id === null) return
   const data = readAnalysis(id)
+  // 懒生成兜底：分析未 ready 且故事数 ≥5 时，后台自动补生成（15s 防抖 + 并发 1 + story_hash 幂等，
+  // 不会刷爆 API）。覆盖批量生成任务漏掉的星（如 seed 导入的故事从未走 API 写操作触发再生）。
+  if (!data.ready) {
+    const meta = getStarStoryMeta(id)
+    const cid = String(id)
+    const now = Date.now()
+    const last = lastTriggerAt.get(cid) ?? 0
+    if ((meta.total ?? 0) >= 5 && now - last > TRIGGER_COOLDOWN_MS) {
+      lastTriggerAt.set(cid, now)
+      triggerAnalysisRegeneration([id])
+    }
+  }
   ok(res, 'ok', data)
 })
 

@@ -44,7 +44,7 @@
 | `location.ts` | 反向地理编码路由（`/api/location/reverse`）。高德 → BigDataCloud → Nominatim 三级回退 |
 | `search.ts` | 星星搜索路由 |
 | `stats.ts` | 统计数据路由 |
-| `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回 |
+| `analysis.ts` | **单星 AI 分析路由**（`/api/catalog/stars/:id/analysis`，兼容旧 `/api/stars/:id/analysis`）。返回预生成的 persona/emotion/themehour；themehour 未生成则即时 SQL 聚合返回；**未 ready 且故事数 ≥5 时懒触发 `triggerAnalysisRegeneration` 后台补生成（60s 冷却 + kernel 15s 防抖 + 并发 1）** | 
 | `collections.ts` | **合集路由**。CRUD 列表/创建/详情/更新/删除/公开列表。新增 **`GET /:id/analysis` 合集 AI 分析接口**（对齐单星分析三态）；**公开列表** `GET /public` 支持 `page/limit/sort=hot | new | resonance | name_asc | stories_desc / visibility=public | anonymous | galaxy`分页排序过滤；**`GET /picks`** 穹庭书局推荐 Picks：前 N 本官方星河 + 14 天内热榜补足。可见性：`visibility ∈ {public, private, anonymous, galaxy}` 四态。星河（galaxy）仅 user_id=0（星穹守护·系统管理员）可创建编辑删除；匿名（anonymous）合集公开展示故事但对外隐藏作者名（owner/管理员除外）；公开/私有为原逻辑 |
 
 ### 服务层 `src/services/`
@@ -52,7 +52,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
-| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置 |
+| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**JSON 任务（默认开）遇到思考模型（deepseek-v4-flash/reasoner/R1）自动回退 `deepseek-chat`**，避免 content 为空导致生成失败 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者） |
 | `collectionService.ts` | 合集业务服务。类型 `CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'`；`PUBLIC_VISIBILITIES = [public, anonymous, galaxy]`；`SYSTEM_ADMIN_USER_ID = 0`（星穹守护 = 管理员）。`validateCollectionInput`校验星河仅管理员可创建；`listPublicCollections`公开合集分页（sort=hot/new/resonance/name_asc/stories_desc，visibility 过滤；**带 keyword 时排序前置匹配优先级：合集名称 > 合集描述 > 故事标签 tags > 故事标题/正文**，同档内保留 sort 次级排序）；`getPublicCollectionPicks(wanted, galaxyN)` 穹庭书局推荐（前 galaxyN 本官方星河按 sort_order ASC + 最近 14 天 hot 补足 wanted 本）。星河合集（visibility=galaxy）默认 sort_order 用于官方卷轴排序；作者可见性规则封装供 starService 复用 |
