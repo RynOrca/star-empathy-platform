@@ -25,8 +25,8 @@ const lastTriggerAt = new Map<string, number>()
 function getCatalogId(req: Request, res: Response): number | null {
   const raw = req.params.id
   const id = parseInt(raw, 10)
-  // 允许负 id（太阳系行星 -100~-108）；仅拒绝 NaN / 0
-  if (!Number.isFinite(id) || id === 0) {
+  // 允许负 id（太阳系行星 -100~-108）；也允许 0（星表第一颗星「天枢 Dubhe」的 id 就是 0）
+  if (!Number.isFinite(id)) {
     badRequest(res, 'catalog_star_id 无效')
     return null
   }

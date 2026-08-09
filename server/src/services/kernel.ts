@@ -215,7 +215,7 @@ function getAllStarKernels(): Map<number, { emotionalTags: Set<string>; themes: 
     SELECT DISTINCT scs.catalog_star_id, sk.emotional_tags, sk.themes
     FROM story_kernels sk
     JOIN story_catalog_stars scs ON sk.story_id = scs.story_id
-    WHERE scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id > 0
+    WHERE scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id >= 0
   `).all() as { catalog_star_id: number; emotional_tags: string; themes: string }[]
 
   const map = new Map<number, { emotionalTags: Set<string>; themes: Set<string> }>()
@@ -515,7 +515,7 @@ export function getUserKernelLines(userId: number, limit = 20): KernelLine[] {
     FROM stars s
     JOIN story_kernels sk ON s.id = sk.story_id
     JOIN story_catalog_stars scs ON s.id = scs.story_id AND scs.is_primary = 1
-    WHERE s.user_id = ? AND scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id > 0
+    WHERE s.user_id = ? AND scs.catalog_star_id IS NOT NULL AND scs.catalog_star_id >= 0
   `).all(userId) as {
     story_id: number
     catalog_star_id: number
@@ -665,7 +665,7 @@ function parseRerankResult(raw: string): Array<{ catalogStarId: number; aiScore:
       catalogStarId: typeof r.catalog_star_id === 'number' ? r.catalog_star_id : (parseInt(String(r.catalogStarId ?? r.id ?? 0), 10) || 0),
       aiScore: typeof r.ai_score === 'number' ? clamp01(r.ai_score) : (clamp01(Number(r.aiScore) || 0)),
       matchReason: typeof r.match_reason === 'string' ? r.match_reason.trim() : (String(r.matchReason ?? '').trim() || '主题高度契合'),
-    })).filter((r: { catalogStarId: number }) => r.catalogStarId > 0)
+    })).filter((r: { catalogStarId: number }) => r.catalogStarId >= 0)
   } catch {
     // 自由文 fallback：逐行抠出 catalogStarId / score / reason
     const lines = jsonStr.split(/\n/).map(l => l.trim()).filter(Boolean)
