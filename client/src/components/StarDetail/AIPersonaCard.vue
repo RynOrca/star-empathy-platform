@@ -38,8 +38,8 @@
 
       <!-- 右：文字解读（80%） -->
       <div class="persona-text">
-        <p class="pt-para first" v-html="paraFirst"></p>
-        <p class="pt-para" v-html="paraSecond"></p>
+        <p v-if="!invalidParaFirst" class="pt-para first" v-html="paraFirst"></p>
+        <p v-if="!invalidParaSecond" class="pt-para" v-html="paraSecond"></p>
         <div class="pt-suggest-wrap">
           <span class="pt-tip">✨ 如果你也想在这里挂心事</span>
           <span class="pt-suggest">{{ suggest }}</span>
@@ -125,6 +125,19 @@ const personaTags = computed(() => props.persona?.tags ?? [])
 const paraFirst   = computed(() => props.persona?.paragraphs?.[0] ?? '')
 const paraSecond  = computed(() => props.persona?.paragraphs?.[1] ?? '')
 const suggest     = computed(() => props.persona?.suggestIntro ?? '')
+
+/**
+ * 段落有效性降级：AI 输出偶发中断会产生"杜牧写："之类的残句（引导词后无正文）。
+ * 渲染时直接隐藏无效段落，宁可少一段也不展示断裂文本。
+ * 判定规则与后端 personaGen.isValidParagraph 保持一致。
+ */
+function isInvalidPara(t: string): boolean {
+  const s = (t ?? '').trim()
+  if (!s || s.length < 10) return true
+  return /^[\u4e00-\u9fa5A-Za-z·\-\s]{1,14}(写|写道|曰|吟|赋)[:：]\s*$/.test(s)
+}
+const invalidParaFirst  = computed(() => isInvalidPara(props.persona?.paragraphs?.[0] ?? ''))
+const invalidParaSecond = computed(() => isInvalidPara(props.persona?.paragraphs?.[1] ?? ''))
 
 const bgStars = Array.from({ length: 26 }, (_, i) => ({
   x: ((i * 31) % 110) + 5,
