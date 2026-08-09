@@ -1,6 +1,4 @@
 <template>
-  <!-- 闪光灯：点击瞬间爆闪后消散（0.9s） -->
-  <div class="flash" :class="{ fire: trigger }" />
   <!-- 黑幕：0.12s 延迟后淡入至全黑（1.22s 到顶） -->
   <div class="fader" :class="{ go: trigger }" />
 </template>
@@ -9,9 +7,10 @@
 import { watch, onBeforeUnmount } from 'vue'
 
 /**
- * 开场切页过渡层：闪光灯 + 黑幕淡入
- * trigger=true 时同时启动两层；黑幕完全覆盖后 emit('after')，
+ * 开场切页过渡层：黑幕淡入
+ * trigger=true 时启动黑幕；完全覆盖后 emit('after')，
  * 由父组件在那一刻执行 router.push（用户看不见切页，感觉是「一黑一亮就是现实场景」）。
+ * 注：原型 a1 的圆形闪光灯（flashGo）已移除——白闪破坏体验。
  */
 const props = defineProps<{ trigger: boolean }>()
 const emit = defineEmits<{ after: [] }>()
@@ -35,45 +34,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.flash {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  pointer-events: none;
-  opacity: 0;
-}
-.flash.fire {
-  animation: flashGo 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-@keyframes flashGo {
-  0% {
-    background: radial-gradient(
-      circle at 50% 50%,
-      rgba(255, 240, 210, 0) 0%,
-      rgba(255, 240, 210, 0) 25%,
-      rgba(0, 0, 0, 0) 100%
-    );
-    opacity: 0;
-  }
-  18% {
-    background: radial-gradient(
-      circle at 50% 50%,
-      rgba(255, 240, 210, 0.95) 0%,
-      rgba(255, 220, 170, 0.55) 32%,
-      rgba(0, 0, 0, 0) 100%
-    );
-    opacity: 1;
-  }
-  100% {
-    background: radial-gradient(
-      circle at 50% 50%,
-      rgba(255, 240, 210, 0) 0%,
-      rgba(255, 240, 210, 0) 60%,
-      rgba(0, 0, 0, 0) 100%
-    );
-    opacity: 0;
-  }
-}
 .fader {
   position: fixed;
   inset: 0;
