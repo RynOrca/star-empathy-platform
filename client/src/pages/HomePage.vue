@@ -399,6 +399,8 @@ onMounted(async () => {
   padding-right: 5%;
   z-index: 2;
   background: transparent;
+  /* 开场黑幕淡入后，卡片错落出现（从下 14px + 淡入） */
+  animation: panelIn 0.8s 0.05s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .brand-title {
@@ -431,6 +433,20 @@ onMounted(async () => {
   padding: 0 5%;
   z-index: 3;
   box-shadow: -15px 0 40px rgba(0, 0, 0, 0.8);
+  /* 开场黑幕淡入后，卡片错落出现（延迟 0.22s，比左栏稍晚） */
+  animation: panelIn 0.8s 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* 面板入场：从下 14px + 淡入（与开场黑幕衔接） */
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .form-container {

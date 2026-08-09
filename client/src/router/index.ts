@@ -9,6 +9,11 @@ const router = createRouter({
       component: () => import('../pages/HomePage.vue'),
     },
     {
+      path: '/welcome',
+      name: 'welcome',
+      component: () => import('../pages/WelcomePage.vue'),
+    },
+    {
       path: '/sky',
       name: 'sky',
       component: () => import('../pages/SkyPage.vue'),
@@ -38,10 +43,15 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
+  const welcomed = sessionStorage.getItem('welcomed')
   if (to.meta.requiresAuth && !token) {
     next('/')
   } else if (to.path === '/' && token) {
     next('/sky')
+  } else if (to.path === '/' && !token && !welcomed) {
+    // 首次访问：先看开场（会话内只跳转一次，刷新后不再重放）
+    sessionStorage.setItem('welcomed', '1')
+    next('/welcome')
   } else {
     next()
   }
