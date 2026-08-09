@@ -95,3 +95,9 @@ jobs:
             echo "=== 部署完成 ==="
             free -h
             pm2 status
+
+            echo "=== 7/6 补全 AI 星格画像（幂等：跳过已生成的，前 30 颗高故事星）==="
+            cd /var/www/star-empathy-platform/server
+            node dist/scripts/generateAllAnalyses.js --limit 30 \
+              || echo "⚠️ AI 分析生成未完成（不影响部署，下次 push 会继续补）"
+            pm2 status

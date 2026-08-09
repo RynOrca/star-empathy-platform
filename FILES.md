@@ -51,8 +51,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt）。**所有叙事生成调用固定 `model: 'deepseek-chat'`（非思考模型），避免 v4-flash 等思考模型输出自由文时中途中断（如只输出"杜牧写："）** |
-| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**JSON 任务（默认开）遇到思考模型（deepseek-v4-flash/reasoner/R1）自动回退 `deepseek-chat`**，避免 content 为空导致生成失败 |
+| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt）。叙事生成走统一 deepseekChat（思考已全局关闭，输出不中断） |
+| `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**模型统一 `deepseek-v4-flash`（deepseek-chat 已下线）**，请求体带 `thinking: { type: 'disabled' }` 全局关闭思考模式——v4-flash 思考会抢占 max_tokens 导致 content 为空/截断；默认 max_tokens 800→2048，`finish_reason=length` 时显式报错提示 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者） |
 | `collectionService.ts` | 合集业务服务。类型 `CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'`；`PUBLIC_VISIBILITIES = [public, anonymous, galaxy]`；`SYSTEM_ADMIN_USER_ID = 0`（星穹守护 = 管理员）。`validateCollectionInput`校验星河仅管理员可创建；`listPublicCollections`公开合集分页（sort=hot/new/resonance/name_asc/stories_desc，visibility 过滤；**带 keyword 时排序前置匹配优先级：合集名称 > 合集描述 > 故事标签 tags > 故事标题/正文**，同档内保留 sort 次级排序）；`getPublicCollectionPicks(wanted, galaxyN)` 穹庭书局推荐（前 galaxyN 本官方星河按 sort_order ASC + 最近 14 天 hot 补足 wanted 本）。星河合集（visibility=galaxy）默认 sort_order 用于官方卷轴排序；作者可见性规则封装供 starService 复用 |

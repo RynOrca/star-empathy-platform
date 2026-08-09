@@ -2,24 +2,23 @@
  * DeepSeek API 封装
  * 兼容 OpenAI Chat Completions 格式
  *
- * 默认模型：deepseek-chat（V3 非思考模型）
+ * 默认模型：deepseek-v4-flash（模型名已统一，deepseek-chat 已下线）
  *
  * 说明：
- *   · deepseek-v4-flash / deepseek-reasoner 属于「思考模型」，它会把正式答案放在
- *     `content`，把思维链放在 `reasoning_content`。但如果 prompt 要求严格 JSON，模型偶
- *     发会只写 reasoning_content 而 content 为空。对此我们做了 3 层兜底：
- *       1) content 空 -> 用 reasoning_content 里解析 JSON
- *       2) 还是空 -> 自动 sleep 后 retry 一次（思考模型偶尔首轮只推理不输出正文）
- *       3) 实在不行抛错（上层 generator 会写 partial 并跳过）
- *   · 不建议把默认模型换成思考模型（又慢又贵又不稳定，JSON 任务 V3 足够）
+ *   · deepseek-v4-flash 默认「思考模式」，max_tokens 限制的是「思维链 + 最终答案」总长度，
+ *     思考过长会把 token 耗尽（finish_reason=length），导致 content 为空或被截断
+ *     （实测 JSON 任务与叙事都出现过，表现为「杜牧写：」等残句）。
+ *     因此本项目所有调用统一关闭思考（thinking: { type: 'disabled' }），
+ *     content 独占 max_tokens，输出完整稳定，也不会返回 reasoning_content。
+ *   · 兜底保留：万一上游忽略 thinking 参数，content 空时仍尝试从 reasoning_content 提取 JSON。
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
-// JSON 任务：非思考模型（deepseek-chat = V3）更便宜更稳，不要用 V4/R1
-const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+// 模型名已统一为 deepseek-v4-flash（deepseek-chat 已下线）
+const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
 
 // 运行时 API Key 持久化文件（兼容 ts-node 开发 和 tsc 编译后生产环境）
 function resolveKeyFilePath(): string {
@@ -101,21 +100,16 @@ export async function deepseekChat(
     throw new Error('DEEPSEEK_API_KEY 未设置，请在设置中配置或在环境变量中设置')
   }
 
-  // JSON 任务（默认开）：思考模型（v4-flash / reasoner / R1 等）会把正式答案放
-  // reasoning_content 而 content 为空，实测不稳定 → 一律回退非思考模型 deepseek-chat。
-  // 自由文/聊天任务（jsonMode=false）不受影响，继续用配置模型。
   const wantJson = options.jsonMode !== false
-  const THINKING_MODELS = ['deepseek-v4-flash', 'deepseek-v4', 'deepseek-reasoner', 'deepseek-r1', 'deepseek-r1-0528']
-  let model = options.model || DEFAULT_MODEL
-  if (wantJson && THINKING_MODELS.includes(model.toLowerCase())) {
-    console.warn(`⚠️ [deepseek] JSON 任务使用思考模型 ${model} 不稳定，回退 deepseek-chat`)
-    model = 'deepseek-chat'
-  }
+  const model = options.model || DEFAULT_MODEL
   const body: Record<string, unknown> = {
     model,
     messages,
     temperature: options.temperature ?? 0.8,
-    max_tokens: options.maxTokens ?? 800,
+    max_tokens: options.maxTokens ?? 2048,
+    // 统一关闭思考模式：v4-flash 思考模式会把 max_tokens 耗在 reasoning_content，
+    // 导致 content 为空/截断（实测 finish_reason=length）。产品输出均不需要公开思维链。
+    thinking: { type: 'disabled' },
   }
 
   // DeepSeek 联网搜索（如果模型支持）
@@ -148,12 +142,21 @@ export async function deepseekChat(
   }
 
   const json = await res.json() as {
-    choices: Array<{ message: { content: string | null; reasoning_content?: string | null } }>
+    choices: Array<{
+      message: { content: string | null; reasoning_content?: string | null }
+      finish_reason?: string | null
+    }>
   }
 
   const message = json.choices?.[0]?.message
   const content = (message?.content ?? '').trim()
   const reasoning = (message?.reasoning_content ?? '').trim()
+  const finishReason = json.choices?.[0]?.finish_reason
+
+  // 思考关闭后理论上不会触发；若仍被截断（思考模式被上游忽略），明确报错提示
+  if (finishReason === 'length') {
+    throw new Error(`DeepSeek 输出被 max_tokens 截断（finish_reason=length），请增大 maxTokens（当前 ${options.maxTokens ?? 2048}）`)
+  }
 
   // 1) 正常情况：content 有值直接用
   if (content) return content

@@ -133,9 +133,9 @@ export async function generatePersona(
         },
       ],
       {
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
         temperature: 0.8,
-        maxTokens: 1200,
+        // 画像 JSON 约 800-1100 tokens；思考已全局关闭，留足余量防截断
+        maxTokens: 1600,
       },
     ),
     // 复用旧版 "古今共望" 叙事 prompt，但去掉三段小节 + 标题，只留正文 2~3 段

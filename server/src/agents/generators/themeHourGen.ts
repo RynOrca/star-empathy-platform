@@ -109,10 +109,9 @@ export async function generateThemeHourTexts(
       },
     ],
     {
-      // V3 非思考模型，配合 response_format.json_object 最稳；可用 env 覆盖
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       temperature: 0.7,
-      maxTokens: 700,
+      // 三段文 + JSON 结构约 700-900 tokens；思考已全局关闭，content 独占，留足余量防截断
+      maxTokens: 1400,
     },
   )
 

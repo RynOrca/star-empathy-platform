@@ -212,9 +212,9 @@ async function generateInsights(
       { role: 'user', content: buildInsightPrompt({ starName: meta.starName, constellation: meta.constellation, emotionScores, samples }) },
     ],
     {
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       temperature: 0.7,
-      maxTokens: 900,
+      // 3 条洞察 JSON 约 700-1000 tokens；思考已全局关闭，留足余量防截断
+      maxTokens: 1600,
     },
   )
   const parsed = safeParseInsights(content)
