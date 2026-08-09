@@ -1055,7 +1055,8 @@ function onStarIdentityClick(e: CustomEvent<{ starId: number }>) {
 // 新增 starIdOverride：当外部事件（非路由 query）需要触发相同定位时直接传 id，不走 route.query
 function focusOnQueryStar(starIdOverride?: number) {
   const targetStarId = starIdOverride != null ? String(starIdOverride) : route.query.star
-  if (!targetStarId) return
+  // targetStarId 可能是 '0'（字符串）也可能是 0（number 转换前）；天枢 id=0 合法，只挡空值
+  if (targetStarId === null || targetStarId === undefined || targetStarId === '') return
   const starId = parseInt(targetStarId as string, 10)
   if (isNaN(starId)) return
   // 负 id = 太阳系行星，走 onPlanetClick → focusOnPlanet 路径（修复收藏行星无法跳转 issue #135）
@@ -2446,7 +2447,8 @@ function onDeleteStory(storyId: number) {
  *  - 这里兜底：刷新 catalogStats / 过滤计数（已有 onDeleteStory/onResonate 单独处理，冗余不坏事）
  */
 function onStarDetailStoriesMutated(kind: 'new' | 'delete' | 'resonate' | 'kernel-edit') {
-  if (!selectedCatalogStarId.value) return
+  // id=0（天枢）是合法 catalog 星
+  if (selectedCatalogStarId.value === null || selectedCatalogStarId.value === undefined || Number.isNaN(selectedCatalogStarId.value)) return
   // 任何真实变更都会让缓存过期，下次 fetchStories 重新拉全量
   invalidateStoriesCache()
   if (kind === 'resonate' || kind === 'delete' || kind === 'kernel-edit') {

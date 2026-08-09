@@ -834,7 +834,8 @@ function scrollToStory(i: number) {
 
 // ─── Favorites helpers (Task5) ───
 async function goToStarWithCheck(starCatalogId: number | undefined, favId: number) {
-  if (!starCatalogId) {
+  // id=0（天枢）是合法 catalog 星，仅 null/undefined 视为缺少归属星
+  if (starCatalogId === null || starCatalogId === undefined || Number.isNaN(starCatalogId)) {
     console.warn('[Profile] 收藏记录缺少 catalog_star_id:', favId)
     return
   }

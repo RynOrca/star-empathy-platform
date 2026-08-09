@@ -1563,7 +1563,8 @@ watch(
 // ─── AI 内核标签 ───
 const kernel = useKernel()
 watch(() => props.catalogStarId, (id) => {
-  if (id) {
+  // id=0（天枢）是合法 catalog 星
+  if (id !== null && id !== undefined && !Number.isNaN(id)) {
     kernel.reset()
     kernel.fetchAggregatedTags(id)
   }
@@ -1592,7 +1593,7 @@ const starAnalysis = useStarAnalysis(catalogStarIdNullable)
  */
 function retriggerStarAnalysis() {
   starAnalysis.reset()
-  if (catalogStarIdNullable.value) {
+  if (catalogStarIdNullable.value !== null && catalogStarIdNullable.value !== undefined && !Number.isNaN(catalogStarIdNullable.value)) {
     starAnalysis.fetchAnalysis()
   }
 }
