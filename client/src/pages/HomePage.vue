@@ -807,5 +807,12 @@ onMounted(async () => {
   .back-link {
     transition: none;
   }
+  /* 开场衔接入场动画：减少动画时直接显示，不延迟不位移 */
+  .left-panel,
+  .right-panel {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>
