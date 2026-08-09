@@ -133,9 +133,9 @@ export async function generatePersona(
         },
       ],
       {
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
         temperature: 0.8,
-        maxTokens: 1200,
+        // 统一 8000：彻底杜绝 max_tokens 截断
+        maxTokens: 8000,
       },
     ),
     // 复用旧版 "古今共望" 叙事 prompt，但去掉三段小节 + 标题，只留正文 2~3 段
@@ -234,11 +234,12 @@ function clampPct(n: unknown): number {
 
 /**
  * 段落有效性：非空、有足够长度，且不是"XX写：/写道："之类的诗句引导残句
- * （AI 输出中断时最常见的形态就是只输出引导词、正文为空）
+ * （AI 输出中断时常见的形态：只输出引导词、正文为空，或以冒号/逗号等不完整标点结尾）
  */
 function isValidParagraph(text: string): boolean {
   const s = (text ?? '').trim()
   if (!s || s.length < 10) return false
-  if (/^[\u4e00-\u9fa5A-Za-z·\-\s]{1,14}(写|写道|曰|吟|赋)[:：]\s*$/.test(s)) return false
+  // 以不完整标点结尾（「杜牧写：」「……思念：」「……，写下：」）→ 中断残句
+  if (/[:：，,、；;…]$/.test(s)) return false
   return true
 }

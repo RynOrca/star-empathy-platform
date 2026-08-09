@@ -95,3 +95,13 @@ jobs:
             echo "=== 部署完成 ==="
             free -h
             pm2 status
+
+            echo "=== 7/6 修复存量 persona 残句（幂等：以冒号/逗号等不完整标点结尾的段落替换为金句/兜底文案）==="
+            node dist/scripts/fix-persona-truncated.js \
+              || echo "⚠️ 残句修复未完成（不影响部署，下次 push 会继续）"
+
+            echo "=== 8/6 补全 AI 星格画像（幂等：跳过已生成的，前 30 颗高故事星）==="
+            cd /var/www/star-empathy-platform/server
+            node dist/scripts/generateAllAnalyses.js --limit 30 \
+              || echo "⚠️ AI 分析生成未完成（不影响部署，下次 push 会继续补）"
+            pm2 status
