@@ -134,7 +134,8 @@ const suggest     = computed(() => props.persona?.suggestIntro ?? '')
 function isInvalidPara(t: string): boolean {
   const s = (t ?? '').trim()
   if (!s || s.length < 10) return true
-  return /^[\u4e00-\u9fa5A-Za-z·\-\s]{1,14}(写|写道|曰|吟|赋)[:：]\s*$/.test(s)
+  // 以不完整标点结尾（「杜牧写：」「……思念：」）→ 中断残句
+  return /[:：，,、；;…]$/.test(s)
 }
 const invalidParaFirst  = computed(() => isInvalidPara(props.persona?.paragraphs?.[0] ?? ''))
 const invalidParaSecond = computed(() => isInvalidPara(props.persona?.paragraphs?.[1] ?? ''))
