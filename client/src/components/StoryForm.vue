@@ -1154,11 +1154,19 @@ defineExpose({ doSubmit, resetForm })
 /* ── 常驻合集 panel（sf-panel-collection）：紧凑，不继承 min-height ── */
 .sf-panel-collection {
   min-height: 0;
+  /* 覆盖 .sf-panel 的 overflow: hidden，避免 CollectionPicker 触发器下边框/阴影被裁剪 */
+  overflow: visible;
+  /* 作为 sf-body flex 子项，禁止压缩，让 panel 高度跟随 field 内容，
+     避免 field 高度超过 panel 导致"背景框框太矮"把 CollectionPicker 下边遮住 */
+  flex-shrink: 0;
   background: linear-gradient(180deg, rgba(255, 217, 138, 0.025), var(--bg-elevated));
   border: 1px solid rgba(255, 217, 138, 0.10);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.008);
 }
-.sf-field-collection { padding: 10px 16px 11px; gap: 6px }
+.sf-field-collection {
+  padding: 10px 16px 14px;
+  gap: 6px;
+}
 .sf-field-collection .sf-label { font-size: 10px; }
 
 /* ═══════ 分组 Panel（内嵌 Card，StarDetail 内嵌面板风） ═══════ */
@@ -1823,7 +1831,7 @@ defineExpose({ doSubmit, resetForm })
   .sf-body { padding: 12px 18px 20px; gap: 14px }
   .sf-panel { min-height: 0 }
   .sf-field { padding: 14px 18px 15px }
-  .sf-field-collection { padding: 9px 14px 10px }
+  .sf-field-collection { padding: 12px 14px 14px }
   .sf-field-collection .sf-label { font-size: 9.5px }
   .sf-sep { margin-left: 18px }
   .sf-textarea { min-height: 220px }

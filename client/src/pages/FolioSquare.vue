@@ -7,7 +7,7 @@
     </div>
 
     <!-- ═══════ 顶部 Sticky 导航栏 ═══════ -->
-    <header class="fs-top">
+    <header class="fs-top" :class="{ 'fs-top-collapsed': isTopCollapsed }">
       <div class="fs-top-left">
         <!-- 左上角：醒目退出按钮（直接回天际，取代原右上"回天际"功能） -->
         <button class="fs-exit" @click="exitToSky" aria-label="退出穹庭书局 · 回天际">
@@ -23,23 +23,52 @@
         </div>
       </div>
       <div class="fs-top-mid">
-        <div class="fs-search">
-          <Search :size="12" class="fs-search-icon" />
-          <input
-            v-model="searchQuery"
-            class="fs-search-input"
-            type="search"
-            placeholder="搜索星笺 / 故事正文 / 标签…"
-            aria-label="搜索星笺或故事"
-          />
+        <div class="fs-search-wrap">
+          <div class="fs-search" :class="{ 'fs-search-active': searchQuery.trim() }">
+            <Search :size="12" class="fs-search-icon" />
+            <input
+              v-model="searchQuery"
+              class="fs-search-input"
+              type="search"
+              placeholder="搜索星笺 / 故事正文 / 标签…"
+              aria-label="搜索星笺或故事"
+              @focus="openSearchDropdown"
+              @blur="onSearchBlur"
+              @keydown.enter.prevent="openFirstSearchResult"
+            />
+            <!-- 搜索中 spinner / 清除按钮 -->
+            <span v-if="searchLoading && searchQuery.trim()" class="fs-search-spinner" aria-label="搜索中"></span>
+            <button v-else-if="searchQuery.trim()" class="fs-search-clear" @click="searchQuery = ''" aria-label="清除搜索">
+              <X :size="12" />
+            </button>
+          </div>
+          <!-- 搜索下拉结果（即时反馈，不再整页跳转到书架） -->
+          <div v-if="searchDropdownOpen" class="fs-search-dropdown" @mousedown.prevent>
+            <div v-if="searchLoading" class="fs-sd-loading">正在检索星笺…</div>
+            <template v-else>
+              <button
+                v-for="r in searchResults"
+                :key="r.id"
+                type="button"
+                class="fs-sd-item"
+                @click="openSearchResult(r)"
+              >
+                <span class="fs-sd-name">{{ r.name }}</span>
+                <span class="fs-sd-meta">{{ r.storyCount ?? 0 }} 则</span>
+                <span class="fs-sd-go">开卷 →</span>
+              </button>
+              <div v-if="!searchResults.length" class="fs-sd-empty">未找到匹配的星笺</div>
+            </template>
+          </div>
         </div>
       </div>
       <div class="fs-top-right">
-        <button v-if="canCreate" class="fs-btn fs-btn-warm" type="button" @click="goProfileNewFolio">
+        <!-- 移动端隐藏"写星笺"按钮，让刷新按钮独占右上角；PC 端两个按钮都显示 -->
+        <button v-if="canCreate" class="fs-btn fs-btn-warm fs-btn-create" type="button" @click="goProfileNewFolio">
           <Plus :size="12" />
           <span>写星笺</span>
         </button>
-        <button class="fs-btn fs-btn-glass" type="button" @click="reloadAll">
+        <button class="fs-btn fs-btn-glass fs-btn-refresh" type="button" @click="reloadAll">
           <RotateCcw :size="12" />
           <span>刷新</span>
         </button>
@@ -196,7 +225,12 @@
             <h2 class="fs-head-title">{{ volumeTabLabel }}</h2>
             <span class="fs-head-sub">{{ volumeTotalLabel }}</span>
           </div>
-          <span class="fs-head-hint">{{ shelfList.length }} 册已加载</span>
+          <span class="fs-head-hint">
+            <template v-if="searchQuery.trim()">
+              {{ shelfLoading ? '搜索中…' : `找到 ${shelfList.length} 册` }}
+            </template>
+            <template v-else>{{ shelfList.length }} 册已加载</template>
+          </span>
         </header>
 
         <!-- 卷目 Tab：全部卷 / 官方星河 / 星友新作 / 匿名手记，移到「全部卷」下方；筛选只针对书架生效 -->
@@ -333,24 +367,75 @@ const volumeTotalLabel = computed(() => {
   return `共 ${totalFolios.value} 册公开星笺 · ${totalStories.value} 则故事`
 })
 
-/* ─── 搜索：P2 正式启用；防抖 250ms 触发书架重新拉取 ─── */
+/* ─── 搜索：防抖 250ms。
+     类型即搜：拉取下拉结果（即时反馈，悬浮在搜索框下，不再整页跳到书架），同时同步过滤书架 ─── */
 const searchQuery = ref('')
+const searchLoading = ref(false)
+const searchResults = ref<Collection[]>([])
+const searchDropdownOpen = ref(false)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-function debounceReloadShelf(reason: 'search' | 'sort' = 'search') {
+
+function openSearchDropdown() {
+  if (searchQuery.value.trim()) searchDropdownOpen.value = true
+}
+function onSearchBlur() {
+  // 延迟关闭，让下拉项 click 先触发
+  setTimeout(() => { searchDropdownOpen.value = false }, 150)
+}
+
+async function fetchSearchResults() {
+  const kw = searchQuery.value.trim()
+  if (!kw) {
+    searchResults.value = []
+    searchDropdownOpen.value = false
+    return
+  }
+  searchLoading.value = true
+  searchDropdownOpen.value = true
+  try {
+    const params = new URLSearchParams()
+    params.set('search', kw)
+    params.set('limit', '8')
+    params.set('sort', 'hot')
+    const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
+    const json = await res.json()
+    searchResults.value = res.ok
+      ? ((json.data?.items ?? []) as any[]).map((r: any) => normalizeCollection(r, { withStories: false }))
+      : []
+  } catch {
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+function debounceSearch() {
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
     searchDebounceTimer = null
+    fetchSearchResults()
+    // 书架同步按当前搜索词过滤（保留全量结果面板，用作"查看全部"）
     resetShelf()
     fetchShelfPage(1)
-  }, reason === 'sort' ? 0 : 250)
+  }, 250)
 }
 watch(searchQuery, () => {
-  // 防抖 250ms；空搜索词也重拉（回到当前卷默认结果）
-  debounceReloadShelf('search')
+  debounceSearch()
 })
+
+function openSearchResult(c: { id: number; name: string }) {
+  searchDropdownOpen.value = false
+  openDetail(c)
+}
+function openFirstSearchResult() {
+  if (searchResults.value.length > 0) {
+    openSearchResult(searchResults.value[0])
+  }
+}
 /* 排序切换：立即刷新书架列表 */
 watch(activeSort, () => {
-  debounceReloadShelf('sort')
+  resetShelf()
+  fetchShelfPage(1)
 })
 
 /* ─── 权限：登录且非访客才能新建 ─── */
@@ -568,19 +653,91 @@ function onReelsTrackScroll() {
   reelsScrollRaf = requestAnimationFrame(updateReelButtons)
 }
 
+/* ─── 移动端顶部栏滚动方向感知：往下滑收起 / 往上滑弹出 ─── */
+/* 实现：滚动直读方向 + 触摸实时反馈双方案。
+   - scroll 事件直读 scrollY 增减判断方向（鼠标滚轮 / 惯性滚动 / 触摸滚动都触发）
+   - touchmove 用手指位移实时反馈（手机浏览器原生搜索框同款手感） */
+const isTopCollapsed = ref(false)
+let lastScrollY = 0
+let scrollDirRaf = 0
+let touchStartY = 0        // touchstart 起始 Y
+const TOP_BAR_HIDABLE = typeof window !== 'undefined' ? window.matchMedia('(max-width: 720px)') : null
+const SCROLL_THRESHOLD = 5 // 超过此位移才触发（px）
+
+function setCollapsed(collapsed: boolean) {
+  if (isTopCollapsed.value !== collapsed) isTopCollapsed.value = collapsed
+}
+
+function onWindowScrollForTopBar() {
+  if (scrollDirRaf) cancelAnimationFrame(scrollDirRaf)
+  scrollDirRaf = requestAnimationFrame(() => {
+    if (!TOP_BAR_HIDABLE || !TOP_BAR_HIDABLE.matches) {
+      if (isTopCollapsed.value) isTopCollapsed.value = false
+      lastScrollY = window.scrollY || 0
+      return
+    }
+    const y = window.scrollY || window.pageYOffset || 0
+    const delta = y - lastScrollY
+    lastScrollY = y
+
+    // 在顶部附近始终展开（避免刚进页面被误收起）
+    if (y < 32) {
+      setCollapsed(false)
+      return
+    }
+
+    // 直读方向：上滑（delta<0）弹出，下滑（delta>0）收起；小阈值防抖动
+    if (delta < -SCROLL_THRESHOLD) setCollapsed(false)
+    else if (delta > SCROLL_THRESHOLD) setCollapsed(true)
+  })
+}
+
+/* 触摸事件：手指位移实时反馈（最可靠，手机浏览器原生搜索框就是这种方案） */
+function onTouchStartForTopBar(e: TouchEvent) {
+  if (e.touches.length !== 1) return
+  touchStartY = e.touches[0].clientY
+}
+
+function onTouchMoveForTopBar(e: TouchEvent) {
+  if (!TOP_BAR_HIDABLE || !TOP_BAR_HIDABLE.matches) return
+  if (e.touches.length !== 1) return
+  const y = window.scrollY || 0
+  // 在顶部附近始终展开
+  if (y < 32) {
+    setCollapsed(false)
+    return
+  }
+  // 手指在屏幕上向上移动 → 内容向上滚（向下浏览）→ 收起
+  // 手指在屏幕上向下移动 → 内容向下滚（向上浏览）→ 弹出
+  const dy = e.touches[0].clientY - touchStartY
+  if (dy < -SCROLL_THRESHOLD) {
+    setCollapsed(true)
+  } else if (dy > SCROLL_THRESHOLD) {
+    setCollapsed(false)
+  }
+}
+
 onMounted(() => {
   reloadAll().finally(attachInfiniteScroll)
-  // reels scroll 监听
   setTimeout(() => {
     const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
     track?.addEventListener('scroll', onReelsTrackScroll, { passive: true })
   }, 200)
+  // 顶部栏滚动方向监听（passive + rAF 节流）
+  window.addEventListener('scroll', onWindowScrollForTopBar, { passive: true })
+  // 触摸事件（移动端最可靠的方向检测）
+  window.addEventListener('touchstart', onTouchStartForTopBar, { passive: true })
+  window.addEventListener('touchmove', onTouchMoveForTopBar, { passive: true })
 })
 onBeforeUnmount(() => {
   io?.disconnect()
   io = null
   const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
   track?.removeEventListener('scroll', onReelsTrackScroll)
+  window.removeEventListener('scroll', onWindowScrollForTopBar)
+  window.removeEventListener('touchstart', onTouchStartForTopBar)
+  window.removeEventListener('touchmove', onTouchMoveForTopBar)
+  if (scrollDirRaf) cancelAnimationFrame(scrollDirRaf)
 })
 
 /* 暴露一个只读的计数 state 辅助（以后可以放 store） */
@@ -778,9 +935,10 @@ updateVolumeCountsQuick()
 }
 
 .fs-top-mid { display: flex; align-items: center; justify-content: center; }
+.fs-search-wrap { position: relative; width: min(520px, 100%); }
 .fs-search {
   display: inline-flex; align-items: center; gap: 8px;
-  width: min(520px, 100%);
+  width: 100%;
   padding: 7px 12px;
   border-radius: var(--radius-full);
   background: var(--overlay-04);
@@ -797,6 +955,77 @@ updateVolumeCountsQuick()
 }
 .fs-search-input::placeholder { color: var(--muted); opacity: 0.6; }
 .fs-search-input:disabled { cursor: not-allowed; opacity: 0.6; }
+/* 搜索激活态：边框高亮 */
+.fs-search-active { background: var(--overlay-08); box-shadow: 0 0 0 1px rgba(255, 217, 138, 0.25); }
+/* 搜索中 spinner */
+.fs-search-spinner {
+  width: 14px; height: 14px; flex-shrink: 0;
+  border: 1.5px solid var(--muted);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: fs-spin 0.6s linear infinite;
+}
+@keyframes fs-spin { to { transform: rotate(360deg); } }
+/* 清除搜索按钮 */
+.fs-search-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: var(--overlay-08);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.fs-search-clear:hover { background: var(--overlay-16); color: var(--ink); }
+/* 隐藏 input type=search 原生清除按钮，避免与自定义清除按钮重复出现两个叉叉 */
+.fs-search-input::-webkit-search-cancel-button,
+.fs-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+
+/* ═══ 搜索下拉结果面板（类型即搜，悬浮于搜索框之下） ═══ */
+.fs-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  z-index: 60;
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(16, 18, 40, 0.98);
+  border: 1px solid rgba(255, 217, 138, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.fs-sd-loading, .fs-sd-empty {
+  padding: 14px 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+.fs-sd-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.fs-sd-item:hover { background: var(--overlay-08); }
+.fs-sd-name {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 500;
+}
+.fs-sd-meta { font-size: 0.68rem; color: var(--muted); flex-shrink: 0; }
+.fs-sd-go { font-size: 0.7rem; color: var(--accent); flex-shrink: 0; font-weight: 500; }
 
 .fs-top-right { display: flex; align-items: center; gap: 8px; }
 .fs-btn {
@@ -1356,17 +1585,29 @@ updateVolumeCountsQuick()
     grid-template-rows: auto auto;
     row-gap: 8px;
     padding: 8px 12px;
+    /* 滚动方向感知：往下浏览时收起，往上滑时弹出 */
+    transition: transform 0.32s cubic-bezier(.22, 1, .36, 1);
   }
-  .fs-top-mid { grid-column: 1 / -1; justify-content: stretch; }
+  .fs-top.fs-top-collapsed { transform: translateY(-100%); }
+  /* 明确 grid 位置：DOM 顺序为 left→mid→right，但 mid 跨两列会导致 auto-placement 把 right 推到第3行，
+     必须显式指定 left/right 在第1行、mid 在第2行 */
+  .fs-top-left { grid-column: 1; grid-row: 1; }
+  .fs-top-right { grid-column: 2; grid-row: 1; justify-self: end; }
+  .fs-top-mid { grid-column: 1 / -1; grid-row: 2; justify-content: stretch; }
+  .fs-search-wrap { width: 100%; }
   .fs-search { width: 100%; }
-  .fs-top-right { justify-self: end; }
+  /* 移动端隐藏"写星笺"按钮，刷新按钮独占右上角 */
+  .fs-btn-create { display: none; }
   /* 移动端退出按钮：仅显示 X 图标，省空间 */
   .fs-exit { height: 32px; padding: 0 9px; font-size: 0; }
   .fs-exit span { display: none; }
-  /* 引导条：移动端适配宽度 */
-  .fs-hero-strip { width: calc(100% - 28px); margin-top: 62px; padding: 7px 12px; }
-  .fhs-sub { display: none; }   /* 移动端隐藏副标，只留 ICON + 主名 */
-  .fs-main { padding: 16px 14px 30px; }
+  /* 引导条：移动端与顶部栏「穹庭书局」品牌重复，且会与搜索框重叠 → 隐藏 */
+  .fs-hero-strip { display: none; }
+  /* 预留 fixed 顶部栏空间（实测顶部栏两行高约 91px + 1px 间距），
+     避免"官方星河"等内容跑到顶部栏背景层被遮挡 */
+  .fs-main { padding: 92px 14px 30px; }
+  /* 移动端缩小 section-head 顶部 margin，让"官方星河"紧接顶部栏 */
+  .fs-section-head { margin-top: 12px; }
   .fs-picks { grid-template-columns: 1fr; }
   .fs-pick { min-height: auto; }
   .fs-filters { flex-direction: column; align-items: stretch; }

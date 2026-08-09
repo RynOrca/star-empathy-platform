@@ -67,7 +67,7 @@
       </div>
 
       <!-- 详情：直接嵌入 CollectionDetail 组件
-           用 fdp-content-wrap 强制取消它原本的 overlay fixed 定位（用 :deep 覆盖） -->
+           任务4：移动端用 flat-mode 整页展示，不再是底部抽屉；PC 端继续用 :deep 拍平模态壳 -->
       <div v-else class="fdp-content-wrap" :key="refreshNonce">
         <CollectionDetail
           :collection-id="collectionId"
@@ -75,6 +75,7 @@
           :current-user-id="userId"
           :is-owner="isOwner"
           :refresh-nonce="refreshNonce"
+          :flat-mode="true"
           @close="backToSquare"
           @story-click="onStoryClick"
           @edit="onWantEditDenied"
@@ -484,29 +485,18 @@ watch(idFromRoute, () => {
   max-height: none !important;
   overflow: visible !important;
 }
-/* 详情页关闭按钮：纯 overlay 块，无硬边 */
-.fdp-content-wrap :deep(.close-btn),
-.fdp-content-wrap :deep(.mobile-close-btn) {
+/* 详情页关闭按钮：纯 overlay 块，无硬边（仅 PC 端 .close-btn；移动端 flatMode 下不存在 .mobile-close-btn） */
+.fdp-content-wrap :deep(.close-btn) {
   background: var(--overlay-04) !important;
   color: var(--ink-secondary) !important;
   border: none !important;
 }
-.fdp-content-wrap :deep(.close-btn:hover),
-.fdp-content-wrap :deep(.mobile-close-btn:hover) {
+.fdp-content-wrap :deep(.close-btn:hover) {
   background: var(--accent-subtle) !important;
   color: var(--accent) !important;
 }
-/* Mobile: 改 sheet 为正常流容器 */
-.fdp-content-wrap :deep(.mobile-sheet) {
-  position: relative !important;
-  bottom: auto !important;
-  width: 100% !important;
-  max-height: none !important;
-  border-radius: var(--radius-xl) !important;
-  margin: 10px auto 0 !important;
-  transform: none !important;
-}
-.fdp-content-wrap :deep(.sheet-handle) { display: none !important; }
+/* 任务4：移动端 flat-mode 整页样式已在 CollectionDetail 内部 .mobile-overlay.flat-mode /
+ * .mobile-sheet.flat-mode 中定义，这里不再重复 :deep 覆盖（避免 !important 冲突） */
 
 /* 响应式 */
 @media (max-width: 720px) {
