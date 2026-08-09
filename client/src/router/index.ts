@@ -46,12 +46,12 @@ router.beforeEach((to, _from, next) => {
 	const welcomed = sessionStorage.getItem("welcomed");
 	if (to.meta.requiresAuth && !token) {
 		next("/");
-	} else if (to.path === "/" && token) {
-		next("/sky");
-	} else if (to.path === "/" && !token && !welcomed) {
-		// 首次访问：先看开场（会话内只跳转一次，刷新后不再重放）
+	} else if (to.path === "/" && !welcomed) {
+		// 新会话访问根路径：一律先看开场（登录与否都看；会话内只播一次，刷新不重放，新开标签页重播）
 		sessionStorage.setItem("welcomed", "1");
 		next("/welcome");
+	} else if (to.path === "/" && token) {
+		next("/sky");
 	} else {
 		next();
 	}
