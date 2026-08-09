@@ -51,7 +51,7 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
+| `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt）。**所有叙事生成调用固定 `model: 'deepseek-chat'`（非思考模型），避免 v4-flash 等思考模型输出自由文时中途中断（如只输出"杜牧写："）** |
 | `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置；**JSON 任务（默认开）遇到思考模型（deepseek-v4-flash/reasoner/R1）自动回退 `deepseek-chat`**，避免 content 为空导致生成失败 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
 | `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者） |
@@ -104,7 +104,7 @@
 | --- | --- |
 | `starAnalysisAgent.ts` | **分析总控 Agent**。`ensureOne()` 单星懒生成（story_hash 幂等 + 1200ms 节流 + partial 入库）；`runAll()` 批量按故事数 DESC + 亮星优先级排序；`upsertAnalysis()` 写 catalog_star_analyses 表 |
 | `collectionAnalysisAgent.ts` | **合集级 AI 分析总控 Agent（Phase 2 预留，当前无文件，待接真实 pipeline）**。将复用 personaGen/emotionGen 并新增 nightscapeGen 做夜空意象/夜色流转/心事轨迹五大气象模型生成；`triggerAnalysisIfNeeded()` 会检查 ready=false → 启动异步任务 → 写 `collection_analyses` 表回 ready=true 给前端轮询拉到 |
-| `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读 |
+| `generators/personaGen.ts` | 人格画像生成器。DeepSeek 取 5 标签/金句/4 维度 + 复用「古今共望」叙事正文做两段解读。**段落完整性校验**：过滤 <10 字 / "XX写："残句，依次兜底（有效叙事段 → 金句 → 通用文案），残句永不入库 |
 | `generators/emotionGen.ts` | 情感解构 + 故事摘录生成器。5 色情绪球 + 百分比洞察 + Top3 独白卡片 |
 | `generators/themeHourGen.ts` | 主题森林/时辰观察三段文生成器。forestNote（森林引导） + peakText（活跃时段） + lowText（沉睡时段） |
 

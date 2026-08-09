@@ -154,11 +154,19 @@ export async function generatePersona(
   // 前端会覆盖 constellation，但至少塞一份可读的进去
   if (!json.constellation) json.constellation = `${meta.starName} · ${meta.constellation}`
 
-  // 替换 AI 占位的 paragraphs 为真实的"古今共望"叙事正文
-  // 保证是 2 段；叙事段不足则用 persona.json 原本内容补齐（如果原来不是占位符就保留）
+  // 替换 AI 占位的 paragraphs 为真实的"古今共望"叙事正文。
+  // 关键：叙事输出可能残缺（思考模型中途中断，如只输出"杜牧写："而没有诗句），
+  // 必须先过滤无效段落，再依次兜底：有效叙事段 → 金句 quote → 通用兜底文案。
+  // 保证两段都是完整可读的文本，绝不把"XX写："之类的残句入库。
   const orig = json.paragraphs as unknown as string[] | undefined
-  const p0 = narrativeParagraphs[0]?.trim() || (!orig || orig[0] === '__KEEP__' ? FALLBACK_PARAGRAPH[0] : orig[0])
-  const p1 = narrativeParagraphs[1]?.trim() || narrativeParagraphs[0]?.trim() || (!orig || orig[1] === '__KEEP__' ? FALLBACK_PARAGRAPH[1] : orig[1])
+  const validNarr = narrativeParagraphs.map(s => (s ?? '').trim()).filter(isValidParagraph)
+  const quoteT = (json.quote || '').trim()
+  const p0 = validNarr[0] || quoteT || FALLBACK_PARAGRAPH[0]
+  const p1 =
+    validNarr[1] ||
+    (validNarr[0] && validNarr[0] !== p0 ? validNarr[0] : '') ||
+    (quoteT && quoteT !== p0 ? quoteT : '') ||
+    FALLBACK_PARAGRAPH[1]
   json.paragraphs = [p0, p1] as [string, string]
 
   return json
@@ -222,4 +230,15 @@ function clampPct(n: unknown): number {
   if (v >= 90) return 62
   if (v === 50) return 52
   return Math.round(v)
+}
+
+/**
+ * 段落有效性：非空、有足够长度，且不是"XX写：/写道："之类的诗句引导残句
+ * （AI 输出中断时最常见的形态就是只输出引导词、正文为空）
+ */
+function isValidParagraph(text: string): boolean {
+  const s = (text ?? '').trim()
+  if (!s || s.length < 10) return false
+  if (/^[\u4e00-\u9fa5A-Za-z·\-\s]{1,14}(写|写道|曰|吟|赋)[:：]\s*$/.test(s)) return false
+  return true
 }
