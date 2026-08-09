@@ -749,7 +749,8 @@ try {
     if (token) {
       const cachedUname = localStorage.getItem('username')
       const cachedUid = localStorage.getItem('userId')
-      username.value = cachedUname || 'placeholder-user'
+      // 没有缓存 username 时保持空（显示登录按钮），绝不冒充已登录 —— 访客/过期 token 首帧就应显示登录按钮
+      username.value = cachedUname || ''
       if (cachedUid) currentUserId.value = Number(cachedUid) || null
     }
   }
@@ -1102,6 +1103,8 @@ watch(() => route.query.star, () => {
 function goLogin() {
   stopRefreshTimer()
   localStorage.removeItem('token')
+  localStorage.removeItem('username')
+  localStorage.removeItem('userId')
   router.push('/')
 }
 

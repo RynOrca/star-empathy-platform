@@ -1172,7 +1172,20 @@ async function loadProfileData() {
       authFetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
-    if (meRes.ok) user.value = meJson.data
+    if (meRes.ok) {
+      const me = meJson.data
+      // 访客账号（体验账号）无个人主页：无论从哪个入口进来都应回登录页。
+      // 同时结束访客会话（清 token），否则守卫会把 '/' 再弹回 /sky，访客永远到不了登录页
+      if (me && me.username === '星穹访客') {
+        showFlash('访客账号无个人主页，请登录后使用', 'info')
+        localStorage.removeItem('token')
+        localStorage.removeItem('username')
+        localStorage.removeItem('userId')
+        router.push('/')
+        return
+      }
+      user.value = me
+    }
     const firstJson = await firstPageRes.json()
     if (firstPageRes.ok && firstJson.data) {
       const items = firstJson.data.items ?? firstJson.data ?? []

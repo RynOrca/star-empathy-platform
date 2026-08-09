@@ -338,6 +338,8 @@ async function handleGuestAccess() {
     const json = await res.json()
     if (!res.ok) throw new Error(json.message || '请求失败')
     localStorage.setItem('token', json.data.token)
+    localStorage.setItem('username', '星穹访客')
+    localStorage.setItem('userId', String(json.data.user.id))
     router.push('/sky')
   } catch (e: any) {
     error.value = e.message || '访客登录失败'
