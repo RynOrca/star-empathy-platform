@@ -177,7 +177,17 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- 底部说明：AI 解读免责（对齐星笺页面）-->
+
+
                 </div>
+
+                <div class="ca-foot-note">
+                  <Info :size="11" />
+                  <span>AI 解读内容由 agent 根据此星下的心事实时聚合生成。</span>
+                </div>
+          
               </div>
             </div>
           </template>
@@ -1026,7 +1036,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Info } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -2154,15 +2164,25 @@ watch(() => props.catalogStarId, () => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Tab 引导条：固定内容高不收缩，让滚动区 narrative-top 拿走剩余高 */
+.tab-intro {
+  flex-shrink: 0;
 }
 .narrative-top {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  /* 兜底：滚动容器内末段留白 24px，保证共鸣榜/最新心事底不被面板底边裁掉 */
+  padding-bottom: 24px;
 }
 .narrative-top::-webkit-scrollbar { width: 5px; }
 .narrative-top::-webkit-scrollbar-track { background: transparent; }
@@ -2242,6 +2262,21 @@ watch(() => props.catalogStarId, () => {
   border-radius: 10px;
 }
 .story-section-bottom:last-child { margin-bottom: 24px; }
+
+/* 底部 AI 免责声明：对齐星笺 ca-foot-note 设计（浅 muted 色 + 虚线边框）*/
+.ca-foot-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 0.64rem;
+  color: var(--muted-light);
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  margin: 4px 28px 0;
+}
 
 /* 左栏宽度不足时，双面板收为上下排列 */
 @media (max-width: 1050px) {
@@ -2940,10 +2975,13 @@ watch(() => props.catalogStarId, () => {
 /* ─── Mobile Content ─── */
 .mobile-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 16px 18px;
+  /* 移动端兜底：底部栏 mobile-bottom-bar 约 72px，再加 16px = 88px 安全 padding，保证「最新心事」末卡片底能完整滚到可视区 */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ─── Mobile Section (Collapsible) ─── */
