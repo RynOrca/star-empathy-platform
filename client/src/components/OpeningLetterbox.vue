@@ -41,11 +41,15 @@ onMounted(async () => {
 }
 .letterbox.top {
   top: 0;
-  box-shadow: 0 1px 0 rgba(255, 217, 138, 0.18) inset;
+  box-shadow:
+    0 1px 0 rgba(255, 217, 138, 0.32) inset,
+    0 2px 16px rgba(202, 167, 255, 0.14) inset;
 }
 .letterbox.bottom {
   bottom: 0;
-  box-shadow: 0 -1px 0 rgba(255, 217, 138, 0.18) inset;
+  box-shadow:
+    0 -1px 0 rgba(255, 217, 138, 0.32) inset,
+    0 -2px 16px rgba(202, 167, 255, 0.14) inset;
 }
 /* 入场增强：从 0 拉高到 14.24vh（1.1s，早于用户点击结束，不与退出 transition 冲突） */
 .letterbox.top.in,
@@ -60,10 +64,14 @@ onMounted(async () => {
 /* 退出：帷幕向上下两侧拉开，金色内阴影同时收进幕布 */
 .letterbox.top.exit {
   height: 0;
-  box-shadow: 0 1px 0 rgba(255, 217, 138, 0) inset;
+  box-shadow:
+    0 1px 0 rgba(255, 217, 138, 0) inset,
+    0 2px 16px rgba(202, 167, 255, 0) inset;
 }
 .letterbox.bottom.exit {
   height: 0;
-  box-shadow: 0 -1px 0 rgba(255, 217, 138, 0) inset;
+  box-shadow:
+    0 -1px 0 rgba(255, 217, 138, 0) inset,
+    0 -2px 16px rgba(202, 167, 255, 0) inset;
 }
 </style>

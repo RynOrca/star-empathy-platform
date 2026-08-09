@@ -47,7 +47,7 @@ import OpeningTransition from '../components/OpeningTransition.vue'
  */
 const router = useRouter()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const { loaded: skyLoaded } = useParticleSky(canvasRef as { value: HTMLCanvasElement | null })
+const { loaded: skyLoaded } = useParticleSky(canvasRef as { value: HTMLCanvasElement | null }, { variant: 'gold-violet' })
 const { flickerOn, start: startFlicker } = useFlickerVignette()
 const { shake } = useScreenShake()
 
@@ -105,29 +105,18 @@ function handleAfter() {
   cursor: pointer;
 }
 
-/* ═══ 保底背景第 1 层：淡星云底色 ═══ */
+/* ═══ 保底背景第 1 层：金紫星云 ═══ */
 .nebula {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(
-      ellipse 80% 60% at 50% 50%,
-      rgba(134, 168, 255, 0.1) 0%,
-      rgba(202, 167, 255, 0.06) 38%,
-      rgba(5, 6, 15, 0) 75%
-    ),
-    radial-gradient(
-      ellipse 55% 40% at 22% 38%,
-      rgba(255, 217, 138, 0.08) 0%,
-      rgba(5, 6, 15, 0) 70%
-    ),
-    radial-gradient(
-      ellipse 50% 38% at 78% 68%,
-      rgba(160, 180, 220, 0.07) 0%,
-      rgba(5, 6, 15, 0) 70%
-    );
+    radial-gradient(ellipse 55% 42% at 28% 32%, rgba(202, 167, 255, 0.16) 0%, rgba(202, 167, 255, 0.05) 45%, rgba(5, 6, 15, 0) 74%),
+    radial-gradient(ellipse 48% 38% at 74% 66%, rgba(255, 217, 138, 0.12) 0%, rgba(255, 217, 138, 0.04) 45%, rgba(5, 6, 15, 0) 72%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(134, 168, 255, 0.08) 0%, rgba(202, 167, 255, 0.06) 38%, rgba(5, 6, 15, 0) 75%),
+    radial-gradient(ellipse 55% 40% at 22% 38%, rgba(255, 217, 138, 0.1) 0%, rgba(5, 6, 15, 0) 70%),
+    radial-gradient(ellipse 50% 38% at 78% 68%, rgba(160, 180, 220, 0.07) 0%, rgba(5, 6, 15, 0) 70%);
 }
 
 /* ═══ Three.js 星空增强层（加载成功后淡入覆盖） ═══ */

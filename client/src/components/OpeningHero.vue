@@ -155,7 +155,7 @@ onMounted(async () => {
   font-size: clamp(0.95rem, 1.6vmin, 1.15rem);
   font-weight: 300;
   letter-spacing: 0.2em;
-  color: rgba(232, 228, 255, 0.82);
+  color: rgba(202, 167, 255, 0.88);
   font-style: italic;
   opacity: 1;
   transform: none;
