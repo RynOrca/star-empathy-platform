@@ -8,6 +8,10 @@ export interface SimilarStar {
   storyCount: number
 }
 
+/** 同星缓存（TTL 5 分钟）：StarDetail 反复挂载时避免对同一颗星重复请求，减轻全局限流压力 */
+const cache = new Map<number, { data: SimilarStar[]; at: number }>()
+const CACHE_TTL = 5 * 60 * 1000
+
 export function useSimilarStars(catalogStarId: () => number) {
   const similarStars = ref<SimilarStar[]>([])
   const loading = ref(false)
@@ -17,6 +21,13 @@ export function useSimilarStars(catalogStarId: () => number) {
     const id = catalogStarId()
     if (!id) return
 
+    // 命中缓存：直接使用，不发请求
+    const hit = cache.get(id)
+    if (hit && Date.now() - hit.at < CACHE_TTL) {
+      similarStars.value = hit.data
+      return
+    }
+
     loading.value = true
     error.value = null
     try {
@@ -24,6 +35,7 @@ export function useSimilarStars(catalogStarId: () => number) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`)
       similarStars.value = (json.data as SimilarStar[]) || []
+      cache.set(id, { data: similarStars.value, at: Date.now() })
     } catch (e: any) {
       error.value = e.message || '加载相似星星失败'
     } finally {

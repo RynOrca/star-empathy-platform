@@ -1494,11 +1494,20 @@ const positionReady = ref(false)
 // ─── 叙事 ───
 const narrative = useNarrative()
 
+/** 叙事请求去重：同一颗星最多拉一次；若首拉时还没有定位，等定位回调到达后再补拉一次带位置的请求 */
+let narrativeFetched = false
+let narrativeFetchedWithPosition = false
+
 function fetchNarrativeWithPosition() {
   if (!props.catalogStarId) return
-  narrative.reset()
   const lat = props.observerLat ?? userPosition.value?.lat
   const lng = props.observerLng ?? userPosition.value?.lng
+  const hasPosition = lat != null && lng != null
+  // 已拉过：带定位的请求不重复；之前无定位而这次有定位，允许补拉一次
+  if (narrativeFetched && (narrativeFetchedWithPosition || !hasPosition)) return
+  narrativeFetched = true
+  if (hasPosition) narrativeFetchedWithPosition = true
+  narrative.reset()
   narrative.fetchNarrative(props.catalogStarId, lat, lng, props.starInfo?.ra, props.starInfo?.dec)
 }
 
@@ -1511,6 +1520,8 @@ watch(() => props.catalogStarId, (id) => {
   isFirstStarChange = false
   searchQuery.value = ''
   detailStoryId.value = null
+  narrativeFetched = false
+  narrativeFetchedWithPosition = false
   if (id && (positionReady.value || props.observerLat != null)) {
     fetchNarrativeWithPosition()
   }

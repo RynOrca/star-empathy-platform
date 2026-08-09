@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref } from "vue";
 
 /**
  * 入场闪烁噪点（200ms 三次闪烁）
@@ -6,17 +6,17 @@ import { ref } from 'vue'
  * 模拟「老电影放映」式噪点闪烁，与电影遮幅的开场气质一致。
  */
 export function useFlickerVignette() {
-  const flickerOn = ref(false)
-  let timer: ReturnType<typeof setTimeout> | null = null
+	const flickerOn = ref(false);
+	let timer: ReturnType<typeof setTimeout> | null = null;
 
-  function start() {
-    if (timer) clearTimeout(timer)
-    flickerOn.value = true
-    timer = setTimeout(() => {
-      flickerOn.value = false
-      timer = null
-    }, 230)
-  }
+	function start() {
+		if (timer) clearTimeout(timer);
+		flickerOn.value = true;
+		timer = setTimeout(() => {
+			flickerOn.value = false;
+			timer = null;
+		}, 230);
+	}
 
-  return { flickerOn, start }
+	return { flickerOn, start };
 }

@@ -249,6 +249,9 @@
           </button>
         </div>
 
+        <div v-if="rateLimited" class="fs-rate-hint">
+          请求太频繁，已静默暂停加载，稍候自动重试…
+        </div>
         <FolioGrid
           :collections="shelfListWithOwner"
           :loading="shelfLoading && shelfList.length === 0"
@@ -489,7 +492,13 @@ async function fetchGalaxyReels() {
   try {
     const res = await authFetch('/api/collections/public?visibility=galaxy&page=1&limit=12&sort=stories_desc')
     const json = await res.json()
+    if (res.status === 429) {
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
     if (res.ok) {
+      rateLimited.value = false
       const rawItems = (json.data?.items ?? []) as any[]
       const list = rawItems.map((r) => normalizeCollection(r, { withStories: false })) as Collection[]
       galaxyReels.value = list
@@ -515,7 +524,13 @@ async function fetchPicks() {
   try {
     const res = await authFetch('/api/collections/picks?wanted=6&galaxyN=3')
     const json = await res.json()
+    if (res.status === 429) {
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
     if (res.ok) {
+      rateLimited.value = false
       const raw = Array.isArray(json.data) ? json.data : []
       picks.value = raw.map((r: any) => normalizeCollection(r, { withStories: false })) as Collection[]
     }
@@ -528,6 +543,19 @@ async function fetchPicks() {
 const shelfList = ref<Collection[]>([])
 const shelfLoading = ref(false)
 const shelfError = ref<string | null>(null)
+/** 429 降噪：限流时静默降级 + 轻提示，8 秒后自动重试一次 */
+const rateLimited = ref(false)
+let rateRetryTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRateRetry() {
+  if (rateRetryTimer) return
+  rateRetryTimer = setTimeout(() => {
+    rateRetryTimer = null
+    rateLimited.value = false
+    if (!shelfLoading.value && !searchLoading.value) {
+      fetchShelfPage(shelfPage.value || 1)
+    }
+  }, 8000)
+}
 const shelfPage = ref(1)
 const shelfTotalPages = ref(0)
 const shelfPageSize = 24
@@ -562,6 +590,14 @@ async function fetchShelfPage(page: number) {
     if (kw) params.set('search', kw)
     const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
     const json = await res.json()
+    // 限流降噪：429 不弹红色错误条，轻提示 + 稍后自动重试
+    if (res.status === 429) {
+      shelfError.value = null
+      rateLimited.value = true
+      scheduleRateRetry()
+      return
+    }
+    rateLimited.value = false
     if (!res.ok) throw new Error(json.message || '加载失败')
     const d = json.data || {}
     shelfTotalPages.value = d.totalPages ?? Math.ceil((d.total ?? 0) / shelfPageSize)
@@ -593,6 +629,7 @@ function loadNextPage() {
 
 /* ─── 总览数据 + 初次拉取 ─── */
 async function reloadAll() {
+  rateLimited.value = false
   resetShelf()
   galaxyReels.value = []
   picks.value = []
@@ -698,6 +735,7 @@ onMounted(() => {
   window.addEventListener('scroll', onWindowScrollForBackTop, { passive: true })
 })
 onBeforeUnmount(() => {
+  if (rateRetryTimer) { clearTimeout(rateRetryTimer); rateRetryTimer = null }
   io?.disconnect()
   io = null
   const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
@@ -1540,8 +1578,21 @@ updateVolumeCountsQuick()
 }
 .fs-foot-chip b { color: var(--accent); font-weight: 600; margin: 0 1px; }
 
+/* ═══════ 限流轻提示 ═══════ */
+.fs-rate-hint {
+  margin: 10px auto 2px;
+  max-width: 560px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(255, 217, 138, 0.08);
+  border: 1px solid rgba(255, 217, 138, 0.22);
+  text-align: center;
+}
+
 /* ═══════ 回顶部悬浮按钮（任务2） ═══════ */
-/* 圆形玻璃钮，右下角固定；仅移动端需要（PC 端顶栏常驻且页面一般不缺快捷入口，不显示） */
+/* 圆形玻璃钮，右下角固定；PC/移动端都显示（PC 顶栏常驻但长页面同样需要快捷回顶） */
 .fs-back-top {
   position: fixed;
   right: 16px;
@@ -1573,13 +1624,6 @@ updateVolumeCountsQuick()
 /* 进出场：淡入 + 上浮 */
 .fs-backtop-enter-active, .fs-backtop-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
 .fs-backtop-enter-from, .fs-backtop-leave-to { opacity: 0; transform: translateY(10px) scale(0.9); }
-
-@media (max-width: 720px) {
-  .fs-back-top { display: inline-flex; }
-}
-@media (min-width: 721px) {
-  .fs-back-top { display: none; }
-}
 
 /* ═══════ 响应式：平板 / 手机 ═══════ */
 @media (max-width: 960px) {

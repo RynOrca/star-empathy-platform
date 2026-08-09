@@ -84,10 +84,11 @@ const upload = multer({
 })
 
 // ═══ 限流 ═══
-// 全局：每分钟 120 次/IP
+// 全局：每分钟 300 次/IP（读接口为主，主星空全量故事分页一次约 37 个请求，120 太紧；
+// 写操作另由 writeLimiter/authLimiter 收紧）
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: '请求过于频繁，请稍后再试', data: null },

@@ -684,6 +684,24 @@
   </div>
 </template>
 
+<script lang="ts">
+/**
+ * 模块级故事分页缓存：必须放在 <script setup> 之外（setup 每次挂载都会重新执行，变量无法跨路由保留）。
+ * SPA 路由切换重复进入主星空时直接命中本地，不再重拉 ~36 个分页请求；
+ * 新故事/删除/共鸣等真实变更通过 invalidateStoriesCache() 失效，下次 fetchStories 重新拉取。
+ */
+const STORIES_CACHE_TTL = 90_000
+let storiesCache: {
+  at: number
+  map: Map<number, any[]>
+  statsMap: Map<number, { stories: number; resonance: number; views: number; favorites: number }>
+  items: any[]
+} | null = null
+function invalidateStoriesCache() {
+  storiesCache = null
+}
+</script>
+
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
@@ -1352,6 +1370,7 @@ const fetchingStories = ref(false)
 let fetchAbort: AbortController | null = null
 
 const PAGE_SIZE = 100
+// 故事分页缓存声明在文件顶部模块级 <script> 块（跨组件实例共享）
 
 // 将数组分成每批 batch 个的小组，用于并发请求
 function chunk<T>(arr: T[], batch: number): T[][] {
@@ -1445,8 +1464,14 @@ function rebuildStatsFromMap() {
   skyRef.value?.sky?.setStarStatsCache(statsMap, userStarPos)
 }
 
-async function fetchStories() {
+async function fetchStories(force = false) {
   if (fetchingStories.value) return
+  // 命中缓存：直接应用本地结果，不发任何分页请求
+  if (!force && storiesCache && Date.now() - storiesCache.at < STORIES_CACHE_TTL) {
+    const cached = storiesCache
+    publishStories(cached.map, cached.statsMap, cached.items)
+    return
+  }
   fetchingStories.value = true
   fetchAbort?.abort()
   fetchAbort = new AbortController()
@@ -1506,6 +1531,10 @@ async function fetchStories() {
         }
         if (!signal.aborted) publishStories(map, statsMap, [])
       }
+    }
+    // 全量拉取完成（未被中断）→ 写入短 TTL 缓存
+    if (!signal.aborted) {
+      storiesCache = { at: Date.now(), map, statsMap, items: Array.from(map.values()).flat() }
     }
   } catch (e: any) {
     if (e.name !== 'AbortError') console.error('获取故事失败:', e)
@@ -2365,6 +2394,7 @@ function onStorySubmitted(story: StoryData) {
     map.set(cid, existing)
   }
   storiesByStarId.value = map
+  invalidateStoriesCache()
   // 更新天空统计
   rebuildStatsFromMap()
   // 更新当前选中星的故事列表（如果故事绑定到当前星）
@@ -2397,6 +2427,7 @@ function onDeleteStory(storyId: number) {
   if (existing) {
     map.set(cid, existing.filter(s => s.id !== storyId))
     storiesByStarId.value = map
+    invalidateStoriesCache()
   }
   // 更新统计
   rebuildStatsFromMap()
@@ -2413,6 +2444,8 @@ function onDeleteStory(storyId: number) {
  */
 function onStarDetailStoriesMutated(kind: 'new' | 'delete' | 'resonate' | 'kernel-edit') {
   if (!selectedCatalogStarId.value) return
+  // 任何真实变更都会让缓存过期，下次 fetchStories 重新拉全量
+  invalidateStoriesCache()
   if (kind === 'resonate' || kind === 'delete' || kind === 'kernel-edit') {
     fetchCatalogStats(selectedCatalogStarId.value)
     rebuildStatsFromMap()
@@ -2460,6 +2493,7 @@ async function onResonate(storyId: number) {
       fetchCatalogStats(selectedCatalogStarId.value)
       // 刷新天空统计
       rebuildStatsFromMap()
+      invalidateStoriesCache()
     }
   } catch (e) {
     console.error('共鸣失败:', e)

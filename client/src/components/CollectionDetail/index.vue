@@ -1799,11 +1799,11 @@ function infoTagStyle(tag: string): Record<string, string> {
   overflow: visible;
 }
 /* flatMode 下顶部栏：sticky 吸顶 + 给点底色保证 tab 可读。
- * top 取 84px：对齐 FolioDetail .fdp-top 移动端两行高度（8+32+6+30+8 ≈ 84px），
+ * top 取 48px：对齐 FolioDetail .fdp-top 移动端单行高度（8+32+8 ≈ 48px，红色退出按钮已移除），
  * 避免吸顶后被 fixed 外层顶栏遮挡；若外层顶栏高度调整需同步此值 */
 .mobile-top-bar.flat-top-bar {
   position: sticky;
-  top: 84px;
+  top: 48px;
   z-index: 5;
   padding: 10px 14px;
   background: rgba(10, 11, 28, 0.92);
@@ -1816,7 +1816,28 @@ function infoTagStyle(tag: string): Record<string, string> {
 /* flatMode 下内容区：取消内嵌滚动，跟父页面一起滚 */
 .mobile-sheet.flat-mode .mobile-content {
   overflow: visible;
-  padding: 4px 14px 24px;
+  padding: 4px 6px 24px;
+}
+/* ═══════ flatMode 通栏化：不再分卡片块，整页宽度 + 横线分隔（markdown --- 风格） ═══════ */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 2px;
+  overflow: visible;
+}
+/* 相邻 panel-wrapper 块之间用横线分隔（代替卡片边界） */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper + .panel-wrapper) {
+  border-top: 1px solid var(--rule);
+}
+/* 星河合集下卷目疏/典藏谱系等子卡也扁平化，避免残留卡片感 */
+.mobile-sheet.flat-mode .mobile-content :deep(.panel-wrapper .panel-wrapper) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 10px 2px;
 }
 /* flatMode 下底部操作栏：不再 sticky 在 sheet 底部，跟内容流式排布 */
 .mobile-sheet.flat-mode .mobile-bottom-bar {

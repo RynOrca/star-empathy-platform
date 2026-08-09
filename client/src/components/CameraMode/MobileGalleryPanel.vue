@@ -309,7 +309,7 @@ function formatTime(iso: string): string {
 <style scoped>
 .mobile-gallery-panel {
   position: fixed;
-  bottom: -13px; /* 原 7px（12px→7px），再向下移动 20px（任务3：卡片位置不够低） */
+  bottom: 10px; /* 用户反馈：-13px 太低，回距底部 10px */
   left: 12px;
   right: 12px;
   z-index: 40;
@@ -331,6 +331,7 @@ function formatTime(iso: string): string {
   align-items: center;
   justify-content: space-between;
   padding: 0 4px 8px;
+  margin-top: -5px; /* 用户反馈：标题行（VOICES IN FRAME）上移 5px */
 }
 .mgp-title-block {
   display: flex;
