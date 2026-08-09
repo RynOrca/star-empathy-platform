@@ -1798,10 +1798,12 @@ function infoTagStyle(tag: string): Record<string, string> {
   min-height: auto;
   overflow: visible;
 }
-/* flatMode 下顶部栏：sticky 吸顶 + 给点底色保证 tab 可读 */
+/* flatMode 下顶部栏：sticky 吸顶 + 给点底色保证 tab 可读。
+ * top 取 84px：对齐 FolioDetail .fdp-top 移动端两行高度（8+32+6+30+8 ≈ 84px），
+ * 避免吸顶后被 fixed 外层顶栏遮挡；若外层顶栏高度调整需同步此值 */
 .mobile-top-bar.flat-top-bar {
   position: sticky;
-  top: 0;
+  top: 84px;
   z-index: 5;
   padding: 10px 14px;
   background: rgba(10, 11, 28, 0.92);

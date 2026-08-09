@@ -983,7 +983,28 @@
                 <ChevronDown :size="20" style="transform: rotate(90deg)" />
               </button>
               <span class="mobile-story-back-label">{{ detailBackLabel }}</span>
-              <div style="width: 20px"></div>
+              <!-- 任务1：外层顶部栏右侧接管共鸣/删除入口（仅自己的故事显示删除），内层 StoryDetail 传 hide-toolbar 隐藏重复工具栏 -->
+              <div class="mobile-story-top-actions">
+                <button
+                  class="mobile-story-resonate"
+                  :class="{ done: isStoryResonated(detailStory) }"
+                  :disabled="isStoryResonating(detailStory)"
+                  @click.stop="onResonate(detailStory)"
+                >
+                  <component :is="isStoryResonated(detailStory) ? CheckIcon : SparklesIcon" :size="14" />
+                  <span>{{ isStoryResonated(detailStory) ? '已共鸣' : '共鸣' }}</span>
+                  <span class="mobile-story-resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                </button>
+                <button
+                  v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                  class="mobile-story-delete"
+                  :disabled="deleting"
+                  @click.stop="confirmDelete(detailStory.id)"
+                >
+                  <Trash2Icon :size="13" />
+                  <span>删除</span>
+                </button>
+              </div>
             </div>
             <div class="mobile-story-detail-body">
               <StoryDetail
@@ -1002,6 +1023,7 @@
                 :createdAtIso="detailStory.createdAt"
                 :siblingStories="siblingStoriesFor(detailStory)"
                 :showStarBelonging="false"
+                :hide-toolbar="true"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
@@ -1027,7 +1049,7 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle } from 'lucide-vue-next'
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Trash2, Check } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -1036,6 +1058,8 @@ const TrendingIcon = TrendingUp
 const ClockIcon = Clock
 const FlameIcon = Flame
 const MessageIcon = MessageCircle
+const Trash2Icon = Trash2
+const CheckIcon = Check
 import StarNarrative from '../StarNarrative.vue'
 import AncientChat from '../AncientChat.vue'
 import StoryDetail from './StoryDetail.vue'
@@ -3091,6 +3115,66 @@ watch(() => props.catalogStarId, () => {
   font-size: 0.85rem;
   color: var(--ink-secondary);
   font-weight: 500;
+}
+
+/* ─── 任务1：移动端故事详情顶部栏右侧 · 共鸣/删除按钮（对齐 StoryDetail 内按钮风格的小号版） ─── */
+.mobile-story-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mobile-story-resonate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+.mobile-story-resonate.done {
+  border-color: rgba(149, 240, 192, 0.25);
+  background: rgba(149, 240, 192, 0.08);
+  color: var(--star-green);
+}
+.mobile-story-resonate:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.mobile-story-resonate-count {
+  opacity: 0.65;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-story-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(255, 107, 138, 0.25);
+  color: #ff6b8a;
+  font-family: var(--font);
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mobile-story-delete:hover:not(:disabled) {
+  background: rgba(255, 107, 138, 0.08);
+  border-color: rgba(255, 107, 138, 0.4);
+}
+.mobile-story-delete:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .mobile-story-detail-body {

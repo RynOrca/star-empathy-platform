@@ -7,7 +7,7 @@
     </div>
 
     <!-- ═══════ 顶部 Sticky 导航栏 ═══════ -->
-    <header class="fs-top" :class="{ 'fs-top-collapsed': isTopCollapsed }">
+    <header class="fs-top">
       <div class="fs-top-left">
         <!-- 左上角：醒目退出按钮（直接回天际，取代原右上"回天际"功能） -->
         <button class="fs-exit" @click="exitToSky" aria-label="退出穹庭书局 · 回天际">
@@ -302,6 +302,20 @@
         </span>
       </footer>
     </main>
+
+    <!-- 任务2：回顶部悬浮按钮（顶部栏滚出可视区域时显示，点击平滑回顶部） -->
+    <Transition name="fs-backtop">
+      <button
+        v-if="showBackTop"
+        type="button"
+        class="fs-back-top"
+        @click="scrollToTop"
+        aria-label="回顶部"
+        title="回顶部"
+      >
+        <ArrowUp :size="17" />
+      </button>
+    </Transition>
   </div>
 </template>
 
@@ -310,7 +324,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, Sparkles, Search, Plus, RotateCcw, Orbit, X,
-  Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User,
+  Landmark, Library, BookOpen, BookMarked, Heart, Globe, Ghost, User, ArrowUp,
 } from 'lucide-vue-next'
 import FolioGrid, { type FolioLike } from '../components/FolioGrid.vue'
 import { authFetch, authHeaders, useAuth } from '../stores/auth'
@@ -653,68 +667,25 @@ function onReelsTrackScroll() {
   reelsScrollRaf = requestAnimationFrame(updateReelButtons)
 }
 
-/* ─── 移动端顶部栏滚动方向感知：往下滑收起 / 往上滑弹出 ─── */
-/* 实现：滚动直读方向 + 触摸实时反馈双方案。
-   - scroll 事件直读 scrollY 增减判断方向（鼠标滚轮 / 惯性滚动 / 触摸滚动都触发）
-   - touchmove 用手指位移实时反馈（手机浏览器原生搜索框同款手感） */
-const isTopCollapsed = ref(false)
-let lastScrollY = 0
-let scrollDirRaf = 0
-let touchStartY = 0        // touchstart 起始 Y
-const TOP_BAR_HIDABLE = typeof window !== 'undefined' ? window.matchMedia('(max-width: 720px)') : null
-const SCROLL_THRESHOLD = 5 // 超过此位移才触发（px）
+/* ─── 任务2：回顶部悬浮按钮（放弃“下滑隐藏/上滑弹出顶部栏”方案，改为曲线救国） ───
+ * 顶部栏（.fs-top）滚出可视区域时显示，回到顶部附近时隐藏；点击平滑滚动回顶部。
+ * 仅移动端展示（隐藏方案原本也只服务移动端，PC 端顶部栏常驻）。 */
+const showBackTop = ref(false)
+let backTopRaf = 0
+/* 移动端顶部栏两行高约 91px，滚动超过 120px 即视为“已滚出可视区域” */
+const BACK_TOP_SHOW_Y = 120
 
-function setCollapsed(collapsed: boolean) {
-  if (isTopCollapsed.value !== collapsed) isTopCollapsed.value = collapsed
-}
-
-function onWindowScrollForTopBar() {
-  if (scrollDirRaf) cancelAnimationFrame(scrollDirRaf)
-  scrollDirRaf = requestAnimationFrame(() => {
-    if (!TOP_BAR_HIDABLE || !TOP_BAR_HIDABLE.matches) {
-      if (isTopCollapsed.value) isTopCollapsed.value = false
-      lastScrollY = window.scrollY || 0
-      return
-    }
+function onWindowScrollForBackTop() {
+  if (backTopRaf) cancelAnimationFrame(backTopRaf)
+  backTopRaf = requestAnimationFrame(() => {
     const y = window.scrollY || window.pageYOffset || 0
-    const delta = y - lastScrollY
-    lastScrollY = y
-
-    // 在顶部附近始终展开（避免刚进页面被误收起）
-    if (y < 32) {
-      setCollapsed(false)
-      return
-    }
-
-    // 直读方向：上滑（delta<0）弹出，下滑（delta>0）收起；小阈值防抖动
-    if (delta < -SCROLL_THRESHOLD) setCollapsed(false)
-    else if (delta > SCROLL_THRESHOLD) setCollapsed(true)
+    const show = y > BACK_TOP_SHOW_Y
+    if (showBackTop.value !== show) showBackTop.value = show
   })
 }
 
-/* 触摸事件：手指位移实时反馈（最可靠，手机浏览器原生搜索框就是这种方案） */
-function onTouchStartForTopBar(e: TouchEvent) {
-  if (e.touches.length !== 1) return
-  touchStartY = e.touches[0].clientY
-}
-
-function onTouchMoveForTopBar(e: TouchEvent) {
-  if (!TOP_BAR_HIDABLE || !TOP_BAR_HIDABLE.matches) return
-  if (e.touches.length !== 1) return
-  const y = window.scrollY || 0
-  // 在顶部附近始终展开
-  if (y < 32) {
-    setCollapsed(false)
-    return
-  }
-  // 手指在屏幕上向上移动 → 内容向上滚（向下浏览）→ 收起
-  // 手指在屏幕上向下移动 → 内容向下滚（向上浏览）→ 弹出
-  const dy = e.touches[0].clientY - touchStartY
-  if (dy < -SCROLL_THRESHOLD) {
-    setCollapsed(true)
-  } else if (dy > SCROLL_THRESHOLD) {
-    setCollapsed(false)
-  }
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 onMounted(() => {
@@ -723,21 +694,16 @@ onMounted(() => {
     const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
     track?.addEventListener('scroll', onReelsTrackScroll, { passive: true })
   }, 200)
-  // 顶部栏滚动方向监听（passive + rAF 节流）
-  window.addEventListener('scroll', onWindowScrollForTopBar, { passive: true })
-  // 触摸事件（移动端最可靠的方向检测）
-  window.addEventListener('touchstart', onTouchStartForTopBar, { passive: true })
-  window.addEventListener('touchmove', onTouchMoveForTopBar, { passive: true })
+  // 顶部栏滚动监听（passive + rAF 节流）→ 任务2：仅用于控制回顶部按钮显隐
+  window.addEventListener('scroll', onWindowScrollForBackTop, { passive: true })
 })
 onBeforeUnmount(() => {
   io?.disconnect()
   io = null
   const track = reelsScrollerRef.value?.querySelector<HTMLElement>('.fs-reels-track')
   track?.removeEventListener('scroll', onReelsTrackScroll)
-  window.removeEventListener('scroll', onWindowScrollForTopBar)
-  window.removeEventListener('touchstart', onTouchStartForTopBar)
-  window.removeEventListener('touchmove', onTouchMoveForTopBar)
-  if (scrollDirRaf) cancelAnimationFrame(scrollDirRaf)
+  window.removeEventListener('scroll', onWindowScrollForBackTop)
+  if (backTopRaf) cancelAnimationFrame(backTopRaf)
 })
 
 /* 暴露一个只读的计数 state 辅助（以后可以放 store） */
@@ -1574,7 +1540,48 @@ updateVolumeCountsQuick()
 }
 .fs-foot-chip b { color: var(--accent); font-weight: 600; margin: 0 1px; }
 
-/* ═══ 响应式：平板 / 手机 ═══ */
+/* ═══════ 回顶部悬浮按钮（任务2） ═══════ */
+/* 圆形玻璃钮，右下角固定；仅移动端需要（PC 端顶栏常驻且页面一般不缺快捷入口，不显示） */
+.fs-back-top {
+  position: fixed;
+  right: 16px;
+  bottom: 28px;
+  z-index: 45;               /* 低于 .fs-top(50)，不与顶栏打架 */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 30, 53, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 217, 138, 0.28);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 217, 138, 0.06);
+  transition: background var(--transition-normal), border-color var(--transition-normal),
+              transform var(--transition-fast), box-shadow var(--transition-normal);
+}
+.fs-back-top:hover {
+  background: rgba(202, 167, 255, 0.14);
+  border-color: rgba(255, 217, 138, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(255, 217, 138, 0.15);
+}
+.fs-back-top:active { transform: scale(0.94); }
+/* 进出场：淡入 + 上浮 */
+.fs-backtop-enter-active, .fs-backtop-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.fs-backtop-enter-from, .fs-backtop-leave-to { opacity: 0; transform: translateY(10px) scale(0.9); }
+
+@media (max-width: 720px) {
+  .fs-back-top { display: inline-flex; }
+}
+@media (min-width: 721px) {
+  .fs-back-top { display: none; }
+}
+
+/* ═══════ 响应式：平板 / 手机 ═══════ */
 @media (max-width: 960px) {
   .fs-picks { grid-template-columns: 1fr 1fr; }
   .fs-pick:nth-child(3) { grid-column: 1 / -1; }
@@ -1585,10 +1592,7 @@ updateVolumeCountsQuick()
     grid-template-rows: auto auto;
     row-gap: 8px;
     padding: 8px 12px;
-    /* 滚动方向感知：往下浏览时收起，往上滑时弹出 */
-    transition: transform 0.32s cubic-bezier(.22, 1, .36, 1);
   }
-  .fs-top.fs-top-collapsed { transform: translateY(-100%); }
   /* 明确 grid 位置：DOM 顺序为 left→mid→right，但 mid 跨两列会导致 auto-placement 把 right 推到第3行，
      必须显式指定 left/right 在第1行、mid 在第2行 */
   .fs-top-left { grid-column: 1; grid-row: 1; }

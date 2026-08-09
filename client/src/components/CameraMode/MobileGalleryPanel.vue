@@ -309,7 +309,7 @@ function formatTime(iso: string): string {
 <style scoped>
 .mobile-gallery-panel {
   position: fixed;
-  bottom: 7px; /* 原 12px，向下移动 5px */
+  bottom: -13px; /* 原 7px（12px→7px），再向下移动 20px（任务3：卡片位置不够低） */
   left: 12px;
   right: 12px;
   z-index: 40;
