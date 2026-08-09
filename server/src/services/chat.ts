@@ -121,7 +121,7 @@ export async function streamChat(
         model: DEFAULT_MODEL,
         messages,
         temperature: 0.9,
-        max_tokens: 1024,
+        max_tokens: 8000,
         // 统一关闭思考模式：v4-flash 思考会抢占 max_tokens 导致回答中断
         thinking: { type: 'disabled' },
         stream: true,

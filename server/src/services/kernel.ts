@@ -73,7 +73,7 @@ async function generateKernel(content: string, title?: string | null): Promise<{
     ],
     {
       temperature: 0.5,
-      maxTokens: 300,
+      maxTokens: 8000,
     },
   )
 
@@ -915,7 +915,7 @@ ${rerankCandidates.map((c, i) => `${i + 1}. [catalogStarId=${c.catalogStarId}] $
           { role: 'system', content: rerankSystem },
           { role: 'user', content: rerankUser },
         ],
-        { temperature: 0.7, maxTokens: 1200, jsonMode: true },
+        { temperature: 0.7, maxTokens: 8000, jsonMode: true },
       )
       const reranked = parseRerankResult(raw)
       const aiMap = new Map(reranked.map(r => [r.catalogStarId, r]))
@@ -1031,7 +1031,7 @@ ${rerankCandidates.map((c, i) => `${i + 1}. [catalogStarId=${c.catalogStarId}] $
 ${picksInfo.map(p => `- [catalogStarId=${p.id}] ${p.starName}（${p.constellation}，视星等 ${p.mag}）`).join('\n')}`
       const raw = await deepseekChat(
         [{ role: 'system', content: reasonSys }, { role: 'user', content: reasonUser }],
-        { temperature: 0.9, maxTokens: 600, jsonMode: true },
+        { temperature: 0.9, maxTokens: 8000, jsonMode: true },
       )
       const parsed = parseRerankResult(raw)
       for (const p of parsed) fallReasons.set(p.catalogStarId, p.matchReason)

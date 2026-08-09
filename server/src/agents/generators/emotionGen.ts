@@ -213,8 +213,8 @@ async function generateInsights(
     ],
     {
       temperature: 0.7,
-      // 3 条洞察 JSON 约 700-1000 tokens；思考已全局关闭，留足余量防截断
-      maxTokens: 1600,
+      // 统一 8000：彻底杜绝 max_tokens 截断
+      maxTokens: 8000,
     },
   )
   const parsed = safeParseInsights(content)

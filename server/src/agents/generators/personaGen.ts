@@ -134,8 +134,8 @@ export async function generatePersona(
       ],
       {
         temperature: 0.8,
-        // 画像 JSON 约 800-1100 tokens；思考已全局关闭，留足余量防截断
-        maxTokens: 1600,
+        // 统一 8000：彻底杜绝 max_tokens 截断
+        maxTokens: 8000,
       },
     ),
     // 复用旧版 "古今共望" 叙事 prompt，但去掉三段小节 + 标题，只留正文 2~3 段

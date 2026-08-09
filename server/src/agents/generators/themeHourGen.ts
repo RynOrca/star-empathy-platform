@@ -110,8 +110,8 @@ export async function generateThemeHourTexts(
     ],
     {
       temperature: 0.7,
-      // 三段文 + JSON 结构约 700-900 tokens；思考已全局关闭，content 独占，留足余量防截断
-      maxTokens: 1400,
+      // 统一 8000：彻底杜绝 max_tokens 截断
+      maxTokens: 8000,
     },
   )
 

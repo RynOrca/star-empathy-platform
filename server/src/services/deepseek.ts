@@ -106,7 +106,7 @@ export async function deepseekChat(
     model,
     messages,
     temperature: options.temperature ?? 0.8,
-    max_tokens: options.maxTokens ?? 2048,
+    max_tokens: options.maxTokens ?? 8000,
     // 统一关闭思考模式：v4-flash 思考模式会把 max_tokens 耗在 reasoning_content，
     // 导致 content 为空/截断（实测 finish_reason=length）。产品输出均不需要公开思维链。
     thinking: { type: 'disabled' },

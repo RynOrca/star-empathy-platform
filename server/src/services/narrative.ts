@@ -567,7 +567,7 @@ export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: num
     const content = await deepseekChat(
       [{ role: 'system', content: system }, { role: 'user', content: user }],
       // 叙事生成是 Markdown，prompt 里没有 "json" 字样 → 必须关掉 json_mode，否则 DeepSeek 400
-      { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+      { temperature: 0.9, maxTokens: 8000, jsonMode: false },
     )
     return extractNarrativeBodyParagraphs(content).slice(0, 3)
   }
@@ -581,7 +581,7 @@ export async function generateNarrativeBodyOnly(catalogStarId: number, lat?: num
   const { system, user } = buildNarrativePrompt(star, visible)
   const content = await deepseekChat(
     [{ role: 'system', content: system }, { role: 'user', content: user }],
-    { temperature: 0.9, maxTokens: 3000, jsonMode: false },
+    { temperature: 0.9, maxTokens: 8000, jsonMode: false },
   )
   return extractNarrativeBodyParagraphs(content).slice(0, 3)
 }
@@ -616,7 +616,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
       ],
       {
         temperature: 0.9,
-        maxTokens: 3000,
+        maxTokens: 8000,
         jsonMode: false,
       },
     )
@@ -654,7 +654,7 @@ export async function getNarrative(catalogStarId: number, lat?: number, lng?: nu
     ],
     {
       temperature: 0.9,
-      maxTokens: 3000,
+      maxTokens: 8000,
       jsonMode: false,
     },
   )
