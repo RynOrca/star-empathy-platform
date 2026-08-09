@@ -39,7 +39,7 @@
         <!-- 登录 -->
         <form v-if="mode === 'login'" class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
           <div class="field">
-            <label for="username">观测者账号</label>
+            <label for="username">用户</label>
             <div class="input-wrap">
               <input
                 id="username"
@@ -55,7 +55,7 @@
           </div>
 
           <div class="field">
-            <label for="password">引力密钥</label>
+            <label for="password">密码</label>
             <div class="input-wrap">
               <input
                 id="password"
@@ -77,7 +77,7 @@
               <input type="checkbox" v-model="rememberMe" />
               <span>记住我，永不坠落</span>
             </label>
-            <span class="forgot" @click="switchMode('forgot')">忘记引力密钥？</span>
+            <span class="forgot" @click="switchMode('forgot')">忘记密码？</span>
           </div>
 
           <button type="submit" class="submit" :disabled="loading">
@@ -94,7 +94,7 @@
         <!-- 注册 -->
         <form v-else-if="mode === 'register'" class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
           <div class="field">
-            <label for="username">观测者账号</label>
+            <label for="username">用户</label>
             <div class="input-wrap">
               <input
                 id="username"
@@ -102,7 +102,7 @@
                 type="text"
                 class="form-input"
                 required
-                placeholder="设置观测者账号"
+                placeholder="设置用户名"
                 maxlength="20"
                 autocomplete="username"
               />
@@ -124,7 +124,7 @@
           </div>
 
           <div class="field">
-            <label for="password">引力密钥</label>
+            <label for="password">密码</label>
             <div class="input-wrap">
               <input
                 id="password"
@@ -132,7 +132,7 @@
                 type="password"
                 class="form-input"
                 required
-                placeholder="设置引力密钥（6-50位）"
+                placeholder="设置密码（6-50 位）"
                 maxlength="50"
                 autocomplete="new-password"
               />
@@ -140,7 +140,7 @@
           </div>
 
           <div class="field">
-            <label for="confirmPassword">确认密钥</label>
+            <label for="confirmPassword">确认密码</label>
             <div class="input-wrap">
               <input
                 id="confirmPassword"
@@ -148,7 +148,7 @@
                 type="password"
                 class="form-input"
                 required
-                placeholder="请再次输入引力密钥"
+                placeholder="请再次输入密码"
                 maxlength="50"
                 autocomplete="new-password"
               />
@@ -171,8 +171,8 @@
         <!-- 找回密码 -->
         <div v-else class="forgot-box">
           <div class="forgot-head">
-            <h2 class="forgot-title">找回引力密钥</h2>
-            <div class="gold-sep">◆ 重铸 ◆</div>
+            <h2 class="forgot-title">找回密码</h2>
+            <div class="gold-sep">◆ 重置 ◆</div>
           </div>
           <form class="auth-form" @submit.prevent="handleForgotSubmit" autocomplete="off">
             <div class="field">
@@ -208,7 +208,7 @@
                 </div>
               </div>
               <div class="field">
-                <label for="newPassword">新引力密钥</label>
+                <label for="newPassword">新密码</label>
                 <div class="input-wrap">
                   <input
                     id="newPassword"
@@ -380,9 +380,9 @@ async function handleLogin() {
 async function handleRegister() {
   error.value = ''
   const u = username.value.trim()
-  if (u.length < 2 || u.length > 20) { error.value = '观测者账号需 2~20 个字符'; return }
-  if (password.value.length < 6 || password.value.length > 50) { error.value = '引力密钥需 6~50 个字符'; return }
-  if (password.value !== password2.value) { error.value = '两次引力密钥不一致'; return }
+  if (u.length < 2 || u.length > 20) { error.value = '用户名需 2~20 个字符'; return }
+  if (password.value.length < 6 || password.value.length > 50) { error.value = '密码需 6~50 个字符'; return }
+  if (password.value !== password2.value) { error.value = '两次密码不一致'; return }
   loading.value = true
   try {
     await register(u, password.value, email.value.trim() || undefined)
