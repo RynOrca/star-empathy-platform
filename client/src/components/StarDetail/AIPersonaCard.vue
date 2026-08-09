@@ -141,7 +141,7 @@ const bgStars = Array.from({ length: 26 }, (_, i) => ({
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  padding: 12px 14px 14px;
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;

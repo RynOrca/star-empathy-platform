@@ -207,7 +207,8 @@ function orbSize(e: { value: number }) { return 40 + (e.value ?? 0) * 26 }
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  padding: 10px 12px 12px;
+  /* ── 统一内边距：左右 16px，与 narrative-bottom / story-section 基线对齐 ── */
+  padding: 10px 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;

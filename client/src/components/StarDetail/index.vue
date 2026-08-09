@@ -485,6 +485,7 @@
         <div class="info-footer">
           <BottomBar
             :isFavorited="isFavorited"
+            :show-ancient-chat="historyStories.length > 0"
             @write-story="onWriteStory"
             @toggle-favorite="toggleFavorite"
             @open-chat="openChat"
@@ -2210,7 +2211,10 @@ watch(() => props.catalogStarId, () => {
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  padding: 12px 14px 14px;
+  /* ── 统一内边距：与 story-section-bottom 16px / AIPersona 16px 对齐 ──
+     所有卡片的内容左基线 = 外 margin 28px + 内 padding 16px = 44px，
+     面板头图标 / section-header 图标 / stats-bar 图标 / footnote 全部纵向一条线 */
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2263,12 +2267,13 @@ watch(() => props.catalogStarId, () => {
 }
 .story-section-bottom:last-child { margin-bottom: 24px; }
 
-/* 底部 AI 免责声明：对齐星笺 ca-foot-note 设计（浅 muted 色 + 虚线边框）*/
+/* 底部 AI 免责声明：对齐星笺 ca-foot-note 设计（浅 muted 色 + 虚线边框）
+   内部左右 padding 16px 与所有卡片的内容左基线 44px 对齐 */
 .ca-foot-note {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 8px 16px;
   font-size: 0.64rem;
   color: var(--muted-light);
   background: rgba(255, 255, 255, 0.015);
@@ -2310,7 +2315,7 @@ watch(() => props.catalogStarId, () => {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 14px 16px;
   margin: 0 28px 20px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -2558,13 +2563,16 @@ watch(() => props.catalogStarId, () => {
 @media (max-width: 768px) {
   .story-stats-bar {
     margin: 0 18px 18px;
-    padding: 12px 14px;
+    padding: 12px 16px;
   }
   .stat-num {
     font-size: 0.9rem;
   }
   .story-section {
     margin: 0 18px 20px;
+  }
+  .ca-foot-note {
+    margin: 4px 18px 0;
   }
 }
 
