@@ -742,6 +742,8 @@ async function handleLogout() {
   } finally {
     logoutLoading.value = false
     showLogoutModal.value = false
+    // 清除开场标记：守卫会把未登录用户带回 /welcome 开场（而非直接登录页）
+    sessionStorage.removeItem('welcomed')
     router.push('/')
   }
 }
