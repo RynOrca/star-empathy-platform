@@ -336,6 +336,6 @@
 | 修改星空显示配置 | `client/src/utils/starDisplayConfig.ts` |
 | 修改定位/城市选择 | `client/src/pages/SkyPage.vue`、`server/src/routes/location.ts` |
 | 修改/新增 **记录 · AI 归属星辰** 功能（写故事 → AI 匹配 Top3 星辰 → 选星挂载 → 飞相机高亮详情） | `server/src/services/kernel.ts`、`server/src/routes/stories.ts`、`client/src/composables/useStarMatching.ts`、`client/src/components/StoryForm.vue`、`client/src/pages/SkyPage.vue` |
-| 添加前端新页面 | `client/src/pages/` 新建，`client/src/router/index.ts` 注册（开场页 `/welcome` 守卫逻辑也在 router/index.ts：无 token 且未看开场 → 跳 `/welcome`，`sessionStorage.welcomed` 会话内只跳一次） |
+| 添加前端新页面 | `client/src/pages/` 新建，`client/src/router/index.ts` 注册（开场页 `/welcome` 守卫逻辑也在 router/index.ts：新会话访问根路径 `/` 一律先看开场——无论登录态，`sessionStorage.welcomed` 会话内只播一次，刷新不重放、新开标签页重播；已登录看完开场 → `/sky`，未登录 → 登录页） |
 | 修改 CSS 设计 token | `client/src/styles/variables.css` |
 | 修改部署流程 | `deploy/`、`.github/workflows/deploy.yml` |
