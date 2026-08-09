@@ -42,6 +42,9 @@ db.exec(`
     catalog_star_id INTEGER,
     location_lat    REAL,
     location_lng    REAL,
+    geohash         TEXT,
+    city            TEXT,
+    province        TEXT,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     view_count      INTEGER NOT NULL DEFAULT 0,
     origin          TEXT,
@@ -188,6 +191,11 @@ try { db.exec('ALTER TABLE users ADD COLUMN signature TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lat REAL'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN location_lng REAL'); } catch {}
+try { db.exec('ALTER TABLE stars ADD COLUMN geohash TEXT'); } catch {}
+try { db.exec('ALTER TABLE stars ADD COLUMN city TEXT'); } catch {}
+try { db.exec('ALTER TABLE stars ADD COLUMN province TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_geohash ON stars(geohash)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_stars_city ON stars(city)'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN origin TEXT'); } catch {}
 try { db.exec('ALTER TABLE stars ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}

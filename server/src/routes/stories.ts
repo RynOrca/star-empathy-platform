@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory, getCatalogStarIdsForStory } from '../services/starService';
+import { getNearbyStories } from '../services/nearbyService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent, extractSuggestedTagsForContent } from '../services/kernel';
 import { verifyCollectionOwnership, createCollection, getDefaultCollection, ensureDefaultCollection } from '../services/collectionService';
 import { resolveValidCatalogIds } from '../services/catalogMeta';
+import { encode as encodeGeohash, PRECISION_LEVELS } from '../utils/geohash';
 
 const router = Router();
 
@@ -28,6 +30,26 @@ router.get('/', authOptional, (req: Request, res: Response) => {
   }
 });
 
+// 附近的人的心事：GET /api/stories/nearby?geohash=&limit=
+// 基于geohash网格 + k-匿名降级 + IDF加权Jaccard情绪匹配
+// 前端传入当前用户geohash（5位），后端自动降级同城→同省→全国→情绪优先
+// 必须注册在 /:storyId 之前，避免被当作 storyId 匹配
+router.get('/nearby', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const geohash = req.query.geohash as string;
+    if (!geohash || geohash.length < 3) {
+      return badRequest(res, '缺少 geohash 参数（至少3位）');
+    }
+    const limit = !isNaN(parseInt(req.query.limit as string, 10)) ? parseInt(req.query.limit as string, 10) : 20;
+    const result = getNearbyStories(geohash, user.id, limit);
+    ok(res, 'success', result);
+  } catch (error) {
+    console.error('GET /api/stories/nearby error:', error);
+    serverError(res);
+  }
+});
+
 // 单条故事详情（authOptional：登录时附带 resonated 是否已共鸣标志）
 router.get('/:storyId', authOptional, (req: Request, res: Response) => {
   try {
@@ -46,7 +68,7 @@ router.get('/:storyId', authOptional, (req: Request, res: Response) => {
 // 投递故事（需登录）
 router.post('/', authRequired, (req: Request, res: Response) => {
   try {
-    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, tags, isAnonymous, imageUrl, collectionId, collectionName, collectionVisibility } = req.body;
+    const { title, content, catalogStarId: catalog_star_id, catalogStarIds: catalog_star_ids, location, tag, tags, isAnonymous, imageUrl, collectionId, collectionName, collectionVisibility, geoInfo } = req.body;
     const user = (req as Request & { user: { id: number } }).user;
 
     if (!content || typeof content !== 'string') {
@@ -70,15 +92,26 @@ router.post('/', authRequired, (req: Request, res: Response) => {
     // 后续 createStar 用 catalogStarIds（一对多挂星支持）
     const catalogStarIds: number[] = effectiveCatalogStarIds;
 
-    let locationData: { lat: number; lng: number } | undefined;
-    if (
+    // 地理信息处理：前端传 location{lat,lng} 或 geoInfo{geohash,city,province}
+    // 后端统一转为 geohash（5位截断）+ city/province 存储，不落库精确坐标
+    let finalGeoInfo: { geohash?: string; city?: string; province?: string } | undefined;
+    if (geoInfo && typeof geoInfo === 'object') {
+      finalGeoInfo = {
+        geohash: typeof geoInfo.geohash === 'string' ? geoInfo.geohash.slice(0, 5) : undefined,
+        city: typeof geoInfo.city === 'string' ? geoInfo.city.slice(0, 50) : undefined,
+        province: typeof geoInfo.province === 'string' ? geoInfo.province.slice(0, 50) : undefined,
+      };
+    } else if (
       location &&
       typeof location.lat === 'number' &&
       typeof location.lng === 'number' &&
       location.lat >= -90 && location.lat <= 90 &&
       location.lng >= -180 && location.lng <= 180
     ) {
-      locationData = { lat: location.lat, lng: location.lng };
+      // 兼容：前端传了 location 但没传 geoInfo → 后端计算 geohash（5位截断，存储层脱敏）
+      finalGeoInfo = {
+        geohash: encodeGeohash(location.lat, location.lng, PRECISION_LEVELS.DISTRICT),
+      };
     }
 
     const esc = (s: string) => s.replace(/[<&"]/g, (c) => {
@@ -114,7 +147,7 @@ router.post('/', authRequired, (req: Request, res: Response) => {
       finalCollectionId = def?.id;
     }
 
-    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, locationData, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags, finalCollectionId);
+    const story = createStar(safeContent, safeTitle ?? undefined, catalogStarId, undefined, user.id, safeTag, anonymous, typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/') ? imageUrl : undefined, catalogStarIds, safeTags, finalCollectionId, finalGeoInfo);
 
     // 异步生成 AI 故事内核
     if (story && (story as { id: number }).id) {

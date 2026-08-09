@@ -35,7 +35,8 @@
 | 文件 | 用途 |
 | --- | --- |
 | `stars.ts` | 旧版星星路由（`/api/stars`），保留兼容 |
-| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏；**`POST /api/stories/match-star`**（authRequired，1~2000 字校验）调 kernel 为未落库新故事寻找 Top3 契合星辰；**`POST /api/stories/ai-tags`**（authOptional，1~2000 字校验）仅生成 3-5 个 AI 建议标签（轻量、不走星星匹配）供前端发故事时实时推荐。 |
+| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏；**`POST /api/stories/match-star`**（authRequired，1~2000 字校验）调 kernel 为未落库新故事寻找 Top3 契合星辰；**`POST /api/stories/ai-tags`**（authOptional，1~2000 字校验）仅生成 3-5 个 AI 建议标签（轻量、不走星星匹配）供前端发故事时实时推荐；**`GET /api/stories/nearby`**（authRequired，`?geohash=&limit=`）返回「附近的人的心事」——基于 geohash 网格 + k-匿名降级（同城→同省→全国→情绪优先）+ IDF 加权 Jaccard 情绪匹配，响应含 sharedEmotions/sharedThemes 共同标签但不泄露精确坐标。POST 投递支持 `geoInfo{geohash,city,province}` 或兼容 `location{lat,lng}`（后端自动截断为 5 位 geohash）。 |
+| `nearbyService.ts` | **附近的人的心事核心匹配服务**。`getNearbyStories(geohash, userId, limit)` 实现多级降级漏斗（district→city→province→country→emotion），k-匿名阈值 K=5，IDF 加权 Jaccard 情绪/主题相似度（复用 story_kernels），时间新鲜度（30天半衰期），返回 sharedEmotions/sharedThemes 供前端"打标签"展示。隐私：只用 geohash 前缀查询，不涉及精确坐标 |
 | `catalog.ts` | 星表恒星路由（`/api/catalog/stars`）。统计、搜索 |
 | `narrative.ts` | **AI 叙事路由**（`/api/catalog/stars/:id/narrative`）。含 `ra`/`dec` 参数用于地平线判断 |
 | `chat.ts` | **古人陪看聊天路由**（`/api/catalog/stars/:id/chat/*`）。古人列表、开场白、SSE 流式聊天 |
@@ -54,8 +55,8 @@
 | `narrative.ts` | **AI 叙事生成核心**。含 `PLANET_MAP`（太阳系星体映射）、`isAboveHorizon`（地平线计算）、`buildNarrativePrompt`（恒星 Prompt）、`buildPlanetNarrativePromptVisible/Hidden`（行星可见/不可见 Prompt） |
 | `deepseek.ts` | DeepSeek API 封装。`deepseekChat()` 函数，支持 temperature/maxTokens 配置 |
 | `chat.ts` | 古人陪看聊天服务。`streamChat()` SSE 流式输出 |
-| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者） |
-| `collectionService.ts` | 合集业务服务。类型 `CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'`；`PUBLIC_VISIBILITIES = [public, anonymous, galaxy]`；`SYSTEM_ADMIN_USER_ID = 0`（星穹守护 = 管理员）。`validateCollectionInput`校验星河仅管理员可创建；`listPublicCollections`公开合集分页（sort=hot/new/resonance/name_asc/stories_desc，visibility 过滤）；`getPublicCollectionPicks(wanted, galaxyN)` 穹庭书局推荐（前 galaxyN 本官方星河按 sort_order ASC + 最近 14 天 hot 补足 wanted 本）。星河合集（visibility=galaxy）默认 sort_order 用于官方卷轴排序；作者可见性规则封装供 starService 复用 |
+| `starService.ts` | 星星 CRUD 业务逻辑。含 `getUserStats()`（用户聚合统计）、`getUserStoriesPaged()`（分页跨星查询）、`getCatalogStats()`（单星聚合）、**`shouldHideAuthor()` 作者名可见性规则**（故事匿名=1 or 合集 visibility=anonymous，且访问者非 owner/管理员 → 隐藏作者）。`createStar` 支持 `geoInfo{geohash,city,province}` 参数（存储层脱敏，不落库精确坐标）。导出 `buildVisibilityFilter`/`hideAuthorForRows`/`buildCollectionMap`/`attachCatalogStarIds` 供 nearbyService 复用 |
+| `collectionService.ts` | 合集业务服务。类型 `CollectionVisibility = 'public' | 'private' | 'anonymous' | 'galaxy'`；`PUBLIC_VISIBILITIES = [public, anonymous, galaxy]`；`SYSTEM_ADMIN_USER_ID = 0`（星穹守护 = 管理员）。`validateCollectionInput` 校验星河仅管理员可创建；`listPublicCollections` 公开合集分页（sort=hot/new/resonance/name_asc/stories_desc，visibility 过滤）；`getPublicCollectionPicks(wanted, galaxyN)` 穹庭书局推荐（前 galaxyN 本官方星河按 sort_order ASC + 最近 14 天 hot 补足 wanted 本）。星河合集（visibility=galaxy）默认 sort_order 用于官方卷轴排序；作者可见性规则封装供 starService 复用 |
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务。含 **`findMatchingStarsForContent(title, content, limit)`** 为未落库的新故事寻找 Top3 最契合的星辰（内核 Jaccard 相似度 Top10 + DeepSeek 语义重排给理由 + 匹配不到时降级选亮星）。**`extractSuggestedTagsForContent(title, content)`** 轻量接口：仅生成 3-5 个 AI 建议标签（不走星星匹配），配合前端 `POST /api/stories/ai-tags` 做实时标签推荐。`getSimilarStars(catalogStarId)` 星 vs 星内核相似度。`generateKernel()` AI 提取内核。 |
 | `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
@@ -74,7 +75,8 @@
 | 文件 | 用途 |
 | --- | --- |
 | `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()`。<br>**含 `convertKeys` 函数**：自动将 snake_case 键转为 camelCase（如 `image_url` → `imageUrl`），SQL 查询中无需重复别名 |
-| `position.ts` | 位置计算工具 |
+| `position.ts` | 位置计算工具（3D 星空坐标随机生成，非地理坐标） |
+| `geohash.ts` | **Geohash 编码工具**（纯 TS 零依赖）。`encode(lat,lng,precision)` 编码、`decode(hash)` 解码、`neighbors(hash)` 8 邻居网格、`truncate(hash,precision)` k-匿名截断、`PRECISION_LEVELS` 精度常量（3=省/4=城/5=区）。参考 Wikipedia Geohash Z-order curve |
 
 ### 中间件 `src/middleware/`
 

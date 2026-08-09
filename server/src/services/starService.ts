@@ -90,7 +90,7 @@ function attachCollectionInfo(stories: any[]): any[] {
 }
 
 // 为故事附加 catalogStarIds（从 story_catalog_stars 连接表读取多对多绑定）
-function attachCatalogStarIds(stories: any[]): any[] {
+export function attachCatalogStarIds(stories: any[]): any[] {
   if (stories.length === 0) return stories;
   const ids = stories.map((s: any) => s.id);
   const placeholders = ids.map(() => '?').join(',');
@@ -117,7 +117,7 @@ function attachCatalogStarIds(stories: any[]): any[] {
 //   - public / anonymous / galaxy 合集：对所有人可见（星河/匿名也公开）
 //   - 无合集故事（collection_id IS NULL）：对所有人可见
 // 未登录时 currentUserId 传 null，`s.user_id = NULL` 永假，自动只剩公开内容。
-function buildVisibilityFilter(currentUserId?: number): { sql: string; params: any[] } {
+export function buildVisibilityFilter(currentUserId?: number): { sql: string; params: any[] } {
   const params: any[] = [];
   const publicIn = PUBLIC_VISIBILITIES.map(() => '?').join(','); // ?,?,?
   params.push(...PUBLIC_VISIBILITIES);
@@ -130,7 +130,7 @@ function buildVisibilityFilter(currentUserId?: number): { sql: string; params: a
   return { sql, params };
 }
 // 故事用户名隐藏：anonymous 合集对外 / 合集故事 is_anonymous=1 对外隐藏；owner 可见
-function hideAuthorForRows(rows: any[], collectionMap: Map<number, { visibility: CollectionVisibility | string; user_id: number }>, currentUserId?: number): any[] {
+export function hideAuthorForRows(rows: any[], collectionMap: Map<number, { visibility: CollectionVisibility | string; user_id: number }>, currentUserId?: number): any[] {
   return rows.map((r: any) => {
     const coll = r.collection_id != null ? collectionMap.get(r.collection_id) : undefined;
     const needHide = shouldHideAuthor({
@@ -144,7 +144,7 @@ function hideAuthorForRows(rows: any[], collectionMap: Map<number, { visibility:
   });
 }
 // 批量根据 collection_id 查 visibility + user_id，给 hideAuthorForRows 用
-function buildCollectionMap(rows: any[]): Map<number, { visibility: CollectionVisibility | string; user_id: number }> {
+export function buildCollectionMap(rows: any[]): Map<number, { visibility: CollectionVisibility | string; user_id: number }> {
   const ids = Array.from(new Set(rows.map((r: any) => r.collection_id).filter((id: any) => id != null))) as number[];
   const map = new Map<number, { visibility: CollectionVisibility | string; user_id: number }>();
   if (ids.length === 0) return map;
@@ -248,6 +248,7 @@ export function createStar(
   catalogStarIds?: number[],
   tags?: string[],
   collectionId?: number,
+  geoInfo?: { geohash?: string; city?: string; province?: string },
 ): Star & { username: string | null; userId: number | null; tags: string[] } {
   const pos = generatePosition();
   // 开放标签：2-6 个汉字/字母/数字，拒绝空串和符号/超长
@@ -292,16 +293,20 @@ export function createStar(
   }
 
   const stmt = db.prepare(`
-    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, user_id, tag, is_anonymous, image_url, tags, collection_id)
-    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO stars (type, title, content, pos_x, pos_y, pos_z, catalog_star_id, location_lat, location_lng, geohash, city, province, user_id, tag, is_anonymous, image_url, tags, collection_id)
+    VALUES ('user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     title ?? null,
     content,
     pos.x, pos.y, pos.z,
     effectiveCatalogStarId ?? null,
-    location?.lat ?? null,
-    location?.lng ?? null,
+    // location_lat/lng 保留列但不再写入精确值（存储层脱敏）
+    null,
+    null,
+    geoInfo?.geohash ?? null,
+    geoInfo?.city ?? null,
+    geoInfo?.province ?? null,
     userId ?? null,
     primaryTag,
     effectiveIsAnonymous,
