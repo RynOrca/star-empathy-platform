@@ -14,7 +14,7 @@
         <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
       </button>
     </div>
-    <div class="action-buttons-secondary">
+    <div v-if="showAncientChat" class="action-buttons-secondary">
       <button class="chat-btn" @click="$emit('open-chat')">
         <MessagesSquareIcon :size="14" />
         <span>与古人共赏</span>
@@ -32,6 +32,8 @@ const MessagesSquareIcon = MessagesSquare
 
 defineProps<{
   isFavorited: boolean
+  /** 是否显示「与古人共赏」按钮：仅当该星下存在历史故事时为 true */
+  showAncientChat?: boolean
 }>()
 
 defineEmits<{

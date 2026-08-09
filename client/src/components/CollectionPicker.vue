@@ -67,7 +67,7 @@
                     class="cp-visi-btn"
                     :class="{ on: newVisibility === 'public' }"
                     @click="newVisibility = 'public'"
-                    title="公开：所有人可见"
+                    title="所有人可见"
                   >
                     <Globe :size="10" />
                     <span>公开</span>
@@ -77,7 +77,7 @@
                     class="cp-visi-btn"
                     :class="{ on: newVisibility === 'anonymous' }"
                     @click="newVisibility = 'anonymous'"
-                    title="匿名：故事发布后不显示发布者（合集的私密性=故事的私密性）"
+                    title="公开但隐藏作者名"
                   >
                     <Ghost :size="10" />
                     <span>匿名</span>
@@ -85,19 +85,9 @@
                   <button
                     type="button"
                     class="cp-visi-btn"
-                    :class="{ on: newVisibility === 'galaxy' }"
-                    @click="newVisibility = 'galaxy'"
-                    title="星河：跨合集漫游池可见（星穹金）"
-                  >
-                    <Galaxy :size="10" />
-                    <span>星河</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="cp-visi-btn"
                     :class="{ on: newVisibility === 'private' }"
                     @click="newVisibility = 'private'"
-                    title="私有：仅自己可见"
+                    title="仅自己可见"
                   >
                     <Lock :size="10" />
                     <span>私有</span>
@@ -192,6 +182,10 @@ const mode = ref<Mode>('none')
 const selectedId = ref<number | null>(null)
 const newName = ref('')
 const newVisibility = ref<CollectionVisibility>('public')
+/* 新建模式不允许星河：如果被设为 galaxy（如外部回填 modelValue.visibility），自动回落 public */
+watch(newVisibility, (v) => {
+  if (v === 'galaxy') newVisibility.value = 'public'
+}, { immediate: true })
 
 /* ═══════ Teleport + fixed 坐标计算（绕开父级 overflow 裁剪） ═══════ */
 const panelStyle = reactive<{

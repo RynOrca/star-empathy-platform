@@ -778,12 +778,13 @@ const displayStories = computed(() => {
    右侧信息面板：从真实故事派生的统计（活跃时辰 / 时间轴 / 标签）
    ═══════════════════════════════════════════════════════════ */
 
-/** 24 小时活跃分布（基于故事 createdAt 的小时） */
+/** 24 小时活跃分布（基于故事 createdAt 的北京时区小时，UTC+8，与后端 computeHourlyAndThemes 口径对齐） */
 const hourlyActivity = computed<number[]>(() => {
   const arr = new Array(24).fill(0)
   for (const s of detail.value?.stories ?? []) {
-    const h = new Date(s.createdAt + 'Z').getUTCHours()
-    if (h >= 0 && h < 24) arr[h]++
+    const utcH = new Date(s.createdAt + 'Z').getUTCHours()
+    const beijingH = (utcH + 8) % 24
+    arr[beijingH]++
   }
   return arr
 })

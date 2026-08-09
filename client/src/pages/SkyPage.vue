@@ -67,7 +67,7 @@
         <button v-if="username && !isGuest && cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" @click="openMyCollections" title="我的星笺">
           <Library :size="18" />
         </button>
-        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，首帧就显示） -->
+        <!-- 行星轨迹开关：开=显示所有行星轨迹，关=只显示太阳轨迹（黄道线）（相机模式隐藏，不依赖定位，默认隐藏，点击打开） -->
         <button v-if="cameraMode.cameraMode.value !== 'observe'" class="nav-icon-btn" :class="{ active: showPlanetTrails }" @click="togglePlanetTrails" :title="showPlanetTrails ? '隐藏行星轨迹' : '显示行星轨迹'">
           <Orbit :size="18" />
         </button>
@@ -1943,7 +1943,8 @@ const resonating = ref(false)
 const catalogStats = ref<{ storyCount: number; totalResonance: number; totalViews: number; starViews: number; favoriteCount: number } | null>(null)
 const showForm = ref(false)
 // 行星轨迹开关：true=显示所有行星视运动轨迹，false=只显示太阳轨迹（黄道线）
-const showPlanetTrails = ref(true)
+// 默认隐藏，用户点击按钮才打开
+const showPlanetTrails = ref(false)
 function togglePlanetTrails() {
   showPlanetTrails.value = !showPlanetTrails.value
   skyRef.value?.sky?.setPlanetTrailsVisible(showPlanetTrails.value)

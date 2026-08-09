@@ -3041,6 +3041,8 @@ for (const s of stars) starById.set(s.id, s)
           depthTest: true,
         })
         const line = new Line(g, mat)
+        // 默认隐藏，由 SkyPage 的 showPlanetTrails 状态驱动显示
+        line.visible = false
         skyGroup.add(line)
         planetTrailLines.push(line)
       }).catch(err => console.error('[useSky] 轨道线计算失败', planet.name, err))
