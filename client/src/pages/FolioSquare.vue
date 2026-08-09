@@ -412,7 +412,7 @@ async function fetchSearchResults() {
   try {
     const params = new URLSearchParams()
     params.set('search', kw)
-    params.set('limit', '8')
+    params.set('limit', '20')
     params.set('sort', 'hot')
     const res = await authFetch('/api/collections/public?' + params.toString(), { headers: authHeaders() })
     const json = await res.json()
@@ -993,12 +993,22 @@ updateVolumeCountsQuick()
   z-index: 60;
   max-height: 320px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 217, 138, 0.22) transparent;
   background: rgba(16, 18, 40, 0.98);
   border: 1px solid rgba(255, 217, 138, 0.18);
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   padding: 6px;
   -webkit-overflow-scrolling: touch;
+}
+.fs-search-dropdown::-webkit-scrollbar { width: 6px; background: transparent; }
+.fs-search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 217, 138, 0.22);
+  border-radius: 8px;
+}
+.fs-search-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 217, 138, 0.38);
 }
 .fs-sd-loading, .fs-sd-empty {
   padding: 14px 12px;
