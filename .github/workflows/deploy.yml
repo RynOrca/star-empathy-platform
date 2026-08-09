@@ -96,12 +96,17 @@ jobs:
             free -h
             pm2 status
 
-            echo "=== 7/6 修复存量 persona 残句（幂等：以冒号/逗号等不完整标点结尾的段落替换为金句/兜底文案）==="
-            node dist/scripts/fix-persona-truncated.js \
-              || echo "⚠️ 残句修复未完成（不影响部署，下次 push 会继续）"
+            echo "=== 7/6 修复存量 persona 残句 + 识别需重生成的星（幂等）==="
+            REGEN_IDS=$(node dist/scripts/fix-persona-truncated.js | grep -o '\[regen\] .*' | sed 's/\[regen\] //' | tr -d ' \r' | head -n1)
+            echo "需重新生成的星: ${REGEN_IDS:-无}"
 
-            echo "=== 8/6 补全 AI 星格画像（幂等：跳过已生成的，前 30 颗高故事星）==="
+            echo "=== 8/6 补全 AI 星格画像 ==="
             cd /var/www/star-empathy-platform/server
+            if [ -n "$REGEN_IDS" ]; then
+              echo "--- 8a/6 强制重生成受影响星（残句/兜底 → 完整新叙事）---"
+              node dist/scripts/generateAllAnalyses.js --ids "$REGEN_IDS" --force \
+                || echo "⚠️ 重新生成未完成（保留兜底文案，下次 push 会继续）"
+            fi
             node dist/scripts/generateAllAnalyses.js --limit 30 \
               || echo "⚠️ AI 分析生成未完成（不影响部署，下次 push 会继续补）"
             pm2 status
