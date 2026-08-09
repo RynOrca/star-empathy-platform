@@ -101,7 +101,16 @@ export async function deepseekChat(
     throw new Error('DEEPSEEK_API_KEY 未设置，请在设置中配置或在环境变量中设置')
   }
 
-  const model = options.model || DEFAULT_MODEL
+  // JSON 任务（默认开）：思考模型（v4-flash / reasoner / R1 等）会把正式答案放
+  // reasoning_content 而 content 为空，实测不稳定 → 一律回退非思考模型 deepseek-chat。
+  // 自由文/聊天任务（jsonMode=false）不受影响，继续用配置模型。
+  const wantJson = options.jsonMode !== false
+  const THINKING_MODELS = ['deepseek-v4-flash', 'deepseek-v4', 'deepseek-reasoner', 'deepseek-r1', 'deepseek-r1-0528']
+  let model = options.model || DEFAULT_MODEL
+  if (wantJson && THINKING_MODELS.includes(model.toLowerCase())) {
+    console.warn(`⚠️ [deepseek] JSON 任务使用思考模型 ${model} 不稳定，回退 deepseek-chat`)
+    model = 'deepseek-chat'
+  }
   const body: Record<string, unknown> = {
     model,
     messages,
@@ -114,7 +123,6 @@ export async function deepseekChat(
     body.enable_search = true
   }
   // JSON 模式（默认开；写叙事等 Markdown/自由文任务显式 jsonMode=false）
-  const wantJson = options.jsonMode !== false
   if (wantJson) body.response_format = { type: 'json_object' }
 
   console.log(`🤖 DeepSeek 请求: ${model}, ${messages.length} 条消息 (try=${_retry + 1})`)
