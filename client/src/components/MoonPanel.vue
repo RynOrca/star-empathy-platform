@@ -46,7 +46,7 @@
             <div
               ref="moonCanvasRef"
               class="moon-preview-canvas"
-              :class="{ 'is-css-fallback': !webglSupported }"
+              :class="{ 'is-css-fallback': !webglSupported || webglFailed }"
               :style="cssFallbackStyle"
             ></div>
             <div class="moon-preview-info">
@@ -308,6 +308,8 @@ const selectedScheduleIdx = ref(0)
 // ─── WebGL 支持检测 ────────────────────────────────────────────────
 
 const webglSupported = checkWebGLSupport()
+// 运行时 WebGL 渲染器创建失败时置为 true，强制降级到 CSS 月相
+const webglFailed = ref(false)
 
 function checkWebGLSupport(): boolean {
   try {
@@ -351,7 +353,7 @@ function computeSunPosition(phaseAngle: number): THREE.Vector3 {
 }
 
 function initThreeScene(): void {
-  if (!moonCanvasRef.value || !webglSupported) return
+  if (!moonCanvasRef.value || !webglSupported || webglFailed.value) return
 
   // 清理旧场景
   disposeThreeScene()
@@ -366,12 +368,19 @@ function initThreeScene(): void {
   camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100)
   camera.position.set(0, 0, 3)
 
-  // 渲染器
-  renderer = new THREE.WebGLRenderer({
-    alpha: true,
-    antialias: true,
-    preserveDrawingBuffer: false,
-  })
+  // 渲染器（部分设备 WebGL 上下文受限/不可用，创建失败时降级为 CSS 月相）
+  try {
+    renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: false,
+    })
+  } catch (e) {
+    console.error('[MoonPanel] WebGL 渲染器创建失败，降级为 CSS 月相', e)
+    webglFailed.value = true
+    disposeThreeScene()
+    return
+  }
   renderer.setSize(size, size)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   container.appendChild(renderer.domElement)
@@ -404,12 +413,12 @@ function initThreeScene(): void {
   moonMesh = new THREE.Mesh(geometry, material)
   scene.add(moonMesh)
 
-  // 太阳光（DirectionalLight）
-  sunLight = new THREE.DirectionalLight(0xfff5e6, 1.2)
+  // 太阳光（DirectionalLight）—— 高强度，确保低照明相位（残月/新月）的细月牙清晰明亮
+  sunLight = new THREE.DirectionalLight(0xfff5e6, 3.0)
   scene.add(sunLight)
 
-  // 地球反照（AmbientLight）—— 暗面微弱蓝光
-  const earthshine = new THREE.AmbientLight(0x1a2a4a, 0.12)
+  // 地球反照（AmbientLight）—— 低强度暗部反照，让未照面隐约可见又不掩盖月牙相位
+  const earthshine = new THREE.AmbientLight(0x8890a8, 0.22)
   scene.add(earthshine)
 
   // 应用初始相位
@@ -469,7 +478,7 @@ function disposeThreeScene(): void {
 // ─── CSS 降级方案（WebGL 不支持时） ────────────────────────────────
 
 const cssFallbackStyle = computed(() => {
-  if (!props.data || webglSupported) return {}
+  if (!props.data || (webglSupported && !webglFailed.value)) return {}
   return computeCssShadowStyle(props.data.phaseAngle)
 })
 
