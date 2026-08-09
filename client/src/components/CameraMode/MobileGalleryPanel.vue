@@ -5,14 +5,24 @@
       <div class="mgp-title-block">
         <GalleryIcon />
         <span class="mgp-title">{{ mode === 'gazing' ? 'STARS IN FRAME' : 'VOICES IN FRAME' }}</span>
-        <span class="mgp-count">{{ stories.length }}</span>
+        <span class="mgp-count">{{ pagedStories.length }}</span>
       </div>
       <div v-if="stories.length > 0" class="mgp-nav">
+        <!-- 换一批：刷新图标按钮，位于 count 与左箭头之间，样式与 nav-btn 一致 -->
+        <button
+          class="mgp-nav-btn mgp-refresh-btn"
+          :disabled="stories.length === 0"
+          @click="nextBatch"
+          aria-label="换一批"
+          title="换一批"
+        >
+          <RefreshIcon />
+        </button>
         <button class="mgp-nav-btn" :disabled="activeIdx === 0" @click="goPrev" aria-label="上一张">
           <ChevronLeftIcon />
         </button>
-        <span class="mgp-pager"><b>{{ activeIdx + 1 }}</b> / {{ stories.length }}</span>
-        <button class="mgp-nav-btn" :disabled="activeIdx >= stories.length - 1" @click="goNext" aria-label="下一张">
+        <span class="mgp-pager"><b>{{ activeIdx + 1 }}</b> / {{ pagedStories.length }}</span>
+        <button class="mgp-nav-btn" :disabled="activeIdx >= pagedStories.length - 1" @click="goNext" aria-label="下一张">
           <ChevronRightIcon />
         </button>
       </div>
@@ -32,7 +42,7 @@
     >
       <div class="mgp-track" :style="{ transform: `translateX(-${trackOffset}px)` }">
         <div
-          v-for="(item, idx) in stories"
+          v-for="(item, idx) in pagedStories"
           :key="item.star.id"
           class="mgp-card"
           :class="{ 'is-active': idx === activeIdx }"
@@ -63,9 +73,9 @@
     </div>
 
     <!-- 小圆点分页器 -->
-    <div v-if="stories.length > 1" class="mgp-dots">
+    <div v-if="pagedStories.length > 1" class="mgp-dots">
       <div
-        v-for="(item, idx) in stories"
+        v-for="(item, idx) in pagedStories"
         :key="`dot-${item.star.id}`"
         class="mgp-dot"
         :class="{ 'is-active': idx === activeIdx }"
@@ -78,7 +88,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import {
-  GalleryIcon, ChevronLeftIcon, ChevronRightIcon,
+  GalleryIcon, ChevronLeftIcon, ChevronRightIcon, RefreshIcon,
   SparklesIcon, FlameIcon, HeartIcon, EyeIcon, CompassIcon,
 } from './icons/CameraIcons'
 import { getStarDisplayName } from '../../utils/starName'
@@ -114,6 +124,51 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateCardWidth)
 })
 
+/** 分页：一次只展示 15 个，"换一批"洗牌并尽量排除当前批的故事 */
+const PAGE_SIZE = 15
+/** 展示池：洗牌后的故事顺序，换一批时重新洗牌 */
+const shuffledStories = ref<StoryListItem[]>([])
+/** 当前已展示过的星 id 集合（用于换一批时排除，避免重复） */
+const shownIds = ref<Set<number>>(new Set())
+
+const pagedStories = computed<StoryListItem[]>(() => shuffledStories.value.slice(0, PAGE_SIZE))
+
+/** Fisher-Yates 洗牌 */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** 重新洗牌并选出下一批故事：优先排除已展示过的，除非池子不够大 */
+function reshuffle(): void {
+  if (props.stories.length === 0) {
+    shuffledStories.value = []
+    return
+  }
+  // 池子不够大（≤PAGE_SIZE）→ 无法排除，直接洗牌
+  if (props.stories.length <= PAGE_SIZE) {
+    shuffledStories.value = shuffle(props.stories)
+    return
+  }
+  // 优先选未展示过的
+  const remaining = props.stories.filter(s => !shownIds.value.has(s.star.id))
+  // 剩余不够一页 → 重置已展示集合，重新洗牌全部
+  if (remaining.length < PAGE_SIZE) {
+    shownIds.value = new Set()
+    shuffledStories.value = shuffle(props.stories).slice(0, PAGE_SIZE)
+  } else {
+    shuffledStories.value = shuffle(remaining).slice(0, PAGE_SIZE)
+  }
+  // 标记本批为已展示
+  for (const s of shuffledStories.value) {
+    shownIds.value.add(s.star.id)
+  }
+}
+
 const activeIdx = ref(0)
 
 /** 轨道偏移量：activeIdx × (cardWidth + gap)，响应 resize/rotate */
@@ -124,36 +179,72 @@ let touchStartX = 0
 let touchStartY = 0
 let didSwipe = false
 
-/** stories 变化时同步 activeIdx：保持当前星或回到首位 */
+/** 星标识（catalogStarId 优先，无则用故事 id） */
+function storyKey(s: StoryListItem): string {
+  const st = s.star
+  return st.catalogStarId !== null && st.catalogStarId !== undefined ? `c${st.catalogStarId}` : `s${st.id}`
+}
+
+/** 上次已处理的故事集合签名（排序后的 key 串），仅当内容真正变化时才重新洗牌 */
+let lastStoryKeys: string | null = null
+
+/** stories 变化时重新洗牌并选出第一批。
+ *  父组件每 400ms 会为 frameStories 生成新的数组引用，即便内容没变也会触发本 watch。
+ *  若内容（星集合）未变则跳过洗牌，避免卡片无缘无故自己跳动。 */
 watch(() => props.stories, (newStories) => {
-  if (newStories.length === 0) {
-    activeIdx.value = 0
+  const keys = newStories.map(storyKey).sort().join(',')
+  if (lastStoryKeys !== null && keys === lastStoryKeys) {
+    // 内容未变化（只是父组件重建了数组引用）→ 保持当前顺序，不做任何操作
     return
   }
-  if (props.activeStarId !== null) {
-    const idx = newStories.findIndex(s => s.star.id === props.activeStarId)
-    if (idx >= 0) {
-      activeIdx.value = idx
-      return
+  lastStoryKeys = keys
+  // 视角内故事真正变化（拖动相机）时，重置已展示集合并重新洗牌
+  shownIds.value = new Set()
+  reshuffle()
+  if (newStories.length > 0) {
+    // 保持当前活动星（如果还在新池子里）
+    if (props.activeStarId !== null) {
+      const idx = shuffledStories.value.findIndex(s => s.star.id === props.activeStarId)
+      if (idx >= 0) {
+        activeIdx.value = idx
+        return
+      }
     }
+    activeIdx.value = 0
+  } else {
+    activeIdx.value = 0
   }
-  activeIdx.value = 0
-})
+}, { immediate: true })
 
 /** activeIdx 变化时同步 activeStarId 到父组件 */
 watch(activeIdx, (newIdx) => {
-  const item = props.stories[newIdx]
+  const item = pagedStories.value[newIdx]
   if (item) emit('activeChange', item.star.id)
+})
+
+/** activeStarId 外部变化时，跳到对应星位置 */
+watch(() => props.activeStarId, (newId) => {
+  if (newId === null) return
+  const idx = shuffledStories.value.findIndex(s => s.star.id === newId)
+  if (idx < 0) return
+  if (activeIdx.value !== idx) activeIdx.value = idx
 })
 
 function goPrev(): void {
   if (activeIdx.value > 0) activeIdx.value--
 }
 function goNext(): void {
-  if (activeIdx.value < props.stories.length - 1) activeIdx.value++
+  if (activeIdx.value < pagedStories.value.length - 1) activeIdx.value++
 }
 function goTo(idx: number): void {
-  if (idx >= 0 && idx < props.stories.length) activeIdx.value = idx
+  if (idx >= 0 && idx < pagedStories.value.length) activeIdx.value = idx
+}
+
+/** 换一批：重新洗牌，尽量展示未看过的故事 */
+function nextBatch(): void {
+  if (props.stories.length === 0) return
+  reshuffle()
+  activeIdx.value = 0
 }
 
 function onCardClick(star: StarData): void {
@@ -218,7 +309,7 @@ function formatTime(iso: string): string {
 <style scoped>
 .mobile-gallery-panel {
   position: fixed;
-  bottom: 12px;
+  bottom: 10px; /* 用户反馈：-13px 太低，回距底部 10px */
   left: 12px;
   right: 12px;
   z-index: 40;
@@ -240,6 +331,7 @@ function formatTime(iso: string): string {
   align-items: center;
   justify-content: space-between;
   padding: 0 4px 8px;
+  margin-top: -5px; /* 用户反馈：标题行（VOICES IN FRAME）上移 5px */
 }
 .mgp-title-block {
   display: flex;

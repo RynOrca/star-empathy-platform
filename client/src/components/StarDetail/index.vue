@@ -516,7 +516,7 @@
         </div>
       </div>
     </div>
-    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：观察模式切换 -->
+    <!-- PC 端行星特写 · 观察/返回按钮（issue #136）：已隐藏（功能存在 bug，待修复后恢复）
     <button
       v-if="isPlanetCloseup"
       class="observe-toggle-btn"
@@ -524,6 +524,7 @@
     >
       {{ observeMode ? '返回' : '观察' }}
     </button>
+    -->
   </div>
   </Transition>
 
@@ -993,7 +994,28 @@
                 <ChevronDown :size="20" style="transform: rotate(90deg)" />
               </button>
               <span class="mobile-story-back-label">{{ detailBackLabel }}</span>
-              <div style="width: 20px"></div>
+              <!-- 任务1：外层顶部栏右侧接管共鸣/删除入口（仅自己的故事显示删除），内层 StoryDetail 传 hide-toolbar 隐藏重复工具栏 -->
+              <div class="mobile-story-top-actions">
+                <button
+                  class="mobile-story-resonate"
+                  :class="{ done: isStoryResonated(detailStory) }"
+                  :disabled="isStoryResonating(detailStory)"
+                  @click.stop="onResonate(detailStory)"
+                >
+                  <component :is="isStoryResonated(detailStory) ? CheckIcon : SparklesIcon" :size="14" />
+                  <span>{{ isStoryResonated(detailStory) ? '已共鸣' : '共鸣' }}</span>
+                  <span class="mobile-story-resonate-count">{{ getDisplayResonance(detailStory) }}</span>
+                </button>
+                <button
+                  v-if="detailStory.userId != null && detailStory.userId === currentUserId"
+                  class="mobile-story-delete"
+                  :disabled="deleting"
+                  @click.stop="confirmDelete(detailStory.id)"
+                >
+                  <Trash2Icon :size="13" />
+                  <span>删除</span>
+                </button>
+              </div>
             </div>
             <div class="mobile-story-detail-body">
               <StoryDetail
@@ -1012,6 +1034,7 @@
                 :createdAtIso="detailStory.createdAt"
                 :siblingStories="siblingStoriesFor(detailStory)"
                 :showStarBelonging="false"
+                :hide-toolbar="true"
                 @back="detailStoryId = null"
                 @resonate="onResonate(detailStory)"
                 @delete="confirmDelete(detailStory.id)"
@@ -1037,7 +1060,8 @@
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted, watch, type Component, toRef, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Info } from 'lucide-vue-next'
+
+import { Star, Sparkles, PenSquare, X, BookOpen, List, User, AlertTriangle, ChevronDown, Eye, Heart, Sparkle, TrendingUp, Clock, Flame, MessageCircle, Trash2, Check } from 'lucide-vue-next'
 const SparklesIcon = Sparkles
 const EyeIcon = Eye
 const HeartIcon = Heart
@@ -1046,6 +1070,8 @@ const TrendingIcon = TrendingUp
 const ClockIcon = Clock
 const FlameIcon = Flame
 const MessageIcon = MessageCircle
+const Trash2Icon = Trash2
+const CheckIcon = Check
 import StarNarrative from '../StarNarrative.vue'
 import AncientChat from '../AncientChat.vue'
 import StoryDetail from './StoryDetail.vue'
@@ -1402,9 +1428,9 @@ import type { SiblingStoryPreview } from './StoryDetail.vue'
 function siblingStoriesFor(story: any): SiblingStoryPreview[] {
   if (!story?.id) return []
   const ownIds = new Set<number>()
-  if (typeof story.catalogStarId === 'number' && story.catalogStarId !== 0) ownIds.add(story.catalogStarId)
+  if (typeof story.catalogStarId === 'number') ownIds.add(story.catalogStarId)
   if (Array.isArray(story.catalogStarIds)) {
-    for (const n of story.catalogStarIds) if (typeof n === 'number' && n !== 0) ownIds.add(n)
+    for (const n of story.catalogStarIds) if (typeof n === 'number') ownIds.add(n)
   }
   const sharesStar = (s: any): boolean => {
     if (s.id === story.id) return false
@@ -1480,11 +1506,20 @@ const positionReady = ref(false)
 // ─── 叙事 ───
 const narrative = useNarrative()
 
+/** 叙事请求去重：同一颗星最多拉一次；若首拉时还没有定位，等定位回调到达后再补拉一次带位置的请求 */
+let narrativeFetched = false
+let narrativeFetchedWithPosition = false
+
 function fetchNarrativeWithPosition() {
   if (!props.catalogStarId) return
-  narrative.reset()
   const lat = props.observerLat ?? userPosition.value?.lat
   const lng = props.observerLng ?? userPosition.value?.lng
+  const hasPosition = lat != null && lng != null
+  // 已拉过：带定位的请求不重复；之前无定位而这次有定位，允许补拉一次
+  if (narrativeFetched && (narrativeFetchedWithPosition || !hasPosition)) return
+  narrativeFetched = true
+  if (hasPosition) narrativeFetchedWithPosition = true
+  narrative.reset()
   narrative.fetchNarrative(props.catalogStarId, lat, lng, props.starInfo?.ra, props.starInfo?.dec)
 }
 
@@ -1497,6 +1532,8 @@ watch(() => props.catalogStarId, (id) => {
   isFirstStarChange = false
   searchQuery.value = ''
   detailStoryId.value = null
+  narrativeFetched = false
+  narrativeFetchedWithPosition = false
   if (id && (positionReady.value || props.observerLat != null)) {
     fetchNarrativeWithPosition()
   }
@@ -1538,7 +1575,8 @@ watch(
 // ─── AI 内核标签 ───
 const kernel = useKernel()
 watch(() => props.catalogStarId, (id) => {
-  if (id) {
+  // id=0（天枢）是合法 catalog 星
+  if (id !== null && id !== undefined && !Number.isNaN(id)) {
     kernel.reset()
     kernel.fetchAggregatedTags(id)
   }
@@ -1567,7 +1605,7 @@ const starAnalysis = useStarAnalysis(catalogStarIdNullable)
  */
 function retriggerStarAnalysis() {
   starAnalysis.reset()
-  if (catalogStarIdNullable.value) {
+  if (catalogStarIdNullable.value !== null && catalogStarIdNullable.value !== undefined && !Number.isNaN(catalogStarIdNullable.value)) {
     starAnalysis.fetchAnalysis()
   }
 }
@@ -3136,6 +3174,66 @@ watch(() => props.catalogStarId, () => {
   font-size: 0.85rem;
   color: var(--ink-secondary);
   font-weight: 500;
+}
+
+/* ─── 任务1：移动端故事详情顶部栏右侧 · 共鸣/删除按钮（对齐 StoryDetail 内按钮风格的小号版） ─── */
+.mobile-story-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mobile-story-resonate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+.mobile-story-resonate.done {
+  border-color: rgba(149, 240, 192, 0.25);
+  background: rgba(149, 240, 192, 0.08);
+  color: var(--star-green);
+}
+.mobile-story-resonate:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.mobile-story-resonate-count {
+  opacity: 0.65;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-story-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(255, 107, 138, 0.25);
+  color: #ff6b8a;
+  font-family: var(--font);
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mobile-story-delete:hover:not(:disabled) {
+  background: rgba(255, 107, 138, 0.08);
+  border-color: rgba(255, 107, 138, 0.4);
+}
+.mobile-story-delete:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .mobile-story-detail-body {

@@ -79,12 +79,10 @@ defineEmits<{
   color: var(--hud-text);
   pointer-events: none;     /* ⭐ 全屏容器不抢交互，子元素单独开 pointer-events */
 }
-/* 顶部两行：用包装容器做原来的顶部背景+模糊（只占顶部，不遮星空） */
+/* 顶部两行：背景透明，让星空完全透出（按钮自身已有背景色保证可读性） */
 .mch-top-wrapper {
   position: relative;
-  background: var(--hud-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: transparent;
   animation: mch-top-enter 0.4s var(--ease-in-out) both;
   pointer-events: auto;      /* ⭐ 只有顶部区域能点 */
 }

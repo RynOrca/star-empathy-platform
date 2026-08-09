@@ -15,12 +15,22 @@ export interface StoryKernel {
   generatedAt: string
 }
 
+/** 同星聚合标签缓存（TTL 5 分钟）：StarDetail 反复挂载时避免对同一颗星重复请求，减轻全局限流压力 */
+const tagsCache = new Map<number, { data: AggregatedTags; at: number }>()
+const TAGS_CACHE_TTL = 5 * 60 * 1000
+
 export function useKernel() {
   const aggregatedTags = ref<AggregatedTags | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   async function fetchAggregatedTags(catalogStarId: number): Promise<void> {
+    // 命中缓存：直接使用，不发请求
+    const hit = tagsCache.get(catalogStarId)
+    if (hit && Date.now() - hit.at < TAGS_CACHE_TTL) {
+      aggregatedTags.value = hit.data
+      return
+    }
     loading.value = true
     error.value = null
     try {
@@ -30,6 +40,7 @@ export function useKernel() {
         throw new Error(json.message || `HTTP ${res.status}`)
       }
       aggregatedTags.value = json.data as AggregatedTags
+      tagsCache.set(catalogStarId, { data: json.data as AggregatedTags, at: Date.now() })
     } catch (e: any) {
       error.value = e.message || '加载标签失败'
     } finally {
@@ -52,6 +63,8 @@ export async function fetchStoryKernel(storyId: number): Promise<StoryKernel | n
     const res = await fetch(`/api/stories/${storyId}/kernel`, { method: 'POST' })
     const json = await res.json()
     if (!res.ok) return null
+    // 内核被用户修改 → 聚合标签缓存作废（编辑场景少，直接全清）
+    tagsCache.clear()
     return json.data as StoryKernel
   } catch {
     return null
@@ -71,6 +84,8 @@ export async function updateStoryKernel(
     })
     const json = await res.json()
     if (!res.ok) return null
+    // 内核被用户修改 → 聚合标签缓存作废（编辑场景少，直接全清）
+    tagsCache.clear()
     return json.data as StoryKernel
   } catch {
     return null

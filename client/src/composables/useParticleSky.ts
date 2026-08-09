@@ -13,8 +13,14 @@ function glowTex(size: number, color: string) {
   const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t
 }
 
-export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
+export interface ParticleSkyOptions {
+  /** 金紫星空变体：金色 + 紫色为主调（welcome 开场页用）；默认蓝金（登录页等） */
+  variant?: 'gold-violet'
+}
+
+export function useParticleSky(canvas: { value: HTMLCanvasElement | null }, opts: ParticleSkyOptions = {}) {
   const loaded = ref(false)
+  const goldViolet = opts.variant === 'gold-violet'
   let id = 0; let sc: THREE.Scene; let cam: THREE.PerspectiveCamera; let rend: THREE.WebGLRenderer
   let onResize: (() => void) | null = null
   const twinklePhases: number[] = []
@@ -32,15 +38,21 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
     rend.setPixelRatio(Math.min(devicePixelRatio, 2))
 
     const tg = glowTex(72, 'rgba(255,217,138,1)')
-    const tb = glowTex(56, 'rgba(134,168,255,1)')
+    const tb = glowTex(56, goldViolet ? 'rgba(202,167,255,1)' : 'rgba(134,168,255,1)')
     const tw = glowTex(44, 'rgba(255,255,255,0.85)')
 
-    // 三层星星，极缓视差漂移
-    const layers = [
-      { n: 500,  t: tg, s: 2.2, r0: 280, r1: 350, v: 4e-5 },
-      { n: 800,  t: tb, s: 1.5, r0: 220, r1: 300, v: 7e-5 },
-      { n: 1400, t: tw, s: 0.9, r0: 170, r1: 350, v: 3e-5 },
-    ]
+    // 三层星星，极缓视差漂移（金紫变体：金色/紫色星更多更亮，白星减少）
+    const layers = goldViolet
+      ? [
+          { n: 700,  t: tg, s: 2.4, r0: 280, r1: 350, v: 4e-5 },
+          { n: 900,  t: tb, s: 1.7, r0: 220, r1: 300, v: 7e-5 },
+          { n: 1200, t: tw, s: 0.9, r0: 170, r1: 350, v: 3e-5 },
+        ]
+      : [
+          { n: 500,  t: tg, s: 2.2, r0: 280, r1: 350, v: 4e-5 },
+          { n: 800,  t: tb, s: 1.5, r0: 220, r1: 300, v: 7e-5 },
+          { n: 1400, t: tw, s: 0.9, r0: 170, r1: 350, v: 3e-5 },
+        ]
 
     const grps: THREE.Points[] = []
     for (const l of layers) {
@@ -78,11 +90,11 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
     }
     const bandGeo = new THREE.BufferGeometry()
     bandGeo.setAttribute('position', new THREE.BufferAttribute(bandPos, 3))
-    const bandTex = glowTex(32, 'rgba(160,180,220,0.6)')
+    const bandTex = glowTex(32, goldViolet ? 'rgba(216,185,255,0.65)' : 'rgba(160,180,220,0.6)')
     const bandMat = new THREE.PointsMaterial({
       size: 0.6, map: bandTex,
       blending: THREE.AdditiveBlending, depthWrite: false,
-      transparent: true, opacity: 0.22,
+      transparent: true, opacity: goldViolet ? 0.3 : 0.22,
     })
     const band = new THREE.Points(bandGeo, bandMat)
     band.userData.spd = 2e-5; sc.add(band); grps.push(band)
@@ -96,7 +108,7 @@ export function useParticleSky(canvas: { value: HTMLCanvasElement | null }) {
       const pts = [new THREE.Vector3(-ln * 0.3, 0, 0), new THREE.Vector3(0, 0, 0)]
       ml = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineBasicMaterial({ color: 0xddeeff, transparent: true, opacity: 0.55 }),
+        new THREE.LineBasicMaterial({ color: goldViolet ? 0xffe9bd : 0xddeeff, transparent: true, opacity: 0.55 }),
       )
       const r = 250 + Math.random() * 50
       ml.position.set(Math.cos(a) * r, Math.sin(a) * r * 0.4, -15 + Math.random() * 30)

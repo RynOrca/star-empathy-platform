@@ -203,18 +203,19 @@ function syncPanelPosition() {
   const r = triggerRef.value.getBoundingClientRect()
   const below = window.innerHeight - r.bottom - 12
   const above = r.top - 12
-  // 整个下拉面板最大不超过 400px（滚动），避免合辑多的时候占满整屏
-  const PANEL_CEILING = 400
-  // 优先在下方展示；下方 <180 且上方更宽裕 → 向上翻
-  const flip = below < 180 && above > below
+  // 整个下拉面板最大不超过 420px（滚动），避免合辑多的时候占满整屏
+  const PANEL_CEILING = 420
+  // 优先在下方展示；下方空间不足（<260）且上方更宽裕 → 向上翻
+  // 阈值从 180 提高到 260，确保下方有足够空间显示完整选项列表
+  const flip = below < 260 && above > below
   delete panelStyle.top
   delete panelStyle.bottom
   if (flip) {
     panelStyle.bottom = `${Math.max(8, window.innerHeight - r.top + 6)}px`
-    panelStyle.maxHeight = `${Math.max(200, Math.min(above - 8, PANEL_CEILING))}px`
+    panelStyle.maxHeight = `${Math.max(240, Math.min(above - 8, PANEL_CEILING))}px`
   } else {
     panelStyle.top = `${r.bottom + 6}px`
-    panelStyle.maxHeight = `${Math.max(220, Math.min(below, PANEL_CEILING))}px`
+    panelStyle.maxHeight = `${Math.max(280, Math.min(below, PANEL_CEILING))}px`
   }
   // 左右防溢出
   const left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8))

@@ -1,44 +1,183 @@
 <template>
   <div class="home-page">
+    <!-- 月亮背景（月入怀主题） -->
+    <div class="moon-wrap">
+      <div class="moon-ring-3"></div>
+      <div class="moon-ring-2"></div>
+      <div class="moon">
+        <span class="mare m-a"></span>
+        <span class="mare m-b"></span>
+        <span class="mare m-c"></span>
+        <span class="mare m-d"></span>
+      </div>
+    </div>
+
     <!-- Three.js 粒子星空背景 -->
     <canvas ref="canvasRef" class="sky-bg" />
 
-    <div class="split-container">
-      <!-- 左栏：品牌意境区（透明，透出底层星空） -->
-      <div class="left-panel">
-        <h1 class="brand-title">星语穹庭</h1>
-        <p class="brand-subtitle">在这里，每颗星星都藏着一个秘密。</p>
-      </div>
+    <div class="wrap">
+      <div class="card">
+        <div class="brand">
+          <p class="role">· STARS · EMPATHY ·</p>
+          <h1>星语穹庭</h1>
+          <div class="gold-sep">◆ 月入怀 ◆</div>
+          <p class="sub">在这里，每颗星星都藏着一个秘密</p>
+        </div>
 
-      <!-- 右栏：功能交互区 -->
-      <div class="right-panel">
-        <div class="form-container">
-          <div class="form-header">
-            <h2 class="form-title" id="formTitle">{{ mode === 'login' ? '欢迎降临星系' : '开启新星籍' }}</h2>
+        <!-- 登录 / 注册 Tab -->
+        <div class="tabs" v-if="mode !== 'forgot'">
+          <div class="tab" :class="{ active: mode === 'login' }" @click="switchMode('login')">
+            <span class="roman">Ⅰ</span>
+            <span class="zh">登录</span>
           </div>
-
-          <!-- 标签页切换 -->
-          <div class="tab-menu" v-if="mode !== 'forgot'">
-            <div
-              class="tab-item"
-              :class="{ active: mode === 'login' }"
-              @click="switchMode('login')"
-            >登录</div>
-            <div
-              class="tab-item"
-              :class="{ active: mode === 'register' }"
-              @click="switchMode('register')"
-            >注册</div>
+          <div class="tab" :class="{ active: mode === 'register' }" @click="switchMode('register')">
+            <span class="roman">Ⅱ</span>
+            <span class="zh">注册</span>
           </div>
+        </div>
 
-          <!-- 找回密码模式 -->
-          <template v-if="mode === 'forgot'">
-            <div class="form-header">
-              <h2 class="form-title">找回引力密钥</h2>
+        <!-- 登录 -->
+        <form v-if="mode === 'login'" class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
+          <div class="field">
+            <label for="username">用户</label>
+            <div class="input-wrap">
+              <input
+                id="username"
+                v-model="username"
+                type="text"
+                class="form-input"
+                required
+                placeholder="请输入账号或邮箱"
+                maxlength="20"
+                autocomplete="username"
+              />
             </div>
-            <form class="auth-form" @submit.prevent="handleForgotSubmit" autocomplete="off">
-              <div class="form-group">
-                <label for="forgotEmail">注册邮箱</label>
+          </div>
+
+          <div class="field">
+            <label for="password">密码</label>
+            <div class="input-wrap">
+              <input
+                id="password"
+                v-model="password"
+                type="password"
+                class="form-input"
+                required
+                placeholder="请输入密码"
+                maxlength="50"
+                autocomplete="current-password"
+              />
+            </div>
+          </div>
+
+          <p v-if="error" class="msg-line error">{{ error }}</p>
+
+          <div class="row">
+            <label class="remember">
+              <input type="checkbox" v-model="rememberMe" />
+              <span>记住我，永不坠落</span>
+            </label>
+            <span class="forgot" @click="switchMode('forgot')">忘记密码？</span>
+          </div>
+
+          <button type="submit" class="submit" :disabled="loading">
+            {{ loading ? '请稍候...' : '登 录' }}
+          </button>
+
+          <div class="divider">· OR ·</div>
+
+          <button type="button" class="guest" :disabled="guestLoading" @click="handleGuestAccess">
+            {{ guestLoading ? '正在校准...' : '匿名快捷体验' }}
+          </button>
+        </form>
+
+        <!-- 注册 -->
+        <form v-else-if="mode === 'register'" class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
+          <div class="field">
+            <label for="username">用户</label>
+            <div class="input-wrap">
+              <input
+                id="username"
+                v-model="username"
+                type="text"
+                class="form-input"
+                required
+                placeholder="设置用户名"
+                maxlength="20"
+                autocomplete="username"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">联络邮箱 <span class="opt">选填</span></label>
+            <div class="input-wrap">
+              <input
+                id="email"
+                v-model="email"
+                type="email"
+                class="form-input"
+                placeholder="your@email.com（用于找回密码）"
+                autocomplete="email"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">密码</label>
+            <div class="input-wrap">
+              <input
+                id="password"
+                v-model="password"
+                type="password"
+                class="form-input"
+                required
+                placeholder="设置密码（6-50 位）"
+                maxlength="50"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="confirmPassword">确认密码</label>
+            <div class="input-wrap">
+              <input
+                id="confirmPassword"
+                v-model="password2"
+                type="password"
+                class="form-input"
+                required
+                placeholder="请再次输入密码"
+                maxlength="50"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+
+          <p v-if="error" class="msg-line error">{{ error }}</p>
+
+          <button type="submit" class="submit" :disabled="loading">
+            {{ loading ? '请稍候...' : '注 册' }}
+          </button>
+
+          <div class="divider">· OR ·</div>
+
+          <button type="button" class="guest" :disabled="guestLoading" @click="handleGuestAccess">
+            {{ guestLoading ? '正在校准...' : '匿名快捷体验' }}
+          </button>
+        </form>
+
+        <!-- 找回密码 -->
+        <div v-else class="forgot-box">
+          <div class="forgot-head">
+            <h2 class="forgot-title">找回密码</h2>
+            <div class="gold-sep">◆ 重置 ◆</div>
+          </div>
+          <form class="auth-form" @submit.prevent="handleForgotSubmit" autocomplete="off">
+            <div class="field">
+              <label for="forgotEmail">注册邮箱</label>
+              <div class="input-wrap">
                 <input
                   id="forgotEmail"
                   v-model="forgotEmail"
@@ -49,10 +188,12 @@
                   autocomplete="email"
                 />
               </div>
+            </div>
 
-              <template v-if="forgotStep === 'code'">
-                <div class="form-group">
-                  <label for="resetCode">验证码</label>
+            <template v-if="forgotStep === 'code'">
+              <div class="field">
+                <label for="resetCode">验证码</label>
+                <div class="input-wrap">
                   <input
                     id="resetCode"
                     v-model="resetCode"
@@ -65,8 +206,10 @@
                     autocomplete="one-time-code"
                   />
                 </div>
-                <div class="form-group">
-                  <label for="newPassword">新引力密钥</label>
+              </div>
+              <div class="field">
+                <label for="newPassword">新密码</label>
+                <div class="input-wrap">
                   <input
                     id="newPassword"
                     v-model="newPassword"
@@ -78,105 +221,21 @@
                     autocomplete="new-password"
                   />
                 </div>
-              </template>
+              </div>
+            </template>
 
-              <p v-if="forgotMsg" class="msg" :class="{ error: forgotError, success: !forgotError }">{{ forgotMsg }}</p>
+            <p v-if="forgotMsg" class="msg-line" :class="{ error: forgotError, success: !forgotError }">{{ forgotMsg }}</p>
 
-              <button type="submit" class="submit-btn" :disabled="forgotLoading">
-                <span v-if="forgotLoading">请稍候...</span>
-                <span v-else>{{ forgotStep === 'send' ? '发送验证码' : '重置密码' }}</span>
-              </button>
-
-              <button type="button" class="back-link" @click="switchMode('login')">← 返回登录</button>
-            </form>
-          </template>
-
-          <!-- 登录/注册表单 -->
-          <template v-else>
-          <form class="auth-form" @submit.prevent="handleSubmit" autocomplete="off">
-            <div class="form-group">
-              <label for="username">观测者账号</label>
-              <input
-                id="username"
-                v-model="username"
-                type="text"
-                class="form-input"
-                required
-                :placeholder="mode === 'register' ? '设置观测者账号' : '请输入账号或邮箱'"
-                maxlength="20"
-                autocomplete="username"
-              />
-            </div>
-
-            <div class="form-group" v-if="mode === 'register'">
-              <label for="email">联络邮箱 <span class="field-optional">选填（用于找回密码）</span></label>
-              <input
-                id="email"
-                v-model="email"
-                type="email"
-                class="form-input"
-                placeholder="your@email.com"
-                autocomplete="email"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="password">引力密钥</label>
-              <input
-                id="password"
-                v-model="password"
-                type="password"
-                class="form-input"
-                required
-                :placeholder="mode === 'register' ? '设置引力密钥' : '请输入密码'"
-                maxlength="50"
-                autocomplete="current-password"
-              />
-            </div>
-
-            <div v-if="mode === 'register'" class="form-group">
-              <label for="confirmPassword">确认密钥</label>
-              <input
-                id="confirmPassword"
-                v-model="password2"
-                type="password"
-                class="form-input"
-                required
-                placeholder="请再次输入引力密钥"
-                maxlength="50"
-                autocomplete="new-password"
-              />
-            </div>
-
-            <p v-if="error" class="error">{{ error }}</p>
-
-            <label v-if="mode === 'login'" class="remember-me">
-              <input type="checkbox" v-model="rememberMe" />
-              <span>记住我，永不坠落</span>
-            </label>
-
-            <button type="submit" class="submit-btn" :disabled="loading">
-              <span v-if="loading">请稍候...</span>
-              <span v-else>{{ mode === 'login' ? '校准并进入星系' : '铸造星籍并启航' }}</span>
+            <button type="submit" class="submit" :disabled="forgotLoading">
+              {{ forgotLoading ? '请稍候...' : (forgotStep === 'send' ? '发送验证码' : '重置密码') }}
             </button>
+
+            <button type="button" class="back-link" @click="switchMode('login')">← 返回登录</button>
           </form>
-
-          <!-- 忘记密码 -->
-          <p v-if="mode === 'login'" class="forgot-link" @click="switchMode('forgot')">忘记引力密钥？</p>
-
-          <!-- 分割线 -->
-          <div class="divider">或</div>
-
-          <!-- 匿名快捷体验 -->
-          <button class="guest-btn" :disabled="guestLoading" @click="handleGuestAccess">
-            <span v-if="guestLoading">正在校准...</span>
-            <span v-else>匿名快捷体验</span>
-          </button>
-          </template>
-
-          <!-- 底部统计 -->
-          <p v-if="stats" class="stats">{{ stats.starCount }} 颗星 · {{ stats.totalResonance }} 次共鸣</p>
         </div>
+
+        <!-- 底部统计 -->
+        <p v-if="stats" class="stats">· <b>{{ fmt(stats.starCount) }}</b> 颗星 · <b>{{ fmt(stats.totalResonance) }}</b> 次共鸣 ·</p>
       </div>
     </div>
   </div>
@@ -203,6 +262,11 @@ const loading = ref(false)
 const guestLoading = ref(false)
 const error = ref('')
 const stats = ref<{ starCount: number; totalResonance: number } | null>(null)
+
+/** 统计数字千分位格式化（如 2384 → 2,384） */
+function fmt(n: number): string {
+  return Number(n).toLocaleString('en-US')
+}
 
 // ─── 找回密码 ───
 const forgotStep = ref<'send' | 'code'>('send')
@@ -316,9 +380,9 @@ async function handleLogin() {
 async function handleRegister() {
   error.value = ''
   const u = username.value.trim()
-  if (u.length < 2 || u.length > 20) { error.value = '观测者账号需 2~20 个字符'; return }
-  if (password.value.length < 6 || password.value.length > 50) { error.value = '引力密钥需 6~50 个字符'; return }
-  if (password.value !== password2.value) { error.value = '两次引力密钥不一致'; return }
+  if (u.length < 2 || u.length > 20) { error.value = '用户名需 2~20 个字符'; return }
+  if (password.value.length < 6 || password.value.length > 50) { error.value = '密码需 6~50 个字符'; return }
+  if (password.value !== password2.value) { error.value = '两次密码不一致'; return }
   loading.value = true
   try {
     await register(u, password.value, email.value.trim() || undefined)
@@ -338,6 +402,8 @@ async function handleGuestAccess() {
     const json = await res.json()
     if (!res.ok) throw new Error(json.message || '请求失败')
     localStorage.setItem('token', json.data.token)
+    localStorage.setItem('username', '星穹访客')
+    localStorage.setItem('userId', String(json.data.user.id))
     router.push('/sky')
   } catch (e: any) {
     error.value = e.message || '访客登录失败'
@@ -356,19 +422,20 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ================= 基础样式复位 ================= */
+/* ═══ 页面基底：深空渐变（与 welcome 同源） ═══ */
 .home-page {
-  width: 100vw;
+  width: 100%;
   min-height: 100dvh;
   position: relative;
   overflow: hidden;
-  background-color: #02040A;
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--bg-overlay) 0%, #0a0c1d 60%, #02040a 100%);
+  color: var(--text-primary);
+  font-family: 'Noto Serif SC', serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Three.js 星空背景 — 全屏底层 */
+/* ═══ Three.js 粒子星空背景（与 welcome 同款，全屏底层） ═══ */
 .sky-bg {
   position: fixed;
   top: 0;
@@ -379,415 +446,498 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-/* ================= 布局容器 ================= */
-.split-container {
+/* ═══ 月亮背景层（月入怀主题） ═══ */
+.moon-wrap {
+  position: fixed;
+  inset: 0;
   display: flex;
-  width: 100%;
-  height: 100vh;
-  position: relative;
+  align-items: center;
+  justify-content: center;
   z-index: 1;
+  pointer-events: none;
 }
-
-/* 左栏：品牌意境区（完全透明，透出底层星空） */
-.left-panel {
-  flex: 6;
+.moon {
+  width: min(62vmin, 520px);
+  height: min(62vmin, 520px);
+  max-width: 520px;
+  max-height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f5e6c5 0%, #d8c19a 35%, #8a7a5a 70%, #3a3325 100%);
+  box-shadow:
+    0 0 120px rgba(255, 217, 138, 0.18),
+    0 0 240px rgba(255, 217, 138, 0.08),
+    inset -40px -40px 120px rgba(0, 0, 0, 0.4);
   position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-left: 10%;
-  padding-right: 5%;
-  z-index: 2;
-  background: transparent;
+  animation: moonBreathe 8s ease-in-out infinite;
+  opacity: 0.85;
+}
+@keyframes moonBreathe {
+  0%, 100% {
+    box-shadow:
+      0 0 120px rgba(255, 217, 138, 0.18),
+      0 0 240px rgba(255, 217, 138, 0.08),
+      inset -40px -40px 120px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 160px rgba(255, 217, 138, 0.25),
+      0 0 320px rgba(255, 217, 138, 0.12),
+      inset -40px -40px 120px rgba(0, 0, 0, 0.4);
+  }
+}
+.moon .mare {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(80, 65, 45, 0.55), rgba(80, 65, 45, 0.1));
+  filter: blur(1px);
+}
+.moon .m-a { width: 27%; height: 18%; top: 22%; left: 18%; transform: rotate(-15deg); }
+.moon .m-b { width: 19%; height: 14%; top: 52%; left: 14%; transform: rotate(10deg); }
+.moon .m-c { width: 23%; height: 15%; top: 58%; left: 48%; transform: rotate(-8deg); }
+.moon .m-d { width: 12%; height: 9%; top: 30%; left: 60%; }
+.moon-ring-2 {
+  position: absolute;
+  width: min(82vmin, 680px);
+  height: min(82vmin, 680px);
+  max-width: 680px;
+  max-height: 680px;
+  border-radius: 50%;
+  border: 1px dashed rgba(202, 167, 255, 0.15);
+  animation: slowRot 80s linear infinite;
+}
+.moon-ring-3 {
+  position: absolute;
+  width: min(98vmin, 820px);
+  height: min(98vmin, 820px);
+  max-width: 820px;
+  max-height: 820px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 217, 138, 0.06);
+}
+@keyframes slowRot {
+  to { transform: rotate(360deg); }
 }
 
-.brand-title {
-  font-size: 4.5rem;
-  font-weight: 700;
-  letter-spacing: 0.6rem;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, #ffffff 0%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.brand-subtitle {
-  font-size: 1.25rem;
-  color: #64748b;
-  letter-spacing: 0.2rem;
-  line-height: 1.8;
-  font-weight: 300;
-}
-
-/* 右栏：功能交互区 */
-.right-panel {
-  flex: 4;
-  background-color: rgba(6, 9, 18, 0.98);
-  border-left: 1px solid rgba(255, 255, 255, 0.04);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 5%;
-  z-index: 3;
-  box-shadow: -15px 0 40px rgba(0, 0, 0, 0.8);
-}
-
-.form-container {
+/* ═══ 布局：居中卡片 ═══ */
+.wrap {
+  position: relative;
+  z-index: 5;
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.form-header {
-  margin-bottom: 2.5rem;
-}
-
-.form-title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: 0.1rem;
-  margin-bottom: 0.5rem;
-  color: #f1f5f9;
-}
-
-/* ================= 标签页切换 ================= */
-.tab-menu {
+  min-height: 100dvh;
   display: flex;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 0.5rem;
+  padding: 40px 16px;
+}
+.card {
+  margin: auto;
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-overlay);
+  background: color-mix(in srgb, var(--bg-overlay) 78%, transparent);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 40px 40px 34px;
+  position: relative;
+  box-shadow: var(--shadow-lg), 0 0 60px var(--accent-glow);
+  animation: cardIn 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--star-purple) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  animation: goldflow 5s linear infinite;
+}
+@keyframes goldflow {
+  to { background-position: 200% 0; }
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.tab-item {
-  font-size: 1rem;
-  color: #475569;
+/* ═══ 品牌区（与 welcome 开场呼应） ═══ */
+.brand {
+  text-align: center;
+  margin-bottom: 26px;
+}
+.brand .role {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.35em;
+  color: var(--accent);
+  opacity: 0.7;
+  margin-bottom: 12px;
+}
+.brand h1 {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-weight: 600;
+  font-size: 2rem;
+  letter-spacing: 0.35em;
+  background: linear-gradient(180deg, #ffe9bd 0%, var(--accent) 38%, #c0a678 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+  padding-left: 0.35em;
+  filter: drop-shadow(0 0 18px rgba(255, 217, 138, 0.2));
+}
+.brand .sub {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  line-height: 1.9;
+}
+.gold-sep {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px 0 12px;
+  color: var(--accent);
+  opacity: 0.45;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+}
+.gold-sep::before,
+.gold-sep::after {
+  content: '';
+  height: 1px;
+  width: 60px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.35;
+}
+
+/* ═══ 登录 / 注册 Tab（罗马数字） ═══ */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tab {
+  padding: 12px 8px 14px;
+  text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  padding-bottom: 0.5rem;
+  color: var(--text-disabled);
+  transition: color 0.35s;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.25em;
   position: relative;
   user-select: none;
 }
-
-.tab-item:hover {
-  color: #94a3b8;
+.tab .roman {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: inherit;
 }
-
-.tab-item.active {
-  color: #ffffff;
-  font-weight: 500;
+.tab .zh {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.3em;
 }
-
-.tab-item.active::after {
+.tab.active {
+  color: var(--accent);
+}
+.tab.active .roman {
+  color: var(--accent);
+}
+.tab.active::after {
   content: '';
   position: absolute;
+  left: 20%;
+  right: 20%;
   bottom: -1px;
-  left: 0;
-  width: 100%;
   height: 2px;
-  background-color: #4f46e5;
-  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
-/* ================= 表单内部元素 ================= */
+/* ═══ 表单 ═══ */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 16px;
 }
-
-.form-group {
+.field {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 8px;
 }
-
-.form-group label {
-  font-size: 0.85rem;
-  color: #94a3b8;
-  letter-spacing: 0.05rem;
-}
-
-.form-input {
-  width: 100%;
-  background-color: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 0.85rem 1rem;
-  color: #ffffff;
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
-  outline: none;
-}
-
-.form-input:focus {
-  border-color: #4f46e5;
-  background-color: rgba(79, 70, 229, 0.05);
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2) inset;
-}
-
-.form-input::placeholder {
-  color: #334155;
-}
-
-/* ================= 按钮组 ================= */
-.submit-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #3730a3 0%, #4f46e5 100%);
-  border: none;
-  color: #ffffff;
-  padding: 0.9rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  letter-spacing: 0.1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 0.5rem;
-  box-shadow: 0 4px 15px rgba(55, 48, 163, 0.3);
-}
-
-.submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
-}
-
-.submit-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* 错误提示 */
-.error {
-  color: #ff8b7d;
+.field label {
   font-size: 0.8rem;
-  margin: -0.5rem 0 0;
-  text-align: center;
-}
-
-/* 消息提示 */
-.msg {
-  font-size: 0.8rem;
-  margin: -0.5rem 0 0;
-  text-align: center;
-}
-.msg.error { color: #ff8b7d; }
-.msg.success { color: #95f0c0; }
-
-/* 忘记密码 */
-.forgot-link {
-  font-size: 0.8rem;
-  color: #64748b;
-  text-align: center;
-  cursor: pointer;
-  margin-top: 0.8rem;
-  transition: color 0.2s;
-  user-select: none;
-}
-.forgot-link:hover { color: #818cf8; }
-
-/* 返回链接 */
-.back-link {
-  background: none;
-  border: none;
-  color: #64748b;
-  font-size: 0.82rem;
-  cursor: pointer;
-  padding: 0;
-  margin-top: 0.5rem;
-  transition: color 0.2s;
-  text-align: center;
-  width: 100%;
-}
-.back-link:hover { color: #818cf8; }
-
-/* 选填标签 */
-.field-optional {
-  font-size: 0.7rem;
-  color: #5a5580;
-  font-weight: 300;
-}
-
-/* 记住我 */
-.remember-me {
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-  color: #64748b;
+  justify-content: space-between;
+}
+.field label .opt {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  color: var(--text-disabled);
+  letter-spacing: 0.15em;
+  font-weight: 400;
+}
+.input-wrap {
+  position: relative;
+}
+.input-wrap::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.5;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.form-input {
+  width: 100%;
+  padding: 13px 16px 13px 32px;
+  background: var(--overlay-02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.35s;
+  letter-spacing: 0.03em;
+}
+.form-input:focus {
+  border-color: var(--rule-focus);
+  background: var(--accent-subtle);
+  box-shadow: 0 0 0 3px var(--accent-glow), inset 0 0 20px var(--accent-glow);
+}
+.form-input::placeholder {
+  color: var(--text-disabled);
+  opacity: 0.65;
+  letter-spacing: 0.05em;
+}
+
+/* ═══ 记住我 / 忘记密码 ═══ */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  margin-top: -4px;
+}
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
-  margin-top: -0.5rem;
 }
-.remember-me input[type="checkbox"] {
-  accent-color: #4f46e5;
-  width: 15px;
-  height: 15px;
+.remember input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
   cursor: pointer;
 }
-.remember-me:hover { color: #818cf8; }
+.forgot {
+  color: var(--star-purple);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  user-select: none;
+}
+.forgot:hover {
+  color: var(--accent);
+}
 
-/* 分割线 */
+/* ═══ 提交按钮（金色渐变 + 扫光） ═══ */
+.submit {
+  margin-top: 6px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #c99a3c 0%, var(--accent) 45%, #e8c570 100%);
+  color: var(--bg-overlay);
+  font-family: var(--font-display), 'Noto Serif SC', serif;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 8px 28px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.35s;
+  position: relative;
+  overflow: hidden;
+}
+.submit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%);
+  transition: transform 0.8s;
+}
+.submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 40px var(--accent-glow);
+}
+.submit:hover:not(:disabled)::before {
+  transform: translateX(120%);
+}
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ═══ 分隔线 / 访客按钮 ═══ */
 .divider {
   display: flex;
   align-items: center;
-  text-align: center;
-  color: #334155;
-  font-size: 0.85rem;
-  margin: 1.8rem 0;
-  letter-spacing: 0.1rem;
+  gap: 14px;
+  color: var(--text-disabled);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
+  margin: 22px 0 16px;
 }
-
 .divider::before,
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-default), transparent);
 }
-
-.divider::before {
-  margin-right: 1em;
-}
-
-.divider::after {
-  margin-left: 1em;
-}
-
-/* 匿名快捷体验按钮 */
-.guest-btn {
-  width: 100%;
-  background-color: transparent;
-  border: 1px solid rgba(79, 70, 229, 0.3);
-  color: #818cf8;
-  padding: 0.9rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: 0.05rem;
+.guest {
+  padding: 13px;
+  background: transparent;
+  border: 1px solid rgba(202, 167, 255, 0.3);
+  color: var(--star-purple);
+  border-radius: var(--radius-md);
+  font-family: 'Noto Serif SC', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.25em;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.35s;
   text-align: center;
-  display: block;
+  width: 100%;
 }
-
-.guest-btn:hover:not(:disabled) {
-  background-color: rgba(79, 70, 229, 0.08);
-  color: #c7d2fe;
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 0 15px rgba(79, 70, 229, 0.15) inset;
+.guest:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--star-purple) 6%, transparent);
+  color: #e2d4ff;
+  border-color: rgba(202, 167, 255, 0.6);
+  box-shadow: 0 0 15px rgba(202, 167, 255, 0.15) inset;
 }
-
-.guest-btn:disabled {
-  opacity: 0.4;
+.guest:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* 底部统计 */
-.stats {
-  color: rgba(148, 163, 184, 0.35);
-  font-size: 0.72rem;
-  margin: 1rem 0 0;
+/* ═══ 提示 / 返回 / 统计 ═══ */
+.msg-line {
+  font-size: 0.8rem;
   text-align: center;
-  letter-spacing: 0.05rem;
+  letter-spacing: 0.05em;
+}
+.msg-line.error { color: var(--error); }
+.msg-line.success { color: var(--success); }
+.back-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+  transition: color 0.2s;
+  text-align: center;
+  width: 100%;
+  letter-spacing: 0.05em;
+  font-family: 'Noto Serif SC', serif;
+}
+.back-link:hover { color: var(--accent); }
+.stats {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+}
+.stats b {
+  color: var(--accent);
+  opacity: 0.6;
+  font-weight: 500;
 }
 
-/* ================= 响应式 ================= */
+/* ═══ 找回密码 ═══ */
+.forgot-head {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.forgot-title {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-size: 1.4rem;
+  letter-spacing: 0.25em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.forgot-head .gold-sep {
+  margin: 12px 0 0;
+}
+
+/* ═══ 响应式 ═══ */
+@media (max-width: 520px) {
+  .card {
+    padding: 32px 24px 28px;
+  }
+}
 @media (max-width: 768px) {
   .home-page {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .split-container {
-    flex-direction: column;
-    min-height: 100dvh;
-    height: auto;
-  }
-  /* 品牌区压缩为顶部精简横幅 */
-  .left-panel {
-    flex: none;
-    padding: 1.5rem 1.5rem 0.5rem;
-    justify-content: flex-start;
-  }
-  .brand-title {
-    font-size: 1.8rem;
-    letter-spacing: 0.4rem;
-    margin-bottom: 0.5rem;
-  }
-  .brand-subtitle {
-    font-size: 0.9rem;
-    letter-spacing: 0.12rem;
-    line-height: 1.5;
-  }
-  /* 表单区自然流动，允许内容撑开 */
-  .right-panel {
-    flex: none;
-    padding: 1rem 1.25rem 2rem;
-    box-shadow: none;
-    border-left: none;
-    background-color: rgba(6, 9, 18, 0.92);
-    justify-content: flex-start;
-  }
-  .form-container {
-    max-width: 100%;
-  }
-  .form-header {
-    margin-bottom: 1.5rem;
-  }
-  .form-title {
-    font-size: 1.5rem;
+  .wrap {
+    padding: 24px 16px;
   }
   .form-input {
-    padding: 0.95rem 1rem;
+    padding: 14px 16px 14px 32px;
     font-size: 1rem;
-  }
-  .submit-btn,
-  .guest-btn {
-    padding: 1rem;
-    font-size: 1rem;
-  }
-  .tab-menu {
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-  .tab-item {
-    padding-bottom: 0.6rem;
-  }
-  .auth-form {
-    gap: 1.25rem;
-  }
-  .stats {
-    margin-top: 1.5rem;
   }
 }
 
-/* 窄屏进一步收窄 */
-@media (max-width: 380px) {
-  .left-panel {
-    padding: 1rem 1rem 0.25rem;
-  }
-  .brand-title {
-    font-size: 1.5rem;
-    letter-spacing: 0.3rem;
-  }
-  .brand-subtitle {
-    font-size: 0.82rem;
-  }
-  .right-panel {
-    padding: 0.75rem 1rem 1.5rem;
-  }
-  .form-title {
-    font-size: 1.3rem;
-  }
-}
-
-/* 尊重用户的减少动画偏好 */
+/* ═══ 尊重用户的减少动画偏好 ═══ */
 @media (prefers-reduced-motion: reduce) {
-  .tab-item,
+  .card,
+  .moon,
+  .moon-ring-2 {
+    animation: none;
+  }
+  .card::before {
+    animation: none;
+  }
+  .tab,
   .form-input,
-  .submit-btn,
-  .guest-btn,
-  .forgot-link,
+  .submit,
+  .guest,
+  .forgot,
   .back-link {
     transition: none;
   }

@@ -323,9 +323,9 @@ export function listPublicCollections(params: {
 
   // 关键字搜索：合集名/描述 或 合集中任一故事的标题/正文/tags 命中（LIKE 模糊匹配，大小写不敏感）
   const kwRaw = (params.keyword ?? '').trim();
+  const likeKw = kwRaw ? `%${kwRaw}%` : '';
   if (kwRaw) {
     // LIKE 通配符 % 包裹；SQLite 默认 LIKE 已对 ASCII 大小写不敏感，中文按字节匹配无影响
-    const likeKw = `%${kwRaw}%`;
     where += ` AND (
       c.name LIKE ?
       OR c.description LIKE ?
@@ -337,6 +337,23 @@ export function listPublicCollections(params: {
     )`;
     countParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
     listParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
+  }
+
+  // 搜索相关性排序：有 keyword 时前置匹配优先级（合集名称 > 合集描述 > 故事标签 > 故事标题/正文），
+  // 同档内仍按用户选择的 sort 排序（如 hot/new）
+  let rankOrder = '';
+  const rankParams: any[] = [];
+  if (kwRaw) {
+    rankOrder = `CASE WHEN c.name LIKE ? THEN 0 ELSE 1 END ASC,
+      CASE WHEN c.description LIKE ? THEN 0 ELSE 1 END ASC,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM stars s WHERE s.collection_id = c.id AND COALESCE(s.tags, '') LIKE ?
+      ) THEN 0 ELSE 1 END ASC,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM stars s WHERE s.collection_id = c.id AND (s.title LIKE ? OR s.content LIKE ?)
+      ) THEN 0 ELSE 1 END ASC,
+      `;
+    rankParams.push(likeKw, likeKw, likeKw, likeKw, likeKw);
   }
 
   // ORDER 构造
@@ -370,8 +387,8 @@ export function listPublicCollections(params: {
   const total = totalRow.cnt;
   const totalPages = Math.ceil(total / l) || 0;
   const rows = db.prepare(
-    `SELECT c.* FROM collections c WHERE ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
-  ).all(...listParams, l, offset);
+    `SELECT c.* FROM collections c WHERE ${where} ORDER BY ${rankOrder}${orderBy} LIMIT ? OFFSET ?`
+  ).all(...listParams, ...rankParams, l, offset);
   const enriched = attachResonanceTotal(attachStoryCount(rows as any[]));
   return {
     items: enriched.map((r) => normalizeCollectionRow(r, { withStories: false })),

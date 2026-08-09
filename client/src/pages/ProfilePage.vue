@@ -742,6 +742,8 @@ async function handleLogout() {
   } finally {
     logoutLoading.value = false
     showLogoutModal.value = false
+    // 清除开场标记：守卫会把未登录用户带回 /welcome 开场（而非直接登录页）
+    sessionStorage.removeItem('welcomed')
     router.push('/')
   }
 }
@@ -832,7 +834,8 @@ function scrollToStory(i: number) {
 
 // ─── Favorites helpers (Task5) ───
 async function goToStarWithCheck(starCatalogId: number | undefined, favId: number) {
-  if (!starCatalogId) {
+  // id=0（天枢）是合法 catalog 星，仅 null/undefined 视为缺少归属星
+  if (starCatalogId === null || starCatalogId === undefined || Number.isNaN(starCatalogId)) {
     console.warn('[Profile] 收藏记录缺少 catalog_star_id:', favId)
     return
   }
@@ -1170,7 +1173,20 @@ async function loadProfileData() {
       authFetch('/api/profile/stats', { headers: { Authorization: `Bearer ${token}` } }),
     ])
     const meJson = await meRes.json()
-    if (meRes.ok) user.value = meJson.data
+    if (meRes.ok) {
+      const me = meJson.data
+      // 访客账号（体验账号）无个人主页：无论从哪个入口进来都应回登录页。
+      // 同时结束访客会话（清 token），否则守卫会把 '/' 再弹回 /sky，访客永远到不了登录页
+      if (me && me.username === '星穹访客') {
+        showFlash('访客账号无个人主页，请登录后使用', 'info')
+        localStorage.removeItem('token')
+        localStorage.removeItem('username')
+        localStorage.removeItem('userId')
+        router.push('/')
+        return
+      }
+      user.value = me
+    }
     const firstJson = await firstPageRes.json()
     if (firstPageRes.ok && firstJson.data) {
       const items = firstJson.data.items ?? firstJson.data ?? []
