@@ -1,12 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { getAllStars, getAllStarsPaged, getStoryById, createStar, resonate, recordStoryView, deleteStory, getCatalogStarIdsForStory } from '../services/starService';
 import { getNearbyStories } from '../services/nearbyService';
+import {
+  addEmotionResonance,
+  getEmotionProfileView,
+  getEmotionGraph,
+} from '../services/emotionResonanceService';
 import { authOptional, authRequired } from '../middleware/auth';
 import { ok, badRequest, notFound, forbidden, serverError } from '../utils/response';
 import { ensureKernel, updateKernel, getKernel, triggerKernelGeneration, triggerAnalysisRegeneration, findMatchingStarsForContent, extractSuggestedTagsForContent } from '../services/kernel';
 import { verifyCollectionOwnership, createCollection, getDefaultCollection, ensureDefaultCollection } from '../services/collectionService';
 import { resolveValidCatalogIds } from '../services/catalogMeta';
 import { encode as encodeGeohash, PRECISION_LEVELS } from '../utils/geohash';
+
+/** 解析布尔查询参数（支持 1/0/true/false/yes/no） */
+function parseBool(v: unknown, defaultVal: boolean): boolean {
+  if (v === undefined || v === null || v === '') return defaultVal;
+  if (typeof v === 'boolean') return v;
+  const s = String(v).toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(s)) return true;
+  if (['0', 'false', 'no', 'off'].includes(s)) return false;
+  return defaultVal;
+}
 
 const router = Router();
 
@@ -30,8 +45,11 @@ router.get('/', authOptional, (req: Request, res: Response) => {
   }
 });
 
-// 附近的人的心事：GET /api/stories/nearby?geohash=&limit=
-// 基于geohash网格 + k-匿名降级 + IDF加权Jaccard情绪匹配
+// 附近的人的心事：GET /api/stories/nearby?geohash=&limit=&diversity=&exploration=&excludeViewed=
+// 基于geohash网格 + k-匿名降级 + IDF加权Jaccard情绪匹配 + 持久化画像 + 二阶推荐
+//   - diversity (默认 true)  MMR 多样性重排，避免前 N 条都是同一情绪
+//   - exploration (默认 true) ε-greedy 探索，10% 概率混入跨象限新情绪
+//   - excludeViewed (默认 true) 排除已浏览/已打标的故事
 // 前端传入当前用户geohash（5位），后端自动降级同城→同省→全国→情绪优先
 // 必须注册在 /:storyId 之前，避免被当作 storyId 匹配
 router.get('/nearby', authRequired, (req: Request, res: Response) => {
@@ -42,10 +60,48 @@ router.get('/nearby', authRequired, (req: Request, res: Response) => {
       return badRequest(res, '缺少 geohash 参数（至少3位）');
     }
     const limit = !isNaN(parseInt(req.query.limit as string, 10)) ? parseInt(req.query.limit as string, 10) : 20;
-    const result = getNearbyStories(geohash, user.id, limit);
+    const diversity = parseBool(req.query.diversity, true);
+    const exploration = parseBool(req.query.exploration, true);
+    const excludeViewed = parseBool(req.query.excludeViewed, true);
+    const result = getNearbyStories(geohash, user.id, limit, undefined, {
+      diversity,
+      exploration,
+      excludeViewed,
+    });
     ok(res, 'success', result);
   } catch (error) {
     console.error('GET /api/stories/nearby error:', error);
+    serverError(res);
+  }
+});
+
+// 用户情绪画像（持久化 + 时间衰减 + VA 维度分布）
+// GET /api/stories/emotion-profile
+// 返回当前用户的长期情绪标签权重、Top 情绪、VA 空间分布
+// 必须注册在 /:storyId 之前，避免被当作 storyId 匹配
+router.get('/emotion-profile', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const data = getEmotionProfileView(user.id);
+    ok(res, 'success', data);
+  } catch (error) {
+    console.error('GET /api/stories/emotion-profile error:', error);
+    serverError(res);
+  }
+});
+
+// 情绪共振图谱：当前用户与他人的共振关系网
+// GET /api/stories/emotion-graph?limit=
+// 返回共振邻居列表（含 sharedEmotions / totalWeight / lastResonanceAt）+ Top 共振情绪
+// 必须注册在 /:storyId 之前，避免被当作 storyId 匹配
+router.get('/emotion-graph', authRequired, (req: Request, res: Response) => {
+  try {
+    const user = (req as Request & { user: { id: number } }).user;
+    const limit = !isNaN(parseInt(req.query.limit as string, 10)) ? parseInt(req.query.limit as string, 10) : 20;
+    const data = getEmotionGraph(user.id, Math.max(1, Math.min(50, limit)));
+    ok(res, 'success', data);
+  } catch (error) {
+    console.error('GET /api/stories/emotion-graph error:', error);
     serverError(res);
   }
 });
@@ -195,6 +251,53 @@ router.post('/:storyId/resonate', authRequired, (req: Request, res: Response) =>
     ok(res, '共鸣已点亮', result);
   } catch (error) {
     console.error('POST /api/stories/:storyId/resonate error:', error);
+    serverError(res);
+  }
+});
+
+// 情绪共振打标（"我也有同感"）：POST /api/stories/:storyId/emotion-resonate
+// Body: { emotionTags: string[], weight?: number }
+// 用户主动给别人的故事打情绪标签，写入 emotion_resonances + 反哺自身画像 + 建立共振边
+// 副作用：
+//   1. 持久化当前用户的情绪画像（source='emotion_resonance'，0.6 权重）
+//   2. 建立当前用户 ↔ 故事作者的共振边（用于二阶推荐）
+//   3. 后续 /nearby 接口会把"和你共振过的人的最新故事"优先推
+// 限制：
+//   - 不能给自己的故事打标
+//   - 每次最多 5 个标签（超出截断）
+//   - 标签仅限中英文（≤12 字符）
+// 幂等：同一 (user, story, tag) 重复打标会累加 weight
+router.post('/:storyId/emotion-resonate', authRequired, (req: Request, res: Response) => {
+  try {
+    const storyId = parseInt(req.params.storyId, 10);
+    if (isNaN(storyId)) return badRequest(res, '无效的 storyId');
+
+    const { emotionTags, weight } = req.body;
+    if (!Array.isArray(emotionTags) || emotionTags.length === 0) {
+      return badRequest(res, 'emotionTags 必须是非空数组');
+    }
+    const safeTags = emotionTags.filter((t: unknown) => typeof t === 'string');
+    if (safeTags.length === 0) {
+      return badRequest(res, 'emotionTags 必须包含至少一个字符串标签');
+    }
+    const w = typeof weight === 'number' && weight > 0 && weight <= 5
+      ? weight
+      : 1.0;
+
+    const user = (req as Request & { user: { id: number } }).user;
+    const result = addEmotionResonance(user.id, storyId, safeTags, w);
+
+    if (!result.success) {
+      // 区分"故事不存在/无作者"与"无有效标签"
+      if (result.message.includes('不存在') || result.message.includes('无作者')) {
+        return notFound(res, result.message);
+      }
+      return badRequest(res, result.message);
+    }
+
+    ok(res, result.message, result);
+  } catch (error) {
+    console.error('POST /api/stories/:storyId/emotion-resonate error:', error);
     serverError(res);
   }
 });

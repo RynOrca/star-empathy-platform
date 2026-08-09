@@ -25,7 +25,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | `src/index.ts` | **服务入口**。Express 启动、路由注册、CORS 配置、静态文件服务 |
-| `src/db.ts` | **数据库初始化**。SQLite 建表（users, stars, narratives, story_kernels 等）、迁移兼容 |
+| `src/db.ts` | **数据库初始化**。SQLite 建表（users, stars, narratives, story_kernels, collections, story_views 等）+ **情绪共振图谱三表**（`emotion_resonances` 用户打标记录 / `user_emotion_profile` 长期画像（多来源+时间衰减）/ `emotion_edges` 用户间共振边（user_a<user_b 防重复，用于二阶推荐））、迁移兼容（ALTER TABLE try-catch） |
 | `package.json` | 依赖与脚本：`dev`（nodemon）、`build`（tsc）、`start`、`seed` |
 | `tsconfig.json` | TypeScript 编译配置 |
 | `.env.example` | 环境变量模板 |
@@ -35,8 +35,8 @@
 | 文件 | 用途 |
 | --- | --- |
 | `stars.ts` | 旧版星星路由（`/api/stars`），保留兼容 |
-| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏；**`POST /api/stories/match-star`**（authRequired，1~2000 字校验）调 kernel 为未落库新故事寻找 Top3 契合星辰；**`POST /api/stories/ai-tags`**（authOptional，1~2000 字校验）仅生成 3-5 个 AI 建议标签（轻量、不走星星匹配）供前端发故事时实时推荐；**`GET /api/stories/nearby`**（authRequired，`?geohash=&limit=`）返回「附近的人的心事」——基于 geohash 网格 + k-匿名降级（同城→同省→全国→情绪优先）+ IDF 加权 Jaccard 情绪匹配，响应含 sharedEmotions/sharedThemes 共同标签但不泄露精确坐标。POST 投递支持 `geoInfo{geohash,city,province}` 或兼容 `location{lat,lng}`（后端自动截断为 5 位 geohash）。 |
-| `nearbyService.ts` | **附近的人的心事核心匹配服务**。`getNearbyStories(geohash, userId, limit)` 实现多级降级漏斗（district→city→province→country→emotion），k-匿名阈值 K=5，IDF 加权 Jaccard 情绪/主题相似度（复用 story_kernels），时间新鲜度（30天半衰期），返回 sharedEmotions/sharedThemes 供前端"打标签"展示。隐私：只用 geohash 前缀查询，不涉及精确坐标 |
+| `stories.ts` | **故事路由**（`/api/stories`）。投递心事、共鸣、浏览、收藏；**`POST /api/stories/match-star`**（authRequired，1~2000 字校验）调 kernel 为未落库新故事寻找 Top3 契合星辰；**`POST /api/stories/ai-tags`**（authOptional，1~2000 字校验）仅生成 3-5 个 AI 建议标签供前端实时推荐；**`GET /api/stories/nearby`**（authRequired，`?geohash=&limit=&diversity=&exploration=&excludeViewed=`）返回「附近的人的心事」v2——geohash 网格 + k-匿名降级（同城→同省→全国→同频）+ IDF 加权 Jaccard + VA 维度相似度 + 持久化情绪画像 + 二阶推荐 + MMR 多样性重排 + ε-greedy 探索 + 已读过滤；**`POST /api/stories/:storyId/emotion-resonate`**（authRequired，body: `{emotionTags:string[], weight?:number}`）用户主动给别人的故事打"我也有同感"情绪标签，反哺自身画像 + 建立 A↔B 共振边（不能给自己打标，幂等累加 weight）；**`GET /api/stories/emotion-profile`**（authRequired）返回当前用户长期情绪画像（多来源加权 + 30 天时间衰减 + VA 空间分布）；**`GET /api/stories/emotion-graph`**（authRequired，`?limit=`）返回共振邻居图谱（sharedEmotions/totalWeight/lastResonanceAt + Top 共振情绪）。POST 投递支持 `geoInfo{geohash,city,province}` 或兼容 `location{lat,lng}`（后端自动截断为 5 位 geohash，存储层脱敏不落库精确坐标）。 |
+| `nearbyService.ts` | **附近的人的心事核心匹配服务 v2（情绪共振图谱版）**。`getNearbyStories(geohash, userId, limit, k?, options?)` 实现六层算法：① 地理锚点 geohash 网格 + k-匿名降级漏斗（district→city→province→country→emotion，K=5）；② 情绪匹配 IDF 加权 Jaccard + VA 维度相似度 + 标签共现增益；③ 持久化画像（调 emotionResonanceService，多来源 story/emotion_resonance/resonate/view 加权 + 30 天半衰期，无画像时降级到 story_kernels 即时计算）；④ 二阶推荐（共振邻居的新故事 neighborBoost 加分）；⑤ 多样性 MMR 重排（λ=0.7）+ ε-greedy 探索（10% 概率混入跨情绪象限故事）+ 同作者限频（MAX_PER_AUTHOR=3）+ 质量过滤（内容≥10 字）；⑥ 已读过滤（SQL 子查询排除 story_views + emotion_resonances）。综合分七维加权：情绪相似 30%×geo + VA 18%×同区加成 + 共现 8% + 时间共振 12%×强度 + 二阶 7% + 新鲜度 15% + 热度 10%。隐私：只用 geohash 前缀查询，响应只含城市名不含坐标/距离。 |
 | `catalog.ts` | 星表恒星路由（`/api/catalog/stars`）。统计、搜索 |
 | `narrative.ts` | **AI 叙事路由**（`/api/catalog/stars/:id/narrative`）。含 `ra`/`dec` 参数用于地平线判断 |
 | `chat.ts` | **古人陪看聊天路由**（`/api/catalog/stars/:id/chat/*`）。古人列表、开场白、SSE 流式聊天 |
@@ -60,7 +60,8 @@
 | `userService.ts` | 用户 CRUD 业务逻辑 |
 | `kernel.ts` | 故事内核（情感标签）提取与匹配服务。含 **`findMatchingStarsForContent(title, content, limit)`** 为未落库的新故事寻找 Top3 最契合的星辰（内核 Jaccard 相似度 Top10 + DeepSeek 语义重排给理由 + 匹配不到时降级选亮星）。**`extractSuggestedTagsForContent(title, content)`** 轻量接口：仅生成 3-5 个 AI 建议标签（不走星星匹配），配合前端 `POST /api/stories/ai-tags` 做实时标签推荐。`getSimilarStars(catalogStarId)` 星 vs 星内核相似度。`generateKernel()` AI 提取内核。 |
 | `starAnalysis.ts` | **单星分析读服务**。`computeThemeHour()`（主题 Top8 + 24h 投递分布 SQL 聚合）；`readAnalysis()` 读 catalog_star_analyses 表 + 即时补 themehour |
-| `collectionAnalysis.ts` | **合集级 AI 分析服务（Phase 1 同步合成 + 缓存，Phase 2 可平滑接真实 agent pipeline）**。`readCollectionAnalysis(id)` 三步：① getStoriesLite → storyCount；② 查 `collection_analyses` 表命中 & story_hash/storyCount 一致 → 直接反序列化 persona/emotion/nightscape JSON 返回 ready=true；③ 未命中 → `computeHourlyAndThemes()` 做 SQL 聚合（24h时辰分布 UTC+8 + tag+正文关键词 Top8 主题）→ `buildPersona()`（5标签/汉名/金句/2段解读/5维度）+ `buildEmotion()`（思念/孤独/释然/希望/共鸣 5色球权重）+ `buildNightscape()`（合集独有：月相节气/五大气象/心事时间轨迹散点/天窗片段3摘录/时辰peakLow/5情绪洞察/主调3段叙事）→ 写缓存（INSERT...ON CONFLICT DO UPDATE，story_hash 由 md5(id:len:md5(content.slice(0,8)) | ...) 做内容变了才重算）→ 返回 ready=true。`triggerAnalysisIfNeeded(id)` Phase 1 空占位，Phase 2 接 agent 异步懒生成 ready=false + 写回表。hashStories 幂等保证同内容不会重复跑 |
+| `collectionAnalysis.ts` | **合集级 AI 分析服务（Phase 1 同步合成 + 缓存，Phase 2 可平滑接真实 agent pipeline）**。`readCollectionAnalysis(id)` 三步：① getStoriesLite → storyCount；② 查 `collection_analyses` 表命中 & story_hash/storyCount 一致 → 直接反序列化 persona/emotion/nightscape JSON 返回 ready=true；③ 未命中 → `computeHourlyAndThemes()` 做 SQL 聚合（24h时辰分布 UTC+8 + tag+正文关键词 Top8 主题）→ `buildPersona()`（5标签/汉名/金句/2段解读/5维度）+ `buildEmotion()`（思念/孤独/释然/希望/共鸣 5色球权重）+ `buildNightscape()`（合集独有：月相节气/五大气象/心事时间轨迹散点/天窗片段3摘录/时辰peakLow/5情绪洞察/主调3段叙事）→ 写缓存（INSERT...ON CONFLICT DO UPDATE，story_hash 由 md5(id:len:md5(content.slice(0,8))|...) 做内容变了才重算）→ 返回 ready=true。`triggerAnalysisIfNeeded(id)` Phase 1 空占位，Phase 2 接 agent 异步懒生成 ready=false + 写回表。hashStories 幂等保证同内容不会重复跑 |
+| `emotionResonanceService.ts` | **情绪共振图谱服务**（nearbyService v2 核心）。三大职责：① `addEmotionResonance(userId, storyId, emotionTags, weight)` 接收用户主动"我也有同感"打标，写入 emotion_resonances + 反哺 user_emotion_profile（source='emotion_resonance'，0.6 权重）+ 建立 emotion_edges 共振边（user_a<user_b 防双向重复，幂等累加 weight）；② `getPersistentEmotionProfile(userId, topN)` 多来源画像聚合（story 1.0 / emotion_resonance 0.6 / resonate 0.3 / view 0.1）+ 30 天半衰期时间衰减，无画像时降级到 story_kernels 即时计算；③ `getEmotionNeighbors(userId, limit)` 共振邻居查询（用于二阶推荐）。配套导出 `boostProfileFromOwnStory`（写故事时反哺）、`boostProfileFromResonate`（共鸣时反哺）、`getViewedStoryIds`（已读集合）、`getEmotionGraph`（图谱可视化）、`getEmotionProfileView`（画像可视化含 VA 分布）。标签校验 `isValidEmotionTag`（中英文 ≤12 字符，每次最多 5 个）。 |
 | `amap.ts` | 高德地图 API 封装（逆地理编码） |
 | `emailService.ts` | 邮件发送服务 |
 
@@ -77,6 +78,7 @@
 | `response.ts` | 统一响应格式：`ok()`、`badRequest()`、`notFound()`、`serverError()`。<br>**含 `convertKeys` 函数**：自动将 snake_case 键转为 camelCase（如 `image_url` → `imageUrl`），SQL 查询中无需重复别名 |
 | `position.ts` | 位置计算工具（3D 星空坐标随机生成，非地理坐标） |
 | `geohash.ts` | **Geohash 编码工具**（纯 TS 零依赖）。`encode(lat,lng,precision)` 编码、`decode(hash)` 解码、`neighbors(hash)` 8 邻居网格、`truncate(hash,precision)` k-匿名截断、`PRECISION_LEVELS` 精度常量（3=省/4=城/5=区）。参考 Wikipedia Geohash Z-order curve |
+| `emotionModel.ts` | **情绪维度模型**（Valence-Arousal 二维坐标）。基于 Russell (1980) 情感环模型，为 16 个情绪标签预设 VA 坐标（valence -1~1 效价 / arousal 0~1 唤醒度）。`getEmotionCoord(tag)` 取坐标、`vaSimilarity(tagsA, tagsB)` 计算两组标签重心欧氏距离转相似度（能发现"焦虑"和"愤怒"虽标签不同但情绪同频）、`emotionIntensity(tags)` 推断 arousal 均值（高唤醒故事更急需排解）、`isSameResonanceZone(tagsA, tagsB)` 判断是否同一情感象限（distress/sadness/joy/calm/neutral）。供 nearbyService v2 情绪匹配 + emotionResonanceService 画像 VA 分布使用。 |
 
 ### 中间件 `src/middleware/`
 
@@ -338,6 +340,11 @@
 | 修改星空显示配置 | `client/src/utils/starDisplayConfig.ts` |
 | 修改定位/城市选择 | `client/src/pages/SkyPage.vue`、`server/src/routes/location.ts` |
 | 修改/新增 **记录 · AI 归属星辰** 功能（写故事 → AI 匹配 Top3 星辰 → 选星挂载 → 飞相机高亮详情） | `server/src/services/kernel.ts`、`server/src/routes/stories.ts`、`client/src/composables/useStarMatching.ts`、`client/src/components/StoryForm.vue`、`client/src/pages/SkyPage.vue` |
+<<<<<<< HEAD
 | 添加前端新页面 | `client/src/pages/` 新建，`client/src/router/index.ts` 注册（开场页 `/welcome` 守卫逻辑也在 router/index.ts：新会话访问根路径 `/` 一律先看开场——无论登录态，`sessionStorage.welcomed` 会话内只播一次，刷新不重放、新开标签页重播；已登录看完开场 → `/sky`，未登录 → 登录页） |
+=======
+| 修改/新增 **附近的人的心事 + 情绪共振图谱**（geohash 邻近 + 情绪画像 + 共振边 + 二阶推荐 + MMR 多样性 + ε-greedy 探索） | `server/src/services/nearbyService.ts`、`server/src/services/emotionResonanceService.ts`、`server/src/utils/emotionModel.ts`、`server/src/utils/geohash.ts`、`server/src/routes/stories.ts`、`server/src/db.ts`（三张图谱表） |
+| 添加前端新页面 | `client/src/pages/` 新建，`client/src/router/index.ts` 注册 |
+>>>>>>> 667d90c (feat(emotion): 情绪共振图谱系统 — 附近的人的心事 v2 升级)
 | 修改 CSS 设计 token | `client/src/styles/variables.css` |
 | 修改部署流程 | `deploy/`、`.github/workflows/deploy.yml` |

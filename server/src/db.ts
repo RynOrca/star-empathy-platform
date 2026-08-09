@@ -184,6 +184,53 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_collections_user ON collections(user_id);
   -- idx_collections_visibility 在下方迁移（添加 visibility 列）后创建，避免旧库无此列时报错
+
+  -- ════════════════════════════════════════════════════════════════
+  -- 情绪共振图谱三表（nearbyService v2）
+  --
+  -- 1) emotion_resonances：用户主动给别人的故事打"我也有同感"的情绪标签
+  --    隐式反馈 → 反哺用户自己的情绪画像 + 建立用户间共振边
+  -- 2) user_emotion_profile：用户长期情绪画像（持久化 + 时间衰减）
+  --    来源权重：story(1.0) > emotion_resonance(0.6) > resonate(0.3) > view(0.1)
+  -- 3) emotion_edges：用户间情绪共振边（曾因同一故事/同一情绪共振过的人）
+  --    二阶推荐依据：和你共振过的人最近写的故事，优先推
+  -- ════════════════════════════════════════════════════════════════
+  CREATE TABLE IF NOT EXISTS emotion_resonances (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    story_id     INTEGER NOT NULL REFERENCES stars(id),
+    emotion_tag  TEXT NOT NULL,
+    weight       REAL NOT NULL DEFAULT 1.0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, story_id, emotion_tag)
+  );
+  CREATE INDEX IF NOT EXISTS idx_emotion_resonances_user ON emotion_resonances(user_id);
+  CREATE INDEX IF NOT EXISTS idx_emotion_resonances_story ON emotion_resonances(story_id);
+
+  CREATE TABLE IF NOT EXISTS user_emotion_profile (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    emotion_tag   TEXT NOT NULL,
+    weight        REAL NOT NULL DEFAULT 0,
+    source        TEXT NOT NULL DEFAULT 'story',
+    last_boost_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, emotion_tag, source)
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_emotion_profile_user ON user_emotion_profile(user_id);
+
+  CREATE TABLE IF NOT EXISTS emotion_edges (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_a             INTEGER NOT NULL REFERENCES users(id),
+    user_b             INTEGER NOT NULL REFERENCES users(id),
+    shared_emotion     TEXT NOT NULL,
+    weight             REAL NOT NULL DEFAULT 1.0,
+    last_resonance_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    -- 始终存 user_a < user_b，避免双向重复
+    CHECK(user_a < user_b),
+    UNIQUE(user_a, user_b, shared_emotion)
+  );
+  CREATE INDEX IF NOT EXISTS idx_emotion_edges_a ON emotion_edges(user_a);
+  CREATE INDEX IF NOT EXISTS idx_emotion_edges_b ON emotion_edges(user_b);
 `);
 
 // 兼容旧数据库：添加新列
