@@ -53,6 +53,16 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
+// JSON 解析失败（malformed body）→ 返回 400 而非 500。
+// express.json() 抛出的错误带 status=400 / type='entity.parse.failed'，
+// 需在全局错误处理之前拦截，否则会被兜底成 500。
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  if (err && (err.type === 'entity.parse.failed' || (err.status === 400 && err instanceof SyntaxError))) {
+    return badRequest(res, '请求体 JSON 格式错误');
+  }
+  next(err);
+});
+
 // 图片上传配置
 const uploadsDir = path.resolve(__dirname, '../data/uploads')
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })

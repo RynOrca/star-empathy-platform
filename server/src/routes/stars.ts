@@ -185,6 +185,7 @@ router.get('/:catalogStarId/stats', (req: Request, res: Response) => {
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    if (!resolveValidCatalogIds(catalogStarId, undefined)) return notFound(res, '恒星不存在');
     const stats = getCatalogStats(catalogStarId);
     ok(res, 'success', stats);
   } catch (error) {
@@ -224,6 +225,7 @@ router.post('/:catalogStarId/favorite', authRequired, (req: Request, res: Respon
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    if (!resolveValidCatalogIds(catalogStarId, undefined)) return notFound(res, '恒星不存在');
     const user = (req as Request & { user: { id: number } }).user;
     const result = addFavorite(catalogStarId, user.id);
     ok(res, result.already ? '已收藏' : '收藏成功');
@@ -238,6 +240,7 @@ router.delete('/:catalogStarId/favorite', authRequired, (req: Request, res: Resp
   try {
     const catalogStarId = parseInt(req.params.catalogStarId, 10);
     if (isNaN(catalogStarId)) return badRequest(res, '无效的 catalogStarId');
+    if (!resolveValidCatalogIds(catalogStarId, undefined)) return notFound(res, '恒星不存在');
     const user = (req as Request & { user: { id: number } }).user;
     removeFavorite(catalogStarId, user.id);
     ok(res, '已取消收藏');
