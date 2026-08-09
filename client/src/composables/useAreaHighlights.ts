@@ -21,7 +21,8 @@ export function useAreaHighlights(catalogStarId: () => number) {
 
   async function fetchHighlights(): Promise<void> {
     const id = catalogStarId()
-    if (!id) return
+    // 天枢 id=0 是合法 catalog 星，不能用 truthy 判断
+    if (id === null || id === undefined || Number.isNaN(id)) return
 
     // 命中缓存：直接使用，不发请求
     const hit = cache.get(id)

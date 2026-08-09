@@ -69,7 +69,8 @@ export function useStarAnalysis(catalogStarId: Ref<number | null>, options?: {
 
   async function fetchAnalysis(): Promise<void> {
     const id = catalogStarId.value
-    if (!id) return
+    // 注意：星表第一颗星「天枢 Dubhe」的 id 就是 0，不能用 !id 判断（0 是合法 id）
+    if (id === null || id === undefined || Number.isNaN(id)) return
     const mySeq = ++inflightSeq
     // 首次：开启 loading；后续轮询：保留 loading=false 不打断已展示的骨架/局部真实数据
     if (pollCount === 0) {
@@ -144,7 +145,8 @@ export function useStarAnalysis(catalogStarId: Ref<number | null>, options?: {
     catalogStarId,
     (id) => {
       reset()
-      if (id) {
+      // id=0（天枢）是合法 catalog 星 id，不能用 truthy 判断
+      if (id !== null && id !== undefined && !Number.isNaN(id)) {
         fetchAnalysis()
       }
     },

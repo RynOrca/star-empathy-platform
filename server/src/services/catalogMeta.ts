@@ -159,13 +159,13 @@ export function listAllCatalogStarIds(): Set<number> {
  * 合法范围：
  *   · 正数：必须存在于 catalog 星表 stars.json 中（通过 getCatalogStar 能查到）
  *   · 负数：必须是太阳系行星 id（isPlanetId 返回 true）
- *   · 0 / NaN / Infinity / 不存在的正数 / 非行星负数 → 非法
+ *   · NaN / Infinity / 不存在的正数 / 非行星负数 → 非法
+ *   · 0 合法（星表第一颗星「天枢 Dubhe」的 id 就是 0）
  */
 export function isValidCatalogId(id: string | number | null | undefined): boolean {
   if (id == null) return false
   const nid = typeof id === 'string' ? parseInt(id, 10) : id
   if (!Number.isFinite(nid)) return false
-  if (nid === 0) return false
   // 行星负 id 允许
   if (nid < 0) return isPlanetId(nid)
   // 正数 id 必须在 stars.json 里存在

@@ -1416,9 +1416,9 @@ import type { SiblingStoryPreview } from './StoryDetail.vue'
 function siblingStoriesFor(story: any): SiblingStoryPreview[] {
   if (!story?.id) return []
   const ownIds = new Set<number>()
-  if (typeof story.catalogStarId === 'number' && story.catalogStarId !== 0) ownIds.add(story.catalogStarId)
+  if (typeof story.catalogStarId === 'number') ownIds.add(story.catalogStarId)
   if (Array.isArray(story.catalogStarIds)) {
-    for (const n of story.catalogStarIds) if (typeof n === 'number' && n !== 0) ownIds.add(n)
+    for (const n of story.catalogStarIds) if (typeof n === 'number') ownIds.add(n)
   }
   const sharesStar = (s: any): boolean => {
     if (s.id === story.id) return false
@@ -1563,7 +1563,8 @@ watch(
 // ─── AI 内核标签 ───
 const kernel = useKernel()
 watch(() => props.catalogStarId, (id) => {
-  if (id) {
+  // id=0（天枢）是合法 catalog 星
+  if (id !== null && id !== undefined && !Number.isNaN(id)) {
     kernel.reset()
     kernel.fetchAggregatedTags(id)
   }
@@ -1592,7 +1593,7 @@ const starAnalysis = useStarAnalysis(catalogStarIdNullable)
  */
 function retriggerStarAnalysis() {
   starAnalysis.reset()
-  if (catalogStarIdNullable.value) {
+  if (catalogStarIdNullable.value !== null && catalogStarIdNullable.value !== undefined && !Number.isNaN(catalogStarIdNullable.value)) {
     starAnalysis.fetchAnalysis()
   }
 }

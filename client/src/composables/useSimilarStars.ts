@@ -19,7 +19,8 @@ export function useSimilarStars(catalogStarId: () => number) {
 
   async function fetchSimilar(): Promise<void> {
     const id = catalogStarId()
-    if (!id) return
+    // 天枢 id=0 是合法 catalog 星，不能用 truthy 判断
+    if (id === null || id === undefined || Number.isNaN(id)) return
 
     // 命中缓存：直接使用，不发请求
     const hit = cache.get(id)
@@ -50,7 +51,8 @@ export function useSimilarStars(catalogStarId: () => number) {
   }
 
   watch(catalogStarId, (id) => {
-    if (id) {
+    // id=0（天枢）合法
+    if (id !== null && id !== undefined && !Number.isNaN(id)) {
       reset()
       fetchSimilar()
     }
